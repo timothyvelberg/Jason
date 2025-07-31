@@ -5,59 +5,38 @@
 //  Created by Timothy Velberg on 31/07/2025.
 //
 
-//
-//  ContentView.swift
-//  Jason
-//
-//  Created by Timothy Velberg on 31/07/2025.
-//
-
-//
-//  ContentView.swift
-//  Jason
-//
-//  Created by Timothy Velberg on 31/07/2025.
-//
-
 import SwiftUI
 import AppKit
 
 struct ContentView: View {
-    @State private var runningApps: [NSRunningApplication] = []
-    @State private var refreshTimer: Timer?
-    @State private var isVisible: Bool = false
-    @State private var hasAccessibilityPermission: Bool = false
+    @StateObject private var appSwitcher = AppSwitcherManager()
     
     var body: some View {
         Group {
-            if !hasAccessibilityPermission {
-                // Show permission request UI
-                permissionRequestView
-            } else if isVisible {
-                // Show the app switcher UI
-                appSwitcherView
+            if !appSwitcher.hasAccessibilityPermission {
+                PermissionRequestView(appSwitcher: appSwitcher)
+            } else if appSwitcher.isVisible {
+                AppSwitcherView(appSwitcher: appSwitcher)
             } else {
-                // Show a minimal hidden state
-                Text("Jason App Switcher")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(width: 200, height: 50)
+                MinimalView()
             }
         }
         .onAppear {
             print("🚀 ContentView appeared")
-            checkAccessibilityPermission()
-            if hasAccessibilityPermission {
-                setupServices()
-            }
         }
         .onDisappear {
             print("👋 ContentView disappeared - stopping services")
-            stopAutoRefresh()
+            appSwitcher.stopAutoRefresh()
         }
     }
+}
+
+// MARK: - Permission Request View
+
+struct PermissionRequestView: View {
+    let appSwitcher: AppSwitcherManager
     
-    var permissionRequestView: some View {
+    var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "key.fill")
                 .font(.system(size: 48))
@@ -87,12 +66,12 @@ struct ContentView: View {
             
             HStack(spacing: 15) {
                 Button("Open System Preferences") {
-                    openAccessibilityPreferences()
+                    appSwitcher.openAccessibilityPreferences()
                 }
                 .buttonStyle(.borderedProminent)
                 
                 Button("Check Again") {
-                    checkAccessibilityPermission()
+                    appSwitcher.checkAccessibilityPermission()
                 }
                 .buttonStyle(.bordered)
             }
@@ -100,278 +79,157 @@ struct ContentView: View {
         .padding(30)
         .frame(maxWidth: 500)
     }
+}
+
+// MARK: - Minimal Hidden View
+
+struct MinimalView: View {
+    var body: some View {
+        Text("Jason App Switcher")
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .frame(width: 200, height: 50)
+    }
+}
+
+// MARK: - App Switcher View
+
+struct AppSwitcherView: View {
+    @ObservedObject var appSwitcher: AppSwitcherManager
     
-    var appSwitcherView: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Running Applications")
-                    .font(.title)
-                
-                Spacer()
-                
-                Button("Hide") {
-                    hideAppSwitcher()
-                }
-                .buttonStyle(.bordered)
-                
-                Text("\(runningApps.count) apps")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.bottom, 10)
-            
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(runningApps, id: \.processIdentifier) { app in
-                        HStack {
-                            // App icon
-                            if let icon = app.icon {
-                                Image(nsImage: icon)
-                                    .resizable()
-                                    .frame(width: 32, height: 32)
-                            } else {
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 32, height: 32)
-                                    .cornerRadius(6)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(app.localizedName ?? "Unknown")
-                                    .font(.headline)
-                                
-                                Text(app.bundleIdentifier ?? "Unknown ID")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            // Status indicators
-                            if app.isActive {
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 8, height: 8)
-                            }
-                            
-                            if app.isHidden {
-                                Image(systemName: "eye.slash")
-                                    .foregroundColor(.secondary)
-                                    .font(.caption)
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(app.isActive ? Color.blue.opacity(0.1) : Color.clear)
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            switchToApp(app)
-                        }
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                                .opacity(app.isActive ? 1 : 0)
-                        )
-                    }
-                }
-            }
+            HeaderView(appSwitcher: appSwitcher)
+            AppListView(appSwitcher: appSwitcher)
         }
         .padding()
         .background(Color(NSColor.windowBackgroundColor))
         .cornerRadius(12)
         .shadow(radius: 10)
     }
+}
+
+// MARK: - Header View
+
+struct HeaderView: View {
+    let appSwitcher: AppSwitcherManager
     
-    func checkAccessibilityPermission() {
-        let trusted = AXIsProcessTrusted()
-        hasAccessibilityPermission = trusted
-        
-        print("🔐 Accessibility permission check: \(trusted ? "✅ GRANTED" : "❌ DENIED")")
-        
-        if trusted {
-            setupServices()
+    var body: some View {
+        HStack {
+            Text("Running Applications")
+                .font(.title)
+            
+            Spacer()
+            
+            Button("Hide") {
+                appSwitcher.hideAppSwitcher()
+            }
+            .buttonStyle(.bordered)
+            
+            Text("\(appSwitcher.runningApps.count) apps")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
+        .padding(.bottom, 10)
     }
+}
+
+// MARK: - App List View
+
+struct AppListView: View {
+    @ObservedObject var appSwitcher: AppSwitcherManager
     
-    func openAccessibilityPreferences() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-        NSWorkspace.shared.open(url)
-    }
-    
-    func setupServices() {
-        print("🎹 Setting up services")
-        setupGlobalHotkeys()
-        startAutoRefresh()
-        loadRunningApplications()
-    }
-    
-    func setupGlobalHotkeys() {
-        print("🎹 Setting up global hotkeys")
-        
-        // Listen for global key events (requires Accessibility permission)
-        NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { event in
-            handleGlobalKeyDown(event)
-        }
-        
-        // Also listen for local events (when our app has focus)
-        NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
-            handleLocalKeyDown(event)
-            return event
-        }
-        
-        print("✅ Global hotkey monitoring started")
-    }
-    
-    func handleGlobalKeyDown(_ event: NSEvent) {
-        // Check for Ctrl+2 combination
-        let isCtrlPressed = event.modifierFlags.contains(.control)
-        let isKey2 = event.keyCode == 19  // Key code for "2"
-        
-        if isCtrlPressed && isKey2 {
-            print("🔥 Global Ctrl+2 detected!")
-            showAppSwitcher()
-        }
-    }
-    
-    func handleLocalKeyDown(_ event: NSEvent) {
-        // Check for Ctrl+2 combination
-        let isCtrlPressed = event.modifierFlags.contains(.control)
-        let isKey2 = event.keyCode == 19  // Key code for "2"
-        
-        if isCtrlPressed && isKey2 {
-            print("🔥 Local Ctrl+2 detected!")
-            showAppSwitcher()
-        }
-        
-        // Check for Escape to hide
-        if event.keyCode == 53 { // Escape key
-            print("⌨️  Escape pressed - hiding app switcher")
-            hideAppSwitcher()
-        }
-    }
-    
-    func showAppSwitcher() {
-        print("👁️  Showing app switcher")
-        isVisible = true
-        loadRunningApplications()
-        
-        // Bring Jason window to the front
-        bringJasonToFront()
-    }
-    
-    func bringJasonToFront() {
-        print("🔝 Bringing Jason to front")
-        
-        // Activate our own application
-        NSApp.activate(ignoringOtherApps: true)
-        
-        // Bring all our windows to the front
-        for window in NSApp.windows {
-            window.orderFrontRegardless()
-        }
-    }
-    
-    func hideAppSwitcher() {
-        print("🙈 Hiding app switcher")
-        isVisible = false
-    }
-    
-    func switchToApp(_ app: NSRunningApplication) {
-        print("🔄 Switching to app: \(app.localizedName ?? "Unknown")")
-        
-        // First hide our app switcher
-        hideAppSwitcher()
-        
-        // Then activate the selected app and bring it to front
-        app.activate()
-        
-        // Give the system a moment to process the activation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            // Try to bring the app's windows to front
-            if let appWindows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] {
-                let targetPID = app.processIdentifier
-                for windowInfo in appWindows {
-                    if let ownerPID = windowInfo[kCGWindowOwnerPID as String] as? Int32,
-                       ownerPID == targetPID {
-                        // Found a window belonging to the target app
-                        print("🪟 Found window for \(app.localizedName ?? "Unknown")")
-                        break
-                    }
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(appSwitcher.runningApps.enumerated()), id: \.element.processIdentifier) { index, app in
+                    AppRowView(
+                        app: app,
+                        isSelected: index == appSwitcher.selectedAppIndex,
+                        onTap: { appSwitcher.switchToApp(app) }
+                    )
                 }
             }
         }
-        
-        print("✅ Successfully switched to \(app.localizedName ?? "Unknown")")
-        
-        // Force a refresh to update the active state indicators
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            loadRunningApplications()
-        }
     }
+}
+
+// MARK: - App Row View
+
+struct AppRowView: View {
+    let app: NSRunningApplication
+    let isSelected: Bool
+    let onTap: () -> Void
     
-    func startAutoRefresh() {
-        // Stop any existing timer
-        stopAutoRefresh()
-        
-        // Start a timer that checks for changes every 1 second
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            loadRunningApplications()
-        }
-        
-        print("✅ Auto-refresh timer started (1 second interval)")
-    }
-    
-    func stopAutoRefresh() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
-        print("🛑 Auto-refresh timer stopped")
-    }
-    
-    func loadRunningApplications() {
-        let allApps = NSWorkspace.shared.runningApplications
-        
-        // Filter to only show regular applications (not background processes) and exclude our own app
-        let newApps = allApps.filter { app in
-            app.activationPolicy == .regular &&
-            app.bundleIdentifier != Bundle.main.bundleIdentifier  // Exclude our own app (Jason)
-        }
-        
-        // Sort by name for better organization
-        let sortedApps = newApps.sorted { app1, app2 in
-            let name1 = app1.localizedName ?? ""
-            let name2 = app2.localizedName ?? ""
-            return name1.localizedCaseInsensitiveCompare(name2) == .orderedAscending
-        }
-        
-        // Only update if there's actually a change (to reduce unnecessary UI updates)
-        let oldAppIDs = Set(runningApps.map { $0.processIdentifier })
-        let newAppIDs = Set(sortedApps.map { $0.processIdentifier })
-        
-        if oldAppIDs != newAppIDs {
-            let oldCount = runningApps.count
-            let newCount = sortedApps.count
-            
-            // Log what changed BEFORE updating the state
-            let added = newAppIDs.subtracting(oldAppIDs)
-            let removed = oldAppIDs.subtracting(newAppIDs)
-            
-            if !added.isEmpty {
-                let addedApps = sortedApps.filter { added.contains($0.processIdentifier) }
-                print("   ➕ Added: \(addedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: ", "))")
+    var body: some View {
+        HStack {
+            // App icon
+            if let icon = app.icon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .frame(width: 32, height: 32)
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(width: 32, height: 32)
+                    .cornerRadius(6)
             }
             
-            if !removed.isEmpty {
-                let removedApps = runningApps.filter { removed.contains($0.processIdentifier) }
-                print("   ➖ Removed: \(removedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: ", "))")
+            VStack(alignment: .leading, spacing: 2) {
+                Text(app.localizedName ?? "Unknown")
+                    .font(.headline)
+                
+                Text(app.bundleIdentifier ?? "Unknown ID")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
             
-            // Update the state AFTER logging
-            runningApps = sortedApps
+            Spacer()
             
-            print("📊 Applications changed: \(oldCount) → \(newCount)")
+            // Status indicators
+            if app.isActive {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 8, height: 8)
+            }
+            
+            if app.isHidden {
+                Image(systemName: "eye.slash")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(backgroundColor)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(strokeColor, lineWidth: 2)
+        )
+    }
+    
+    private var backgroundColor: Color {
+        if isSelected {
+            return Color.blue.opacity(0.3) // Selected app
+        } else if app.isActive {
+            return Color.green.opacity(0.1) // Active app
+        } else {
+            return Color.clear
+        }
+    }
+    
+    private var strokeColor: Color {
+        if isSelected {
+            return Color.blue // Selected app border
+        } else if app.isActive {
+            return Color.green.opacity(0.5) // Active app border
+        } else {
+            return Color.clear
         }
     }
 }
