@@ -42,8 +42,6 @@ extension AppSwitcherManager {
         let isCtrlPressed = event.modifierFlags.contains(.control)
         let isKey2 = event.keyCode == 19  // Key code for "2"
         
-        print("🎯 Key pressed: code=\(event.keyCode), isVisible=\(isVisible), isGlobal=\(isGlobal)")
-        
         if isCtrlPressed && isKey2 && !isVisible {
             print("🔥 \(isGlobal ? "Global" : "Local") Ctrl+2 detected!")
             showAppSwitcher()
