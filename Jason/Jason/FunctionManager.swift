@@ -31,28 +31,25 @@ class FunctionManager: ObservableObject {
         print("FunctionManager initialized")
     }
     
-    // Generic method to load functions from apps
-    func loadFromApps() {
-        guard let appSwitcher = appSwitcher else { return }
-        
-        currentFunctionList = appSwitcher.runningApps.map { app in
-            FunctionItem(
-                id: "\(app.processIdentifier)",
-                name: app.localizedName ?? "Unknown",
-                icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
-                action: {
-                    appSwitcher.switchToApp(app)
-                }
-            )
+    func loadFunctions() {
+        // Load from app switcher provider
+        if let appSwitcher = appSwitcher {
+            currentFunctionList = appSwitcher.runningApps.map { app in
+                FunctionItem(
+                    id: "\(app.processIdentifier)",
+                    name: app.localizedName ?? "Unknown",
+                    icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
+                    action: {
+                        appSwitcher.switchToApp(app)
+                    }
+                )
+            }
+            print("Loaded \(currentFunctionList.count) functions")
         }
-        
-        print("Loaded \(currentFunctionList.count) functions from apps")
     }
     
-    // Mock data for testing
     func loadMockFunctions() {
-        
-        currentFunctionList = (1...5).map { index in
+        currentFunctionList = (1...8).map { index in
             FunctionItem(
                 id: "mock-\(index)",
                 name: "Function \(index)",

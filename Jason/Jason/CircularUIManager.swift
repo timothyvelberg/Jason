@@ -61,12 +61,12 @@ class CircularUIManager: ObservableObject {
             return
         }
         
-        // Load functions from apps (or mock data if no apps available)
-        functionManager.loadFromApps()
+        // Load functions
+        functionManager.loadFunctions()
         
         // If no functions, load mock data for testing
         if functionManager.currentFunctionList.isEmpty {
-            print("No apps found, loading mock data for testing")
+            print("No functions found, loading mock data for testing")
             functionManager.loadMockFunctions()
         }
         
@@ -79,7 +79,7 @@ class CircularUIManager: ObservableObject {
         // Capture current mouse position
         mousePosition = NSEvent.mouseLocation
         isVisible = true
-        overlayWindow?.showOverlay(at: mousePosition)  // Pass the mouse position
+        overlayWindow?.showOverlay(at: mousePosition)
         
         // Start tracking mouse movement
         mouseTracker?.startTrackingMouse()

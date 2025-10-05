@@ -108,7 +108,7 @@ struct CircularUIView: View {
         
         let newAngleOffset = Double(newRotationIndex) * sliceSize - 90 - sliceSize
         
-        withAnimation(.easeInOut(duration: 0.15)) {
+        withAnimation(.easeOut(duration: 0.08)){
             angleOffset = newAngleOffset
             startAngle = Angle(degrees: angleOffset - sliceSize / 2)
             endAngle = Angle(degrees: angleOffset + sliceSize / 2)
