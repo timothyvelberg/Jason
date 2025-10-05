@@ -5,7 +5,6 @@
 //  Created by Timothy Velberg on 05/10/2025.
 //
 
-
 import SwiftUI
 import AppKit
 
@@ -18,7 +17,7 @@ struct CircularUIView: View {
     }
     
     private var selectedFunctionIndex: Int {
-        functionManager.selectedFunctionIndex
+        functionManager.currentSelectedIndex  // Changed to use computed property
     }
     
     // Dynamic wheel size based on function count
@@ -80,6 +79,10 @@ struct CircularUIView: View {
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
         }
         .ignoresSafeArea()
+        .onAppear {
+            // Initialize slice on first appearance
+            updateSlice(for: selectedFunctionIndex, totalCount: functionList.count)
+        }
         .onChange(of: functionList.count) {
             rotationIndex = selectedFunctionIndex
             previousIndex = selectedFunctionIndex
@@ -91,31 +94,40 @@ struct CircularUIView: View {
     }
     
     private func updateSlice(for index: Int, totalCount: Int) {
-        guard index != previousIndex else { return }
+        guard totalCount > 0 else { return }
         
         let sliceSize = 360.0 / Double(totalCount)
-        var newRotationIndex = rotationIndex
         
-        // Calculate shortest rotation direction
-        let forwardSteps = (index - previousIndex + totalCount) % totalCount
-        let backwardSteps = (previousIndex - index + totalCount) % totalCount
-        
-        if forwardSteps <= backwardSteps {
-            newRotationIndex += forwardSteps
+        // Only animate if index changed, but always set the angles
+        if index != previousIndex {
+            var newRotationIndex = rotationIndex
+            
+            // Calculate shortest rotation direction
+            let forwardSteps = (index - previousIndex + totalCount) % totalCount
+            let backwardSteps = (previousIndex - index + totalCount) % totalCount
+            
+            if forwardSteps <= backwardSteps {
+                newRotationIndex += forwardSteps
+            } else {
+                newRotationIndex -= backwardSteps
+            }
+            
+            let newAngleOffset = Double(newRotationIndex) * sliceSize - 90 - sliceSize
+            
+            withAnimation(.easeInOut(duration: 0.08)) {
+                angleOffset = newAngleOffset
+                startAngle = Angle(degrees: angleOffset - sliceSize / 2)
+                endAngle = Angle(degrees: angleOffset + sliceSize / 2)
+            }
+            
+            previousIndex = index
+            rotationIndex = newRotationIndex
         } else {
-            newRotationIndex -= backwardSteps
-        }
-        
-        let newAngleOffset = Double(newRotationIndex) * sliceSize - 90 - sliceSize
-        
-        withAnimation(.easeOut(duration: 0.08)){
-            angleOffset = newAngleOffset
+            // Initial setup without animation
+            let angleOffset = Double(index) * sliceSize - 90 - sliceSize
             startAngle = Angle(degrees: angleOffset - sliceSize / 2)
             endAngle = Angle(degrees: angleOffset + sliceSize / 2)
         }
-        
-        previousIndex = index
-        rotationIndex = newRotationIndex
     }
     
     private func centeredCircularPosition(index: Int, total: Int, radius: CGFloat) -> CGPoint {

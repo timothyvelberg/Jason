@@ -64,9 +64,13 @@ class CircularUIManager: ObservableObject {
         // Load functions
         functionManager.loadFunctions()
         
-        // If no functions, load mock data for testing
-        if functionManager.currentFunctionList.isEmpty {
-            print("No functions found, loading mock data for testing")
+        // Check if we have valid data (categories with functions)
+        let hasValidData = !functionManager.categories.isEmpty &&
+                           functionManager.categories.contains(where: { !$0.functions.isEmpty })
+        
+        // If no valid data, load mock data for testing
+        if !hasValidData {
+            print("No valid function data, loading mock data for testing")
             functionManager.loadMockFunctions()
         }
         
