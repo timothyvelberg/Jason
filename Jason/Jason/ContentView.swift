@@ -10,19 +10,21 @@ import AppKit
 
 struct ContentView: View {
     @StateObject private var appSwitcher = AppSwitcherManager()
+    @StateObject private var circularUI = CircularUIManager()
     
     var body: some View {
         Group {
             if !appSwitcher.hasAccessibilityPermission {
-                PermissionRequestView(appSwitcher: appSwitcher)
+                PermissionRequestView(appSwitcher: appSwitcher, circularUI: circularUI)
             } else if appSwitcher.isVisible {
                 AppSwitcherView(appSwitcher: appSwitcher)
             } else {
-                MinimalView()
+                MinimalView(circularUI: circularUI)
             }
         }
         .onAppear {
             print("🚀 ContentView appeared")
+            circularUI.setup(with: appSwitcher)
         }
         .onDisappear {
             print("👋 ContentView disappeared - stopping services")
@@ -35,6 +37,7 @@ struct ContentView: View {
 
 struct PermissionRequestView: View {
     let appSwitcher: AppSwitcherManager
+    @ObservedObject var circularUI: CircularUIManager
     
     var body: some View {
         VStack(spacing: 20) {
@@ -75,6 +78,26 @@ struct PermissionRequestView: View {
                 }
                 .buttonStyle(.bordered)
             }
+            
+            // Development testing buttons
+            Divider()
+                .padding(.vertical, 10)
+            
+            Text("Development Testing")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            HStack(spacing: 10) {
+                Button("Test Circular UI") {
+                    circularUI.show()
+                }
+                .buttonStyle(.borderedProminent)
+                
+                Button("Hide") {
+                    circularUI.hide()
+                }
+                .buttonStyle(.bordered)
+            }
         }
         .padding(30)
         .frame(maxWidth: 500)
@@ -84,11 +107,25 @@ struct PermissionRequestView: View {
 // MARK: - Minimal Hidden View
 
 struct MinimalView: View {
+    @ObservedObject var circularUI: CircularUIManager
+    
     var body: some View {
-        Text("Jason App Switcher")
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .frame(width: 200, height: 50)
+        VStack(spacing: 10) {
+            Text("Jason App Switcher")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Button("Test Circular UI") {
+                circularUI.show()
+            }
+            .buttonStyle(.borderedProminent)
+            
+            Button("Hide Circular UI") {
+                circularUI.hide()
+            }
+            .buttonStyle(.bordered)
+        }
+        .frame(width: 200, height: 100)
     }
 }
 

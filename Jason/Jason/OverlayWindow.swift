@@ -39,26 +39,19 @@ class OverlayWindow: NSWindow {
         print("🪟 Overlay window created")
     }
     
-    func showOverlay() {
-        print("👁️ Showing overlay window")
+    func showOverlay(at mouseLocation: NSPoint) {
+        print("Showing overlay window at mouse location: \(mouseLocation)")
         
-        // Center on the current screen
-        if let screen = NSScreen.main {
-            let screenFrame = screen.visibleFrame
-            let windowFrame = self.frame
-            let x = screenFrame.midX - windowFrame.width / 2
-            let y = screenFrame.midY - windowFrame.height / 2
-            self.setFrame(NSRect(x: x, y: y, width: windowFrame.width, height: windowFrame.height), display: true)
-        }
+        // Position window centered at mouse location
+        let newX = mouseLocation.x - (self.frame.width / 2)
+        let newY = mouseLocation.y - (self.frame.height / 2)
+        self.setFrameOrigin(NSPoint(x: newX, y: newY))
         
         // Bring to front and show
         self.makeKeyAndOrderFront(nil)
-        self.level = .screenSaver // Even higher level to ensure it's on top
+        self.level = .screenSaver
         
-        // Activate our app to receive key events
         NSApp.activate(ignoringOtherApps: true)
-        
-        // Make sure this window can become key to receive keyboard events
         self.makeKey()
     }
     
