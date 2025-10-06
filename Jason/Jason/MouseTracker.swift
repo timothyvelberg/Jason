@@ -105,7 +105,9 @@ class MouseTracker {
         var adjustedAngle = angle.truncatingRemainder(dividingBy: 360)
         if adjustedAngle < 0 { adjustedAngle += 360 }
 
-        adjustedAngle += halfSlice + sliceSize
+        // FIXED: Changed from "halfSlice + sliceSize" to just "halfSlice"
+        // This removes the extra full-slice offset that was causing selection to be one slice ahead
+        adjustedAngle += halfSlice
         if adjustedAngle >= 360 { adjustedAngle -= 360 }
 
         for index in 0..<totalFunctions {

@@ -5,7 +5,6 @@
 //  Created by Timothy Velberg on 06/10/2025.
 //
 
-
 import SwiftUI
 import AppKit
 
@@ -76,6 +75,7 @@ struct RingView: View {
                     }
             }
         }
+        .frame(width: totalDiameter, height: totalDiameter)
     }
     
     private func iconPosition(for index: Int) -> CGPoint {
@@ -84,9 +84,11 @@ struct RingView: View {
         }
         
         let sliceSize = 360.0 / CGFloat(nodes.count)
+        // Position icon at the start of its slice (aligned with mouse tracking)
         let iconAngle = -90 + (sliceSize * CGFloat(index))
         let angleInRadians = iconAngle * (.pi / 180)
         
+        // Calculate position relative to this ring's center
         let center = CGPoint(x: totalDiameter / 2, y: totalDiameter / 2)
         let x = center.x + middleRadius * cos(angleInRadians)
         let y = center.y + middleRadius * sin(angleInRadians)
