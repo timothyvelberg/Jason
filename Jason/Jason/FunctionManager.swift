@@ -13,11 +13,13 @@ class FunctionManager: ObservableObject {
     @Published var rootNodes: [FunctionNode] = []
     @Published var navigationStack: [FunctionNode] = []
     @Published var selectedIndex: Int = 0
-    @Published var selectedOuterIndex: Int = 0  // Track selection in outer ring
+    @Published var selectedOuterIndex: Int = 0
+    @Published var isOuterRingExpanded: Bool = false
+    @Published var hoveredIndex: Int = 0
+    
     
     private var appSwitcher: AppSwitcherManager?
     
-    // Current level we're viewing (inner ring)
     var currentLevel: [FunctionNode] {
         if navigationStack.isEmpty {
             return rootNodes
@@ -28,24 +30,20 @@ class FunctionManager: ObservableObject {
     
     // MARK: - Ring Display Properties
     
-    // Inner ring - always shows current level
     var innerRingNodes: [FunctionNode] {
         return currentLevel
     }
     
-    // Outer ring - shows children of selected inner ring item
     var outerRingNodes: [FunctionNode] {
         guard selectedIndex >= 0, selectedIndex < currentLevel.count else { return [] }
         let selectedNode = currentLevel[selectedIndex]
         return selectedNode.children ?? []
     }
     
-    // Should we display the outer ring?
     var shouldShowOuterRing: Bool {
-        return !outerRingNodes.isEmpty
+        return isOuterRingExpanded && !outerRingNodes.isEmpty
     }
     
-    // For backward compatibility with existing UI code
     var currentFunctionList: [FunctionItem] {
         return currentLevel.map { node in
             FunctionItem(
@@ -64,7 +62,7 @@ class FunctionManager: ObservableObject {
     }
     
     var currentSelectedIndex: Int {
-        return selectedIndex
+        return hoveredIndex
     }
     
     init(appSwitcher: AppSwitcherManager) {
@@ -82,6 +80,7 @@ class FunctionManager: ObservableObject {
         navigationStack.append(node)
         selectedIndex = 0
         selectedOuterIndex = 0
+        isOuterRingExpanded = false
         print("Navigated into: \(node.name), depth: \(navigationStack.count)")
     }
     
@@ -93,6 +92,7 @@ class FunctionManager: ObservableObject {
         let previous = navigationStack.removeLast()
         selectedIndex = 0
         selectedOuterIndex = 0
+        isOuterRingExpanded = false
         print("Navigated back from: \(previous.name), depth: \(navigationStack.count)")
     }
     
@@ -100,11 +100,21 @@ class FunctionManager: ObservableObject {
     
     func selectInnerRing(at index: Int) {
         guard index >= 0, index < innerRingNodes.count else { return }
-        selectedIndex = index
-        selectedOuterIndex = 0  // Reset outer ring selection
         
         let node = innerRingNodes[index]
-        print("Selected inner ring \(index): \(node.name)")
+        
+        if selectedIndex == index {
+            // Clicking same item - toggle expansion
+            isOuterRingExpanded.toggle()
+            print("Toggled outer ring for \(node.name): \(isOuterRingExpanded ? "shown" : "hidden")")
+        } else {
+            // Clicking different item - select it and expand if it has children
+            selectedIndex = index
+            hoveredIndex = index  // Keep hover in sync
+            selectedOuterIndex = 0
+            isOuterRingExpanded = node.isBranch
+            print("Selected inner ring \(index): \(node.name), outer ring: \(isOuterRingExpanded ? "shown" : "hidden")")
+        }
     }
     
     func selectOuterRing(at index: Int) {
@@ -116,8 +126,8 @@ class FunctionManager: ObservableObject {
     }
     
     func selectFunction(at index: Int) {
-        // For backward compatibility - selects inner ring
-        selectInnerRing(at: index)
+        guard index >= 0, index < innerRingNodes.count else { return }
+        hoveredIndex = index
     }
     
     // MARK: - Execution
@@ -149,7 +159,6 @@ class FunctionManager: ObservableObject {
     }
     
     func executeSelected() {
-        // Backward compatibility - executes inner ring
         executeInnerRing()
     }
     
