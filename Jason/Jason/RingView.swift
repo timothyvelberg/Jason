@@ -93,6 +93,19 @@ struct RingView: View {
                 updateSlice(for: index, totalCount: nodes.count)
             }
         }
+        .onAppear {
+            // Initialize animation state to current selection
+            if let index = selectedIndex {
+                rotationIndex = index
+                previousIndex = index
+                let totalCount = nodes.count
+                guard totalCount > 0 else { return }
+                let sliceSize = 360.0 / Double(totalCount)
+                let angleOffset = Double(index) * sliceSize - 90
+                startAngle = Angle(degrees: angleOffset - sliceSize / 2)
+                endAngle = Angle(degrees: angleOffset + sliceSize / 2)
+            }
+        }
     }
     
     private func updateSlice(for index: Int, totalCount: Int) {

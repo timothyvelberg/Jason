@@ -148,9 +148,9 @@ class MouseTracker {
         var adjustedAngle = angle.truncatingRemainder(dividingBy: 360)
         if adjustedAngle < 0 { adjustedAngle += 360 }
 
-        adjustedAngle -= halfSlice
-        if adjustedAngle < 0 { adjustedAngle += 360 }
-
+        adjustedAngle += sliceSize - halfSlice
+        if adjustedAngle >= 360 { adjustedAngle -= 360 }
+        
         for index in 0..<totalCount {
             let startAngle = CGFloat(index) * sliceSize
             let endAngle = startAngle + sliceSize

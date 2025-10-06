@@ -10,8 +10,6 @@ import AppKit
 
 // MARK: - FunctionNode (Tree Structure)
 
-// MARK: - FunctionNode (Tree Structure)
-
 class FunctionNode: Identifiable, ObservableObject {
     let id: String
     let name: String

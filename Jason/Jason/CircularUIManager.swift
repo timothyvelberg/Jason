@@ -5,6 +5,7 @@
 //  Created by Timothy Velberg on 31/07/2025.
 //
 
+
 import Foundation
 import AppKit
 import SwiftUI
@@ -29,9 +30,31 @@ class CircularUIManager: ObservableObject {
         if let functionManager = functionManager {
             self.mouseTracker = MouseTracker(functionManager: functionManager)
             
-            mouseTracker?.onPieHover = { pieIndex in
-                guard pieIndex != nil else { return }
-                print("Hovering over function at index: \(String(describing: pieIndex))")
+            mouseTracker?.onPieHover = { [weak functionManager] pieIndex in
+                guard let pieIndex = pieIndex, let fm = functionManager else { return }
+                
+                // Determine which ring is active
+                let ringLevel = fm.shouldShowOuterRing ? 1 : 0
+                
+                if ringLevel == 0 {
+                    // Inner ring
+                    let nodes = fm.innerRingNodes
+                    if nodes.indices.contains(pieIndex) {
+                        let node = nodes[pieIndex]
+                        let type = node.isLeaf ? "FUNCTION" : "CATEGORY"
+                        print("🎯 [INNER RING] Hovering: index=\(pieIndex), name='\(node.name)', type=\(type)")
+                        print("   hoveredIndex=\(fm.hoveredIndex), selectedIndex=\(fm.selectedIndex)")
+                    }
+                } else {
+                    // Outer ring
+                    let nodes = fm.outerRingNodes
+                    if nodes.indices.contains(pieIndex) {
+                        let node = nodes[pieIndex]
+                        let type = node.isLeaf ? "FUNCTION" : "CATEGORY"
+                        print("🎯 [OUTER RING] Hovering: index=\(pieIndex), name='\(node.name)', type=\(type)")
+                        print("   hoveredOuterIndex=\(fm.hoveredOuterIndex), selectedOuterIndex=\(fm.selectedOuterIndex)")
+                    }
+                }
             }
         }
         
