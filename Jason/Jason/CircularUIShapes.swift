@@ -7,21 +7,21 @@
 
 import SwiftUI
 
-// MARK: - Donut Shape (Full circular background)
+// MARK: - Donut Shape
 
 struct DonutShape: Shape {
     let holePercentage: CGFloat
+    let outerPercentage: CGFloat
     
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let center = CGPoint(x: rect.midX, y: rect.midY)
-        let outerRadius = rect.width / 2
-        let innerRadius = outerRadius * holePercentage
+        let maxRadius = rect.width / 2
+        let outerRadius = maxRadius * outerPercentage
+        let innerRadius = maxRadius * holePercentage
 
-        // Outer circle
         path.addArc(center: center, radius: outerRadius, startAngle: .degrees(0), endAngle: .degrees(360), clockwise: false)
 
-        // Inner circle (creates the hole)
         var innerPath = Path()
         innerPath.addArc(center: center, radius: innerRadius, startAngle: .degrees(0), endAngle: .degrees(360), clockwise: false)
         
@@ -31,12 +31,13 @@ struct DonutShape: Shape {
     }
 }
 
-// MARK: - Pie Slice Shape (Animated highlight)
+// MARK: - Pie Slice Shape
 
 struct PieSliceShape: Shape {
     var startAngle: Angle
     var endAngle: Angle
     var innerRadiusRatio: CGFloat
+    var outerRadiusRatio: CGFloat
 
     var animatableData: AnimatablePair<Double, Double> {
         get { AnimatablePair(startAngle.degrees, endAngle.degrees) }
@@ -49,21 +50,19 @@ struct PieSliceShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let center = CGPoint(x: rect.midX, y: rect.midY)
-        let outerRadius = rect.width / 2
-        let innerRadius = outerRadius * innerRadiusRatio
+        let maxRadius = rect.width / 2
+        let outerRadius = maxRadius * outerRadiusRatio
+        let innerRadius = maxRadius * innerRadiusRatio
 
-        // Outer pie slice
         path.move(to: center)
         path.addArc(center: center, radius: outerRadius, startAngle: startAngle, endAngle: endAngle, clockwise: false)
         path.closeSubpath()
 
-        // Inner cutout
         var innerPath = Path()
         innerPath.move(to: center)
         innerPath.addArc(center: center, radius: innerRadius, startAngle: startAngle, endAngle: endAngle, clockwise: false)
         innerPath.closeSubpath()
 
-        // Combine paths to create cutout effect
         path.addPath(innerPath)
 
         return path

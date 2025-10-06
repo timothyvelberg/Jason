@@ -2,7 +2,7 @@
 //  CircularUIView.swift
 //  Jason
 //
-//  Created by Timothy Velberg on 05/10/2025.
+//  Created by Timothy Velberg on 31/07/2025.
 //
 
 import SwiftUI
@@ -12,31 +12,71 @@ struct CircularUIView: View {
     @ObservedObject var circularUI: CircularUIManager
     @ObservedObject var functionManager: FunctionManager
     
+    // Inner ring properties
+    private var innerRingNodes: [FunctionNode] {
+        functionManager.innerRingNodes
+    }
+    
+    // Outer ring properties
+    private var outerRingNodes: [FunctionNode] {
+        functionManager.outerRingNodes
+    }
+    
+    private var shouldShowOuterRing: Bool {
+        functionManager.shouldShowOuterRing
+    }
+    
+    private var selectedInnerIndex: Int {
+        functionManager.selectedIndex
+    }
+    
+    private var selectedOuterIndex: Int {
+        functionManager.selectedOuterIndex
+    }
+    
+    // For backward compatibility with mouse tracking
     private var functionList: [FunctionItem] {
         functionManager.currentFunctionList
     }
     
     private var selectedFunctionIndex: Int {
-        functionManager.currentSelectedIndex  // Changed to use computed property
+        functionManager.currentSelectedIndex
     }
     
-    // Dynamic wheel size based on function count
-    private var wheelSize: CGFloat {
+    // Dynamic wheel sizing
+    private var baseWheelSize: CGFloat {
         let baseSize: CGFloat = 160
         let extraSizePerItem: CGFloat = 24
         let maxSize: CGFloat = 1000
         
-        let calculatedSize = baseSize + (CGFloat(functionList.count) * extraSizePerItem)
+        let calculatedSize = baseSize + (CGFloat(innerRingNodes.count) * extraSizePerItem)
         return min(maxSize, calculatedSize)
     }
     
-    private var holePercentage: CGFloat { 0.33 }
+    // Adjust wheel size if outer ring is shown
+    private var wheelSize: CGFloat {
+        return shouldShowOuterRing ? baseWheelSize + 120 : baseWheelSize
+    }
     
-    private var calculatedRadius: CGFloat {
-        let outerRadius: CGFloat = wheelSize / 2
-        let holeRadius: CGFloat = outerRadius * holePercentage
-        let middleRadius: CGFloat = (outerRadius + holeRadius) / 2
-        return middleRadius
+    // Inner ring geometry
+    private var innerHolePercentage: CGFloat { 0.33 }
+    private var innerRingThickness: CGFloat { 0.30 }  // 30% of radius
+    
+    // Outer ring geometry (only when shown)
+    private var outerRingStart: CGFloat { innerHolePercentage + innerRingThickness }
+    private var outerRingThickness: CGFloat { 0.25 }
+    
+    private var innerRadius: CGFloat {
+        let outerRadius = wheelSize / 2
+        let holeRadius = outerRadius * innerHolePercentage
+        let innerRingOuter = outerRadius * (innerHolePercentage + innerRingThickness)
+        return (holeRadius + innerRingOuter) / 2
+    }
+    
+    private var outerRadius: CGFloat {
+        let outerRadius = wheelSize / 2
+        let outerRingInner = outerRadius * outerRingStart
+        return (outerRingInner + outerRadius) / 2
     }
     
     @State private var startAngle: Angle = .degrees(0)
@@ -51,28 +91,65 @@ struct CircularUIView: View {
                 let donutBackgroundColor: Color = .black.opacity(0.8)
                 let sliceColor: Color = .blue.opacity(0.8)
                 
-                // Background donut
-                DonutShape(holePercentage: holePercentage)
-                    .fill(donutBackgroundColor, style: FillStyle(eoFill: true))
-                    .frame(width: wheelSize, height: wheelSize)
+                // INNER RING - Background donut
+                DonutShape(
+                    holePercentage: innerHolePercentage,
+                    outerPercentage: innerHolePercentage + innerRingThickness
+                )
+                .fill(donutBackgroundColor, style: FillStyle(eoFill: true))
+                .frame(width: wheelSize, height: wheelSize)
                 
-                // Animated highlight slice
+                // INNER RING - Animated highlight slice
                 PieSliceShape(
                     startAngle: startAngle,
                     endAngle: endAngle,
-                    innerRadiusRatio: holePercentage
+                    innerRadiusRatio: innerHolePercentage,
+                    outerRadiusRatio: innerHolePercentage + innerRingThickness
                 )
                 .fill(sliceColor, style: FillStyle(eoFill: true))
                 .frame(width: wheelSize, height: wheelSize)
                 
-                // App icons positioned in a circle
-                ForEach(Array(functionList.enumerated()), id: \.offset) { index, item in
-                    let icon = item.icon
-                    Image(nsImage: icon)
+                // INNER RING - Icons
+                ForEach(Array(innerRingNodes.enumerated()), id: \.element.id) { index, node in
+                    Image(nsImage: node.icon)
                         .resizable()
                         .scaledToFit()
                         .frame(width: 48, height: 48)
-                        .position(centeredCircularPosition(index: index, total: functionList.count, radius: calculatedRadius))
+                        .position(circularPosition(
+                            index: index,
+                            total: innerRingNodes.count,
+                            radius: innerRadius
+                        ))
+                        .onTapGesture {
+                            functionManager.selectInnerRing(at: index)
+                        }
+                }
+                
+                // OUTER RING (if should be shown)
+                if shouldShowOuterRing {
+                    // OUTER RING - Background donut
+                    DonutShape(
+                        holePercentage: outerRingStart,
+                        outerPercentage: 1.0
+                    )
+                    .fill(donutBackgroundColor.opacity(0.6), style: FillStyle(eoFill: true))
+                    .frame(width: wheelSize, height: wheelSize)
+                    
+                    // OUTER RING - Icons
+                    ForEach(Array(outerRingNodes.enumerated()), id: \.element.id) { index, node in
+                        Image(nsImage: node.icon)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 40, height: 40)
+                            .position(circularPosition(
+                                index: index,
+                                total: outerRingNodes.count,
+                                radius: outerRadius
+                            ))
+                            .onTapGesture {
+                                functionManager.selectOuterRing(at: index)
+                            }
+                    }
                 }
             }
             .frame(width: wheelSize, height: wheelSize)
@@ -80,7 +157,6 @@ struct CircularUIView: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            // Initialize slice on first appearance
             updateSlice(for: selectedFunctionIndex, totalCount: functionList.count)
         }
         .onChange(of: functionList.count) {
@@ -98,11 +174,9 @@ struct CircularUIView: View {
         
         let sliceSize = 360.0 / Double(totalCount)
         
-        // Only animate if index changed, but always set the angles
         if index != previousIndex {
             var newRotationIndex = rotationIndex
             
-            // Calculate shortest rotation direction
             let forwardSteps = (index - previousIndex + totalCount) % totalCount
             let backwardSteps = (previousIndex - index + totalCount) % totalCount
             
@@ -123,14 +197,13 @@ struct CircularUIView: View {
             previousIndex = index
             rotationIndex = newRotationIndex
         } else {
-            // Initial setup without animation
             let angleOffset = Double(index) * sliceSize - 90 - sliceSize
             startAngle = Angle(degrees: angleOffset - sliceSize / 2)
             endAngle = Angle(degrees: angleOffset + sliceSize / 2)
         }
     }
     
-    private func centeredCircularPosition(index: Int, total: Int, radius: CGFloat) -> CGPoint {
+    private func circularPosition(index: Int, total: Int, radius: CGFloat) -> CGPoint {
         guard total > 0 else { return CGPoint(x: wheelSize/2, y: wheelSize/2) }
         
         let sliceSize = 360.0 / CGFloat(total)

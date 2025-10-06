@@ -26,11 +26,9 @@ class CircularUIManager: ObservableObject {
         self.appSwitcher = appSwitcher
         self.functionManager = FunctionManager(appSwitcher: appSwitcher)
         
-        // Initialize mouse tracker with function manager
         if let functionManager = functionManager {
             self.mouseTracker = MouseTracker(functionManager: functionManager)
             
-            // Set up hover callback
             mouseTracker?.onPieHover = { pieIndex in
                 guard pieIndex != nil else { return }
                 print("Hovering over function at index: \(String(describing: pieIndex))")
@@ -45,7 +43,6 @@ class CircularUIManager: ObservableObject {
         
         overlayWindow = OverlayWindow()
         
-        // Set the CircularUIView as the window's content
         let contentView = CircularUIView(
             circularUI: self,
             functionManager: functionManager
@@ -61,38 +58,43 @@ class CircularUIManager: ObservableObject {
             return
         }
         
-        // Load functions
         functionManager.loadFunctions()
         
-        // Check if we have valid data (categories with functions)
-        let hasValidData = !functionManager.categories.isEmpty &&
-                           functionManager.categories.contains(where: { !$0.functions.isEmpty })
+        // Check if we have any actual content (leaf nodes or branches with children)
+        let hasValidData: Bool = {
+            guard !functionManager.rootNodes.isEmpty else { return false }
+            
+            // Check if any root node has content
+            for node in functionManager.rootNodes {
+                if node.isLeaf {
+                    return true  // Has at least one executable function
+                } else if node.childCount > 0 {
+                    return true  // Has at least one category with children
+                }
+            }
+            return false
+        }()
         
-        // If no valid data, load mock data for testing
         if !hasValidData {
             print("No valid function data, loading mock data for testing")
             functionManager.loadMockFunctions()
         }
         
-        // Don't show if still no functions available
         guard !functionManager.currentFunctionList.isEmpty else {
             print("No functions to display")
             return
         }
         
-        // Capture current mouse position
         mousePosition = NSEvent.mouseLocation
         isVisible = true
         overlayWindow?.showOverlay(at: mousePosition)
         
-        // Start tracking mouse movement
         mouseTracker?.startTrackingMouse()
         
         print("Showing circular UI at position: \(mousePosition)")
     }
     
     func hide() {
-        // Stop tracking mouse
         mouseTracker?.stopTrackingMouse()
         
         isVisible = false
@@ -103,7 +105,7 @@ class CircularUIManager: ObservableObject {
     func executeSelectedFunction() {
         guard let functionManager = functionManager else { return }
         
-        let selectedIndex = functionManager.selectedFunctionIndex
+        let selectedIndex = functionManager.selectedIndex
         let currentFunctions = functionManager.currentFunctionList
         
         guard currentFunctions.indices.contains(selectedIndex) else {

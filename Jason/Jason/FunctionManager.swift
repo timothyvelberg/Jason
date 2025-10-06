@@ -9,47 +9,62 @@ import Foundation
 import AppKit
 import SwiftUI
 
-// MARK: - FunctionItem
-
-struct FunctionItem {
-    let id: String
-    let name: String
-    let icon: NSImage
-    let action: () -> Void
-}
-
-// MARK: - FunctionCategory
-
-struct FunctionCategory {
-    let id: String
-    let name: String
-    let icon: NSImage
-    let functions: [FunctionItem]
-}
-
-// MARK: - FunctionManager
-
 class FunctionManager: ObservableObject {
-    @Published var categories: [FunctionCategory] = []
-    @Published var selectedCategoryIndex: Int = 0
-    @Published var selectedFunctionIndex: Int = 0
-    @Published var isShowingCategories: Bool = true
+    @Published var rootNodes: [FunctionNode] = []
+    @Published var navigationStack: [FunctionNode] = []
+    @Published var selectedIndex: Int = 0
+    @Published var selectedOuterIndex: Int = 0  // Track selection in outer ring
     
     private var appSwitcher: AppSwitcherManager?
     
-    // Computed property for current display list
-    var currentFunctionList: [FunctionItem] {
-        if isShowingCategories {
-            return categoriesToFunctionItems()
+    // Current level we're viewing (inner ring)
+    var currentLevel: [FunctionNode] {
+        if navigationStack.isEmpty {
+            return rootNodes
         } else {
-            guard categories.indices.contains(selectedCategoryIndex) else { return [] }
-            return categories[selectedCategoryIndex].functions
+            return navigationStack.last?.children ?? []
         }
     }
     
-    // Computed property for current selection index
+    // MARK: - Ring Display Properties
+    
+    // Inner ring - always shows current level
+    var innerRingNodes: [FunctionNode] {
+        return currentLevel
+    }
+    
+    // Outer ring - shows children of selected inner ring item
+    var outerRingNodes: [FunctionNode] {
+        guard selectedIndex >= 0, selectedIndex < currentLevel.count else { return [] }
+        let selectedNode = currentLevel[selectedIndex]
+        return selectedNode.children ?? []
+    }
+    
+    // Should we display the outer ring?
+    var shouldShowOuterRing: Bool {
+        return !outerRingNodes.isEmpty
+    }
+    
+    // For backward compatibility with existing UI code
+    var currentFunctionList: [FunctionItem] {
+        return currentLevel.map { node in
+            FunctionItem(
+                id: node.id,
+                name: node.name,
+                icon: node.icon,
+                action: {
+                    if node.isLeaf {
+                        node.action?()
+                    } else {
+                        self.navigateInto(node)
+                    }
+                }
+            )
+        }
+    }
+    
     var currentSelectedIndex: Int {
-        return isShowingCategories ? selectedCategoryIndex : selectedFunctionIndex
+        return selectedIndex
     }
     
     init(appSwitcher: AppSwitcherManager) {
@@ -57,163 +72,187 @@ class FunctionManager: ObservableObject {
         print("FunctionManager initialized")
     }
     
-    private func categoriesToFunctionItems() -> [FunctionItem] {
-        return categories.map { category in
-            FunctionItem(
-                id: category.id,
-                name: category.name,
-                icon: category.icon,
-                action: {
-                    self.openCategory()
-                }
-            )
+    // MARK: - Navigation
+    
+    func navigateInto(_ node: FunctionNode) {
+        guard node.isBranch else {
+            print("Cannot navigate into leaf node: \(node.name)")
+            return
+        }
+        navigationStack.append(node)
+        selectedIndex = 0
+        selectedOuterIndex = 0
+        print("Navigated into: \(node.name), depth: \(navigationStack.count)")
+    }
+    
+    func navigateBack() {
+        guard !navigationStack.isEmpty else {
+            print("Already at root level")
+            return
+        }
+        let previous = navigationStack.removeLast()
+        selectedIndex = 0
+        selectedOuterIndex = 0
+        print("Navigated back from: \(previous.name), depth: \(navigationStack.count)")
+    }
+    
+    // MARK: - Selection
+    
+    func selectInnerRing(at index: Int) {
+        guard index >= 0, index < innerRingNodes.count else { return }
+        selectedIndex = index
+        selectedOuterIndex = 0  // Reset outer ring selection
+        
+        let node = innerRingNodes[index]
+        print("Selected inner ring \(index): \(node.name)")
+    }
+    
+    func selectOuterRing(at index: Int) {
+        guard index >= 0, index < outerRingNodes.count else { return }
+        selectedOuterIndex = index
+        
+        let node = outerRingNodes[index]
+        print("Selected outer ring \(index): \(node.name)")
+    }
+    
+    func selectFunction(at index: Int) {
+        // For backward compatibility - selects inner ring
+        selectInnerRing(at: index)
+    }
+    
+    // MARK: - Execution
+    
+    func executeInnerRing() {
+        guard selectedIndex >= 0, selectedIndex < innerRingNodes.count else { return }
+        let node = innerRingNodes[selectedIndex]
+        
+        if node.isLeaf {
+            print("Executing inner ring function: \(node.name)")
+            node.action?()
+        } else {
+            print("Navigating into category: \(node.name)")
+            navigateInto(node)
         }
     }
+    
+    func executeOuterRing() {
+        guard selectedOuterIndex >= 0, selectedOuterIndex < outerRingNodes.count else { return }
+        let node = outerRingNodes[selectedOuterIndex]
+        
+        if node.isLeaf {
+            print("Executing outer ring function: \(node.name)")
+            node.action?()
+        } else {
+            print("Navigating into nested category: \(node.name)")
+            navigateInto(node)
+        }
+    }
+    
+    func executeSelected() {
+        // Backward compatibility - executes inner ring
+        executeInnerRing()
+    }
+    
+    // MARK: - Data Loading
     
     func loadFunctions() {
         guard let appSwitcher = appSwitcher else { return }
         
-        let appFunctions = appSwitcher.runningApps.map { app in
-            FunctionItem(
+        let appNodes = appSwitcher.runningApps.map { app in
+            FunctionNode(
                 id: "\(app.processIdentifier)",
                 name: app.localizedName ?? "Unknown",
                 icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
+                children: nil,
                 action: {
                     appSwitcher.switchToApp(app)
                 }
             )
         }
         
-        categories = [
-            FunctionCategory(
+        rootNodes = [
+            FunctionNode(
                 id: "apps",
                 name: "Applications",
                 icon: NSImage(systemSymbolName: "app.fill", accessibilityDescription: nil) ?? NSImage(),
-                functions: appFunctions
+                children: appNodes,
+                action: nil
             )
         ]
         
-        print("Loaded \(categories.count) categories with \(appFunctions.count) functions")
+        print("Loaded \(rootNodes.count) root nodes with \(appNodes.count) app functions")
     }
     
     func loadMockFunctions() {
-        let category1Functions = (1...4).map { index in
-            FunctionItem(
+        let cat1Leaves = (1...4).map { index in
+            FunctionNode(
                 id: "cat1-func-\(index)",
-                name: "Cat1 Function \(index)",
+                name: "Cat1 Func \(index)",
                 icon: NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil) ?? NSImage(),
+                children: nil,
                 action: { print("Cat1 Function \(index) executed") }
             )
         }
         
-        let category2Functions = (1...3).map { index in
-            FunctionItem(
+        let cat2Leaves = (1...3).map { index in
+            FunctionNode(
                 id: "cat2-func-\(index)",
-                name: "Cat2 Function \(index)",
+                name: "Cat2 Func \(index)",
                 icon: NSImage(systemSymbolName: "heart.fill", accessibilityDescription: nil) ?? NSImage(),
+                children: nil,
                 action: { print("Cat2 Function \(index) executed") }
             )
         }
         
-        let category3Functions = (1...5).map { index in
-            FunctionItem(
-                id: "cat3-func-\(index)",
-                name: "Cat3 Function \(index)",
-                icon: NSImage(systemSymbolName: "circle.fill", accessibilityDescription: nil) ?? NSImage(),
-                action: { print("Cat3 Function \(index) executed") }
+        let nestedLeaves = (1...2).map { index in
+            FunctionNode(
+                id: "nested-func-\(index)",
+                name: "Nested Func \(index)",
+                icon: NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: nil) ?? NSImage(),
+                children: nil,
+                action: { print("Nested Function \(index) executed") }
             )
         }
         
-        let category4Functions = (1...6).map { index in
-            FunctionItem(
-                id: "cat4-func-\(index)",
-                name: "Cat4 Function \(index)",
-                icon: NSImage(systemSymbolName: "square.fill", accessibilityDescription: nil) ?? NSImage(),
-                action: { print("Cat4 Function \(index) executed") }
-            )
-        }
+        let nestedCategory = FunctionNode(
+            id: "nested-category",
+            name: "Nested Category",
+            icon: NSImage(systemSymbolName: "folder.badge.gearshape", accessibilityDescription: nil) ?? NSImage(),
+            children: nestedLeaves,
+            action: nil
+        )
         
-        let category5Functions = (1...3).map { index in
-            FunctionItem(
-                id: "cat5-func-\(index)",
-                name: "Cat5 Function \(index)",
-                icon: NSImage(systemSymbolName: "triangle.fill", accessibilityDescription: nil) ?? NSImage(),
-                action: { print("Cat5 Function \(index) executed") }
-            )
-        }
-        
-        let category6Functions = (1...4).map { index in
-            FunctionItem(
-                id: "cat6-func-\(index)",
-                name: "Cat6 Function \(index)",
-                icon: NSImage(systemSymbolName: "diamond.fill", accessibilityDescription: nil) ?? NSImage(),
-                action: { print("Cat6 Function \(index) executed") }
-            )
-        }
-        
-        categories = [
-            FunctionCategory(
+        rootNodes = [
+            FunctionNode(
                 id: "category-1",
                 name: "Category 1",
                 icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
-                functions: category1Functions
+                children: cat1Leaves,
+                action: nil
             ),
-            FunctionCategory(
+            FunctionNode(
                 id: "category-2",
                 name: "Category 2",
                 icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
-                functions: category2Functions
+                children: cat2Leaves,
+                action: nil
             ),
-            FunctionCategory(
-                id: "category-3",
-                name: "Category 3",
-                icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
-                functions: category3Functions
+            FunctionNode(
+                id: "direct-function-1",
+                name: "Direct Function",
+                icon: NSImage(systemSymbolName: "bolt.circle.fill", accessibilityDescription: nil) ?? NSImage(),
+                children: nil,
+                action: { print("Direct function executed!") }
             ),
-            FunctionCategory(
-                id: "category-4",
-                name: "Category 4",
+            FunctionNode(
+                id: "category-with-nested",
+                name: "Has Nested Cat",
                 icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
-                functions: category4Functions
-            ),
-            FunctionCategory(
-                id: "category-5",
-                name: "Category 5",
-                icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
-                functions: category5Functions
-            ),
-            FunctionCategory(
-                id: "category-6",
-                name: "Category 6",
-                icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
-                functions: category6Functions
+                children: [nestedCategory] + cat1Leaves,
+                action: nil
             )
         ]
         
-        print("Loaded \(categories.count) mock categories for testing")
-    }
-    
-    func openCategory() {
-        isShowingCategories = false
-        selectedFunctionIndex = 0
-        print("Opened category: \(categories[selectedCategoryIndex].name)")
-    }
-    
-    func closeCategory() {
-        isShowingCategories = true
-        selectedFunctionIndex = 0
-        print("Closed category, back to category view")
-    }
-    
-    func selectFunction(at index: Int) {
-        guard index >= 0, index < currentFunctionList.count else { return }
-        
-        if isShowingCategories {
-            selectedCategoryIndex = index
-        } else {
-            selectedFunctionIndex = index
-        }
-        
-        print("Selected at index \(index): \(currentFunctionList[index].name)")
+        print("Loaded \(rootNodes.count) root nodes (tree structure)")
     }
 }
