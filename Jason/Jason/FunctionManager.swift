@@ -101,6 +101,27 @@ class FunctionManager: ObservableObject {
     
     // MARK: - Selection
     
+    func expandRing(at index: Int) {
+        guard index >= 0, index < innerRingNodes.count else { return }
+        let node = innerRingNodes[index]
+        guard node.isBranch else { return }
+        
+        selectedIndex = index
+        hoveredIndex = index
+        selectedOuterIndex = 0
+        hoveredOuterIndex = 0
+        isOuterRingExpanded = true
+        
+        print("Expanded ring for '\(node.name)'")
+    }
+    
+    func collapseRing() {
+        isOuterRingExpanded = false
+        selectedOuterIndex = 0
+        hoveredOuterIndex = 0
+        print("Collapsed outer ring")
+    }
+    
     func selectInnerRing(at index: Int) {
         guard index >= 0, index < innerRingNodes.count else { return }
         
@@ -213,7 +234,7 @@ class FunctionManager: ObservableObject {
             )
         }
         
-        let cat2Leaves = (1...7).map { index in
+        let cat2Leaves = (1...3).map { index in
             FunctionNode(
                 id: "cat2-func-\(index)",
                 name: "Cat2 Func \(index)",
@@ -258,13 +279,6 @@ class FunctionManager: ObservableObject {
             ),
             FunctionNode(
                 id: "direct-function-1",
-                name: "Direct Function",
-                icon: NSImage(systemSymbolName: "bolt.circle.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: nil,
-                action: { print("Direct function executed!") }
-            ),
-            FunctionNode(
-                id: "direct-function-2",
                 name: "Direct Function",
                 icon: NSImage(systemSymbolName: "bolt.circle.fill", accessibilityDescription: nil) ?? NSImage(),
                 children: nil,

@@ -63,15 +63,15 @@ struct CircularUIView: View {
                         thickness: ring.thickness,
                         nodes: ring.nodes,
                         selectedIndex: ring.selectedIndex,
-                        onNodeTapped: { index in
-                            handleRingTap(level: ring.level, index: index)
+                        onNodeTapped: { _ in
+                            // Click behavior removed - expansion now driven by distance
                         }
                     )
                     .transition(.customScale(from: 0.7))  // Customize starting scale here
                     .id(ring.level)  // Use stable identifier based on ring level
                 }
             }
-            .animation(.easeOut(duration: 0.05), value: rings.count)
+            .animation(.easeOut(duration: 0.1), value: rings.count)
             .frame(width: totalSize, height: totalSize)
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
         }

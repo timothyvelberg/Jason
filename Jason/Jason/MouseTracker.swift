@@ -18,6 +18,11 @@ class MouseTracker {
 
     var mouseAngleOffset: CGFloat = 0
     
+    // Ring configuration (must match CircularUIView)
+    private let centerHoleRadius: CGFloat = 50
+    private let ringThickness: CGFloat = 80
+    private let ringMargin: CGFloat = 10
+    
     init(functionManager: FunctionManager) {
         self.functionManager = functionManager
     }
@@ -40,7 +45,7 @@ class MouseTracker {
                 print("Mouse moved, starting selection tracking.")
             }
             if hasMouseMoved {
-                self.trackMousePosition(initial: false)
+                self.trackMousePosition(distance: distance)
             }
         }
     }
@@ -54,11 +59,14 @@ class MouseTracker {
         print("Mouse tracking stopped")
     }
 
-    private func trackMousePosition(initial: Bool) {
+    private func trackMousePosition(distance: CGFloat) {
         guard let start = trackingStartPoint else { return }
 
         let current = NSEvent.mouseLocation
         let angle = self.calculateAngle(from: start, to: current)
+        
+        // Handle boundary crossing based on distance
+        handleBoundaryCrossing(distance: distance)
         
         // Always track the outermost visible ring
         let ringLevel = getOutermostVisibleRing()
@@ -70,11 +78,50 @@ class MouseTracker {
         let pieIndex = angleToIndex(angle, totalCount: functions.count)
         
         // Update if index or ring level changed
-        if initial || pieIndex != lastFunctionIndex || ringLevel != lastRingLevel {
+        if pieIndex != lastFunctionIndex || ringLevel != lastRingLevel {
             updateRingSelection(level: ringLevel, index: pieIndex)
             lastFunctionIndex = pieIndex
             lastRingLevel = ringLevel
             onPieHover?(pieIndex)
+        }
+    }
+    
+    private func handleBoundaryCrossing(distance: CGFloat) {
+        let innerRingOuterRadius = centerHoleRadius + ringThickness
+        
+        let isOutsideInnerRing = distance > innerRingOuterRadius
+        let isOuterRingVisible = functionManager.shouldShowOuterRing
+        
+        if isOutsideInnerRing && !isOuterRingVisible {
+            // Mouse crossed outward - check if hovering over a category
+            if let hoveredIndex = lastFunctionIndex {
+                let innerNodes = functionManager.innerRingNodes
+                if innerNodes.indices.contains(hoveredIndex) {
+                    let node = innerNodes[hoveredIndex]
+                    if node.isBranch {
+                        // Expand to show this category's children
+                        print("🔵 Boundary crossed outward over category '\(node.name)' - expanding")
+                        functionManager.expandRing(at: hoveredIndex)
+                    }
+                }
+            }
+        } else if !isOutsideInnerRing && isOuterRingVisible {
+            // Mouse crossed inward - collapse outer ring
+            print("🔴 Boundary crossed inward - collapsing")
+            functionManager.collapseRing()
+        } else if isOutsideInnerRing && isOuterRingVisible {
+            // Mouse is in outer ring area - check for category switching
+            if let hoveredIndex = lastFunctionIndex, lastRingLevel == 0 {
+                let innerNodes = functionManager.innerRingNodes
+                if innerNodes.indices.contains(hoveredIndex) {
+                    let node = innerNodes[hoveredIndex]
+                    if node.isBranch && hoveredIndex != functionManager.selectedIndex {
+                        // Different category - switch to it
+                        print("🔄 Switching to category '\(node.name)'")
+                        functionManager.expandRing(at: hoveredIndex)
+                    }
+                }
+            }
         }
     }
     
@@ -109,10 +156,8 @@ class MouseTracker {
         switch level {
         case 0:
             functionManager.selectFunction(at: index)
-            print("Tracking inner ring, index: \(index)")
         case 1:
             functionManager.selectOuterFunction(at: index)
-            print("Tracking outer ring, index: \(index)")
         default:
             break
         }
@@ -148,6 +193,7 @@ class MouseTracker {
         var adjustedAngle = angle.truncatingRemainder(dividingBy: 360)
         if adjustedAngle < 0 { adjustedAngle += 360 }
 
+        // Shift forward by half a slice for proper alignment
         adjustedAngle += sliceSize - halfSlice
         if adjustedAngle >= 360 { adjustedAngle -= 360 }
         
