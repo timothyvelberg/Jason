@@ -66,6 +66,7 @@ struct CircularUIView: View {
                             handleRingTap(level: ring.level, index: index)
                         }
                     )
+                    .id(ring.level)  // Use stable identifier based on ring level
                 }
             }
             .frame(width: totalSize, height: totalSize)
@@ -89,7 +90,8 @@ struct CircularUIView: View {
 // MARK: - Ring Configuration
 
 struct RingConfiguration: Identifiable {
-    let id = UUID()
+    // Use level as stable identifier instead of UUID
+    var id: Int { level }
     let level: Int
     let startRadius: CGFloat
     let thickness: CGFloat

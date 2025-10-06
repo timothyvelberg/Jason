@@ -20,6 +20,13 @@ struct RingView: View {
     private let selectionColor: Color = .blue.opacity(0.8)
     private let iconSize: CGFloat = 48
     
+    // Animation state - matching the old working version
+    @State private var startAngle: Angle = .degrees(0)
+    @State private var endAngle: Angle = .degrees(90)
+    @State private var angleOffset: Double = 0
+    @State private var previousIndex: Int = 0
+    @State private var rotationIndex: Int = 0
+    
     // Calculated properties
     private var endRadius: CGFloat {
         return startRadius + thickness
@@ -48,14 +55,11 @@ struct RingView: View {
             .fill(backgroundColor, style: FillStyle(eoFill: true))
             .frame(width: totalDiameter, height: totalDiameter)
             
-            // Selection indicator (if any item is selected)
-            if let selectedIndex = selectedIndex, nodes.indices.contains(selectedIndex) {
-                let sliceSize = 360.0 / Double(nodes.count)
-                let angleOffset = -90 + (Double(selectedIndex) * sliceSize)
-                
+            // Animated selection indicator
+            if selectedIndex != nil {
                 PieSliceShape(
-                    startAngle: Angle(degrees: angleOffset - sliceSize / 2),
-                    endAngle: Angle(degrees: angleOffset + sliceSize / 2),
+                    startAngle: startAngle,
+                    endAngle: endAngle,
                     innerRadiusRatio: innerRadiusRatio,
                     outerRadiusRatio: 1.0
                 )
@@ -76,6 +80,49 @@ struct RingView: View {
             }
         }
         .frame(width: totalDiameter, height: totalDiameter)
+        .onChange(of: nodes.count) {
+            // Reset animation state when node count changes
+            if let index = selectedIndex {
+                rotationIndex = index
+                previousIndex = index
+                updateSlice(for: index, totalCount: nodes.count)
+            }
+        }
+        .onChange(of: selectedIndex) {
+            if let index = selectedIndex {
+                updateSlice(for: index, totalCount: nodes.count)
+            }
+        }
+    }
+    
+    private func updateSlice(for index: Int, totalCount: Int) {
+        guard index != previousIndex else { return }
+        guard totalCount > 0 else { return }
+        
+        let sliceSize = 360.0 / Double(totalCount)
+        var newRotationIndex = rotationIndex
+        
+        // Calculate shortest rotation direction (same as old version)
+        let forwardSteps = (index - previousIndex + totalCount) % totalCount
+        let backwardSteps = (previousIndex - index + totalCount) % totalCount
+        
+        if forwardSteps <= backwardSteps {
+            newRotationIndex += forwardSteps
+        } else {
+            newRotationIndex -= backwardSteps
+        }
+        
+        // Use the EXACT same formula as the old working version
+        let newAngleOffset = Double(newRotationIndex) * sliceSize - 90
+        
+        withAnimation(.easeOut(duration: 0.08)) {
+            angleOffset = newAngleOffset
+            startAngle = Angle(degrees: angleOffset - sliceSize / 2)
+            endAngle = Angle(degrees: angleOffset + sliceSize / 2)
+        }
+        
+        previousIndex = index
+        rotationIndex = newRotationIndex
     }
     
     private func iconPosition(for index: Int) -> CGPoint {
