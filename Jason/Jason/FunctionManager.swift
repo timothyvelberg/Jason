@@ -14,6 +14,7 @@ class FunctionManager: ObservableObject {
     @Published var navigationStack: [FunctionNode] = []
     @Published var selectedIndex: Int = 0
     @Published var selectedOuterIndex: Int = 0
+    @Published var hoveredOuterIndex: Int = 0  // New: track outer ring hover
     @Published var isOuterRingExpanded: Bool = false
     @Published var hoveredIndex: Int = 0
     
@@ -80,6 +81,7 @@ class FunctionManager: ObservableObject {
         navigationStack.append(node)
         selectedIndex = 0
         selectedOuterIndex = 0
+        hoveredOuterIndex = 0
         isOuterRingExpanded = false
         print("Navigated into: \(node.name), depth: \(navigationStack.count)")
     }
@@ -92,6 +94,7 @@ class FunctionManager: ObservableObject {
         let previous = navigationStack.removeLast()
         selectedIndex = 0
         selectedOuterIndex = 0
+        hoveredOuterIndex = 0
         isOuterRingExpanded = false
         print("Navigated back from: \(previous.name), depth: \(navigationStack.count)")
     }
@@ -112,6 +115,7 @@ class FunctionManager: ObservableObject {
             selectedIndex = index
             hoveredIndex = index  // Keep hover in sync
             selectedOuterIndex = 0
+            hoveredOuterIndex = 0
             isOuterRingExpanded = node.isBranch
             print("Selected inner ring \(index): \(node.name), outer ring: \(isOuterRingExpanded ? "shown" : "hidden")")
         }
@@ -120,6 +124,7 @@ class FunctionManager: ObservableObject {
     func selectOuterRing(at index: Int) {
         guard index >= 0, index < outerRingNodes.count else { return }
         selectedOuterIndex = index
+        hoveredOuterIndex = index
         
         let node = outerRingNodes[index]
         print("Selected outer ring \(index): \(node.name)")
@@ -128,6 +133,11 @@ class FunctionManager: ObservableObject {
     func selectFunction(at index: Int) {
         guard index >= 0, index < innerRingNodes.count else { return }
         hoveredIndex = index
+    }
+    
+    func selectOuterFunction(at index: Int) {
+        guard index >= 0, index < outerRingNodes.count else { return }
+        hoveredOuterIndex = index
     }
     
     // MARK: - Execution

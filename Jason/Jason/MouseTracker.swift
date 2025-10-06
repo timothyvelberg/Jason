@@ -12,6 +12,7 @@ class MouseTracker {
     private var trackingStartPoint: NSPoint?
     private var trackingTimer: Timer?
     private var lastFunctionIndex: Int?
+    private var lastRingLevel: Int?
     var onPieHover: ((Int?) -> Void)?
     private var functionManager: FunctionManager
 
@@ -48,11 +49,9 @@ class MouseTracker {
         trackingTimer?.invalidate()
         trackingTimer = nil
         trackingStartPoint = nil
+        lastFunctionIndex = nil
+        lastRingLevel = nil
         print("Mouse tracking stopped")
-    }
-    
-    private var currentFunctions: [FunctionItem] {
-        functionManager.currentFunctionList
     }
 
     private func trackMousePosition(initial: Bool) {
@@ -60,14 +59,62 @@ class MouseTracker {
 
         let current = NSEvent.mouseLocation
         let angle = self.calculateAngle(from: start, to: current)
-        let pieIndex = self.angleToIndex(angle)
         
-        if initial || pieIndex != lastFunctionIndex {
-            functionManager.selectFunction(at: pieIndex)
+        // Always track the outermost visible ring
+        let ringLevel = getOutermostVisibleRing()
+        
+        // Get the appropriate function list for this ring level
+        let functions = functionsForRing(level: ringLevel)
+        guard !functions.isEmpty else { return }
+        
+        let pieIndex = angleToIndex(angle, totalCount: functions.count)
+        
+        // Update if index or ring level changed
+        if initial || pieIndex != lastFunctionIndex || ringLevel != lastRingLevel {
+            updateRingSelection(level: ringLevel, index: pieIndex)
             lastFunctionIndex = pieIndex
-            if let pieIndex = lastFunctionIndex {
-                onPieHover?(pieIndex)
+            lastRingLevel = ringLevel
+            onPieHover?(pieIndex)
+        }
+    }
+    
+    private func getOutermostVisibleRing() -> Int {
+        // If outer ring is visible, track it (level 1)
+        // Otherwise track inner ring (level 0)
+        if functionManager.shouldShowOuterRing {
+            return 1
+        }
+        return 0
+    }
+    
+    private func functionsForRing(level: Int) -> [FunctionItem] {
+        switch level {
+        case 0:
+            return functionManager.currentFunctionList
+        case 1:
+            return functionManager.outerRingNodes.map { node in
+                FunctionItem(
+                    id: node.id,
+                    name: node.name,
+                    icon: node.icon,
+                    action: { node.action?() }
+                )
             }
+        default:
+            return []
+        }
+    }
+    
+    private func updateRingSelection(level: Int, index: Int) {
+        switch level {
+        case 0:
+            functionManager.selectFunction(at: index)
+            print("Tracking inner ring, index: \(index)")
+        case 1:
+            functionManager.selectOuterFunction(at: index)
+            print("Tracking outer ring, index: \(index)")
+        default:
+            break
         }
     }
     
@@ -92,25 +139,19 @@ class MouseTracker {
         return degrees
     }
     
-    private var sliceSize: CGFloat {
-        let total = currentFunctions.count
-        return total > 0 ? 360.0 / CGFloat(total) : 0
-    }
-    
-    private func angleToIndex(_ angle: CGFloat) -> Int {
-        let totalFunctions = currentFunctions.count
-        guard totalFunctions > 0 else { return -1 }
+    private func angleToIndex(_ angle: CGFloat, totalCount: Int) -> Int {
+        guard totalCount > 0 else { return -1 }
+        
+        let sliceSize = 360.0 / CGFloat(totalCount)
         let halfSlice = sliceSize / 2
 
         var adjustedAngle = angle.truncatingRemainder(dividingBy: 360)
         if adjustedAngle < 0 { adjustedAngle += 360 }
 
-        // FIXED: Changed from "halfSlice + sliceSize" to just "halfSlice"
-        // This removes the extra full-slice offset that was causing selection to be one slice ahead
-        adjustedAngle += halfSlice
-        if adjustedAngle >= 360 { adjustedAngle -= 360 }
+        adjustedAngle -= halfSlice
+        if adjustedAngle < 0 { adjustedAngle += 360 }
 
-        for index in 0..<totalFunctions {
+        for index in 0..<totalCount {
             let startAngle = CGFloat(index) * sliceSize
             let endAngle = startAngle + sliceSize
 

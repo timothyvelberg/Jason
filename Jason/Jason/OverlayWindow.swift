@@ -12,14 +12,14 @@ class OverlayWindow: NSWindow {
     
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
-            styleMask: [.borderless], // No title bar or decorations
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 800),  // Increased from 600x400
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
         
         // Make window behavior suitable for overlay
-        self.level = .floating // Appears above most other windows
+        self.level = .floating
         self.isOpaque = false
         self.backgroundColor = NSColor.clear
         self.hasShadow = true

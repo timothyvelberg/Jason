@@ -15,6 +15,7 @@ struct CircularUIView: View {
     // Ring configuration
     private let centerHoleRadius: CGFloat = 50
     private let ringThickness: CGFloat = 80
+    private let ringMargin: CGFloat = 10  // Gap between rings
     
     // Calculate rings to display
     private var rings: [RingConfiguration] {
@@ -29,7 +30,7 @@ struct CircularUIView: View {
             nodes: functionManager.innerRingNodes,
             selectedIndex: functionManager.hoveredIndex
         ))
-        currentRadius += ringThickness
+        currentRadius += ringThickness + ringMargin
         
         // Outer ring - only if expanded
         if functionManager.shouldShowOuterRing {
@@ -38,9 +39,9 @@ struct CircularUIView: View {
                 startRadius: currentRadius,
                 thickness: ringThickness,
                 nodes: functionManager.outerRingNodes,
-                selectedIndex: functionManager.selectedOuterIndex
+                selectedIndex: functionManager.hoveredOuterIndex  // Changed from selectedOuterIndex
             ))
-            currentRadius += ringThickness
+            currentRadius += ringThickness + ringMargin
         }
         
         return result
