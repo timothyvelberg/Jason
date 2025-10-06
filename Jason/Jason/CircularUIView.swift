@@ -15,7 +15,7 @@ struct CircularUIView: View {
     // Ring configuration
     private let centerHoleRadius: CGFloat = 50
     private let ringThickness: CGFloat = 80
-    private let ringMargin: CGFloat = 10  // Gap between rings
+    private let ringMargin: CGFloat = 4  // Gap between rings
     
     // Calculate rings to display
     private var rings: [RingConfiguration] {
@@ -67,9 +67,11 @@ struct CircularUIView: View {
                             handleRingTap(level: ring.level, index: index)
                         }
                     )
+                    .transition(.customScale(from: 0.7))  // Customize starting scale here
                     .id(ring.level)  // Use stable identifier based on ring level
                 }
             }
+            .animation(.easeOut(duration: 0.05), value: rings.count)
             .frame(width: totalSize, height: totalSize)
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
         }
@@ -98,4 +100,26 @@ struct RingConfiguration: Identifiable {
     let thickness: CGFloat
     let nodes: [FunctionNode]
     let selectedIndex: Int?
+}
+
+// MARK: - Custom Scale Transition
+
+extension AnyTransition {
+    static func customScale(from startScale: CGFloat) -> AnyTransition {
+        .modifier(
+            active: ScaleModifier(scale: startScale, opacity: 0),
+            identity: ScaleModifier(scale: 1.0, opacity: 1)
+        )
+    }
+}
+
+struct ScaleModifier: ViewModifier {
+    let scale: CGFloat
+    let opacity: Double
+    
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(scale)
+            .opacity(opacity)
+    }
 }
