@@ -213,7 +213,7 @@ class FunctionManager: ObservableObject {
             )
         }
         
-        let cat2Leaves = (1...3).map { index in
+        let cat2Leaves = (1...7).map { index in
             FunctionNode(
                 id: "cat2-func-\(index)",
                 name: "Cat2 Func \(index)",
@@ -258,6 +258,13 @@ class FunctionManager: ObservableObject {
             ),
             FunctionNode(
                 id: "direct-function-1",
+                name: "Direct Function",
+                icon: NSImage(systemSymbolName: "bolt.circle.fill", accessibilityDescription: nil) ?? NSImage(),
+                children: nil,
+                action: { print("Direct function executed!") }
+            ),
+            FunctionNode(
+                id: "direct-function-2",
                 name: "Direct Function",
                 icon: NSImage(systemSymbolName: "bolt.circle.fill", accessibilityDescription: nil) ?? NSImage(),
                 children: nil,
