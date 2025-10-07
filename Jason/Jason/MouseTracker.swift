@@ -21,7 +21,7 @@ class MouseTracker {
     // Ring configuration (must match CircularUIView)
     private let centerHoleRadius: CGFloat = 50
     private let ringThickness: CGFloat = 80
-    private let ringMargin: CGFloat = 10
+    private let ringMargin: CGFloat = 2
     
     init(functionManager: FunctionManager) {
         self.functionManager = functionManager

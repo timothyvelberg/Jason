@@ -274,6 +274,16 @@ class FunctionManager: ObservableObject {
             )
         }
         
+        let nemo2Leaves = (1...8).map { index in
+            FunctionNode(
+                id: "nested-nemo-\(index)",
+                name: "Nested Func \(index)",
+                icon: NSImage(systemSymbolName: "doc.text.fill", accessibilityDescription: nil) ?? NSImage(),
+                children: nil,
+                action: { print("Nested Function \(index) executed") }
+            )
+        }
+        
         let nestedCategory = FunctionNode(
             id: "nested-category",
             name: "Nested Category",
@@ -317,6 +327,13 @@ class FunctionManager: ObservableObject {
                 icon: NSImage(systemSymbolName: "externaldrive.fill.badge.person.crop", accessibilityDescription: nil) ?? NSImage(),
                 children: nil,
                 action: { print("Direct function executed!") }
+            ),
+            FunctionNode(
+                id: "category-nemo",
+                name: "Category 1",
+                icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
+                children: nemo2Leaves,
+                action: nil
             ),
             FunctionNode(
                 id: "direct-function-4",

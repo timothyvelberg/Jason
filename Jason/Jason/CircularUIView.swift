@@ -15,7 +15,7 @@ struct CircularUIView: View {
     // Ring configuration
     private let centerHoleRadius: CGFloat = 50
     private let ringThickness: CGFloat = 80
-    private let ringMargin: CGFloat = 4  // Gap between rings
+    private let ringMargin: CGFloat = 2  // Gap between rings
     
     // Calculate rings to display
     private var rings: [RingConfiguration] {

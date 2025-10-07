@@ -51,6 +51,10 @@ struct RingView: View {
         return shouldDimOpacity ? 0.9 : 1.0
     }
     
+    private var ringScale: CGFloat {
+        return shouldDimOpacity ? 0.95 : 1.0
+    }
+    
     var body: some View {
         ZStack {
             // Ring background
@@ -87,6 +91,7 @@ struct RingView: View {
         }
         .frame(width: totalDiameter, height: totalDiameter)
         .opacity(ringOpacity)  // NEW: Apply opacity to entire ring
+        .scaleEffect(ringScale)  
         .animation(.easeInOut(duration: 0.2), value: shouldDimOpacity)  // NEW: Animate opacity changes
         .onChange(of: nodes.count) {
             if let index = selectedIndex {
