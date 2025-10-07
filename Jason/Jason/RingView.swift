@@ -14,6 +14,7 @@ struct RingView: View {
     let nodes: [FunctionNode]
     let selectedIndex: Int?
     let onNodeTapped: (Int) -> Void
+    let shouldDimOpacity: Bool
     
     // Visual properties
     private let backgroundColor: Color = .black.opacity(0.8)
@@ -26,7 +27,7 @@ struct RingView: View {
     @State private var angleOffset: Double = 0
     @State private var previousIndex: Int? = nil
     @State private var rotationIndex: Int = 0
-    @State private var hasAppeared: Bool = false  // Track if ring has appeared before
+    @State private var hasAppeared: Bool = false
     
     // Calculated properties
     private var endRadius: CGFloat {
@@ -41,9 +42,13 @@ struct RingView: View {
         return endRadius * 2
     }
     
-    // Convert to percentage for shapes (relative to total diameter)
     private var innerRadiusRatio: CGFloat {
         return startRadius / endRadius
+    }
+    
+    // NEW: Computed opacity based on shouldDimOpacity
+    private var ringOpacity: Double {
+        return shouldDimOpacity ? 0.9 : 1.0
     }
     
     var body: some View {
@@ -81,14 +86,14 @@ struct RingView: View {
             }
         }
         .frame(width: totalDiameter, height: totalDiameter)
+        .opacity(ringOpacity)  // NEW: Apply opacity to entire ring
+        .animation(.easeInOut(duration: 0.2), value: shouldDimOpacity)  // NEW: Animate opacity changes
         .onChange(of: nodes.count) {
-            // Reset animation state when node count changes
             if let index = selectedIndex {
                 rotationIndex = index
                 previousIndex = index
                 updateSlice(for: index, totalCount: nodes.count)
             } else {
-                // No selection yet
                 previousIndex = nil
             }
         }
@@ -98,11 +103,10 @@ struct RingView: View {
             }
         }
         .onAppear {
-            // Initialize animation state to current selection if one exists
             if let index = selectedIndex {
                 rotationIndex = index
                 previousIndex = index
-                hasAppeared = true  // Already has a selection
+                hasAppeared = true
                 let totalCount = nodes.count
                 guard totalCount > 0 else { return }
                 let sliceSize = 360.0 / Double(totalCount)
@@ -110,10 +114,9 @@ struct RingView: View {
                 startAngle = Angle(degrees: angleOffset - sliceSize / 2)
                 endAngle = Angle(degrees: angleOffset + sliceSize / 2)
             } else {
-                // No selection yet - reset everything including hasAppeared
                 rotationIndex = 0
                 previousIndex = nil
-                hasAppeared = false  // Reset for fresh start
+                hasAppeared = false
                 startAngle = .degrees(0)
                 endAngle = .degrees(90)
             }
@@ -125,15 +128,13 @@ struct RingView: View {
         
         let sliceSize = 360.0 / Double(totalCount)
         
-        // Check if this is the first selection OR ring just appeared
         if previousIndex == nil || !hasAppeared {
-            // First selection or fresh appearance - snap to position without animation
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
                 rotationIndex = index
                 previousIndex = index
-                hasAppeared = true  // Mark as having appeared
+                hasAppeared = true
                 let angleOffset = Double(index) * sliceSize - 90
                 startAngle = Angle(degrees: angleOffset - sliceSize / 2)
                 endAngle = Angle(degrees: angleOffset + sliceSize / 2)
@@ -141,12 +142,10 @@ struct RingView: View {
             return
         }
         
-        // Unwrap and check if index changed
         guard let prevIndex = previousIndex, index != prevIndex else { return }
         
         var newRotationIndex = rotationIndex
         
-        // Calculate shortest rotation direction using unwrapped prevIndex
         let forwardSteps = (index - prevIndex + totalCount) % totalCount
         let backwardSteps = (prevIndex - index + totalCount) % totalCount
         
@@ -174,11 +173,9 @@ struct RingView: View {
         }
         
         let sliceSize = 360.0 / CGFloat(nodes.count)
-        // Position icon at the start of its slice (aligned with mouse tracking)
         let iconAngle = -90 + (sliceSize * CGFloat(index))
         let angleInRadians = iconAngle * (.pi / 180)
         
-        // Calculate position relative to this ring's center
         let center = CGPoint(x: totalDiameter / 2, y: totalDiameter / 2)
         let x = center.x + middleRadius * cos(angleInRadians)
         let y = center.y + middleRadius * sin(angleInRadians)

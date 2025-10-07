@@ -64,10 +64,11 @@ struct CircularUIView: View {
                         nodes: ring.nodes,
                         selectedIndex: ring.selectedIndex,
                         onNodeTapped: { _ in
-                            // Click behavior removed - expansion now driven by distance
-                        }
+                        },
+                        shouldDimOpacity: ring.level == 0 && functionManager.shouldShowOuterRing 
+
                     )
-                    .transition(.customScale(from: 0.7))  // Customize starting scale here
+                    .transition(.customScale(from: 0.7))
                     .id("\(ring.level)-\(functionManager.ringResetTrigger)") 
                 }
             }
