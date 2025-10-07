@@ -68,7 +68,7 @@ struct CircularUIView: View {
                         }
                     )
                     .transition(.customScale(from: 0.7))  // Customize starting scale here
-                    .id(ring.level)  // Use stable identifier based on ring level
+                    .id("\(ring.level)-\(functionManager.ringResetTrigger)") 
                 }
             }
             .animation(.easeOut(duration: 0.1), value: rings.count)

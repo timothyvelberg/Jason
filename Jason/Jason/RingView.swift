@@ -26,6 +26,7 @@ struct RingView: View {
     @State private var angleOffset: Double = 0
     @State private var previousIndex: Int? = nil
     @State private var rotationIndex: Int = 0
+    @State private var hasAppeared: Bool = false  // Track if ring has appeared before
     
     // Calculated properties
     private var endRadius: CGFloat {
@@ -101,6 +102,7 @@ struct RingView: View {
             if let index = selectedIndex {
                 rotationIndex = index
                 previousIndex = index
+                hasAppeared = true  // Already has a selection
                 let totalCount = nodes.count
                 guard totalCount > 0 else { return }
                 let sliceSize = 360.0 / Double(totalCount)
@@ -108,9 +110,10 @@ struct RingView: View {
                 startAngle = Angle(degrees: angleOffset - sliceSize / 2)
                 endAngle = Angle(degrees: angleOffset + sliceSize / 2)
             } else {
-                // No selection yet - reset everything
+                // No selection yet - reset everything including hasAppeared
                 rotationIndex = 0
                 previousIndex = nil
+                hasAppeared = false  // Reset for fresh start
                 startAngle = .degrees(0)
                 endAngle = .degrees(90)
             }
@@ -122,14 +125,15 @@ struct RingView: View {
         
         let sliceSize = 360.0 / Double(totalCount)
         
-        // Check if this is the first selection
-        if previousIndex == nil {
-            // First selection - snap to position without animation
+        // Check if this is the first selection OR ring just appeared
+        if previousIndex == nil || !hasAppeared {
+            // First selection or fresh appearance - snap to position without animation
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
                 rotationIndex = index
                 previousIndex = index
+                hasAppeared = true  // Mark as having appeared
                 let angleOffset = Double(index) * sliceSize - 90
                 startAngle = Angle(degrees: angleOffset - sliceSize / 2)
                 endAngle = Angle(degrees: angleOffset + sliceSize / 2)

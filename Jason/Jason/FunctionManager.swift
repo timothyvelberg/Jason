@@ -17,6 +17,7 @@ class FunctionManager: ObservableObject {
     @Published var hoveredOuterIndex: Int? = nil
     @Published var isOuterRingExpanded: Bool = false
     @Published var hoveredIndex: Int? = nil
+    @Published var ringResetTrigger: UUID = UUID()
     
     
     private var appSwitcher: AppSwitcherManager?
@@ -82,6 +83,7 @@ class FunctionManager: ObservableObject {
         hoveredIndex = nil
         hoveredOuterIndex = nil
         isOuterRingExpanded = false
+        ringResetTrigger = UUID()  // 👈 Add this line
         print("FunctionManager state reset")
     }
     
