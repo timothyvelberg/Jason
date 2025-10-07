@@ -224,7 +224,7 @@ class FunctionManager: ObservableObject {
     }
     
     func loadMockFunctions() {
-        let cat1Leaves = (1...4).map { index in
+        let cat1Leaves = (1...6).map { index in
             FunctionNode(
                 id: "cat1-func-\(index)",
                 name: "Cat1 Func \(index)",
@@ -281,6 +281,27 @@ class FunctionManager: ObservableObject {
                 id: "direct-function-1",
                 name: "Direct Function",
                 icon: NSImage(systemSymbolName: "bolt.circle.fill", accessibilityDescription: nil) ?? NSImage(),
+                children: nil,
+                action: { print("Direct function executed!") }
+            ),
+            FunctionNode(
+                id: "direct-function-2",
+                name: "Direct Function",
+                icon: NSImage(systemSymbolName: "person.fill", accessibilityDescription: nil) ?? NSImage(),
+                children: nil,
+                action: { print("Direct function executed!") }
+            ),
+            FunctionNode(
+                id: "direct-function-3",
+                name: "Direct Function",
+                icon: NSImage(systemSymbolName: "externaldrive.fill.badge.person.crop", accessibilityDescription: nil) ?? NSImage(),
+                children: nil,
+                action: { print("Direct function executed!") }
+            ),
+            FunctionNode(
+                id: "direct-function-4",
+                name: "Direct Function",
+                icon: NSImage(systemSymbolName: "house.circle.fill", accessibilityDescription: nil) ?? NSImage(),
                 children: nil,
                 action: { print("Direct function executed!") }
             ),
