@@ -5,7 +5,6 @@
 //  Created by Timothy Velberg on 31/07/2025.
 //
 
-
 import Foundation
 import AppKit
 import SwiftUI
@@ -122,13 +121,17 @@ class CircularUIManager: ObservableObject {
         
         isVisible = false
         overlayWindow?.hideOverlay()
+        
+        // Reset all state for clean slate on next show
+        functionManager?.reset()
+        
         print("Hiding circular UI")
     }
     
     func executeSelectedFunction() {
-        guard let functionManager = functionManager else { return }
+        guard let functionManager = functionManager,
+              let selectedIndex = functionManager.selectedIndex else { return }
         
-        let selectedIndex = functionManager.selectedIndex
         let currentFunctions = functionManager.currentFunctionList
         
         guard currentFunctions.indices.contains(selectedIndex) else {

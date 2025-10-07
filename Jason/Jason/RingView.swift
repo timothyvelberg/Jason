@@ -20,11 +20,11 @@ struct RingView: View {
     private let selectionColor: Color = .blue.opacity(0.8)
     private let iconSize: CGFloat = 48
     
-    // Animation state - matching the old working version
+    // Animation state
     @State private var startAngle: Angle = .degrees(0)
     @State private var endAngle: Angle = .degrees(90)
     @State private var angleOffset: Double = 0
-    @State private var previousIndex: Int = 0
+    @State private var previousIndex: Int? = nil
     @State private var rotationIndex: Int = 0
     
     // Calculated properties
@@ -86,6 +86,9 @@ struct RingView: View {
                 rotationIndex = index
                 previousIndex = index
                 updateSlice(for: index, totalCount: nodes.count)
+            } else {
+                // No selection yet
+                previousIndex = nil
             }
         }
         .onChange(of: selectedIndex) {
@@ -94,7 +97,7 @@ struct RingView: View {
             }
         }
         .onAppear {
-            // Initialize animation state to current selection
+            // Initialize animation state to current selection if one exists
             if let index = selectedIndex {
                 rotationIndex = index
                 previousIndex = index
@@ -104,20 +107,44 @@ struct RingView: View {
                 let angleOffset = Double(index) * sliceSize - 90
                 startAngle = Angle(degrees: angleOffset - sliceSize / 2)
                 endAngle = Angle(degrees: angleOffset + sliceSize / 2)
+            } else {
+                // No selection yet - reset everything
+                rotationIndex = 0
+                previousIndex = nil
+                startAngle = .degrees(0)
+                endAngle = .degrees(90)
             }
         }
     }
     
     private func updateSlice(for index: Int, totalCount: Int) {
-        guard index != previousIndex else { return }
         guard totalCount > 0 else { return }
         
         let sliceSize = 360.0 / Double(totalCount)
+        
+        // Check if this is the first selection
+        if previousIndex == nil {
+            // First selection - snap to position without animation
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                rotationIndex = index
+                previousIndex = index
+                let angleOffset = Double(index) * sliceSize - 90
+                startAngle = Angle(degrees: angleOffset - sliceSize / 2)
+                endAngle = Angle(degrees: angleOffset + sliceSize / 2)
+            }
+            return
+        }
+        
+        // Unwrap and check if index changed
+        guard let prevIndex = previousIndex, index != prevIndex else { return }
+        
         var newRotationIndex = rotationIndex
         
-        // Calculate shortest rotation direction (same as old version)
-        let forwardSteps = (index - previousIndex + totalCount) % totalCount
-        let backwardSteps = (previousIndex - index + totalCount) % totalCount
+        // Calculate shortest rotation direction using unwrapped prevIndex
+        let forwardSteps = (index - prevIndex + totalCount) % totalCount
+        let backwardSteps = (prevIndex - index + totalCount) % totalCount
         
         if forwardSteps <= backwardSteps {
             newRotationIndex += forwardSteps
@@ -125,7 +152,6 @@ struct RingView: View {
             newRotationIndex -= backwardSteps
         }
         
-        // Use the EXACT same formula as the old working version
         let newAngleOffset = Double(newRotationIndex) * sliceSize - 90
         
         withAnimation(.easeOut(duration: 0.08)) {

@@ -12,11 +12,11 @@ import SwiftUI
 class FunctionManager: ObservableObject {
     @Published var rootNodes: [FunctionNode] = []
     @Published var navigationStack: [FunctionNode] = []
-    @Published var selectedIndex: Int = 0
-    @Published var selectedOuterIndex: Int = 0
-    @Published var hoveredOuterIndex: Int = 0  // New: track outer ring hover
+    @Published var selectedIndex: Int? = nil
+    @Published var selectedOuterIndex: Int? = nil
+    @Published var hoveredOuterIndex: Int? = nil
     @Published var isOuterRingExpanded: Bool = false
-    @Published var hoveredIndex: Int = 0
+    @Published var hoveredIndex: Int? = nil
     
     
     private var appSwitcher: AppSwitcherManager?
@@ -36,7 +36,9 @@ class FunctionManager: ObservableObject {
     }
     
     var outerRingNodes: [FunctionNode] {
-        guard selectedIndex >= 0, selectedIndex < currentLevel.count else { return [] }
+        guard let selectedIndex = selectedIndex,
+              selectedIndex >= 0,
+              selectedIndex < currentLevel.count else { return [] }
         let selectedNode = currentLevel[selectedIndex]
         return selectedNode.children ?? []
     }
@@ -62,13 +64,25 @@ class FunctionManager: ObservableObject {
         }
     }
     
-    var currentSelectedIndex: Int {
+    var currentSelectedIndex: Int? {
         return hoveredIndex
     }
     
     init(appSwitcher: AppSwitcherManager) {
         self.appSwitcher = appSwitcher
         print("FunctionManager initialized")
+    }
+    
+    // MARK: - State Management
+    
+    func reset() {
+        navigationStack.removeAll()
+        selectedIndex = nil
+        selectedOuterIndex = nil
+        hoveredIndex = nil
+        hoveredOuterIndex = nil
+        isOuterRingExpanded = false
+        print("FunctionManager state reset")
     }
     
     // MARK: - Navigation
@@ -79,9 +93,9 @@ class FunctionManager: ObservableObject {
             return
         }
         navigationStack.append(node)
-        selectedIndex = 0
-        selectedOuterIndex = 0
-        hoveredOuterIndex = 0
+        selectedIndex = nil
+        selectedOuterIndex = nil
+        hoveredOuterIndex = nil
         isOuterRingExpanded = false
         print("Navigated into: \(node.name), depth: \(navigationStack.count)")
     }
@@ -92,9 +106,9 @@ class FunctionManager: ObservableObject {
             return
         }
         let previous = navigationStack.removeLast()
-        selectedIndex = 0
-        selectedOuterIndex = 0
-        hoveredOuterIndex = 0
+        selectedIndex = nil
+        selectedOuterIndex = nil
+        hoveredOuterIndex = nil
         isOuterRingExpanded = false
         print("Navigated back from: \(previous.name), depth: \(navigationStack.count)")
     }
@@ -108,8 +122,8 @@ class FunctionManager: ObservableObject {
         
         selectedIndex = index
         hoveredIndex = index
-        selectedOuterIndex = 0
-        hoveredOuterIndex = 0
+        selectedOuterIndex = nil
+        hoveredOuterIndex = nil
         isOuterRingExpanded = true
         
         print("Expanded ring for '\(node.name)'")
@@ -117,8 +131,8 @@ class FunctionManager: ObservableObject {
     
     func collapseRing() {
         isOuterRingExpanded = false
-        selectedOuterIndex = 0
-        hoveredOuterIndex = 0
+        selectedOuterIndex = nil
+        hoveredOuterIndex = nil
         print("Collapsed outer ring")
     }
     
@@ -135,8 +149,8 @@ class FunctionManager: ObservableObject {
             // Clicking different item - select it and expand if it has children
             selectedIndex = index
             hoveredIndex = index  // Keep hover in sync
-            selectedOuterIndex = 0
-            hoveredOuterIndex = 0
+            selectedOuterIndex = nil
+            hoveredOuterIndex = nil
             isOuterRingExpanded = node.isBranch
             print("Selected inner ring \(index): \(node.name), outer ring: \(isOuterRingExpanded ? "shown" : "hidden")")
         }
@@ -164,7 +178,9 @@ class FunctionManager: ObservableObject {
     // MARK: - Execution
     
     func executeInnerRing() {
-        guard selectedIndex >= 0, selectedIndex < innerRingNodes.count else { return }
+        guard let selectedIndex = selectedIndex,
+              selectedIndex >= 0,
+              selectedIndex < innerRingNodes.count else { return }
         let node = innerRingNodes[selectedIndex]
         
         if node.isLeaf {
@@ -177,7 +193,9 @@ class FunctionManager: ObservableObject {
     }
     
     func executeOuterRing() {
-        guard selectedOuterIndex >= 0, selectedOuterIndex < outerRingNodes.count else { return }
+        guard let selectedOuterIndex = selectedOuterIndex,
+              selectedOuterIndex >= 0,
+              selectedOuterIndex < outerRingNodes.count else { return }
         let node = outerRingNodes[selectedOuterIndex]
         
         if node.isLeaf {
@@ -316,4 +334,5 @@ class FunctionManager: ObservableObject {
         
         print("Loaded \(rootNodes.count) root nodes (tree structure)")
     }
+
 }
