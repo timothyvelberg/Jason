@@ -17,8 +17,7 @@ struct RingView: View {
     let shouldDimOpacity: Bool
     
     // Visual properties
-    private let backgroundColor: Color = .black.opacity(0.8)
-    private let selectionColor: Color = .blue.opacity(0.8)
+    private let backgroundColor: Color = .black.opacity(0.9)
     private let iconSize: CGFloat = 32
     
     // Animation state
@@ -53,6 +52,10 @@ struct RingView: View {
     
     private var ringScale: CGFloat {
         return shouldDimOpacity ? 0.95 : 1.0
+    }
+    
+    private var selectionColor: Color {
+        return shouldDimOpacity ? .gray.opacity(0.25) : .blue.opacity(0.8)
     }
     
     var body: some View {
