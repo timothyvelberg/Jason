@@ -18,7 +18,7 @@ struct RingView: View {
     // Visual properties
     private let backgroundColor: Color = .black.opacity(0.8)
     private let selectionColor: Color = .blue.opacity(0.8)
-    private let iconSize: CGFloat = 48
+    private let iconSize: CGFloat = 32
     
     // Animation state
     @State private var startAngle: Angle = .degrees(0)
