@@ -324,3 +324,43 @@ class AppSwitcherManager: ObservableObject {
         }
     }
 }
+
+// MARK: - App Actions (for context menu)
+
+extension AppSwitcherManager {
+    
+    /// Quit an application
+    func quitApp(_ app: NSRunningApplication) {
+        print("🚪 Quitting app: \(app.localizedName ?? "Unknown")")
+        app.terminate()
+    }
+    
+    /// Hide an application
+    func hideApp(_ app: NSRunningApplication) {
+        print("👁️ Hiding app: \(app.localizedName ?? "Unknown")")
+        app.hide()
+    }
+    
+    /// Show app information
+    func showAppInfo(_ app: NSRunningApplication) {
+        print("ℹ️ App Info for: \(app.localizedName ?? "Unknown")")
+        print("   PID: \(app.processIdentifier)")
+        print("   Bundle ID: \(app.bundleIdentifier ?? "Unknown")")
+        print("   Active: \(app.isActive)")
+        print("   Hidden: \(app.isHidden)")
+        
+        // Future: Could show a nice info panel
+    }
+    
+    /// Unhide an application (show it)
+    func unhideApp(_ app: NSRunningApplication) {
+        print("👀 Unhiding app: \(app.localizedName ?? "Unknown")")
+        app.unhide()
+    }
+    
+    /// Force quit an application (future)
+    func forceQuitApp(_ app: NSRunningApplication) {
+        print("⚠️ Force quitting app: \(app.localizedName ?? "Unknown")")
+        app.forceTerminate()
+    }
+}

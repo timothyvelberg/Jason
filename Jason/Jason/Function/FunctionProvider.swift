@@ -64,35 +64,30 @@ extension AppSwitcherManager: FunctionProvider {
                     icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
                     onSelect: { [weak self] in
                         self?.switchToApp(app)
-                        print("Brought \(app.localizedName ?? "Unknown") to front")
                     }
                 ),
                 FunctionNode(
                     id: "hide-\(app.processIdentifier)",
                     name: "Hide",
                     icon: NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak app] in
-                        app?.hide()
-                        print("Hide \(app?.localizedName ?? "Unknown")")
+                    onSelect: { [weak self] in
+                        self?.hideApp(app)
                     }
                 ),
                 FunctionNode(
                     id: "quit-\(app.processIdentifier)",
                     name: "Quit",
                     icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak app] in
-                        app?.terminate()
-                        print("Quit \(app?.localizedName ?? "Unknown")")
+                    onSelect: { [weak self] in
+                        self?.quitApp(app)
                     }
                 ),
                 FunctionNode(
                     id: "info-\(app.processIdentifier)",
                     name: "App Info",
                     icon: NSImage(systemSymbolName: "info.circle", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: {
-                        print("Show info for \(app.localizedName ?? "Unknown")")
-                        print("  PID: \(app.processIdentifier)")
-                        print("  Bundle: \(app.bundleIdentifier ?? "Unknown")")
+                    onSelect: { [weak self] in
+                        self?.showAppInfo(app)
                     }
                 )
             ]
@@ -101,7 +96,7 @@ extension AppSwitcherManager: FunctionProvider {
                 id: "app-\(app.processIdentifier)",
                 name: app.localizedName ?? "Unknown",
                 icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
-                contextActions: contextActions,  // NEW: Add context actions
+                contextActions: contextActions,
                 onSelect: { [weak self] in
                     // Primary action: switch to app
                     self?.switchToApp(app)
