@@ -36,7 +36,8 @@ struct CircularUIView: View {
                         onNodeTapped: { index in
                             handleRingTap(level: ring.level, index: index)
                         },
-                        shouldDimOpacity: shouldDimRing(ring.level)
+                        shouldDimOpacity: shouldDimRing(ring.level),
+                        sliceConfig: ring.sliceConfig  // NEW: Pass slice configuration
                     )
                     .transition(.customScale(from: 0.7))
                     .id("\(ring.level)-\(functionManager.ringResetTrigger)")
@@ -68,6 +69,7 @@ struct RingConfiguration: Identifiable {
     let thickness: CGFloat
     let nodes: [FunctionNode]
     let selectedIndex: Int?
+    let sliceConfig: PieSliceConfig  // NEW: Pie slice configuration
 }
 
 // MARK: - Custom Scale Transition

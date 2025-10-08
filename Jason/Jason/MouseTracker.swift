@@ -84,7 +84,20 @@ class MouseTracker {
         let nodes = functionManager.rings[ringLevel].nodes
         guard !nodes.isEmpty else { return }
         
-        let pieIndex = angleToIndex(angle, totalCount: nodes.count)
+        // Get the slice configuration for this ring
+        let configs = functionManager.ringConfigurations
+        guard ringLevel < configs.count else { return }
+        let sliceConfig = configs[ringLevel].sliceConfig
+        
+        // Check if angle is within the slice (for partial slices)
+        if !sliceConfig.isFullCircle {
+            if !isAngleInSlice(angle, sliceConfig: sliceConfig) {
+                // Mouse is outside the slice - don't update hover
+                return
+            }
+        }
+        
+        let pieIndex = angleToIndex(angle, sliceConfig: sliceConfig)
         
         // Update if index or ring level changed
         if pieIndex != lastFunctionIndex || ringLevel != lastRingLevel {
@@ -200,28 +213,68 @@ class MouseTracker {
         return degrees
     }
     
-    private func angleToIndex(_ angle: CGFloat, totalCount: Int) -> Int {
+    private func angleToIndex(_ angle: CGFloat, sliceConfig: PieSliceConfig) -> Int {
+        let configs = functionManager.ringConfigurations
+        let ringLevel = functionManager.activeRingLevel
+        guard ringLevel < configs.count else { return -1 }
+        
+        let totalCount = configs[ringLevel].nodes.count
         guard totalCount > 0 else { return -1 }
         
-        let sliceSize = 360.0 / CGFloat(totalCount)
-        let halfSlice = sliceSize / 2
-
-        var adjustedAngle = angle.truncatingRemainder(dividingBy: 360)
-        if adjustedAngle < 0 { adjustedAngle += 360 }
-
-        // Shift forward by half a slice for proper alignment
-        adjustedAngle += sliceSize - halfSlice
-        if adjustedAngle >= 360 { adjustedAngle -= 360 }
+        let itemAngle = CGFloat(sliceConfig.itemAngle)
         
-        for index in 0..<totalCount {
-            let startAngle = CGFloat(index) * sliceSize
-            let endAngle = startAngle + sliceSize
-
-            if adjustedAngle >= startAngle && adjustedAngle < endAngle {
+        if sliceConfig.isFullCircle {
+            // Full circle: items centered at 22.5°, 67.5°, etc.
+            // Zones should be: [0° to 45°], [45° to 90°], etc.
+            
+            var adjustedAngle = angle
+            if adjustedAngle < 0 { adjustedAngle += 360 }
+            
+            // Don't add any offset - zones start at 0° boundaries
+            let index = Int(adjustedAngle / itemAngle) % totalCount
+            return index
+        } else {
+            // Partial slice: items centered in their slices
+            let sliceStart = CGFloat(sliceConfig.startAngle)
+            
+            var normalizedAngle = angle
+            if normalizedAngle < 0 { normalizedAngle += 360 }
+            
+            var relativeAngle = normalizedAngle - sliceStart
+            if relativeAngle < 0 { relativeAngle += 360 }
+            if relativeAngle >= 360 { relativeAngle -= 360 }
+            
+            let index = Int(relativeAngle / itemAngle)
+            
+            if index >= 0 && index < totalCount {
                 return index
             }
         }
 
         return -1
+    }
+    
+    private func isAngleInSlice(_ angle: CGFloat, sliceConfig: PieSliceConfig) -> Bool {
+        if sliceConfig.isFullCircle {
+            return true  // Full circle always contains any angle
+        }
+        
+        let sliceStart = CGFloat(sliceConfig.startAngle)
+        let sliceEnd = CGFloat(sliceConfig.endAngle)
+        let totalAngle = CGFloat(sliceConfig.totalAngle)
+        
+        // Normalize angle to 0-360
+        var normalizedAngle = angle
+        while normalizedAngle < 0 { normalizedAngle += 360 }
+        while normalizedAngle >= 360 { normalizedAngle -= 360 }
+        
+        // Handle wrap-around case (e.g., slice from 350° to 10°)
+        if sliceEnd < sliceStart {
+            // Slice wraps around 0°
+            return normalizedAngle >= sliceStart || normalizedAngle <= sliceEnd
+        } else {
+            // Normal case
+            return normalizedAngle >= sliceStart && normalizedAngle <= sliceEnd
+        }
     }
 }

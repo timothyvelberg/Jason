@@ -47,12 +47,75 @@ class FunctionManager: ObservableObject {
         var currentRadius = centerHoleRadius
         
         for (index, ringState) in rings.enumerated() {
+            // Calculate slice configuration
+            let sliceConfig: PieSliceConfig
+            
+            if index == 0 {
+                // Ring 0 is always a full circle
+                sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+            } else {
+                // Ring 1+ are partial slices aligned to parent's selected item
+                guard index > 0, rings.indices.contains(index - 1) else {
+                    sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                    continue
+                }
+                
+                let parentRing = rings[index - 1]
+                guard let parentSelectedIndex = parentRing.selectedIndex,
+                      parentSelectedIndex < parentRing.nodes.count else {
+                    sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                    continue
+                }
+                
+                // Get the parent's slice config to calculate correct angle
+                // We need to use the previously generated config
+                let parentSliceConfig: PieSliceConfig
+                if index - 1 < configs.count {
+                    parentSliceConfig = configs[index - 1].sliceConfig
+                } else {
+                    // Fallback: parent is Ring 0 (full circle)
+                    parentSliceConfig = .fullCircle(itemCount: parentRing.nodes.count)
+                }
+                
+                // Calculate parent's actual angle position using its slice config
+                let parentAngle: Double
+                if parentSliceConfig.isFullCircle {
+                    // Parent is full circle - use even distribution
+                    let parentItemAngle = 360.0 / Double(parentRing.nodes.count)
+                    parentAngle = Double(parentSelectedIndex) * parentItemAngle
+                } else {
+                    // Parent is partial slice - align to START of parent item (not center)
+                    let baseAngle = parentSliceConfig.startAngle
+                    let itemAngle = parentSliceConfig.itemAngle
+                    parentAngle = baseAngle + (Double(parentSelectedIndex) * itemAngle)
+                }
+                
+                // Get the parent node to check if it has a single child
+                let parentNode = parentRing.nodes[parentSelectedIndex]
+                let itemCount = ringState.nodes.count
+                
+                // If parent only has 1 child, use parent's angle width
+                if itemCount == 1 {
+                    sliceConfig = .partialSlice(
+                        itemCount: itemCount,
+                        centeredAt: parentAngle,
+                        defaultItemAngle: parentSliceConfig.itemAngle
+                    )
+                } else {
+                    sliceConfig = .partialSlice(
+                        itemCount: itemCount,
+                        centeredAt: parentAngle
+                    )
+                }
+            }
+            
             configs.append(RingConfiguration(
                 level: index,
                 startRadius: currentRadius,
                 thickness: ringThickness,
                 nodes: ringState.nodes,
-                selectedIndex: ringState.hoveredIndex
+                selectedIndex: ringState.hoveredIndex,
+                sliceConfig: sliceConfig
             ))
             currentRadius += ringThickness + ringMargin
         }
@@ -180,7 +243,10 @@ class FunctionManager: ObservableObject {
         
         let node = rings[ringLevel].nodes[index]
         
-        guard node.isBranch, let children = node.children, !children.isEmpty else {
+        // Use displayedChildren which respects maxDisplayedChildren limit
+        let displayedChildren = node.displayedChildren
+        
+        guard node.isBranch, !displayedChildren.isEmpty else {
             print("Cannot expand non-category or empty category: \(node.name)")
             return
         }
@@ -194,11 +260,11 @@ class FunctionManager: ObservableObject {
             rings.removeSubrange((ringLevel + 1)...)
         }
         
-        // Add new ring with children
-        rings.append(RingState(nodes: children))
+        // Add new ring with displayed children (respects limit)
+        rings.append(RingState(nodes: displayedChildren))
         activeRingLevel = ringLevel + 1
         
-        print("Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(children.count) nodes")
+        print("Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes")
     }
     
     func collapseToRing(level: Int) {
@@ -230,8 +296,7 @@ class FunctionManager: ObservableObject {
             navigateInto(node)
         }
     }
-    
-    // MARK: - Data Loading
+
     
     func loadFunctions() {
         guard let appSwitcher = appSwitcher else { return }
@@ -283,7 +348,7 @@ class FunctionManager: ObservableObject {
             )
         }
         
-        let nestedLeaves = (1...6).map { index in
+        let nestedLeaves = (1...2).map { index in
             FunctionNode(
                 id: "nested-func-\(index)",
                 name: "Nested Func \(index)",

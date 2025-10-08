@@ -15,6 +15,7 @@ struct RingView: View {
     let selectedIndex: Int?
     let onNodeTapped: (Int) -> Void
     let shouldDimOpacity: Bool
+    let sliceConfig: PieSliceConfig  // NEW: Pie slice configuration
     
     // Visual properties
     private let backgroundColor: Color = .black.opacity(0.9)
@@ -60,13 +61,26 @@ struct RingView: View {
     
     var body: some View {
         ZStack {
-            // Ring background
-            DonutShape(
-                holePercentage: innerRadiusRatio,
-                outerPercentage: 1.0
-            )
-            .fill(backgroundColor, style: FillStyle(eoFill: true))
-            .frame(width: totalDiameter, height: totalDiameter)
+            // Ring background - either full circle or partial slice
+            if sliceConfig.isFullCircle {
+                // Full circle background
+                DonutShape(
+                    holePercentage: innerRadiusRatio,
+                    outerPercentage: 1.0
+                )
+                .fill(backgroundColor, style: FillStyle(eoFill: true))
+                .frame(width: totalDiameter, height: totalDiameter)
+            } else {
+                // Partial slice background
+                PieSliceShape(
+                    startAngle: .degrees(sliceConfig.startAngle - 90),  // Adjust for 0° = top
+                    endAngle: .degrees(sliceConfig.endAngle - 90),
+                    innerRadiusRatio: innerRadiusRatio,
+                    outerRadiusRatio: 1.0
+                )
+                .fill(backgroundColor, style: FillStyle(eoFill: true))
+                .frame(width: totalDiameter, height: totalDiameter)
+            }
             
             // Animated selection indicator
             if selectedIndex != nil {
@@ -93,9 +107,9 @@ struct RingView: View {
             }
         }
         .frame(width: totalDiameter, height: totalDiameter)
-        .opacity(ringOpacity)  // NEW: Apply opacity to entire ring
-        .scaleEffect(ringScale)  
-        .animation(.easeInOut(duration: 0.2), value: shouldDimOpacity)  // NEW: Animate opacity changes
+        .opacity(ringOpacity)
+        .scaleEffect(ringScale)
+        .animation(.easeInOut(duration: 0.2), value: shouldDimOpacity)
         .onChange(of: nodes.count) {
             if let index = selectedIndex {
                 rotationIndex = index
@@ -117,16 +131,20 @@ struct RingView: View {
                 hasAppeared = true
                 let totalCount = nodes.count
                 guard totalCount > 0 else { return }
-                let sliceSize = 360.0 / Double(totalCount)
-                let angleOffset = Double(index) * sliceSize - 90
-                startAngle = Angle(degrees: angleOffset - sliceSize / 2)
-                endAngle = Angle(degrees: angleOffset + sliceSize / 2)
+                
+                // Use slice config for initial angles
+                let itemAngle = sliceConfig.itemAngle
+                let baseAngle = sliceConfig.startAngle
+                let angleOffset = baseAngle + (Double(index) * itemAngle) + (itemAngle / 2)
+                
+                startAngle = Angle(degrees: angleOffset - itemAngle / 2 - 90)
+                endAngle = Angle(degrees: angleOffset + itemAngle / 2 - 90)
             } else {
                 rotationIndex = 0
                 previousIndex = nil
                 hasAppeared = false
                 startAngle = .degrees(0)
-                endAngle = .degrees(90)
+                endAngle = .degrees(sliceConfig.itemAngle)
             }
         }
     }
@@ -134,7 +152,7 @@ struct RingView: View {
     private func updateSlice(for index: Int, totalCount: Int) {
         guard totalCount > 0 else { return }
         
-        let sliceSize = 360.0 / Double(totalCount)
+        let itemAngle = sliceConfig.itemAngle
         
         if previousIndex == nil || !hasAppeared {
             var transaction = Transaction()
@@ -143,9 +161,12 @@ struct RingView: View {
                 rotationIndex = index
                 previousIndex = index
                 hasAppeared = true
-                let angleOffset = Double(index) * sliceSize - 90
-                startAngle = Angle(degrees: angleOffset - sliceSize / 2)
-                endAngle = Angle(degrees: angleOffset + sliceSize / 2)
+                
+                let baseAngle = sliceConfig.startAngle
+                let angleOffset = baseAngle + (Double(index) * itemAngle) + (itemAngle / 2)
+                
+                startAngle = Angle(degrees: angleOffset - itemAngle / 2 - 90)
+                endAngle = Angle(degrees: angleOffset + itemAngle / 2 - 90)
             }
             return
         }
@@ -163,12 +184,13 @@ struct RingView: View {
             newRotationIndex -= backwardSteps
         }
         
-        let newAngleOffset = Double(newRotationIndex) * sliceSize - 90
+        let baseAngle = sliceConfig.startAngle
+        let newAngleOffset = baseAngle + (Double(newRotationIndex) * itemAngle) + (itemAngle / 2)
         
         withAnimation(.easeOut(duration: 0.08)) {
             angleOffset = newAngleOffset
-            startAngle = Angle(degrees: angleOffset - sliceSize / 2)
-            endAngle = Angle(degrees: angleOffset + sliceSize / 2)
+            startAngle = Angle(degrees: angleOffset - itemAngle / 2 - 90)
+            endAngle = Angle(degrees: angleOffset + itemAngle / 2 - 90)
         }
         
         previousIndex = index
@@ -180,9 +202,13 @@ struct RingView: View {
             return CGPoint(x: totalDiameter / 2, y: totalDiameter / 2)
         }
         
-        let sliceSize = 360.0 / CGFloat(nodes.count)
-        let iconAngle = -90 + (sliceSize * CGFloat(index))
-        let angleInRadians = iconAngle * (.pi / 180)
+        // Calculate position within the slice
+        let itemAngle = sliceConfig.itemAngle
+        let baseAngle = sliceConfig.startAngle
+        
+        // Position at the center of this item's slice
+        let iconAngle = baseAngle + (itemAngle * Double(index)) + (itemAngle / 2)
+        let angleInRadians = (iconAngle - 90) * (.pi / 180)  // Adjust for 0° = top
         
         let center = CGPoint(x: totalDiameter / 2, y: totalDiameter / 2)
         let x = center.x + middleRadius * cos(angleInRadians)
