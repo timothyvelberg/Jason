@@ -59,12 +59,12 @@ extension AppSwitcherManager: FunctionProvider {
             // Create context actions for each app
             let contextActions = [
                 FunctionNode(
-                    id: "quit-\(app.processIdentifier)",
-                    name: "Quit",
-                    icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak app] in
-                        app?.terminate()
-                        print("Quit \(app?.localizedName ?? "Unknown")")
+                    id: "activate-\(app.processIdentifier)",
+                    name: "Bring to Front",
+                    icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
+                    onSelect: { [weak self] in
+                        self?.switchToApp(app)
+                        print("Brought \(app.localizedName ?? "Unknown") to front")
                     }
                 ),
                 FunctionNode(
@@ -74,6 +74,15 @@ extension AppSwitcherManager: FunctionProvider {
                     onSelect: { [weak app] in
                         app?.hide()
                         print("Hide \(app?.localizedName ?? "Unknown")")
+                    }
+                ),
+                FunctionNode(
+                    id: "quit-\(app.processIdentifier)",
+                    name: "Quit",
+                    icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
+                    onSelect: { [weak app] in
+                        app?.terminate()
+                        print("Quit \(app?.localizedName ?? "Unknown")")
                     }
                 ),
                 FunctionNode(

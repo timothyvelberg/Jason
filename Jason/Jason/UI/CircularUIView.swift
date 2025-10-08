@@ -56,7 +56,24 @@ struct CircularUIView: View {
     }
     
     private func handleRingTap(level: Int, index: Int) {
+        // Select the node
         functionManager.selectNode(ringLevel: level, index: index)
+        
+        // Get the node to check what to do
+        guard level < functionManager.rings.count else { return }
+        guard index < functionManager.rings[level].nodes.count else { return }
+        
+        let node = functionManager.rings[level].nodes[index]
+        
+        if node.isLeaf {
+            // It's a function - execute it
+            print("🖱️ Tapped leaf node: \(node.name) - executing")
+            node.onSelect?()
+        } else if node.isBranch {
+            // It's a category - expand it
+            print("🖱️ Tapped branch node: \(node.name) - expanding")
+            functionManager.expandCategory(ringLevel: level, index: index)
+        }
     }
 }
 
