@@ -35,6 +35,8 @@ class CircularUIManager: ObservableObject {
         // Register mock provider for testing (shows alongside real apps)
         functionManager?.registerProvider(MockFunctionProvider())
         
+        functionManager?.registerProvider(FinderLogic())
+        
         if let functionManager = functionManager {
             self.mouseTracker = MouseTracker(functionManager: functionManager)
             
