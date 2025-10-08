@@ -35,7 +35,7 @@ class FunctionManager: ObservableObject {
     
     private var rootNodes: [FunctionNode] = []
     private var navigationStack: [FunctionNode] = []
-    private var appSwitcher: AppSwitcherManager?
+    private var providers: [FunctionProvider] = []  // Changed from appSwitcher
     
     // MARK: - Computed Properties for UI
     
@@ -80,9 +80,9 @@ class FunctionManager: ObservableObject {
                 // Calculate parent's actual angle position using its slice config
                 let parentAngle: Double
                 if parentSliceConfig.isFullCircle {
-                    // Parent is full circle - use even distribution
+                    // Parent is full circle - items centered in slices
                     let parentItemAngle = 360.0 / Double(parentRing.nodes.count)
-                    parentAngle = Double(parentSelectedIndex) * parentItemAngle
+                    parentAngle = (Double(parentSelectedIndex) * parentItemAngle) + (parentItemAngle / 2)
                 } else {
                     // Parent is partial slice - align to START of parent item (not center)
                     let baseAngle = parentSliceConfig.startAngle
@@ -132,7 +132,7 @@ class FunctionManager: ObservableObject {
                 icon: node.icon,
                 action: {
                     if node.isLeaf {
-                        node.action?()
+                        node.onSelect?()
                     } else {
                         self.navigateInto(node)
                     }
@@ -143,9 +143,21 @@ class FunctionManager: ObservableObject {
     
     // MARK: - Initialization
     
-    init(appSwitcher: AppSwitcherManager) {
-        self.appSwitcher = appSwitcher
-        print("FunctionManager initialized")
+    init(providers: [FunctionProvider] = []) {
+        self.providers = providers
+        print("FunctionManager initialized with \(providers.count) provider(s)")
+    }
+    
+    // MARK: - Provider Management
+    
+    func registerProvider(_ provider: FunctionProvider) {
+        providers.append(provider)
+        print("Registered provider: \(provider.providerName)")
+    }
+    
+    func removeProvider(withId id: String) {
+        providers.removeAll { $0.providerId == id }
+        print("Removed provider: \(id)")
     }
     
     // MARK: - State Management
@@ -212,9 +224,21 @@ class FunctionManager: ObservableObject {
         guard rings.indices.contains(ringLevel) else { return }
         guard rings[ringLevel].nodes.indices.contains(index) else { return }
         
+        // Call onHoverExit on previously hovered node
+        if let prevIndex = rings[ringLevel].hoveredIndex,
+           prevIndex != index,
+           rings[ringLevel].nodes.indices.contains(prevIndex) {
+            let prevNode = rings[ringLevel].nodes[prevIndex]
+            prevNode.onHoverExit?()
+        }
+        
         rings[ringLevel].hoveredIndex = index
         
         let node = rings[ringLevel].nodes[index]
+        
+        // Call onHover on newly hovered node
+        node.onHover?()
+        
         print("Hovering ring \(ringLevel), index \(index): \(node.name)")
     }
     
@@ -290,152 +314,39 @@ class FunctionManager: ObservableObject {
         
         if node.isLeaf {
             print("Executing function: \(node.name)")
-            node.action?()
+            node.onSelect?()  // Call the onSelect handler
         } else {
             print("Navigating into category: \(node.name)")
             navigateInto(node)
         }
     }
-
+    
+    // MARK: - Data Loading
     
     func loadFunctions() {
-        guard let appSwitcher = appSwitcher else { return }
-        
-        let appNodes = appSwitcher.runningApps.map { app in
-            FunctionNode(
-                id: "\(app.processIdentifier)",
-                name: app.localizedName ?? "Unknown",
-                icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
-                children: nil,
-                action: {
-                    appSwitcher.switchToApp(app)
-                }
-            )
+        // Refresh all providers to get latest data
+        for provider in providers {
+            provider.refresh()
         }
         
-        rootNodes = [
-            FunctionNode(
-                id: "apps",
-                name: "Applications",
-                icon: NSImage(systemSymbolName: "app.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: appNodes,
-                action: nil
-            )
-        ]
+        // Collect functions from all providers
+        rootNodes = providers.flatMap { provider in
+            let functions = provider.provideFunctions()
+            print("Provider '\(provider.providerName)' provided \(functions.count) root node(s)")
+            return functions
+        }
         
         rebuildRings()
-        print("Loaded \(rootNodes.count) root nodes with \(appNodes.count) app functions")
+        print("Loaded \(rootNodes.count) total root nodes from \(providers.count) provider(s)")
     }
     
+    // DEPRECATED: Use providers instead
     func loadMockFunctions() {
-        let cat1Leaves = (1...6).map { index in
-            FunctionNode(
-                id: "cat1-func-\(index)",
-                name: "Cat1 Func \(index)",
-                icon: NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: nil,
-                action: { print("Cat1 Function \(index) executed") }
-            )
-        }
+        print("⚠️ loadMockFunctions() is deprecated. Register MockFunctionProvider instead.")
         
-        let cat2Leaves = (1...3).map { index in
-            FunctionNode(
-                id: "cat2-func-\(index)",
-                name: "Cat2 Func \(index)",
-                icon: NSImage(systemSymbolName: "heart.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: nil,
-                action: { print("Cat2 Function \(index) executed") }
-            )
-        }
-        
-        let nestedLeaves = (1...2).map { index in
-            FunctionNode(
-                id: "nested-func-\(index)",
-                name: "Nested Func \(index)",
-                icon: NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: nil,
-                action: { print("Nested Function \(index) executed") }
-            )
-        }
-        
-        let nemo2Leaves = (1...8).map { index in
-            FunctionNode(
-                id: "nested-nemo-\(index)",
-                name: "Nested Func \(index)",
-                icon: NSImage(systemSymbolName: "doc.text.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: nil,
-                action: { print("Nested Function \(index) executed") }
-            )
-        }
-        
-        let nestedCategory = FunctionNode(
-            id: "nested-category",
-            name: "Nested Category",
-            icon: NSImage(systemSymbolName: "folder.badge.gearshape", accessibilityDescription: nil) ?? NSImage(),
-            children: nestedLeaves,
-            action: nil
-        )
-        
-        rootNodes = [
-            FunctionNode(
-                id: "category-1",
-                name: "Category 1",
-                icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: cat1Leaves,
-                action: nil
-            ),
-            FunctionNode(
-                id: "category-2",
-                name: "Category 2",
-                icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: cat2Leaves,
-                action: nil
-            ),
-            FunctionNode(
-                id: "direct-function-1",
-                name: "Direct Function",
-                icon: NSImage(systemSymbolName: "bolt.circle.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: nil,
-                action: { print("Direct function executed!") }
-            ),
-            FunctionNode(
-                id: "direct-function-2",
-                name: "Direct Function",
-                icon: NSImage(systemSymbolName: "person.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: nil,
-                action: { print("Direct function executed!") }
-            ),
-            FunctionNode(
-                id: "direct-function-3",
-                name: "Direct Function",
-                icon: NSImage(systemSymbolName: "externaldrive.fill.badge.person.crop", accessibilityDescription: nil) ?? NSImage(),
-                children: nil,
-                action: { print("Direct function executed!") }
-            ),
-            FunctionNode(
-                id: "category-nemo",
-                name: "Category 1",
-                icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: nemo2Leaves,
-                action: nil
-            ),
-            FunctionNode(
-                id: "direct-function-4",
-                name: "Direct Function",
-                icon: NSImage(systemSymbolName: "house.circle.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: nil,
-                action: { print("Direct function executed!") }
-            ),
-            FunctionNode(
-                id: "category-with-nested",
-                name: "Has Nested Cat",
-                icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: [nestedCategory] + cat1Leaves,
-                action: nil
-            )
-        ]
-        
-        rebuildRings()
-        print("Loaded \(rootNodes.count) root nodes (tree structure)")
+        // For backward compatibility, create a mock provider
+        let mockProvider = MockFunctionProvider()
+        providers = [mockProvider]
+        loadFunctions()
     }
 }

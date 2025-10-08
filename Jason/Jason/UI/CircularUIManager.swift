@@ -24,7 +24,15 @@ class CircularUIManager: ObservableObject {
     
     func setup(with appSwitcher: AppSwitcherManager) {
         self.appSwitcher = appSwitcher
-        self.functionManager = FunctionManager(appSwitcher: appSwitcher)
+        
+        // Create FunctionManager with providers
+        self.functionManager = FunctionManager()
+        
+        // Register AppSwitcher as a provider
+        functionManager?.registerProvider(appSwitcher)
+        
+        // Register mock provider for testing (shows alongside real apps)
+        functionManager?.registerProvider(MockFunctionProvider())
         
         if let functionManager = functionManager {
             self.mouseTracker = MouseTracker(functionManager: functionManager)

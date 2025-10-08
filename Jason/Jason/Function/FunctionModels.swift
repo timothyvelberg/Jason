@@ -15,56 +15,71 @@ class FunctionNode: Identifiable, ObservableObject {
     let name: String
     let icon: NSImage
     let children: [FunctionNode]?
-    let action: (() -> Void)?
-    let maxDisplayedChildren: Int?  // NEW: Limit how many children to show
+    let contextActions: [FunctionNode]?  // NEW: Actions shown in next ring for leaf nodes
+    let onSelect: (() -> Void)?  // Renamed from 'action' for clarity
+    let onHover: (() -> Void)?   // NEW: Called when mouse enters
+    let onHoverExit: (() -> Void)?  // NEW: Called when mouse leaves
+    let maxDisplayedChildren: Int?
     
     init(
         id: String,
         name: String,
         icon: NSImage,
         children: [FunctionNode]? = nil,
-        action: (() -> Void)? = nil,
-        maxDisplayedChildren: Int? = nil  // NEW parameter
+        contextActions: [FunctionNode]? = nil,  // NEW parameter
+        onSelect: (() -> Void)? = nil,
+        onHover: (() -> Void)? = nil,   // NEW parameter
+        onHoverExit: (() -> Void)? = nil,  // NEW parameter
+        maxDisplayedChildren: Int? = nil
     ) {
         self.id = id
         self.name = name
         self.icon = icon
         self.children = children
-        self.action = action
+        self.contextActions = contextActions
+        self.onSelect = onSelect
+        self.onHover = onHover
+        self.onHoverExit = onHoverExit
         self.maxDisplayedChildren = maxDisplayedChildren
     }
     
-    // Leaf = has action, no children
+    // DEPRECATED: For backward compatibility
+    var action: (() -> Void)? {
+        return onSelect
+    }
+    
+    // Leaf = has onSelect action, no children or contextActions
     var isLeaf: Bool {
-        return children == nil && action != nil
+        return children == nil && contextActions == nil && onSelect != nil
     }
     
-    // Branch = has children (even if empty array)
+    // Branch = has children OR contextActions
     var isBranch: Bool {
-        return children != nil
+        return children != nil || contextActions != nil
     }
     
-    // Is this a valid branch (has actual children)?
+    // Is this a valid branch (has actual children or context actions)?
     var hasChildren: Bool {
-        return (children?.count ?? 0) > 0
+        return (children?.count ?? 0) > 0 || (contextActions?.count ?? 0) > 0
     }
     
     var childCount: Int {
-        return children?.count ?? 0
+        return children?.count ?? contextActions?.count ?? 0
     }
     
-    // NEW: Get children with limit applied
+    // NEW: Get children with limit applied (works for both children and contextActions)
     var displayedChildren: [FunctionNode] {
-        guard let children = children else { return [] }
+        // Prefer children over contextActions
+        let actualChildren = children ?? contextActions ?? []
         
-        if let maxChildren = maxDisplayedChildren, children.count > maxChildren {
+        if let maxChildren = maxDisplayedChildren, actualChildren.count > maxChildren {
             // Return limited children + a "view more" node
-            let limitedChildren = Array(children.prefix(maxChildren))
+            let limitedChildren = Array(actualChildren.prefix(maxChildren))
             // TODO: Add "View More..." node here
             return limitedChildren
         }
         
-        return children
+        return actualChildren
     }
 }
 
