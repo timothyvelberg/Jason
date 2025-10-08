@@ -17,6 +17,7 @@ class CircularUIManager: ObservableObject {
     private var appSwitcher: AppSwitcherManager?
     var functionManager: FunctionManager?
     private var mouseTracker: MouseTracker?
+    private var isCtrlPressed: Bool = false  // NEW: Track Ctrl key state
     
     init() {
         print("CircularUIManager initialized")
@@ -55,6 +56,63 @@ class CircularUIManager: ObservableObject {
         }
         
         setupOverlayWindow()
+        setupGlobalHotkeys()  // NEW: Setup keyboard shortcuts
+    }
+    
+    // NEW: Setup keyboard shortcut listener
+    private func setupGlobalHotkeys() {
+        print("⌨️ Setting up circular UI hotkeys")
+        
+        // Listen for global key events (keyDown and flagsChanged)
+        NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+            self?.handleGlobalKeyEvent(event)
+        }
+        
+        // Also listen for local events
+        NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+            self?.handleLocalKeyEvent(event)
+            return event
+        }
+        
+        print("✅ Circular UI hotkey monitoring started")
+    }
+    
+    // NEW: Handle global keyboard events
+    private func handleGlobalKeyEvent(_ event: NSEvent) {
+        let isCtrlCurrentlyPressed = event.modifierFlags.contains(.control)
+        let isShiftPressed = event.modifierFlags.contains(.shift)
+        let isTildeKey = event.keyCode == 50
+        
+        // Show UI when Ctrl + Shift + Tilde is pressed
+        if event.type == .keyDown && isCtrlCurrentlyPressed && isShiftPressed && isTildeKey && !isVisible {
+            print("⌨️ Ctrl+Shift+~ detected - showing circular UI")
+            isCtrlPressed = true
+            show()
+            return
+        }
+        
+        // Track Ctrl key state changes
+        if event.type == .flagsChanged {
+            let wasCtrlPressed = isCtrlPressed
+            isCtrlPressed = isCtrlCurrentlyPressed
+            
+            // If Ctrl was released and UI is visible, hide it
+            if wasCtrlPressed && !isCtrlCurrentlyPressed && isVisible {
+                print("⌨️ Ctrl released - hiding circular UI")
+                hide()
+            }
+        }
+        
+        // Hide UI on Escape
+        if event.type == .keyDown && event.keyCode == 53 && isVisible {
+            print("⌨️ Escape pressed - hiding circular UI")
+            hide()
+        }
+    }
+    
+    // NEW: Handle local keyboard events
+    private func handleLocalKeyEvent(_ event: NSEvent) {
+        handleGlobalKeyEvent(event)
     }
     
     private func setupOverlayWindow() {
@@ -118,6 +176,7 @@ class CircularUIManager: ObservableObject {
         mouseTracker?.stopTrackingMouse()
         
         isVisible = false
+        isCtrlPressed = false  // NEW: Reset Ctrl state
         overlayWindow?.hideOverlay()
         
         // Reset all state for clean slate on next show
