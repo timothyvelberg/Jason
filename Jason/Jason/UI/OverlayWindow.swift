@@ -27,8 +27,11 @@ class OverlayWindow: NSWindow {
         self.canHide = false
         self.collectionBehavior = [.canJoinAllSpaces, .stationary]
         
-        // Accept key events
+        // CRITICAL: Accept mouse events (both movement and clicks)
         self.acceptsMouseMovedEvents = true
+        self.ignoresMouseEvents = false  // NEW: Must be false to accept clicks!
+        
+        print("🪟 [OverlayWindow] ignoresMouseEvents set to: \(self.ignoresMouseEvents)")
         
         // Center the window on screen
         self.center()
@@ -53,6 +56,8 @@ class OverlayWindow: NSWindow {
         
         NSApp.activate(ignoringOtherApps: true)
         self.makeKey()
+        
+        print("🪟 Window is now key: \(self.isKeyWindow), ignoresMouseEvents: \(self.ignoresMouseEvents)")
     }
     
     func hideOverlay() {
@@ -82,5 +87,11 @@ class OverlayWindow: NSWindow {
         } else {
             super.keyDown(with: event)
         }
+    }
+    
+    // Log mouse events for debugging
+    override func mouseDown(with event: NSEvent) {
+        print("🖱️ [OverlayWindow] mouseDown detected at: \(event.locationInWindow)")
+        super.mouseDown(with: event)
     }
 }

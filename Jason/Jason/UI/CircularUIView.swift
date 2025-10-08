@@ -66,11 +66,16 @@ struct CircularUIView: View {
         let node = functionManager.rings[level].nodes[index]
         
         if node.isLeaf {
-            // It's a function - execute it
-            print("🖱️ Tapped leaf node: \(node.name) - executing")
+            // It's a function - execute it and hide the UI
+            print("🖱️ Tapped leaf node: \(node.name) - executing and hiding UI")
             node.onSelect?()
+            
+            // Hide the UI after a short delay to allow the action to complete
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                circularUI.hide()
+            }
         } else if node.isBranch {
-            // It's a category - expand it
+            // It's a category - expand it (keep UI open)
             print("🖱️ Tapped branch node: \(node.name) - expanding")
             functionManager.expandCategory(ringLevel: level, index: index)
         }

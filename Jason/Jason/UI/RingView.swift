@@ -60,7 +60,10 @@ struct RingView: View {
     }
     
     var body: some View {
-        ZStack {
+        let _ = print("🔵 [RingView] Rendering - Nodes: \(nodes.count), Selected: \(selectedIndex?.description ?? "none")")
+        let _ = print("   SliceConfig - Start: \(sliceConfig.startAngle)°, End: \(sliceConfig.endAngle)°, ItemAngle: \(sliceConfig.itemAngle)°, IsFullCircle: \(sliceConfig.isFullCircle)")
+        
+        return ZStack {
             // Ring background - either full circle or partial slice
             if sliceConfig.isFullCircle {
                 // Full circle background
@@ -70,6 +73,7 @@ struct RingView: View {
                 )
                 .fill(backgroundColor, style: FillStyle(eoFill: true))
                 .frame(width: totalDiameter, height: totalDiameter)
+                .allowsHitTesting(false)  // Don't block clicks, let slices handle them
             } else {
                 // Partial slice background
                 PieSliceShape(
@@ -80,6 +84,40 @@ struct RingView: View {
                 )
                 .fill(backgroundColor, style: FillStyle(eoFill: true))
                 .frame(width: totalDiameter, height: totalDiameter)
+                .allowsHitTesting(false)  // Don't block clicks, let slices handle them
+            }
+            
+            // Individual clickable slices for each node
+            ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
+                let itemAngle = sliceConfig.itemAngle
+                let baseAngle = sliceConfig.startAngle
+                let sliceStart = baseAngle + (itemAngle * Double(index))
+                let sliceEnd = sliceStart + itemAngle
+                
+                let _ = print("   Creating clickable slice \(index): \(sliceStart)° to \(sliceEnd)° for '\(node.name)'")
+                
+                PieSliceShape(
+                    startAngle: .degrees(sliceStart - 90),
+                    endAngle: .degrees(sliceEnd - 90),
+                    innerRadiusRatio: innerRadiusRatio,
+                    outerRadiusRatio: 1.0
+                )
+                .fill(Color.clear)  // Transparent but still clickable
+                // TEMPORARY DEBUG: Make slices visible to verify they exist
+                // .fill(Color.red.opacity(0.2))  // Uncomment to see the clickable areas
+                .contentShape(PieSliceShape(  // CRITICAL: Tell SwiftUI this shape is tappable
+                    startAngle: .degrees(sliceStart - 90),
+                    endAngle: .degrees(sliceEnd - 90),
+                    innerRadiusRatio: innerRadiusRatio,
+                    outerRadiusRatio: 1.0
+                ))
+                .frame(width: totalDiameter, height: totalDiameter)
+                .onTapGesture {
+                    print("🖱️ [RingView] Slice tapped - Index: \(index), Node: \(node.name)")
+                    print("   Slice angles: \(sliceStart)° to \(sliceEnd)°")
+                    print("   Calling onNodeTapped(\(index))")
+                    onNodeTapped(index)
+                }
             }
             
             // Animated selection indicator
@@ -92,17 +130,19 @@ struct RingView: View {
                 )
                 .fill(selectionColor, style: FillStyle(eoFill: true))
                 .frame(width: totalDiameter, height: totalDiameter)
+                .allowsHitTesting(false)  // CRITICAL: Don't block clicks to slices below!
             }
             
-            // Icons positioned around the ring
+            // Icons positioned around the ring (non-interactive, just visual)
             ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
                 Image(nsImage: node.icon)
                     .resizable()
                     .scaledToFit()
                     .frame(width: iconSize, height: iconSize)
                     .position(iconPosition(for: index))
+                    .allowsHitTesting(false)  // Prevent double-handling, let slices handle taps
                     .onTapGesture {
-                        onNodeTapped(index)
+                        print("⚠️ [RingView] Icon tapped (shouldn't happen!) - Index: \(index)")
                     }
             }
         }
