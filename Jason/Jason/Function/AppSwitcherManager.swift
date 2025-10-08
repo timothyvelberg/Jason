@@ -341,17 +341,6 @@ extension AppSwitcherManager {
         app.hide()
     }
     
-    /// Show app information
-    func showAppInfo(_ app: NSRunningApplication) {
-        print("ℹ️ App Info for: \(app.localizedName ?? "Unknown")")
-        print("   PID: \(app.processIdentifier)")
-        print("   Bundle ID: \(app.bundleIdentifier ?? "Unknown")")
-        print("   Active: \(app.isActive)")
-        print("   Hidden: \(app.isHidden)")
-        
-        // Future: Could show a nice info panel
-    }
-    
     /// Unhide an application (show it)
     func unhideApp(_ app: NSRunningApplication) {
         print("👀 Unhiding app: \(app.localizedName ?? "Unknown")")

@@ -80,11 +80,11 @@ class FunctionManager: ObservableObject {
                 // Calculate parent's actual angle position using its slice config
                 let parentAngle: Double
                 if parentSliceConfig.isFullCircle {
-                    // Parent is full circle - items centered in slices
+                    // Parent is full circle - use START of parent item slice
                     let parentItemAngle = 360.0 / Double(parentRing.nodes.count)
-                    parentAngle = (Double(parentSelectedIndex) * parentItemAngle) + (parentItemAngle / 2)
+                    parentAngle = Double(parentSelectedIndex) * parentItemAngle
                 } else {
-                    // Parent is partial slice - align to START of parent item (not center)
+                    // Parent is partial slice - align to START of parent item
                     let baseAngle = parentSliceConfig.startAngle
                     let itemAngle = parentSliceConfig.itemAngle
                     parentAngle = baseAngle + (Double(parentSelectedIndex) * itemAngle)
@@ -320,7 +320,7 @@ class FunctionManager: ObservableObject {
             navigateInto(node)
         }
     }
-    
+
     // MARK: - Data Loading
     
     func loadFunctions() {

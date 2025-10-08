@@ -50,7 +50,7 @@ extension AppSwitcherManager: FunctionProvider {
     }
     
     var providerIcon: NSImage {
-        return NSImage(systemSymbolName: "app.fill", accessibilityDescription: nil) ?? NSImage()
+        return NSImage(systemSymbolName: "iphone.app.switcher", accessibilityDescription: nil) ?? NSImage()
     }
     
     func provideFunctions() -> [FunctionNode] {
@@ -80,14 +80,6 @@ extension AppSwitcherManager: FunctionProvider {
                     icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
                     onSelect: { [weak self] in
                         self?.quitApp(app)
-                    }
-                ),
-                FunctionNode(
-                    id: "info-\(app.processIdentifier)",
-                    name: "App Info",
-                    icon: NSImage(systemSymbolName: "info.circle", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak self] in
-                        self?.showAppInfo(app)
                     }
                 )
             ]
