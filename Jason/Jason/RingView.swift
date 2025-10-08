@@ -45,7 +45,7 @@ struct RingView: View {
         return startRadius / endRadius
     }
     
-    // NEW: Computed opacity based on shouldDimOpacity
+    // Computed opacity based on shouldDimOpacity
     private var ringOpacity: Double {
         return shouldDimOpacity ? 0.9 : 1.0
     }

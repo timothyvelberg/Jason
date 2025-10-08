@@ -10,46 +10,59 @@ import AppKit
 import SwiftUI
 
 class FunctionManager: ObservableObject {
-    @Published var rootNodes: [FunctionNode] = []
-    @Published var navigationStack: [FunctionNode] = []
-    @Published var selectedIndex: Int? = nil
-    @Published var selectedOuterIndex: Int? = nil
-    @Published var hoveredOuterIndex: Int? = nil
-    @Published var isOuterRingExpanded: Bool = false
-    @Published var hoveredIndex: Int? = nil
-    @Published var ringResetTrigger: UUID = UUID()
     
+    // MARK: - Ring State Structure
     
-    private var appSwitcher: AppSwitcherManager?
-    
-    var currentLevel: [FunctionNode] {
-        if navigationStack.isEmpty {
-            return rootNodes
-        } else {
-            return navigationStack.last?.children ?? []
+    struct RingState {
+        var nodes: [FunctionNode]
+        var hoveredIndex: Int?
+        var selectedIndex: Int?
+        
+        init(nodes: [FunctionNode]) {
+            self.nodes = nodes
+            self.hoveredIndex = nil
+            self.selectedIndex = nil
         }
     }
     
-    // MARK: - Ring Display Properties
+    // MARK: - Published State
     
-    var innerRingNodes: [FunctionNode] {
-        return currentLevel
-    }
+    @Published var rings: [RingState] = []
+    @Published var activeRingLevel: Int = 0
+    @Published var ringResetTrigger: UUID = UUID()
     
-    var outerRingNodes: [FunctionNode] {
-        guard let selectedIndex = selectedIndex,
-              selectedIndex >= 0,
-              selectedIndex < currentLevel.count else { return [] }
-        let selectedNode = currentLevel[selectedIndex]
-        return selectedNode.children ?? []
-    }
+    // MARK: - Private State
     
-    var shouldShowOuterRing: Bool {
-        return isOuterRingExpanded && !outerRingNodes.isEmpty
+    private var rootNodes: [FunctionNode] = []
+    private var navigationStack: [FunctionNode] = []
+    private var appSwitcher: AppSwitcherManager?
+    
+    // MARK: - Computed Properties for UI
+    
+    var ringConfigurations: [RingConfiguration] {
+        var configs: [RingConfiguration] = []
+        let centerHoleRadius: CGFloat = 50
+        let ringThickness: CGFloat = 80
+        let ringMargin: CGFloat = 2
+        var currentRadius = centerHoleRadius
+        
+        for (index, ringState) in rings.enumerated() {
+            configs.append(RingConfiguration(
+                level: index,
+                startRadius: currentRadius,
+                thickness: ringThickness,
+                nodes: ringState.nodes,
+                selectedIndex: ringState.hoveredIndex
+            ))
+            currentRadius += ringThickness + ringMargin
+        }
+        
+        return configs
     }
     
     var currentFunctionList: [FunctionItem] {
-        return currentLevel.map { node in
+        guard !rings.isEmpty else { return [] }
+        return rings[0].nodes.map { node in
             FunctionItem(
                 id: node.id,
                 name: node.name,
@@ -65,9 +78,7 @@ class FunctionManager: ObservableObject {
         }
     }
     
-    var currentSelectedIndex: Int? {
-        return hoveredIndex
-    }
+    // MARK: - Initialization
     
     init(appSwitcher: AppSwitcherManager) {
         self.appSwitcher = appSwitcher
@@ -78,13 +89,34 @@ class FunctionManager: ObservableObject {
     
     func reset() {
         navigationStack.removeAll()
-        selectedIndex = nil
-        selectedOuterIndex = nil
-        hoveredIndex = nil
-        hoveredOuterIndex = nil
-        isOuterRingExpanded = false
-        ringResetTrigger = UUID()  // 👈 Add this line
+        rings.removeAll()
+        activeRingLevel = 0
+        ringResetTrigger = UUID()
         print("FunctionManager state reset")
+    }
+    
+    private func rebuildRings() {
+        rings.removeAll()
+        
+        // Get current level nodes
+        let currentNodes = navigationStack.isEmpty ? rootNodes : (navigationStack.last?.children ?? [])
+        
+        guard !currentNodes.isEmpty else { return }
+        
+        // Always have at least the base ring
+        rings.append(RingState(nodes: currentNodes))
+        
+        // If there's a selected category in ring 0, show its children in ring 1
+        if let ring0 = rings.first,
+           let selectedIndex = ring0.selectedIndex,
+           selectedIndex < ring0.nodes.count {
+            let selectedNode = ring0.nodes[selectedIndex]
+            if selectedNode.isBranch, let children = selectedNode.children, !children.isEmpty {
+                rings.append(RingState(nodes: children))
+            }
+        }
+        
+        print("Rebuilt rings: \(rings.count) ring(s)")
     }
     
     // MARK: - Navigation
@@ -95,10 +127,8 @@ class FunctionManager: ObservableObject {
             return
         }
         navigationStack.append(node)
-        selectedIndex = nil
-        selectedOuterIndex = nil
-        hoveredOuterIndex = nil
-        isOuterRingExpanded = false
+        activeRingLevel = 0
+        rebuildRings()
         print("Navigated into: \(node.name), depth: \(navigationStack.count)")
     }
     
@@ -108,109 +138,97 @@ class FunctionManager: ObservableObject {
             return
         }
         let previous = navigationStack.removeLast()
-        selectedIndex = nil
-        selectedOuterIndex = nil
-        hoveredOuterIndex = nil
-        isOuterRingExpanded = false
+        activeRingLevel = 0
+        rebuildRings()
         print("Navigated back from: \(previous.name), depth: \(navigationStack.count)")
     }
     
-    // MARK: - Selection
+    // MARK: - Ring Interaction
     
-    func expandRing(at index: Int) {
-        guard index >= 0, index < innerRingNodes.count else { return }
-        let node = innerRingNodes[index]
-        guard node.isBranch else { return }
+    func hoverNode(ringLevel: Int, index: Int) {
+        guard rings.indices.contains(ringLevel) else { return }
+        guard rings[ringLevel].nodes.indices.contains(index) else { return }
         
-        selectedIndex = index
-        hoveredIndex = index
-        selectedOuterIndex = nil
-        hoveredOuterIndex = nil
-        isOuterRingExpanded = true
+        rings[ringLevel].hoveredIndex = index
         
-        print("Expanded ring for '\(node.name)'")
+        let node = rings[ringLevel].nodes[index]
+        print("Hovering ring \(ringLevel), index \(index): \(node.name)")
     }
     
-    func collapseRing() {
-        isOuterRingExpanded = false
-        selectedOuterIndex = nil
-        hoveredOuterIndex = nil
-        print("Collapsed outer ring")
+    func selectNode(ringLevel: Int, index: Int) {
+        guard rings.indices.contains(ringLevel) else { return }
+        guard rings[ringLevel].nodes.indices.contains(index) else { return }
+        
+        rings[ringLevel].selectedIndex = index
+        rings[ringLevel].hoveredIndex = index
+        
+        let node = rings[ringLevel].nodes[index]
+        print("Selected ring \(ringLevel), index \(index): \(node.name)")
     }
     
-    func selectInnerRing(at index: Int) {
-        guard index >= 0, index < innerRingNodes.count else { return }
+    func expandCategory(ringLevel: Int, index: Int) {
+        print("⭐ expandCategory called: ringLevel=\(ringLevel), index=\(index)")
         
-        let node = innerRingNodes[index]
-        
-        if selectedIndex == index {
-            // Clicking same item - toggle expansion
-            isOuterRingExpanded.toggle()
-            print("Toggled outer ring for \(node.name): \(isOuterRingExpanded ? "shown" : "hidden")")
-        } else {
-            // Clicking different item - select it and expand if it has children
-            selectedIndex = index
-            hoveredIndex = index  // Keep hover in sync
-            selectedOuterIndex = nil
-            hoveredOuterIndex = nil
-            isOuterRingExpanded = node.isBranch
-            print("Selected inner ring \(index): \(node.name), outer ring: \(isOuterRingExpanded ? "shown" : "hidden")")
+        guard rings.indices.contains(ringLevel) else {
+            print("❌ Invalid ring level: \(ringLevel)")
+            return
         }
-    }
-    
-    func selectOuterRing(at index: Int) {
-        guard index >= 0, index < outerRingNodes.count else { return }
-        selectedOuterIndex = index
-        hoveredOuterIndex = index
+        guard rings[ringLevel].nodes.indices.contains(index) else {
+            print("❌ Invalid node index: \(index) for ring level: \(ringLevel)")
+            return
+        }
         
-        let node = outerRingNodes[index]
-        print("Selected outer ring \(index): \(node.name)")
+        let node = rings[ringLevel].nodes[index]
+        
+        guard node.isBranch, let children = node.children, !children.isEmpty else {
+            print("Cannot expand non-category or empty category: \(node.name)")
+            return
+        }
+        
+        // Select the node at this level
+        rings[ringLevel].selectedIndex = index
+        rings[ringLevel].hoveredIndex = index
+        
+        // Remove any rings beyond this level
+        if ringLevel + 1 < rings.count {
+            rings.removeSubrange((ringLevel + 1)...)
+        }
+        
+        // Add new ring with children
+        rings.append(RingState(nodes: children))
+        activeRingLevel = ringLevel + 1
+        
+        print("Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(children.count) nodes")
     }
     
-    func selectFunction(at index: Int) {
-        guard index >= 0, index < innerRingNodes.count else { return }
-        hoveredIndex = index
-    }
-    
-    func selectOuterFunction(at index: Int) {
-        guard index >= 0, index < outerRingNodes.count else { return }
-        hoveredOuterIndex = index
+    func collapseToRing(level: Int) {
+        guard level >= 0, level < rings.count else { return }
+        
+        // Remove all rings after the specified level
+        if level + 1 < rings.count {
+            let removed = rings.count - (level + 1)
+            rings.removeSubrange((level + 1)...)
+            activeRingLevel = level
+            print("Collapsed \(removed) ring(s), now at ring \(level)")
+        }
     }
     
     // MARK: - Execution
     
-    func executeInnerRing() {
-        guard let selectedIndex = selectedIndex,
-              selectedIndex >= 0,
-              selectedIndex < innerRingNodes.count else { return }
-        let node = innerRingNodes[selectedIndex]
+    func executeSelected() {
+        guard activeRingLevel < rings.count else { return }
+        guard let selectedIndex = rings[activeRingLevel].selectedIndex else { return }
+        guard rings[activeRingLevel].nodes.indices.contains(selectedIndex) else { return }
+        
+        let node = rings[activeRingLevel].nodes[selectedIndex]
         
         if node.isLeaf {
-            print("Executing inner ring function: \(node.name)")
+            print("Executing function: \(node.name)")
             node.action?()
         } else {
             print("Navigating into category: \(node.name)")
             navigateInto(node)
         }
-    }
-    
-    func executeOuterRing() {
-        guard let selectedOuterIndex = selectedOuterIndex,
-              selectedOuterIndex >= 0,
-              selectedOuterIndex < outerRingNodes.count else { return }
-        let node = outerRingNodes[selectedOuterIndex]
-        
-        if node.isLeaf {
-            print("Executing outer ring function: \(node.name)")
-            node.action?()
-        } else {
-            print("Navigating into nested category: \(node.name)")
-            navigateInto(node)
-        }
-    }
-    
-    func executeSelected() {
-        executeInnerRing()
     }
     
     // MARK: - Data Loading
@@ -240,6 +258,7 @@ class FunctionManager: ObservableObject {
             )
         ]
         
+        rebuildRings()
         print("Loaded \(rootNodes.count) root nodes with \(appNodes.count) app functions")
     }
     
@@ -264,7 +283,7 @@ class FunctionManager: ObservableObject {
             )
         }
         
-        let nestedLeaves = (1...2).map { index in
+        let nestedLeaves = (1...6).map { index in
             FunctionNode(
                 id: "nested-func-\(index)",
                 name: "Nested Func \(index)",
@@ -351,7 +370,7 @@ class FunctionManager: ObservableObject {
             )
         ]
         
+        rebuildRings()
         print("Loaded \(rootNodes.count) root nodes (tree structure)")
     }
-
 }

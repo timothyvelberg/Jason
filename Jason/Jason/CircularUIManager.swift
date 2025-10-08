@@ -32,27 +32,16 @@ class CircularUIManager: ObservableObject {
             mouseTracker?.onPieHover = { [weak functionManager] pieIndex in
                 guard let pieIndex = pieIndex, let fm = functionManager else { return }
                 
-                // Determine which ring is active
-                let ringLevel = fm.shouldShowOuterRing ? 1 : 0
+                let ringLevel = fm.activeRingLevel
                 
-                if ringLevel == 0 {
-                    // Inner ring
-                    let nodes = fm.innerRingNodes
-                    if nodes.indices.contains(pieIndex) {
-                        let node = nodes[pieIndex]
-                        let type = node.isLeaf ? "FUNCTION" : "CATEGORY"
-                        print("🎯 [INNER RING] Hovering: index=\(pieIndex), name='\(node.name)', type=\(type)")
-                        print("   hoveredIndex=\(fm.hoveredIndex), selectedIndex=\(fm.selectedIndex)")
-                    }
-                } else {
-                    // Outer ring
-                    let nodes = fm.outerRingNodes
-                    if nodes.indices.contains(pieIndex) {
-                        let node = nodes[pieIndex]
-                        let type = node.isLeaf ? "FUNCTION" : "CATEGORY"
-                        print("🎯 [OUTER RING] Hovering: index=\(pieIndex), name='\(node.name)', type=\(type)")
-                        print("   hoveredOuterIndex=\(fm.hoveredOuterIndex), selectedOuterIndex=\(fm.selectedOuterIndex)")
-                    }
+                guard ringLevel < fm.rings.count else { return }
+                let nodes = fm.rings[ringLevel].nodes
+                
+                if nodes.indices.contains(pieIndex) {
+                    let node = nodes[pieIndex]
+                    let type = node.isLeaf ? "FUNCTION" : "CATEGORY"
+                    print("🎯 [RING \(ringLevel)] Hovering: index=\(pieIndex), name='\(node.name)', type=\(type)")
+                    print("   hoveredIndex=\(fm.rings[ringLevel].hoveredIndex ?? -1), selectedIndex=\(fm.rings[ringLevel].selectedIndex ?? -1)")
                 }
             }
         }
@@ -84,10 +73,11 @@ class CircularUIManager: ObservableObject {
         
         // Check if we have any actual content (leaf nodes or branches with children)
         let hasValidData: Bool = {
-            guard !functionManager.rootNodes.isEmpty else { return false }
+            guard functionManager.rings.count > 0 else { return false }
+            guard !functionManager.rings[0].nodes.isEmpty else { return false }
             
             // Check if any root node has content
-            for node in functionManager.rootNodes {
+            for node in functionManager.rings[0].nodes {
                 if node.isLeaf {
                     return true  // Has at least one executable function
                 } else if node.childCount > 0 {
@@ -129,18 +119,7 @@ class CircularUIManager: ObservableObject {
     }
     
     func executeSelectedFunction() {
-        guard let functionManager = functionManager,
-              let selectedIndex = functionManager.selectedIndex else { return }
-        
-        let currentFunctions = functionManager.currentFunctionList
-        
-        guard currentFunctions.indices.contains(selectedIndex) else {
-            print("Invalid function index: \(selectedIndex)")
-            return
-        }
-        
-        let selectedFunction = currentFunctions[selectedIndex]
-        print("Executing function: \(selectedFunction.name)")
-        selectedFunction.action()
+        guard let functionManager = functionManager else { return }
+        functionManager.executeSelected()
     }
 }
