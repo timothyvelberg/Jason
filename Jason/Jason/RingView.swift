@@ -135,6 +135,8 @@ struct RingView: View {
                 // Use slice config for initial angles
                 let itemAngle = sliceConfig.itemAngle
                 let baseAngle = sliceConfig.startAngle
+                
+                // Center selection around item in middle of slice (all rings)
                 let angleOffset = baseAngle + (Double(index) * itemAngle) + (itemAngle / 2)
                 
                 startAngle = Angle(degrees: angleOffset - itemAngle / 2 - 90)
@@ -163,6 +165,7 @@ struct RingView: View {
                 hasAppeared = true
                 
                 let baseAngle = sliceConfig.startAngle
+                // Center selection around item in middle of slice (all rings)
                 let angleOffset = baseAngle + (Double(index) * itemAngle) + (itemAngle / 2)
                 
                 startAngle = Angle(degrees: angleOffset - itemAngle / 2 - 90)
@@ -173,18 +176,25 @@ struct RingView: View {
         
         guard let prevIndex = previousIndex, index != prevIndex else { return }
         
-        var newRotationIndex = rotationIndex
+        var newRotationIndex: Int
         
-        let forwardSteps = (index - prevIndex + totalCount) % totalCount
-        let backwardSteps = (prevIndex - index + totalCount) % totalCount
-        
-        if forwardSteps <= backwardSteps {
-            newRotationIndex += forwardSteps
+        if sliceConfig.isFullCircle {
+            // Full circle: use wrap-around logic
+            let forwardSteps = (index - prevIndex + totalCount) % totalCount
+            let backwardSteps = (prevIndex - index + totalCount) % totalCount
+            
+            if forwardSteps <= backwardSteps {
+                newRotationIndex = rotationIndex + forwardSteps
+            } else {
+                newRotationIndex = rotationIndex - backwardSteps
+            }
         } else {
-            newRotationIndex -= backwardSteps
+            // Partial slice: no wrap-around, just use the actual index
+            newRotationIndex = index
         }
         
         let baseAngle = sliceConfig.startAngle
+        // Center selection around item in middle of slice (all rings)
         let newAngleOffset = baseAngle + (Double(newRotationIndex) * itemAngle) + (itemAngle / 2)
         
         withAnimation(.easeOut(duration: 0.08)) {
@@ -206,7 +216,7 @@ struct RingView: View {
         let itemAngle = sliceConfig.itemAngle
         let baseAngle = sliceConfig.startAngle
         
-        // Position at the center of this item's slice
+        // Position items centered in their slices for all rings
         let iconAngle = baseAngle + (itemAngle * Double(index)) + (itemAngle / 2)
         let angleInRadians = (iconAngle - 90) * (.pi / 180)  // Adjust for 0° = top
         
