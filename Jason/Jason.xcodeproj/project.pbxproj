@@ -6,15 +6,8 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		1C2AEA022E93BDB700FBB12C /* KeyboardEventHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C2AE9F72E93BDB700FBB12C /* KeyboardEventHandler.swift */; };
-		1C2AEA032E93BDB700FBB12C /* MouseTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C2AE9F82E93BDB700FBB12C /* MouseTracker.swift */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
 		1C0298022E3B9914002661DB /* Jason.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jason.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		1C2AE9F72E93BDB700FBB12C /* KeyboardEventHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardEventHandler.swift; sourceTree = "<group>"; };
-		1C2AE9F82E93BDB700FBB12C /* MouseTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseTracker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -41,7 +34,6 @@
 			children = (
 				1C0298042E3B9914002661DB /* Jason */,
 				1C0298032E3B9914002661DB /* Products */,
-				1C2AEA172E9674A600FBB12C /* Utils */,
 			);
 			sourceTree = "<group>";
 		};
@@ -51,15 +43,6 @@
 				1C0298022E3B9914002661DB /* Jason.app */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		1C2AEA172E9674A600FBB12C /* Utils */ = {
-			isa = PBXGroup;
-			children = (
-				1C2AE9F82E93BDB700FBB12C /* MouseTracker.swift */,
-				1C2AE9F72E93BDB700FBB12C /* KeyboardEventHandler.swift */,
-			);
-			path = Utils;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -136,8 +119,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1C2AEA022E93BDB700FBB12C /* KeyboardEventHandler.swift in Sources */,
-				1C2AEA032E93BDB700FBB12C /* MouseTracker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
