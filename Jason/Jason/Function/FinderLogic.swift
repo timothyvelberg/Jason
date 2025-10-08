@@ -97,6 +97,14 @@ class FinderLogic: FunctionProvider {
                     onSelect: { [weak self] in
                         self?.revealInFinder(folderURL)
                     }
+                ),
+                FunctionNode(
+                    id: "delete-folder-\(folderURL.path)",
+                    name: "Move to Trash",
+                    icon: NSImage(systemSymbolName: "trash", accessibilityDescription: nil) ?? NSImage(),
+                    onSelect: { [weak self] in
+                        self?.deleteItem(folderURL)
+                    }
                 )
             ],
             onSelect: { [weak self] in
@@ -141,6 +149,14 @@ class FinderLogic: FunctionProvider {
                     icon: NSImage(systemSymbolName: "eye", accessibilityDescription: nil) ?? NSImage(),
                     onSelect: { [weak self] in
                         self?.quickLook(fileURL)
+                    }
+                ),
+                FunctionNode(
+                    id: "delete-file-\(fileURL.path)",
+                    name: "Move to Trash",
+                    icon: NSImage(systemSymbolName: "trash", accessibilityDescription: nil) ?? NSImage(),
+                    onSelect: { [weak self] in
+                        self?.deleteItem(fileURL)
                     }
                 )
             ],
@@ -189,5 +205,19 @@ class FinderLogic: FunctionProvider {
         // Note: Quick Look requires QLPreviewPanel, more complex to implement
         // For now, just open the file
         NSWorkspace.shared.open(url)
+    }
+    
+    private func deleteItem(_ url: URL) {
+        print("🗑️ Moving to trash: \(url.lastPathComponent)")
+        
+        do {
+            // Move to trash (safe, user can recover)
+            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            print("✅ Successfully moved to trash: \(url.lastPathComponent)")
+        } catch {
+            // Show error alert if something goes wrong
+            print("❌ Failed to move to trash: \(error.localizedDescription)")
+            // ... alert shown to user
+        }
     }
 }
