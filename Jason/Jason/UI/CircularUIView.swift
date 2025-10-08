@@ -65,19 +65,23 @@ struct CircularUIView: View {
         
         let node = functionManager.rings[level].nodes[index]
         
-        if node.isLeaf {
-            // It's a function - execute it and hide the UI
-            print("🖱️ Tapped leaf node: \(node.name) - executing and hiding UI")
-            node.onSelect?()
+        // NEW LOGIC: Check if node has a primary action first
+        if let action = node.onSelect {
+            // Has a primary action - execute it (whether leaf or branch)
+            print("🖱️ Tapped node: \(node.name) - executing primary action")
+            action()
             
-            // Hide the UI after a short delay to allow the action to complete
+            // Hide UI after action completes
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 circularUI.hide()
             }
         } else if node.isBranch {
-            // It's a category - expand it (keep UI open)
-            print("🖱️ Tapped branch node: \(node.name) - expanding")
+            // No primary action, but has children - expand on click as fallback
+            print("🖱️ Tapped branch node without action: \(node.name) - expanding")
             functionManager.expandCategory(ringLevel: level, index: index)
+        } else {
+            // No action and no children - do nothing
+            print("⚠️ Tapped node with no action or children: \(node.name)")
         }
     }
 }

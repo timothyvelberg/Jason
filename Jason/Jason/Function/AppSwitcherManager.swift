@@ -353,3 +353,96 @@ extension AppSwitcherManager {
         app.forceTerminate()
     }
 }
+
+extension AppSwitcherManager: FunctionProvider {
+    var providerId: String {
+        return "app-switcher"
+    }
+    
+    var providerName: String {
+        return "Applications"
+    }
+    
+    var providerIcon: NSImage {
+        return NSImage(systemSymbolName: "square.grid.3x3.fill", accessibilityDescription: nil) ?? NSImage()
+    }
+    
+    func provideFunctions() -> [FunctionNode] {
+        // Convert running apps to FunctionNodes with context actions
+        let appNodes = runningApps.map { app in
+            // Create context actions for each app
+            let contextActions = [
+                FunctionNode(
+                    id: "activate-\(app.processIdentifier)",
+                    name: "Bring to Front",
+                    icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
+                    onSelect: { [weak self] in
+                        self?.switchToApp(app)
+                    }
+                ),
+                FunctionNode(
+                    id: "hide-\(app.processIdentifier)",
+                    name: "Hide",
+                    icon: NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil) ?? NSImage(),
+                    onSelect: { [weak self] in
+                        self?.hideApp(app)
+                    }
+                ),
+                FunctionNode(
+                    id: "quit-\(app.processIdentifier)",
+                    name: "Quit",
+                    icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
+                    onSelect: { [weak self] in
+                        self?.quitApp(app)
+                    }
+                )
+            ]
+            
+            return FunctionNode(
+                id: "app-\(app.processIdentifier)",
+                name: app.localizedName ?? "Unknown",
+                icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
+                contextActions: contextActions,
+                onSelect: { [weak self] in
+                    // Primary action: switch to app
+                    self?.switchToApp(app)
+                },
+                onHover: {
+                    // Optional: Could preview app windows here
+                    print("Hovering over \(app.localizedName ?? "Unknown")")
+                },
+                onHoverExit: {
+                    // Optional: Clean up preview
+                    print("Left \(app.localizedName ?? "Unknown")")
+                }
+            )
+        }
+        
+        // Return as a single category node with primary action
+        return [
+            FunctionNode(
+                id: providerId,
+                name: providerName,
+                icon: providerIcon,
+                children: appNodes,
+                onSelect: { [weak self] in
+                    // NEW: Primary action - open Applications folder
+                    print("📂 Opening Applications folder")
+                    self?.openApplicationsFolder()
+                },
+                maxDisplayedChildren: 12  // Limit to 12 apps in the pie slice
+            )
+        ]
+    }
+    
+    func refresh() {
+        // Force reload of running applications
+        loadRunningApplications()
+    }
+    
+    // NEW: Helper method to open Applications folder
+    private func openApplicationsFolder() {
+        let applicationsURL = URL(fileURLWithPath: "/Applications")
+        NSWorkspace.shared.open(applicationsURL)
+    }
+}
