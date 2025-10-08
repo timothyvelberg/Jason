@@ -2,7 +2,13 @@
 //  FinderLogic.swift
 //  Jason
 //
-//  Created by Timothy Velberg on 08/10/2025.
+//  Shows open Finder windows in a simple list
+//  - Ring 0: Single "Finder" item
+//    - Click: Opens new Finder window
+//    - Hover+outward: Shows all open windows + "New Window" option
+//
+//  - Ring 1: Open Finder windows (simple list)
+//    - Click: Brings that window to front
 //
 
 import Foundation
@@ -12,212 +18,278 @@ class FinderLogic: FunctionProvider {
     
     // MARK: - Provider Info
     
-    var providerId: String { "finder" }
+    var providerId: String { "finder-windows" }
     var providerName: String { "Finder" }
     var providerIcon: NSImage {
         return NSWorkspace.shared.icon(forFile: "/System/Library/CoreServices/Finder.app")
     }
-    
-    // MARK: - Settings
-    
-    private let maxItemsPerFolder: Int = 5
-    
-    // TEST: Just your Desktop folder
-    private let startingFolders: [URL] = [
-        URL(fileURLWithPath: "/Users/timothy/Desktop")
-    ]
     
     // MARK: - Provide Functions
     
     func provideFunctions() -> [FunctionNode] {
         print("🔍 [FinderLogic] provideFunctions() called")
         
-        // TEST: Return Desktop folder directly (no wrapper)
-        // This makes it appear directly in Ring 0
-        let folderNodes = startingFolders.compactMap { folderURL in
-            createFolderNode(for: folderURL)
+        // Get all open Finder windows
+        let finderWindows = getOpenFinderWindows()
+        print("🔍 [FinderLogic] Found \(finderWindows.count) open Finder window(s)")
+        
+        // Create simple nodes for each window (no children)
+        var windowNodes = finderWindows.compactMap { windowInfo in
+            createFinderWindowNode(for: windowInfo)
         }
         
-        print("🔍 [FinderLogic] Returning \(folderNodes.count) root node(s)")
-        return folderNodes
+        // Add "New Window" action at the end
+        windowNodes.append(FunctionNode(
+            id: "new-finder-window",
+            name: "New Window",
+            icon: NSImage(systemSymbolName: "plus.rectangle", accessibilityDescription: nil) ?? NSImage(),
+            onSelect: { [weak self] in
+                self?.openNewFinderWindow()
+            }
+        ))
+        
+        // Return as single "Finder" category
+        return [
+            FunctionNode(
+                id: providerId,
+                name: providerName,
+                icon: providerIcon,
+                children: windowNodes,
+                onSelect: { [weak self] in
+                    // Primary action: Open new Finder window
+                    print("📂 Opening new Finder window")
+                    self?.openNewFinderWindow()
+                }
+            )
+        ]
     }
     
     func refresh() {
         print("🔄 [FinderLogic] refresh() called")
-        // No-op for now, file system is always up-to-date
     }
     
-    // MARK: - Private Logic
+    // MARK: - Finder Window Discovery
     
-    /// Creates a FunctionNode for a folder
-    /// - On press: Opens the folder in Finder
-    /// - Sub-category: Shows folder contents (up to maxItemsPerFolder)
-    private func createFolderNode(for folderURL: URL) -> FunctionNode? {
-        guard folderURL.hasDirectoryPath else { return nil }
-        
-        print("📂 [FinderLogic] Creating node for folder: \(folderURL.lastPathComponent)")
-        
-        // Get folder contents
-        let contents = getFolderContents(folderURL)
-        print("   Found \(contents.count) items")
-        
-        // Limit to max items
-        let limitedContents = Array(contents.prefix(maxItemsPerFolder))
-        print("   Showing \(limitedContents.count) items (limit: \(maxItemsPerFolder))")
-        
-        // Create child nodes for each item
-        let childNodes = limitedContents.compactMap { itemURL -> FunctionNode? in
-            if itemURL.hasDirectoryPath {
-                // It's a folder - recurse
-                return createFolderNode(for: itemURL)
-            } else {
-                // It's a file - create file node
-                return createFileNode(for: itemURL)
-            }
-        }
-        
-        return FunctionNode(
-            id: "folder-\(folderURL.path)",
-            name: folderURL.lastPathComponent,
-            icon: NSWorkspace.shared.icon(forFile: folderURL.path),
-            children: childNodes.isEmpty ? nil : childNodes,
-            contextActions: [
-                FunctionNode(
-                    id: "open-folder-\(folderURL.path)",
-                    name: "Open in Finder",
-                    icon: NSImage(systemSymbolName: "folder", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak self] in
-                        self?.openInFinder(folderURL)
-                    }
-                ),
-                FunctionNode(
-                    id: "reveal-folder-\(folderURL.path)",
-                    name: "Reveal in Finder",
-                    icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak self] in
-                        self?.revealInFinder(folderURL)
-                    }
-                ),
-                FunctionNode(
-                    id: "delete-folder-\(folderURL.path)",
-                    name: "Move to Trash",
-                    icon: NSImage(systemSymbolName: "trash", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak self] in
-                        self?.deleteItem(folderURL)
-                    }
-                )
-            ],
-            onSelect: { [weak self] in
-                // Primary action: Open folder
-                self?.openInFinder(folderURL)
-            },
-            maxDisplayedChildren: maxItemsPerFolder
-        )
+    struct FinderWindowInfo {
+        let name: String
+        let url: URL
+        let index: Int
     }
     
-    /// Creates a FunctionNode for a file
-    /// - On press: Opens the file
-    private func createFileNode(for fileURL: URL) -> FunctionNode? {
-        guard !fileURL.hasDirectoryPath else { return nil }
+    private func getOpenFinderWindows() -> [FinderWindowInfo] {
+        print("🔍 [FinderLogic] Querying Finder for open windows...")
         
-        print("📄 [FinderLogic] Creating node for file: \(fileURL.lastPathComponent)")
+        // Use System Events to query Finder windows (more reliable)
+        let script = """
+        tell application "System Events"
+            tell process "Finder"
+                set windowList to {}
+                set allWindows to every window
+                
+                repeat with i from 1 to count of allWindows
+                    try
+                        set theWindow to item i of allWindows
+                        set windowName to name of theWindow as string
+                        
+                        -- Skip special windows
+                        if windowName is not "" and windowName does not start with "." then
+                            copy windowName to end of windowList
+                        end if
+                    on error errMsg
+                        -- Skip windows that can't be accessed
+                    end try
+                end repeat
+                
+                return windowList
+            end tell
+        end tell
+        """
         
-        return FunctionNode(
-            id: "file-\(fileURL.path)",
-            name: fileURL.lastPathComponent,
-            icon: NSWorkspace.shared.icon(forFile: fileURL.path),
-            contextActions: [
-                FunctionNode(
-                    id: "open-file-\(fileURL.path)",
-                    name: "Open",
-                    icon: NSImage(systemSymbolName: "doc", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak self] in
-                        self?.openFile(fileURL)
-                    }
-                ),
-                FunctionNode(
-                    id: "reveal-file-\(fileURL.path)",
-                    name: "Reveal in Finder",
-                    icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak self] in
-                        self?.revealInFinder(fileURL)
-                    }
-                ),
-                FunctionNode(
-                    id: "quicklook-\(fileURL.path)",
-                    name: "Quick Look",
-                    icon: NSImage(systemSymbolName: "eye", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak self] in
-                        self?.quickLook(fileURL)
-                    }
-                ),
-                FunctionNode(
-                    id: "delete-file-\(fileURL.path)",
-                    name: "Move to Trash",
-                    icon: NSImage(systemSymbolName: "trash", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak self] in
-                        self?.deleteItem(fileURL)
-                    }
-                )
-            ],
-            onSelect: { [weak self] in
-                // Primary action: Open file
-                self?.openFile(fileURL)
-            }
-        )
-    }
-    
-    // MARK: - File System Helpers
-    
-    private func getFolderContents(_ folderURL: URL) -> [URL] {
-        do {
-            let contents = try FileManager.default.contentsOfDirectory(
-                at: folderURL,
-                includingPropertiesForKeys: [.isDirectoryKey, .nameKey],
-                options: [.skipsHiddenFiles, .skipsPackageDescendants]
-            )
-            return contents.sorted { $0.lastPathComponent < $1.lastPathComponent }
-        } catch {
-            print("Error reading folder contents: \(error)")
+        var windows: [FinderWindowInfo] = []
+        
+        guard let appleScript = NSAppleScript(source: script) else {
+            print("❌ Failed to create AppleScript")
             return []
         }
+        
+        var error: NSDictionary?
+        let result = appleScript.executeAndReturnError(&error)
+        
+        if let error = error {
+            print("❌ AppleScript error: \(error)")
+            if let errorMessage = error["NSAppleScriptErrorMessage"] as? String {
+                print("   Error message: \(errorMessage)")
+            }
+            return []
+        }
+        
+        print("✅ AppleScript executed successfully")
+        print("   Result type: \(result.descriptorType)")
+        print("   Number of items: \(result.numberOfItems)")
+        
+        // Parse the result - each item is just a window name
+        if result.numberOfItems > 0 {
+            for i in 1...result.numberOfItems {
+                guard let item = result.atIndex(i) else {
+                    print("   ⚠️ Could not get item at index \(i)")
+                    continue
+                }
+                
+                if let windowName = item.stringValue {
+                    print("   ✅ Found window: \(windowName)")
+                    
+                    // Try to guess the path from the window name
+                    let url = guessURLFromWindowName(windowName)
+                    windows.append(FinderWindowInfo(name: windowName, url: url, index: i))
+                } else {
+                    print("   ⚠️ Could not get string value for item \(i)")
+                }
+            }
+        } else {
+            print("   ℹ️ No Finder windows currently open")
+        }
+        
+        print("🔍 [FinderLogic] Returning \(windows.count) window(s)")
+        return windows
+    }
+    
+    private func guessURLFromWindowName(_ windowName: String) -> URL {
+        // Try common locations first
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        
+        let commonPaths: [String: String] = [
+            "Desktop": "Desktop",
+            "Documents": "Documents",
+            "Downloads": "Downloads",
+            "Pictures": "Pictures",
+            "Music": "Music",
+            "Movies": "Movies",
+            "Applications": "/Applications",
+            "Utilities": "/Applications/Utilities"
+        ]
+        
+        if let relativePath = commonPaths[windowName] {
+            if relativePath.hasPrefix("/") {
+                return URL(fileURLWithPath: relativePath)
+            } else {
+                return homeDir.appendingPathComponent(relativePath)
+            }
+        }
+        
+        // If not a common name, try as subfolder of home directory
+        let guessedPath = homeDir.appendingPathComponent(windowName)
+        if FileManager.default.fileExists(atPath: guessedPath.path) {
+            return guessedPath
+        }
+        
+        // Fallback to home directory
+        print("   ⚠️ Could not determine path for window '\(windowName)', using home directory")
+        return homeDir
+    }
+    
+    private func createFinderWindowNode(for windowInfo: FinderWindowInfo) -> FunctionNode? {
+        print("🪟 [FinderLogic] Creating node for window: \(windowInfo.name)")
+        
+        // Simple node with context action to close
+        return FunctionNode(
+            id: "finder-window-\(windowInfo.index)",
+            name: windowInfo.name,
+            icon: NSWorkspace.shared.icon(forFile: windowInfo.url.path),
+            contextActions: [
+                FunctionNode(
+                    id: "close-window-\(windowInfo.index)",
+                    name: "Close Window",
+                    icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
+                    onSelect: { [weak self] in
+                        self?.closeFinderWindow(windowInfo.index)
+                    }
+                )
+            ],
+            onSelect: { [weak self] in
+                // Primary action: Bring this Finder window to front
+                self?.bringFinderWindowToFront(windowInfo.index)
+            }
+        )
     }
     
     // MARK: - Actions
     
-    private func openInFinder(_ url: URL) {
-        print("📂 Opening folder: \(url.lastPathComponent)")
-        NSWorkspace.shared.open(url)
-    }
-    
-    private func openFile(_ url: URL) {
-        print("📄 Opening file: \(url.lastPathComponent)")
-        NSWorkspace.shared.open(url)
-    }
-    
-    private func revealInFinder(_ url: URL) {
-        print("👁️ Revealing in Finder: \(url.lastPathComponent)")
-        NSWorkspace.shared.activateFileViewerSelecting([url])
-    }
-    
-    private func quickLook(_ url: URL) {
-        print("👀 Quick Look: \(url.lastPathComponent)")
-        // Note: Quick Look requires QLPreviewPanel, more complex to implement
-        // For now, just open the file
-        NSWorkspace.shared.open(url)
-    }
-    
-    private func deleteItem(_ url: URL) {
-        print("🗑️ Moving to trash: \(url.lastPathComponent)")
+    private func openNewFinderWindow() {
+        print("🪟 Opening new Finder window")
         
-        do {
-            // Move to trash (safe, user can recover)
-            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
-            print("✅ Successfully moved to trash: \(url.lastPathComponent)")
-        } catch {
-            // Show error alert if something goes wrong
-            print("❌ Failed to move to trash: \(error.localizedDescription)")
-            // ... alert shown to user
+        let script = """
+        tell application "Finder"
+            activate
+            make new Finder window
+        end tell
+        """
+        
+        if let appleScript = NSAppleScript(source: script) {
+            var error: NSDictionary?
+            appleScript.executeAndReturnError(&error)
+            
+            if let error = error {
+                print("❌ Failed to open new window: \(error)")
+            } else {
+                print("✅ New Finder window opened")
+            }
+        }
+    }
+    
+    private func bringFinderWindowToFront(_ windowIndex: Int) {
+        print("🪟 Bringing Finder window \(windowIndex) to front")
+        
+        let script = """
+        tell application "System Events"
+            tell process "Finder"
+                set frontmost to true
+                perform action "AXRaise" of window \(windowIndex)
+            end tell
+        end tell
+        """
+        
+        if let appleScript = NSAppleScript(source: script) {
+            var error: NSDictionary?
+            appleScript.executeAndReturnError(&error)
+            
+            if let error = error {
+                print("❌ Failed to bring window to front: \(error)")
+                
+                // Fallback: try the Finder approach
+                let fallbackScript = """
+                tell application "Finder"
+                    activate
+                    set index of window \(windowIndex) to 1
+                end tell
+                """
+                
+                if let fallbackAS = NSAppleScript(source: fallbackScript) {
+                    fallbackAS.executeAndReturnError(nil)
+                }
+            } else {
+                print("✅ Window brought to front")
+            }
+        }
+    }
+    
+    private func closeFinderWindow(_ windowIndex: Int) {
+        print("❌ Closing Finder window \(windowIndex)")
+        
+        let script = """
+        tell application "Finder"
+            close window \(windowIndex)
+        end tell
+        """
+        
+        if let appleScript = NSAppleScript(source: script) {
+            var error: NSDictionary?
+            appleScript.executeAndReturnError(&error)
+            
+            if let error = error {
+                print("❌ Failed to close window: \(error)")
+            } else {
+                print("✅ Window closed")
+            }
         }
     }
 }
