@@ -55,7 +55,13 @@ class MockFunctionProvider: FunctionProvider {
                 id: "mock-few-func-\(index)",
                 name: "Quick \(index)",
                 icon: NSImage(systemSymbolName: "heart.fill", accessibilityDescription: nil) ?? NSImage(),
-                onSelect: { print("Mock Few Function \(index) executed") }
+                // EXPLICIT INTERACTION MODEL:
+                onLeftClick: .execute {
+                    print("Mock Few Function \(index) executed")
+                },
+                onMiddleClick: .executeKeepOpen {
+                    print("Mock Few Function \(index) executed (UI stays open)")
+                }
             )
         }
         
@@ -65,7 +71,13 @@ class MockFunctionProvider: FunctionProvider {
                 id: "mock-nested-func-\(index)",
                 name: "Nested \(index)",
                 icon: NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: nil) ?? NSImage(),
-                onSelect: { print("Mock Nested Function \(index) executed") }
+                // EXPLICIT INTERACTION MODEL:
+                onLeftClick: .execute {
+                    print("Mock Nested Function \(index) executed")
+                },
+                onMiddleClick: .executeKeepOpen {
+                    print("Mock Nested Function \(index) executed (UI stays open)")
+                }
             )
         }
         
@@ -74,18 +86,27 @@ class MockFunctionProvider: FunctionProvider {
             name: "Nested Category",
             icon: NSImage(systemSymbolName: "folder.badge.gearshape", accessibilityDescription: nil) ?? NSImage(),
             children: nestedLeaves,
-            preferredLayout: .partialSlice  // Nested categories as partial slice
+            preferredLayout: .partialSlice,  // Nested categories as partial slice
+            // EXPLICIT INTERACTION MODEL:
+            onLeftClick: .expand,           // Click to expand
+            onRightClick: .expand,          // Right-click to expand
+            onMiddleClick: .expand,         // Middle-click to expand
+            onBoundaryCross: .expand        // Auto-expand on boundary cross
         )
         
         return [
-            
-            // Example 4: Nested structure with mixed layouts
+            // Example: Nested structure with mixed layouts
             FunctionNode(
                 id: "mock-category-with-nested",
                 name: "Mixed Layout",
                 icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
                 children: [nestedCategory] + fewLeaves,
-                preferredLayout: .partialSlice  // This level uses partial
+                preferredLayout: .partialSlice,  // This level uses partial
+                // EXPLICIT INTERACTION MODEL:
+                onLeftClick: .expand,           // Click to expand
+                onRightClick: .expand,          // Right-click to expand
+                onMiddleClick: .expand,         // Middle-click to expand
+                onBoundaryCross: .expand        // Auto-expand on boundary cross
             )
         ]
     }

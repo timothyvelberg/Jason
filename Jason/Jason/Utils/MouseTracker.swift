@@ -117,7 +117,7 @@ class MouseTracker {
             currentRadius = ringOuterRadius + ringMargin
         }
         
-        // NEW: If beyond all rings, treat as being in the active (outermost) ring
+        // If beyond all rings, treat as being in the active (outermost) ring
         // This allows continuous outward expansion based on angle tracking
         if functionManager.rings.count > 0 {
             print("🎯 Beyond all rings at distance \(distance), treating as active ring \(functionManager.activeRingLevel)")
@@ -139,7 +139,7 @@ class MouseTracker {
             }
         }
         
-        // NEW: Check if we're beyond the active ring's boundary
+        // Check if we're beyond the active ring's boundary
         if let currentRingLevel = currentRingLevel,
            currentRingLevel == activeRingLevel,
            distance > activeRingOuterRadius {
@@ -160,18 +160,27 @@ class MouseTracker {
                     if nodes.indices.contains(pieIndex) {
                         let node = nodes[pieIndex]
                         
-                        if node.shouldAutoExpand {  // ← CHANGED: was node.isBranch
-                            print("🔵 Beyond boundary (\(distance) > \(activeRingOuterRadius)) but in angle range - expanding '\(node.name)'")
+                        // USE EXPLICIT INTERACTION MODEL
+                        switch node.onBoundaryCross {
+                        case .expand:
+                            print("🔵 Beyond boundary (\(distance) > \(activeRingOuterRadius)) - expanding '\(node.name)'")
                             functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)
                             
                             // Update tracking state to the new ring
                             lastFunctionIndex = pieIndex
                             lastRingLevel = activeRingLevel
                             return
-                        } else if node.isContextMenu {  // ← NEW: Inform user about context menu
-                            print("⚠️ Beyond boundary hovering context menu '\(node.name)', use right-click to open")
-                        } else {
-                            print("⚠️ Beyond boundary hovering leaf node '\(node.name)', not expanding")
+                            
+                        case .doNothing:
+                            print("⚠️ Beyond boundary hovering '\(node.name)' - no auto-expand (use right-click)")
+                            
+                        case .execute(let action):
+                            print("⚠️ Beyond boundary hovering '\(node.name)' - would execute action (unusual for boundary cross)")
+                            // Optionally execute: action()
+                            
+                        case .executeKeepOpen(let action):
+                            print("⚠️ Beyond boundary hovering '\(node.name)' - would execute and keep open (unusual for boundary cross)")
+                            // Optionally execute: action()
                         }
                     }
                 }
@@ -195,10 +204,17 @@ class MouseTracker {
                     let node = nodes[hoveredIndex]
                     let currentSelectedIndex = functionManager.rings[activeRingLevel].selectedIndex
                     
-                    // If hovering over a different category (with children, not context menu) and there's an expanded ring above
-                    if node.children != nil && node.children!.count > 0 && hoveredIndex != currentSelectedIndex && functionManager.rings.count > activeRingLevel + 1 {
-                        print("🔄 Switching to category '\(node.name)'")
-                        functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+                    // If hovering over a different category and there's an expanded ring above
+                    // Check if this node wants to auto-expand
+                    if hoveredIndex != currentSelectedIndex && functionManager.rings.count > activeRingLevel + 1 {
+                        switch node.onBoundaryCross {
+                        case .expand:
+                            print("🔄 Switching to category '\(node.name)'")
+                            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+                        default:
+                            // Don't switch if node doesn't want auto-expansion
+                            break
+                        }
                     }
                 }
             }

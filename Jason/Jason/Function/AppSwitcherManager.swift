@@ -376,7 +376,11 @@ extension AppSwitcherManager: FunctionProvider {
                     id: "activate-\(app.processIdentifier)",
                     name: "Bring to Front",
                     icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak self] in
+                    // EXPLICIT INTERACTION MODEL:
+                    onLeftClick: .execute { [weak self] in
+                        self?.switchToApp(app)
+                    },
+                    onMiddleClick: .executeKeepOpen { [weak self] in
                         self?.switchToApp(app)
                     }
                 ),
@@ -384,7 +388,11 @@ extension AppSwitcherManager: FunctionProvider {
                     id: "hide-\(app.processIdentifier)",
                     name: "Hide",
                     icon: NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak self] in
+                    // EXPLICIT INTERACTION MODEL:
+                    onLeftClick: .execute { [weak self] in
+                        self?.hideApp(app)
+                    },
+                    onMiddleClick: .executeKeepOpen { [weak self] in
                         self?.hideApp(app)
                     }
                 ),
@@ -392,7 +400,11 @@ extension AppSwitcherManager: FunctionProvider {
                     id: "quit-\(app.processIdentifier)",
                     name: "Quit",
                     icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak self] in
+                    // EXPLICIT INTERACTION MODEL:
+                    onLeftClick: .execute { [weak self] in
+                        self?.quitApp(app)
+                    },
+                    onMiddleClick: .executeKeepOpen { [weak self] in
                         self?.quitApp(app)
                     }
                 )
@@ -402,11 +414,19 @@ extension AppSwitcherManager: FunctionProvider {
                 id: "app-\(app.processIdentifier)",
                 name: app.localizedName ?? "Unknown",
                 icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
-                contextActions: contextActions,  // ← UNCOMMENTED!
-                onSelect: { [weak self] in
-                    // Primary action: switch to app
+                contextActions: contextActions,
+                preferredLayout: .partialSlice,
+                // EXPLICIT INTERACTION MODEL:
+                onLeftClick: .execute { [weak self] in
+                    // Primary action: switch to app and close UI
                     self?.switchToApp(app)
                 },
+                onRightClick: .expand,  // Right-click: Show context menu
+                onMiddleClick: .executeKeepOpen { [weak self] in
+                    // Middle-click: Switch to app but keep UI open
+                    self?.switchToApp(app)
+                },
+                onBoundaryCross: .doNothing,  // Don't auto-expand context menus
                 onHover: {
                     // Optional: Could preview app windows here
                     print("Hovering over \(app.localizedName ?? "Unknown")")
@@ -418,20 +438,30 @@ extension AppSwitcherManager: FunctionProvider {
             )
         }
         
-        // Return as a single category node with primary action
+        // Return as a single category node
         return [
             FunctionNode(
                 id: providerId,
                 name: providerName,
                 icon: providerIcon,
                 children: appNodes,
-                onSelect: { [weak self] in
-                    // Primary action - open Applications folder
+                maxDisplayedChildren: 12,  // Limit to 12 apps in the pie slice
+                preferredLayout: .fullCircle,  // Use full circle for many apps
+                // EXPLICIT INTERACTION MODEL:
+                onLeftClick: .expand,           // Click to expand applications
+                onRightClick: .execute { [weak self] in
+                    // Right-click: Open Applications folder
                     print("📂 Opening Applications folder")
                     self?.openApplicationsFolder()
                 },
-                maxDisplayedChildren: 12,  // Limit to 12 apps in the pie slice
-                preferredLayout: .fullCircle  // ← NEW: Use full circle for many apps!
+                onMiddleClick: .expand,         // Middle-click: Expand
+                onBoundaryCross: .expand,       // Auto-expand on boundary cross
+                onHover: {
+                    print("📱 Hovering over Applications category")
+                },
+                onHoverExit: {
+                    print("📱 Left Applications category")
+                }
             )
         ]
     }

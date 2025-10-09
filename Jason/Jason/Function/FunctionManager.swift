@@ -145,10 +145,14 @@ class FunctionManager: ObservableObject {
                 name: node.name,
                 icon: node.icon,
                 action: {
-                    if node.isLeaf {
-                        node.onSelect?()
-                    } else {
+                    // Use explicit interaction model
+                    switch node.onLeftClick {
+                    case .execute(let action), .executeKeepOpen(let action):
+                        action()
+                    case .expand:
                         self.navigateInto(node)
+                    case .doNothing:
+                        print("No action defined for '\(node.name)'")
                     }
                 }
             )
@@ -326,12 +330,26 @@ class FunctionManager: ObservableObject {
         
         let node = rings[activeRingLevel].nodes[selectedIndex]
         
-        if node.isLeaf {
-            print("Executing function: \(node.name)")
-            node.onSelect?()
-        } else {
-            print("Navigating into category: \(node.name)")
-            navigateInto(node)
+        print("Executing node: \(node.name)")
+        
+        // USE EXPLICIT INTERACTION MODEL
+        switch node.onLeftClick {
+        case .execute(let action):
+            print("   ✅ Executing action (will close UI)")
+            action()
+            
+        case .executeKeepOpen(let action):
+            print("   ✅ Executing action (UI stays open)")
+            action()
+            
+        case .expand:
+            print("   ✅ Navigating/expanding into: \(node.name)")
+            if node.isBranch {
+                navigateInto(node)
+            }
+            
+        case .doNothing:
+            print("   ⚠️ No action defined for '\(node.name)'")
         }
     }
 

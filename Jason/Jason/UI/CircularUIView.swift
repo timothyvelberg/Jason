@@ -60,6 +60,9 @@ struct CircularUIView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CircularUIRightClick"))) { _ in
             handleGlobalRightClick()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CircularUIMiddleClick"))) { _ in
+            handleGlobalMiddleClick()
+        }
     }
     
     private func shouldDimRing(_ level: Int) -> Bool {
@@ -67,7 +70,56 @@ struct CircularUIView: View {
         return level != functionManager.activeRingLevel
     }
     
-    // NEW: Global right-click handler - shows context menu if available
+    // MARK: - Middle Click Handler
+    
+    private func handleGlobalMiddleClick() {
+        let activeRingLevel = functionManager.activeRingLevel
+        
+        guard activeRingLevel < functionManager.rings.count else {
+            print("⚠️ No active ring for middle-click")
+            return
+        }
+        
+        // Get the currently hovered item
+        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
+            print("⚠️ No item currently hovered for middle-click")
+            return
+        }
+        
+        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
+            print("⚠️ Invalid hovered index for middle-click")
+            return
+        }
+        
+        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
+        
+        print("🖱️ [Middle Click] On item: '\(node.name)' at ring \(activeRingLevel), index \(hoveredIndex)")
+        
+        // USE EXPLICIT INTERACTION MODEL
+        switch node.onMiddleClick {
+        case .execute(let action):
+            print("   ✅ Executing action (will close UI)")
+            action()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                circularUI.hide()
+            }
+            
+        case .executeKeepOpen(let action):
+            print("   ✅ Executing action (UI stays open)")
+            action()
+            // Don't hide UI
+            
+        case .expand:
+            print("   ✅ Expanding")
+            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+            
+        case .doNothing:
+            print("   ⚠️ No middle-click action defined")
+        }
+    }
+    
+    // MARK: - Right Click Handler
+    
     private func handleGlobalRightClick() {
         let activeRingLevel = functionManager.activeRingLevel
         
@@ -91,19 +143,31 @@ struct CircularUIView: View {
         
         print("🖱️ [Right Click] On item: '\(node.name)' at ring \(activeRingLevel), index \(hoveredIndex)")
         
-        // Check if this node has context actions
-        if node.isContextMenu {
-            print("   ✅ Has context menu - expanding")
+        // USE EXPLICIT INTERACTION MODEL
+        switch node.onRightClick {
+        case .execute(let action):
+            print("   ✅ Executing action (will close UI)")
+            action()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                circularUI.hide()
+            }
+            
+        case .executeKeepOpen(let action):
+            print("   ✅ Executing action (UI stays open)")
+            action()
+            // Don't hide UI
+            
+        case .expand:
+            print("   ✅ Expanding")
             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
-        } else if node.shouldAutoExpand {
-            print("   ✅ Has children - expanding")
-            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
-        } else {
-            print("   ⚠️ No context menu or children available")
+            
+        case .doNothing:
+            print("   ⚠️ No right-click action defined")
         }
     }
     
-    // NEW: Global click handler - executes currently hovered item
+    // MARK: - Left Click Handler (Global)
+    
     private func handleGlobalClick() {
         let activeRingLevel = functionManager.activeRingLevel
         
@@ -127,32 +191,31 @@ struct CircularUIView: View {
         
         print("🖱️ [Global Click] Executing hovered item: '\(node.name)' at ring \(activeRingLevel), index \(hoveredIndex)")
         
-        // Execute based on node type
-        if node.isLeaf {
-            // Leaf node - execute action
-            node.onSelect?()
-            
-            // Hide UI after execution
+        // USE EXPLICIT INTERACTION MODEL
+        switch node.onLeftClick {
+        case .execute(let action):
+            print("   ✅ Executing action (will close UI)")
+            action()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 circularUI.hide()
             }
-        } else if node.shouldAutoExpand {
-            // Regular branch node - expand category
+            
+        case .executeKeepOpen(let action):
+            print("   ✅ Executing action (UI stays open)")
+            action()
+            // Don't hide UI
+            
+        case .expand:
+            print("   ✅ Expanding category")
             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
-        } else if node.isContextMenu {
-            // Context menu node - left-click executes primary action if available
-            if let action = node.onSelect {
-                action()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    circularUI.hide()
-                }
-            } else {
-                print("   💡 Use right-click to show context menu")
-            }
+            
+        case .doNothing:
+            print("   ⚠️ No left-click action defined")
         }
     }
     
-    // Keep existing ring tap handler for compatibility
+    // MARK: - Ring Tap Handler (Legacy/Compatibility)
+    
     private func handleRingTap(level: Int, index: Int) {
         // Select the node
         functionManager.selectNode(ringLevel: level, index: index)
@@ -165,18 +228,26 @@ struct CircularUIView: View {
         
         print("🖱️ [Ring Tap] Clicked: '\(node.name)' at ring \(level), index \(index)")
         
-        // Check if node has a primary action first
-        if let action = node.onSelect {
-            // Has a primary action - execute it
+        // USE EXPLICIT INTERACTION MODEL (same as global click)
+        switch node.onLeftClick {
+        case .execute(let action):
+            print("   ✅ Executing action (will close UI)")
             action()
-            
-            // Hide UI after action completes
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 circularUI.hide()
             }
-        } else if node.isBranch {
-            // No primary action, but has children - expand
+            
+        case .executeKeepOpen(let action):
+            print("   ✅ Executing action (UI stays open)")
+            action()
+            // Don't hide UI
+            
+        case .expand:
+            print("   ✅ Expanding category")
             functionManager.expandCategory(ringLevel: level, index: index)
+            
+        case .doNothing:
+            print("   ⚠️ No left-click action defined")
         }
     }
 }

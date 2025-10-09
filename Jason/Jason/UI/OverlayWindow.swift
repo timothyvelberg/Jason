@@ -10,6 +10,9 @@ import AppKit
 
 class OverlayWindow: NSWindow {
     
+    // Callback for when window loses focus
+    var onLostFocus: (() -> Void)?
+    
     init() {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 800),
@@ -72,6 +75,15 @@ class OverlayWindow: NSWindow {
     
     override var canBecomeMain: Bool {
         return true
+    }
+    
+    // NEW: Detect when window loses focus
+    override func resignKey() {
+        print("🔴 [OverlayWindow] Window lost focus - triggering hide")
+        super.resignKey()
+        
+        // Call the callback to hide the UI
+        onLostFocus?()
     }
     
     // Prevent window from being closed

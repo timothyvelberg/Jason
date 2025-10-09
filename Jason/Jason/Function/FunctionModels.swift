@@ -15,6 +15,45 @@ enum LayoutStyle {
     case partialSlice // Partial arc centered on parent
 }
 
+// MARK: - Interaction Model
+
+/// Defines what happens when a user interacts with a FunctionNode
+enum InteractionBehavior {
+    case execute(() -> Void)           // Execute an action (and usually close UI)
+    case executeKeepOpen(() -> Void)   // Execute an action but keep UI open
+    case expand                         // Expand to show children or contextActions
+    case doNothing                      // No interaction
+    
+    var shouldExecute: Bool {
+        switch self {
+        case .execute, .executeKeepOpen:
+            return true
+        case .expand, .doNothing:
+            return false
+        }
+    }
+    
+    var shouldCloseUI: Bool {
+        switch self {
+        case .execute:
+            return true
+        case .executeKeepOpen, .expand, .doNothing:
+            return false
+        }
+    }
+    
+    func perform() {
+        switch self {
+        case .execute(let action), .executeKeepOpen(let action):
+            action()
+        case .expand, .doNothing:
+            break
+        }
+    }
+}
+
+// MARK: - FunctionNode (Tree Structure)
+
 // MARK: - FunctionNode (Tree Structure)
 
 class FunctionNode: Identifiable, ObservableObject {
@@ -23,11 +62,18 @@ class FunctionNode: Identifiable, ObservableObject {
     let icon: NSImage
     let children: [FunctionNode]?
     let contextActions: [FunctionNode]?
-    let onSelect: (() -> Void)?
-    let onHover: (() -> Void)?
-    let onHoverExit: (() -> Void)?
     let maxDisplayedChildren: Int?
     let preferredLayout: LayoutStyle?
+    
+    // MARK: - Interaction Model (Explicit Behavior)
+    let onLeftClick: InteractionBehavior
+    let onRightClick: InteractionBehavior
+    let onMiddleClick: InteractionBehavior
+    let onBoundaryCross: InteractionBehavior
+    
+    // MARK: - Legacy Events (Deprecated - use interaction model instead)
+    let onHover: (() -> Void)?
+    let onHoverExit: (() -> Void)?
     
     init(
         id: String,
@@ -35,32 +81,57 @@ class FunctionNode: Identifiable, ObservableObject {
         icon: NSImage,
         children: [FunctionNode]? = nil,
         contextActions: [FunctionNode]? = nil,
-        onSelect: (() -> Void)? = nil,
+        maxDisplayedChildren: Int? = nil,
+        preferredLayout: LayoutStyle? = nil,
+        // Explicit interaction declarations
+        onLeftClick: InteractionBehavior = .doNothing,
+        onRightClick: InteractionBehavior = .doNothing,
+        onMiddleClick: InteractionBehavior = .doNothing,
+        onBoundaryCross: InteractionBehavior = .doNothing,
+        // Legacy
         onHover: (() -> Void)? = nil,
         onHoverExit: (() -> Void)? = nil,
-        maxDisplayedChildren: Int? = nil,
-        preferredLayout: LayoutStyle? = nil
+        // DEPRECATED: Old onSelect parameter
+        onSelect: (() -> Void)? = nil
     ) {
         self.id = id
         self.name = name
         self.icon = icon
         self.children = children
         self.contextActions = contextActions
-        self.onSelect = onSelect
-        self.onHover = onHover
-        self.onHoverExit = onHoverExit
         self.maxDisplayedChildren = maxDisplayedChildren
         self.preferredLayout = preferredLayout
+        
+        // Set interaction behaviors
+        // If old onSelect was provided, convert it to onLeftClick for backward compatibility
+        if let onSelect = onSelect {
+            self.onLeftClick = .execute(onSelect)
+        } else {
+            self.onLeftClick = onLeftClick
+        }
+        
+        self.onRightClick = onRightClick
+        self.onMiddleClick = onMiddleClick
+        self.onBoundaryCross = onBoundaryCross
+        
+        self.onHover = onHover
+        self.onHoverExit = onHoverExit
     }
     
-    // DEPRECATED: For backward compatibility
+    // MARK: - Computed Properties
+    
+    // DEPRECATED: For backward compatibility only
     var action: (() -> Void)? {
-        return onSelect
+        return nil  // Use onLeftClick instead
     }
     
-    // Leaf = has onSelect action, no children or contextActions
+    var onSelect: (() -> Void)? {
+        return nil  // Use onLeftClick instead
+    }
+    
+    // Leaf = has executable left-click action, no children or contextActions
     var isLeaf: Bool {
-        return children == nil && contextActions == nil && onSelect != nil
+        return children == nil && contextActions == nil && onLeftClick.shouldExecute
     }
     
     // Branch = has children OR contextActions
@@ -68,17 +139,8 @@ class FunctionNode: Identifiable, ObservableObject {
         return children != nil || contextActions != nil
     }
     
-    // NEW: Is this a context menu (has contextActions, not regular children)?
-    var isContextMenu: Bool {
-        return contextActions != nil && children == nil
-    }
-    
-    // NEW: Should this auto-expand on boundary cross?
-    // Regular categories (children) = yes
-    // Context menus (contextActions) = no (right-click only)
-    var shouldAutoExpand: Bool {
-        return children != nil && children!.count > 0
-    }
+    // REMOVED: isContextMenu - use onRightClick behavior instead
+    // REMOVED: shouldAutoExpand - use onBoundaryCross behavior instead
     
     // Is this a valid branch (has actual children or context actions)?
     var hasChildren: Bool {

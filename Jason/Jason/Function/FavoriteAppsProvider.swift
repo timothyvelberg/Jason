@@ -103,15 +103,22 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
     // MARK: - FunctionProvider Methods
     
     func provideFunctions() -> [FunctionNode] {
-        // Convert favorite apps to FunctionNodes
+        // Convert favorite apps to FunctionNodes with explicit interaction model
         let appNodes = resolvedApps.map { appInfo in
             FunctionNode(
                 id: "fav-\(appInfo.bundleIdentifier)",
                 name: appInfo.name,
                 icon: appInfo.icon,
-                onSelect: { [weak self] in
+                preferredLayout: nil,
+                // EXPLICIT INTERACTION MODEL:
+                onLeftClick: .execute { [weak self] in
                     self?.launchApp(appInfo)
                 },
+                onRightClick: .doNothing,  // Could add "Remove from Favorites" context menu later
+                onMiddleClick: .executeKeepOpen { [weak self] in
+                    self?.launchApp(appInfo)
+                },
+                onBoundaryCross: .doNothing,
                 onHover: {
                     print("Hovering over favorite: \(appInfo.name)")
                 },
@@ -128,12 +135,18 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
                 name: providerName,
                 icon: providerIcon,
                 children: appNodes,
-                onSelect: { [weak self] in
-                    // Primary action - could open a favorites manager
-                    print("⭐ Opening Favorites")
-                    self?.openFavoritesManager()
+                preferredLayout: .partialSlice,  // Use partial slice for compact display
+                // EXPLICIT INTERACTION MODEL:
+                onLeftClick: .expand,           // Click to expand favorites
+                onRightClick: .expand,          // Right-click also expands
+                onMiddleClick: .expand,         // Middle-click expands
+                onBoundaryCross: .expand,       // Auto-expand on boundary cross
+                onHover: {
+                    print("⭐ Hovering over Favorites category")
                 },
-                preferredLayout: .partialSlice  // Use full circle for easy access to all favorites
+                onHoverExit: {
+                    print("⭐ Left Favorites category")
+                }
             )
         ]
     }

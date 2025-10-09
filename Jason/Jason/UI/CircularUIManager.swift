@@ -17,6 +17,7 @@ class CircularUIManager: ObservableObject {
     private var appSwitcher: AppSwitcherManager?
     var functionManager: FunctionManager?
     private var mouseTracker: MouseTracker?
+    private var gestureManager: GestureManager?  // ← NEW
     private var isHandlingShortcut: Bool = false  // Prevent double-handling
     
     init() {
@@ -62,7 +63,65 @@ class CircularUIManager: ObservableObject {
         
         setupOverlayWindow()
         setupGlobalHotkeys()
-        setupRightClickMonitoring()
+        setupGestureManager()  // ← NEW: Replace setupRightClickMonitoring()
+    }
+    
+    // NEW: Setup GestureManager
+    private func setupGestureManager() {
+        print("🖱️ Setting up GestureManager")
+        
+        gestureManager = GestureManager()
+        
+        gestureManager?.onGesture = { [weak self] event in
+            guard let self = self, self.isVisible else { return }
+            
+            switch event.type {
+            case .click(.right):
+                print("🖱️ Right-click detected at \(event.position)")
+                self.handleRightClick(event: event)
+                
+            case .click(.middle):
+                print("🖱️ Middle-click detected at \(event.position)")
+                self.handleMiddleClick(event: event)
+                
+            case .click(.left):
+                // Left-click is handled by CircularUIView's tap gesture
+                // but we could add global left-click handling here if needed
+                break
+                
+            default:
+                break
+            }
+        }
+        
+        print("✅ GestureManager ready")
+    }
+    
+    // NEW: Handle right-click gesture
+    private func handleRightClick(event: GestureManager.GestureEvent) {
+        // Post notification for CircularUIView to handle
+        // (CircularUIView knows the UI context better)
+        NotificationCenter.default.post(
+            name: NSNotification.Name("CircularUIRightClick"),
+            object: nil,
+            userInfo: [
+                "position": event.position,
+                "timestamp": event.timestamp
+            ]
+        )
+    }
+    
+    // NEW: Handle middle-click gesture
+    private func handleMiddleClick(event: GestureManager.GestureEvent) {
+        // Post notification for CircularUIView to handle
+        NotificationCenter.default.post(
+            name: NSNotification.Name("CircularUIMiddleClick"),
+            object: nil,
+            userInfo: [
+                "position": event.position,
+                "timestamp": event.timestamp
+            ]
+        )
     }
     
     // Setup keyboard shortcut listener
@@ -120,28 +179,6 @@ class CircularUIManager: ObservableObject {
         }
     }
     
-    // Add this method after setupGlobalHotkeys()
-    private func setupRightClickMonitoring() {
-        print("🖱️ Setting up right-click monitoring")
-        
-        // Listen for global right-click events
-        NSEvent.addGlobalMonitorForEvents(matching: [.rightMouseDown]) { [weak self] event in
-            guard let self = self, self.isVisible else { return }
-            print("🖱️ [GLOBAL] Right-click detected while UI visible")
-            NotificationCenter.default.post(name: NSNotification.Name("CircularUIRightClick"), object: nil)
-        }
-        
-        // Also listen for local right-clicks
-        NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown]) { [weak self] event in
-            guard let self = self, self.isVisible else { return event }
-            print("🖱️ [LOCAL] Right-click detected while UI visible")
-            NotificationCenter.default.post(name: NSNotification.Name("CircularUIRightClick"), object: nil)
-            return nil  // Consume the event
-        }
-        
-        print("✅ Right-click monitoring started")
-    }
-    
     // Handle local keyboard events (when Jason is in focus)
     private func handleLocalKeyEvent(_ event: NSEvent) -> NSEvent? {
         let isCtrlPressed = event.modifierFlags.contains(.control)
@@ -191,6 +228,11 @@ class CircularUIManager: ObservableObject {
         
         overlayWindow = OverlayWindow()
         
+        // NEW: Set up focus loss callback
+        overlayWindow?.onLostFocus = { [weak self] in
+            self?.hide()
+        }
+        
         let contentView = CircularUIView(
             circularUI: self,
             functionManager: functionManager
@@ -239,12 +281,14 @@ class CircularUIManager: ObservableObject {
         overlayWindow?.showOverlay(at: mousePosition)
         
         mouseTracker?.startTrackingMouse()
+        gestureManager?.startMonitoring()  // ← NEW: Start gesture monitoring
         
         print("Showing circular UI at position: \(mousePosition)")
     }
     
     func hide() {
         mouseTracker?.stopTrackingMouse()
+        gestureManager?.stopMonitoring()  // ← NEW: Stop gesture monitoring
         
         isVisible = false
         overlayWindow?.hideOverlay()
