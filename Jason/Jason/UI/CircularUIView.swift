@@ -26,6 +26,15 @@ struct CircularUIView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
+                // Global click handler - executes currently hovered item
+                // This allows clicking ANYWHERE to execute the hovered item
+                Color.clear
+                    .contentShape(Rectangle())
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .onTapGesture {
+                        handleGlobalClick()
+                    }
+                
                 // Generate rings dynamically
                 ForEach(rings) { ring in
                     RingView(
@@ -37,10 +46,11 @@ struct CircularUIView: View {
                             handleRingTap(level: ring.level, index: index)
                         },
                         shouldDimOpacity: shouldDimRing(ring.level),
-                        sliceConfig: ring.sliceConfig  // NEW: Pass slice configuration
+                        sliceConfig: ring.sliceConfig
                     )
                     .transition(.customScale(from: 0.7))
                     .id("\(ring.level)-\(functionManager.ringResetTrigger)")
+                    .allowsHitTesting(false)  // Disable individual ring clicks, use global handler
                 }
             }
             .animation(.easeOut(duration: 0.1), value: rings.count)
@@ -55,6 +65,46 @@ struct CircularUIView: View {
         return level != functionManager.activeRingLevel
     }
     
+    // NEW: Global click handler - executes currently hovered item
+    private func handleGlobalClick() {
+        let activeRingLevel = functionManager.activeRingLevel
+        
+        guard activeRingLevel < functionManager.rings.count else {
+            print("⚠️ No active ring to execute")
+            return
+        }
+        
+        // Get the currently hovered item
+        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
+            print("⚠️ No item currently hovered")
+            return
+        }
+        
+        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
+            print("⚠️ Invalid hovered index")
+            return
+        }
+        
+        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
+        
+        print("🖱️ [Global Click] Executing hovered item: '\(node.name)' at ring \(activeRingLevel), index \(hoveredIndex)")
+        
+        // Execute based on node type
+        if node.isLeaf {
+            // Leaf node - execute action
+            node.onSelect?()
+            
+            // Hide UI after execution
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                circularUI.hide()
+            }
+        } else if node.isBranch {
+            // Branch node - expand category
+            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+        }
+    }
+    
+    // Keep existing ring tap handler for compatibility
     private func handleRingTap(level: Int, index: Int) {
         // Select the node
         functionManager.selectNode(ringLevel: level, index: index)
@@ -65,10 +115,11 @@ struct CircularUIView: View {
         
         let node = functionManager.rings[level].nodes[index]
         
-        // NEW LOGIC: Check if node has a primary action first
+        print("🖱️ [Ring Tap] Clicked: '\(node.name)' at ring \(level), index \(index)")
+        
+        // Check if node has a primary action first
         if let action = node.onSelect {
-            // Has a primary action - execute it (whether leaf or branch)
-            print("🖱️ Tapped node: \(node.name) - executing primary action")
+            // Has a primary action - execute it
             action()
             
             // Hide UI after action completes
@@ -76,12 +127,8 @@ struct CircularUIView: View {
                 circularUI.hide()
             }
         } else if node.isBranch {
-            // No primary action, but has children - expand on click as fallback
-            print("🖱️ Tapped branch node without action: \(node.name) - expanding")
+            // No primary action, but has children - expand
             functionManager.expandCategory(ringLevel: level, index: index)
-        } else {
-            // No action and no children - do nothing
-            print("⚠️ Tapped node with no action or children: \(node.name)")
         }
     }
 }
@@ -95,7 +142,7 @@ struct RingConfiguration: Identifiable {
     let thickness: CGFloat
     let nodes: [FunctionNode]
     let selectedIndex: Int?
-    let sliceConfig: PieSliceConfig  // NEW: Pie slice configuration
+    let sliceConfig: PieSliceConfig
 }
 
 // MARK: - Custom Scale Transition

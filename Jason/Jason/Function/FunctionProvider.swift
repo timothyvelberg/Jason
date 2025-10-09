@@ -48,15 +48,6 @@ class MockFunctionProvider: FunctionProvider {
     }
     
     func provideFunctions() -> [FunctionNode] {
-        // Example: Category with MANY items - use full circle
-        let manyLeaves = (1...20).map { index in
-            FunctionNode(
-                id: "mock-many-func-\(index)",
-                name: "Item \(index)",
-                icon: NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil) ?? NSImage(),
-                onSelect: { print("Mock Many Function \(index) executed") }
-            )
-        }
         
         // Example: Category with FEW items - use partial slice
         let fewLeaves = (1...3).map { index in
@@ -87,31 +78,6 @@ class MockFunctionProvider: FunctionProvider {
         )
         
         return [
-            // Example 1: Many items → Full circle for easier access
-            FunctionNode(
-                id: "mock-category-many",
-                name: "Many Items (Full ⭕)",
-                icon: NSImage(systemSymbolName: "square.grid.3x3.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: manyLeaves,
-                preferredLayout: .fullCircle  // ← Full circle with 20 items (18° each)
-            ),
-            
-            // Example 2: Few items → Partial slice stays close to parent
-            FunctionNode(
-                id: "mock-category-few",
-                name: "Few Items (Slice 🍕)",
-                icon: NSImage(systemSymbolName: "square.grid.2x2.fill", accessibilityDescription: nil) ?? NSImage(),
-                children: fewLeaves,
-                preferredLayout: .partialSlice  // ← Partial slice (90° total)
-            ),
-            
-            // Example 3: Direct function (no children)
-            FunctionNode(
-                id: "mock-direct-function-1",
-                name: "Direct Action",
-                icon: NSImage(systemSymbolName: "bolt.circle.fill", accessibilityDescription: nil) ?? NSImage(),
-                onSelect: { print("Mock direct function executed!") }
-            ),
             
             // Example 4: Nested structure with mixed layouts
             FunctionNode(
