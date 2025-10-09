@@ -68,13 +68,8 @@ class MouseTracker {
         // Determine which ring the mouse is in based on distance
         let ringLevel = determineRingLevel(distance: distance)
         
-        // Debug: Print distance and detected ring level
-        if ringLevel == nil {
-            print("📏 Distance: \(distance), Ring Level: nil (OUTSIDE)")
-        }
-        
         // Handle boundary crossing between rings
-        handleBoundaryCrossing(distance: distance, currentRingLevel: ringLevel)
+        handleBoundaryCrossing(distance: distance, currentRingLevel: ringLevel, angle: angle)
         
         // Only track hover if we're inside a ring
         guard let ringLevel = ringLevel else { return }
@@ -111,6 +106,7 @@ class MouseTracker {
     private func determineRingLevel(distance: CGFloat) -> Int? {
         var currentRadius = centerHoleRadius
         
+        // Check each ring's boundary
         for ringLevel in 0..<functionManager.rings.count {
             let ringOuterRadius = currentRadius + ringThickness
             
@@ -121,14 +117,17 @@ class MouseTracker {
             currentRadius = ringOuterRadius + ringMargin
         }
         
-        // If beyond all rings, return nil to indicate we're outside
-        // For ring 0: boundary is at 50 + 80 = 130 pixels
-        let ring0Boundary = centerHoleRadius + ringThickness
-        print("🎯 Mouse distance \(distance) > ring 0 boundary \(ring0Boundary) - OUTSIDE ALL RINGS")
+        // NEW: If beyond all rings, treat as being in the active (outermost) ring
+        // This allows continuous outward expansion based on angle tracking
+        if functionManager.rings.count > 0 {
+            print("🎯 Beyond all rings at distance \(distance), treating as active ring \(functionManager.activeRingLevel)")
+            return functionManager.activeRingLevel
+        }
+        
         return nil
     }
     
-    private func handleBoundaryCrossing(distance: CGFloat, currentRingLevel: Int?) {
+    private func handleBoundaryCrossing(distance: CGFloat, currentRingLevel: Int?, angle: CGFloat) {
         let activeRingLevel = functionManager.activeRingLevel
         
         // Calculate the outer boundary of the active ring
@@ -140,26 +139,38 @@ class MouseTracker {
             }
         }
         
-        // Debug: Print boundary info
-        if currentRingLevel == nil && distance > activeRingOuterRadius {
-            print("🔍 Outside all rings: distance=\(distance), boundary=\(activeRingOuterRadius), lastIndex=\(String(describing: lastFunctionIndex)), lastLevel=\(String(describing: lastRingLevel))")
-        }
-        
-        // Check if mouse crossed outward beyond the active ring
-        if currentRingLevel == nil && distance > activeRingOuterRadius {
-            // Mouse is outside all rings - check if we should expand
-            if let hoveredIndex = lastFunctionIndex, let lastLevel = lastRingLevel, lastLevel == activeRingLevel {
-                guard activeRingLevel < functionManager.rings.count else { return }
-                let nodes = functionManager.rings[activeRingLevel].nodes
+        // NEW: Check if we're beyond the active ring's boundary
+        if let currentRingLevel = currentRingLevel,
+           currentRingLevel == activeRingLevel,
+           distance > activeRingOuterRadius {
+            
+            // Get the slice configuration for the active ring
+            let configs = functionManager.ringConfigurations
+            guard activeRingLevel < configs.count else { return }
+            let sliceConfig = configs[activeRingLevel].sliceConfig
+            
+            // Check if the angle is within a valid slice
+            if sliceConfig.isFullCircle || isAngleInSlice(angle, sliceConfig: sliceConfig) {
+                // Calculate which item we're hovering over
+                let pieIndex = angleToIndex(angle, sliceConfig: sliceConfig)
                 
-                if nodes.indices.contains(hoveredIndex) {
-                    let node = nodes[hoveredIndex]
-                    if node.isBranch {
-                        print("🔵 Boundary crossed outward over category '\(node.name)' - expanding")
-                        functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
-                        return
-                    } else {
-                        print("⚠️ Hovering over leaf node '\(node.name)', not expanding")
+                if pieIndex >= 0 {
+                    let nodes = functionManager.rings[activeRingLevel].nodes
+                    
+                    if nodes.indices.contains(pieIndex) {
+                        let node = nodes[pieIndex]
+                        
+                        if node.isBranch {
+                            print("🔵 Beyond boundary (\(distance) > \(activeRingOuterRadius)) but in angle range - expanding '\(node.name)'")
+                            functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)
+                            
+                            // Update tracking state to the new ring
+                            lastFunctionIndex = pieIndex
+                            lastRingLevel = activeRingLevel
+                            return
+                        } else {
+                            print("⚠️ Beyond boundary hovering leaf node '\(node.name)', not expanding")
+                        }
                     }
                 }
             }
