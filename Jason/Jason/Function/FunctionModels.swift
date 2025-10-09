@@ -8,6 +8,13 @@
 import Foundation
 import AppKit
 
+// MARK: - Layout Style
+
+enum LayoutStyle {
+    case fullCircle   // 360° ring, items evenly distributed
+    case partialSlice // Partial arc centered on parent
+}
+
 // MARK: - FunctionNode (Tree Structure)
 
 class FunctionNode: Identifiable, ObservableObject {
@@ -15,22 +22,24 @@ class FunctionNode: Identifiable, ObservableObject {
     let name: String
     let icon: NSImage
     let children: [FunctionNode]?
-    let contextActions: [FunctionNode]?  // NEW: Actions shown in next ring for leaf nodes
-    let onSelect: (() -> Void)?  // Renamed from 'action' for clarity
-    let onHover: (() -> Void)?   // NEW: Called when mouse enters
-    let onHoverExit: (() -> Void)?  // NEW: Called when mouse leaves
+    let contextActions: [FunctionNode]?
+    let onSelect: (() -> Void)?
+    let onHover: (() -> Void)?
+    let onHoverExit: (() -> Void)?
     let maxDisplayedChildren: Int?
+    let preferredLayout: LayoutStyle?  // NEW: Layout preference for this node's children
     
     init(
         id: String,
         name: String,
         icon: NSImage,
         children: [FunctionNode]? = nil,
-        contextActions: [FunctionNode]? = nil,  // NEW parameter
+        contextActions: [FunctionNode]? = nil,
         onSelect: (() -> Void)? = nil,
-        onHover: (() -> Void)? = nil,   // NEW parameter
-        onHoverExit: (() -> Void)? = nil,  // NEW parameter
-        maxDisplayedChildren: Int? = nil
+        onHover: (() -> Void)? = nil,
+        onHoverExit: (() -> Void)? = nil,
+        maxDisplayedChildren: Int? = nil,
+        preferredLayout: LayoutStyle? = nil  // NEW parameter
     ) {
         self.id = id
         self.name = name
@@ -41,6 +50,7 @@ class FunctionNode: Identifiable, ObservableObject {
         self.onHover = onHover
         self.onHoverExit = onHoverExit
         self.maxDisplayedChildren = maxDisplayedChildren
+        self.preferredLayout = preferredLayout
     }
     
     // DEPRECATED: For backward compatibility
@@ -67,7 +77,7 @@ class FunctionNode: Identifiable, ObservableObject {
         return children?.count ?? contextActions?.count ?? 0
     }
     
-    // NEW: Get children with limit applied (works for both children and contextActions)
+    // Get children with limit applied (works for both children and contextActions)
     var displayedChildren: [FunctionNode] {
         // Prefer children over contextActions
         let actualChildren = children ?? contextActions ?? []
@@ -98,12 +108,14 @@ struct PieSliceConfig {
         return totalAngle >= 360.0
     }
     
-    // Factory method for full circle (Ring 0)
+    // Factory method for full circle
+    // Automatically calculates itemAngle based on item count
     static func fullCircle(itemCount: Int) -> PieSliceConfig {
+        let itemAngle = 360.0 / Double(max(itemCount, 1))
         return PieSliceConfig(
             startAngle: 0,
             endAngle: 360,
-            itemAngle: 360.0 / Double(itemCount)
+            itemAngle: itemAngle
         )
     }
     
@@ -114,7 +126,6 @@ struct PieSliceConfig {
         // Handle single item case - inherit parent's angle
         let itemAngle: Double
         if itemCount == 1 {
-            // We'll need the parent's angle width - for now use default
             itemAngle = defaultItemAngle
         } else {
             itemAngle = totalAngle / Double(itemCount)

@@ -32,6 +32,9 @@ class CircularUIManager: ObservableObject {
         // Register AppSwitcher as a provider
         functionManager?.registerProvider(appSwitcher)
         
+        // Register Favorites Provider
+        functionManager?.registerProvider(FavoriteAppsProvider())
+        
         // Register mock provider for testing (shows alongside real apps)
         functionManager?.registerProvider(MockFunctionProvider())
         

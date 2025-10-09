@@ -35,7 +35,7 @@ class FunctionManager: ObservableObject {
     
     private var rootNodes: [FunctionNode] = []
     private var navigationStack: [FunctionNode] = []
-    private var providers: [FunctionProvider] = []  // Changed from appSwitcher
+    private var providers: [FunctionProvider] = []
     
     // MARK: - Computed Properties for UI
     
@@ -51,10 +51,10 @@ class FunctionManager: ObservableObject {
             let sliceConfig: PieSliceConfig
             
             if index == 0 {
-                // Ring 0 is always a full circle
+                // Ring 0 is always a full circle (mixes different providers)
                 sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
             } else {
-                // Ring 1+ are partial slices aligned to parent's selected item
+                // Ring 1+ - check parent node's layout preference
                 guard index > 0, rings.indices.contains(index - 1) else {
                     sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
                     continue
@@ -67,45 +67,55 @@ class FunctionManager: ObservableObject {
                     continue
                 }
                 
-                // Get the parent's slice config to calculate correct angle
-                // We need to use the previously generated config
-                let parentSliceConfig: PieSliceConfig
-                if index - 1 < configs.count {
-                    parentSliceConfig = configs[index - 1].sliceConfig
-                } else {
-                    // Fallback: parent is Ring 0 (full circle)
-                    parentSliceConfig = .fullCircle(itemCount: parentRing.nodes.count)
-                }
-                
-                // Calculate parent's actual angle position using its slice config
-                let parentAngle: Double
-                if parentSliceConfig.isFullCircle {
-                    // Parent is full circle - use START of parent item slice
-                    let parentItemAngle = 360.0 / Double(parentRing.nodes.count)
-                    parentAngle = Double(parentSelectedIndex) * parentItemAngle
-                } else {
-                    // Parent is partial slice - align to START of parent item
-                    let baseAngle = parentSliceConfig.startAngle
-                    let itemAngle = parentSliceConfig.itemAngle
-                    parentAngle = baseAngle + (Double(parentSelectedIndex) * itemAngle)
-                }
-                
-                // Get the parent node to check if it has a single child
+                // Get the parent node to check its layout preference
                 let parentNode = parentRing.nodes[parentSelectedIndex]
-                let itemCount = ringState.nodes.count
+                let preferredLayout = parentNode.preferredLayout ?? .partialSlice  // Default to partial
                 
-                // If parent only has 1 child, use parent's angle width
-                if itemCount == 1 {
-                    sliceConfig = .partialSlice(
-                        itemCount: itemCount,
-                        centeredAt: parentAngle,
-                        defaultItemAngle: parentSliceConfig.itemAngle
-                    )
+                if preferredLayout == .fullCircle {
+                    // Parent wants children as full circle
+                    print("🔵 Ring \(index): Using FULL CIRCLE layout (parent '\(parentNode.name)' preference)")
+                    sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
                 } else {
-                    sliceConfig = .partialSlice(
-                        itemCount: itemCount,
-                        centeredAt: parentAngle
-                    )
+                    // Parent wants children as partial slice
+                    print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentNode.name)' preference)")
+                    
+                    // Get the parent's slice config to calculate correct angle
+                    let parentSliceConfig: PieSliceConfig
+                    if index - 1 < configs.count {
+                        parentSliceConfig = configs[index - 1].sliceConfig
+                    } else {
+                        // Fallback: parent is Ring 0 (full circle)
+                        parentSliceConfig = .fullCircle(itemCount: parentRing.nodes.count)
+                    }
+                    
+                    // Calculate parent's actual angle position
+                    let parentAngle: Double
+                    if parentSliceConfig.isFullCircle {
+                        // Parent is full circle - use START of parent item slice
+                        let parentItemAngle = 360.0 / Double(parentRing.nodes.count)
+                        parentAngle = Double(parentSelectedIndex) * parentItemAngle
+                    } else {
+                        // Parent is partial slice - align to START of parent item
+                        let baseAngle = parentSliceConfig.startAngle
+                        let itemAngle = parentSliceConfig.itemAngle
+                        parentAngle = baseAngle + (Double(parentSelectedIndex) * itemAngle)
+                    }
+                    
+                    let itemCount = ringState.nodes.count
+                    
+                    // If parent only has 1 child, use parent's angle width
+                    if itemCount == 1 {
+                        sliceConfig = .partialSlice(
+                            itemCount: itemCount,
+                            centeredAt: parentAngle,
+                            defaultItemAngle: parentSliceConfig.itemAngle
+                        )
+                    } else {
+                        sliceConfig = .partialSlice(
+                            itemCount: itemCount,
+                            centeredAt: parentAngle
+                        )
+                    }
                 }
             }
             
@@ -314,7 +324,7 @@ class FunctionManager: ObservableObject {
         
         if node.isLeaf {
             print("Executing function: \(node.name)")
-            node.onSelect?()  // Call the onSelect handler
+            node.onSelect?()
         } else {
             print("Navigating into category: \(node.name)")
             navigateInto(node)

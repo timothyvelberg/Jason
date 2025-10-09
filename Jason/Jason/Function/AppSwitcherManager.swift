@@ -397,7 +397,7 @@ extension AppSwitcherManager: FunctionProvider {
 //                    }
 //                )
 //            ]
-//            
+//
             return FunctionNode(
                 id: "app-\(app.processIdentifier)",
                 name: app.localizedName ?? "Unknown",
@@ -426,11 +426,12 @@ extension AppSwitcherManager: FunctionProvider {
                 icon: providerIcon,
                 children: appNodes,
                 onSelect: { [weak self] in
-                    // NEW: Primary action - open Applications folder
+                    // Primary action - open Applications folder
                     print("📂 Opening Applications folder")
                     self?.openApplicationsFolder()
                 },
-                maxDisplayedChildren: 12  // Limit to 12 apps in the pie slice
+                maxDisplayedChildren: 12,  // Limit to 12 apps in the pie slice
+                preferredLayout: .fullCircle  // ← NEW: Use full circle for many apps!
             )
         ]
     }
@@ -440,7 +441,7 @@ extension AppSwitcherManager: FunctionProvider {
         loadRunningApplications()
     }
     
-    // NEW: Helper method to open Applications folder
+    // Helper method to open Applications folder
     private func openApplicationsFolder() {
         let applicationsURL = URL(fileURLWithPath: "/Applications")
         NSWorkspace.shared.open(applicationsURL)
