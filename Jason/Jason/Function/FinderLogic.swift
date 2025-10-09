@@ -4,7 +4,8 @@
 //
 //  Shows open Finder windows in a simple list
 //  - Ring 0: Single "Finder" item
-//    - Click: Opens new Finder window
+//    - Click: Expands to show windows
+//    - Right-click: Opens new Finder window
 //    - Hover+outward: Shows all open windows + "New Window" option
 //
 //  - Ring 1: Open Finder windows (simple list)
@@ -43,7 +44,12 @@ class FinderLogic: FunctionProvider {
             id: "new-finder-window",
             name: "New Window",
             icon: NSImage(systemSymbolName: "plus.rectangle", accessibilityDescription: nil) ?? NSImage(),
-            onSelect: { [weak self] in
+            preferredLayout: nil,
+            // EXPLICIT INTERACTION MODEL:
+            onLeftClick: .execute { [weak self] in
+                self?.openNewFinderWindow()
+            },
+            onMiddleClick: .executeKeepOpen { [weak self] in
                 self?.openNewFinderWindow()
             }
         ))
@@ -55,11 +61,16 @@ class FinderLogic: FunctionProvider {
                 name: providerName,
                 icon: providerIcon,
                 children: windowNodes,
-                onSelect: { [weak self] in
-                    // Primary action: Open new Finder window
-                    print("📂 Opening new Finder window")
+                preferredLayout: .partialSlice,
+                // EXPLICIT INTERACTION MODEL:
+                onLeftClick: .expand,           // Click to show windows list
+                onRightClick: .execute { [weak self] in
+                    // Right-click: Quick action to open new window
+                    print("📂 Opening new Finder window (right-click)")
                     self?.openNewFinderWindow()
-                }
+                },
+                onMiddleClick: .expand,         // Middle-click to expand
+                onBoundaryCross: .expand        // Auto-expand on boundary cross
             )
         ]
     }
@@ -200,15 +211,28 @@ class FinderLogic: FunctionProvider {
                     id: "close-window-\(windowInfo.index)",
                     name: "Close Window",
                     icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
-                    onSelect: { [weak self] in
+                    preferredLayout: nil,
+                    // EXPLICIT INTERACTION MODEL:
+                    onLeftClick: .execute { [weak self] in
+                        self?.closeFinderWindow(windowInfo.index)
+                    },
+                    onMiddleClick: .executeKeepOpen { [weak self] in
                         self?.closeFinderWindow(windowInfo.index)
                     }
                 )
             ],
-            onSelect: { [weak self] in
+            preferredLayout: .partialSlice,
+            // EXPLICIT INTERACTION MODEL:
+            onLeftClick: .execute { [weak self] in
                 // Primary action: Bring this Finder window to front
                 self?.bringFinderWindowToFront(windowInfo.index)
-            }
+            },
+            onRightClick: .expand,  // Right-click: Show context menu (close window)
+            onMiddleClick: .executeKeepOpen { [weak self] in
+                // Middle-click: Bring window to front, keep UI open
+                self?.bringFinderWindowToFront(windowInfo.index)
+            },
+            onBoundaryCross: .doNothing  // Don't auto-expand context menus
         )
     }
     
