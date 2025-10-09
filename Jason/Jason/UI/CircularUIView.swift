@@ -12,6 +12,7 @@ struct CircularUIView: View {
     @ObservedObject var circularUI: CircularUIManager
     @ObservedObject var functionManager: FunctionManager
     
+    
     // Get ring configurations directly from FunctionManager
     private var rings: [RingConfiguration] {
         return functionManager.ringConfigurations
@@ -24,44 +25,56 @@ struct CircularUIView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Global click handler - executes currently hovered item
-                // This allows clicking ANYWHERE to execute the hovered item
-                Color.clear
-                    .contentShape(Rectangle())
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .onTapGesture {
-                        handleGlobalClick()
+        // NEW: Wrap everything in ZStack to add drag overlay on top
+        ZStack {
+            // Existing circular UI content
+            GeometryReader { geometry in
+                ZStack {
+                    // Global click handler - executes currently hovered item
+                    // This allows clicking ANYWHERE to execute the hovered item
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .onTapGesture {
+                            handleGlobalClick()
+                        }
+                    
+                    // Generate rings dynamically
+                    ForEach(rings) { ring in
+                        RingView(
+                            startRadius: ring.startRadius,
+                            thickness: ring.thickness,
+                            nodes: ring.nodes,
+                            selectedIndex: ring.selectedIndex,
+                            onNodeTapped: { index in
+                                handleRingTap(level: ring.level, index: index)
+                            },
+                            shouldDimOpacity: shouldDimRing(ring.level),
+                            sliceConfig: ring.sliceConfig
+                        )
+                        .transition(.customScale(from: 0.7))
+                        .id("\(ring.level)-\(functionManager.ringResetTrigger)")
                     }
-                
-                // Generate rings dynamically
-                ForEach(rings) { ring in
-                    RingView(
-                        startRadius: ring.startRadius,
-                        thickness: ring.thickness,
-                        nodes: ring.nodes,
-                        selectedIndex: ring.selectedIndex,
-                        onNodeTapped: { index in
-                            handleRingTap(level: ring.level, index: index)
-                        },
-                        shouldDimOpacity: shouldDimRing(ring.level),
-                        sliceConfig: ring.sliceConfig
-                    )
-                    .transition(.customScale(from: 0.7))
-                    .id("\(ring.level)-\(functionManager.ringResetTrigger)")
                 }
+                .animation(.easeOut(duration: 0.1), value: rings.count)
+                .frame(width: totalSize, height: totalSize)
+                .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
             }
-            .animation(.easeOut(duration: 0.1), value: rings.count)
-            .frame(width: totalSize, height: totalSize)
-            .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
-        }
-        .ignoresSafeArea()
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CircularUIRightClick"))) { _ in
-            handleGlobalRightClick()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CircularUIMiddleClick"))) { _ in
-            handleGlobalMiddleClick()
+            .ignoresSafeArea()
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CircularUIRightClick"))) { _ in
+                handleGlobalRightClick()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CircularUIMiddleClick"))) { _ in
+                handleGlobalMiddleClick()
+            }
+            
+            // NEW: Drag overlay - sits on top to handle drag gestures
+            DraggableOverlay(
+                dragProvider: $circularUI.currentDragProvider,
+                dragStartPoint: $circularUI.dragStartPoint
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .allowsHitTesting(false)  // CRITICAL: Don't block clicks, only handle drags
         }
     }
     
@@ -115,6 +128,9 @@ struct CircularUIView: View {
             
         case .doNothing:
             print("   ⚠️ No middle-click action defined")
+            
+        case .drag:
+            print("   ⚠️ Middle-click on draggable item (drag not supported on middle-click)")
         }
     }
     
@@ -163,6 +179,9 @@ struct CircularUIView: View {
             
         case .doNothing:
             print("   ⚠️ No right-click action defined")
+            
+        case .drag:
+            print("   ⚠️ Right-click on draggable item (drag not supported on right-click)")
         }
     }
     
@@ -209,6 +228,10 @@ struct CircularUIView: View {
             print("   ✅ Expanding category")
             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
             
+        case .drag:
+            print("   🎯 Draggable item clicked (drag will be handled by gesture system)")
+            // Drag is handled by GestureManager, not by click
+            
         case .doNothing:
             print("   ⚠️ No left-click action defined")
         }
@@ -245,6 +268,10 @@ struct CircularUIView: View {
         case .expand:
             print("   ✅ Expanding category")
             functionManager.expandCategory(ringLevel: level, index: index)
+            
+        case .drag:
+            print("   🎯 Draggable item tapped (drag will be handled by gesture system)")
+            // Drag is handled by GestureManager, not by tap
             
         case .doNothing:
             print("   ⚠️ No left-click action defined")

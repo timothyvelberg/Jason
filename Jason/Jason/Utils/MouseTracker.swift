@@ -166,7 +166,6 @@ class MouseTracker {
                             print("🔵 Beyond boundary (\(distance) > \(activeRingOuterRadius)) - expanding '\(node.name)'")
                             functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)
                             
-                            // Update tracking state to the new ring
                             lastFunctionIndex = pieIndex
                             lastRingLevel = activeRingLevel
                             return
@@ -176,11 +175,13 @@ class MouseTracker {
                             
                         case .execute(let action):
                             print("⚠️ Beyond boundary hovering '\(node.name)' - would execute action (unusual for boundary cross)")
-                            // Optionally execute: action()
                             
                         case .executeKeepOpen(let action):
                             print("⚠️ Beyond boundary hovering '\(node.name)' - would execute and keep open (unusual for boundary cross)")
-                            // Optionally execute: action()
+                            
+                        case .drag:
+                            // Drag doesn't make sense for boundary crossing
+                            print("⚠️ Beyond boundary hovering '\(node.name)' - draggable item (no auto-expand)")
                         }
                     }
                 }
@@ -211,7 +212,7 @@ class MouseTracker {
                         case .expand:
                             print("🔄 Switching to category '\(node.name)'")
                             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
-                        default:
+                        case .doNothing, .execute, .executeKeepOpen, .drag:
                             // Don't switch if node doesn't want auto-expansion
                             break
                         }

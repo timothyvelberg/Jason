@@ -15,20 +15,40 @@ enum LayoutStyle {
     case partialSlice // Partial arc centered on parent
 }
 
-// MARK: - Interaction Model
+// MARK: - Drag Provider
+struct DragProvider {
+    let fileURLs: [URL]                          // Files to drag
+    let dragImage: NSImage?                      // Optional custom drag image
+    let allowedOperations: NSDragOperation       // copy, move, link, etc.
+    let onDragStarted: (() -> Void)?            // Called when drag begins
+    let onDragCompleted: ((Bool) -> Void)?      // Called when drag ends (success)
+    
+    init(fileURLs: [URL],
+         dragImage: NSImage? = nil,
+         allowedOperations: NSDragOperation = [.copy, .move],
+         onDragStarted: (() -> Void)? = nil,
+         onDragCompleted: ((Bool) -> Void)? = nil) {
+        self.fileURLs = fileURLs
+        self.dragImage = dragImage
+        self.allowedOperations = allowedOperations
+        self.onDragStarted = onDragStarted
+        self.onDragCompleted = onDragCompleted
+    }
+}
 
-/// Defines what happens when a user interacts with a FunctionNode
+// MARK: - Extended InteractionBehavior
 enum InteractionBehavior {
-    case execute(() -> Void)           // Execute an action (and usually close UI)
-    case executeKeepOpen(() -> Void)   // Execute an action but keep UI open
-    case expand                         // Expand to show children or contextActions
+    case execute(() -> Void)           // Execute action, close UI
+    case executeKeepOpen(() -> Void)   // Execute action, keep UI open
+    case expand                         // Show children/contextActions
+    case drag(DragProvider)            // Enable drag-and-drop
     case doNothing                      // No interaction
     
     var shouldExecute: Bool {
         switch self {
         case .execute, .executeKeepOpen:
             return true
-        case .expand, .doNothing:
+        default:
             return false
         }
     }
@@ -37,16 +57,34 @@ enum InteractionBehavior {
         switch self {
         case .execute:
             return true
-        case .executeKeepOpen, .expand, .doNothing:
+        case .executeKeepOpen, .expand, .drag, .doNothing:
             return false
         }
+    }
+    
+    var isDraggable: Bool {
+        if case .drag = self {
+            return true
+        }
+        return false
+    }
+    
+    var dragProvider: DragProvider? {
+        if case .drag(let provider) = self {
+            return provider
+        }
+        return nil
     }
     
     func perform() {
         switch self {
         case .execute(let action), .executeKeepOpen(let action):
             action()
-        case .expand, .doNothing:
+        case .expand:
+            print("⚠️ Expand should be handled by UI layer")
+        case .drag:
+            print("⚠️ Drag should be handled by gesture system")
+        case .doNothing:
             break
         }
     }
@@ -217,6 +255,8 @@ struct PieSliceConfig {
     }
 }
 
+
+
 // MARK: - Legacy Structures (to be removed after migration)
 
 struct FunctionItem {
@@ -231,4 +271,21 @@ struct FunctionCategory {
     let name: String
     let icon: NSImage
     let functions: [FunctionItem]
+}
+
+// MARK: - Updated FunctionNode
+extension FunctionNode {
+    // Add drag behavior property
+    var onDrag: InteractionBehavior {
+        // Check if left click is draggable
+        if case .drag = onLeftClick {
+            return onLeftClick
+        }
+        // Default: not draggable
+        return .doNothing
+    }
+    
+    var isDraggable: Bool {
+        return onDrag.isDraggable
+    }
 }

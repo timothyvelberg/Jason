@@ -151,6 +151,9 @@ class FunctionManager: ObservableObject {
                         action()
                     case .expand:
                         self.navigateInto(node)
+                    case .drag:
+                        // Drag is handled by GestureManager, not by action()
+                        print("Draggable item '\(node.name)' - use click+drag gesture")
                     case .doNothing:
                         print("No action defined for '\(node.name)'")
                     }
@@ -347,6 +350,10 @@ class FunctionManager: ObservableObject {
             if node.isBranch {
                 navigateInto(node)
             }
+            
+        case .drag:
+            print("   🎯 Draggable item '\(node.name)' - use click+drag gesture to drag")
+            // Drag is handled by GestureManager, not by executeSelected()
             
         case .doNothing:
             print("   ⚠️ No action defined for '\(node.name)'")

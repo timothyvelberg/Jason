@@ -13,11 +13,16 @@ class CircularUIManager: ObservableObject {
     @Published var isVisible: Bool = false
     @Published var mousePosition: CGPoint = .zero
     
+    // Drag support
+    @Published var currentDragProvider: DragProvider?
+    @Published var dragStartPoint: CGPoint?
+    private var draggedNode: FunctionNode?
+    
     private var overlayWindow: OverlayWindow?
     private var appSwitcher: AppSwitcherManager?
     var functionManager: FunctionManager?
     private var mouseTracker: MouseTracker?
-    private var gestureManager: GestureManager?  // ← NEW
+    private var gestureManager: GestureManager?
     private var isHandlingShortcut: Bool = false  // Prevent double-handling
     
     init() {
@@ -63,66 +68,189 @@ class CircularUIManager: ObservableObject {
         
         setupOverlayWindow()
         setupGlobalHotkeys()
-        setupGestureManager()  // ← NEW: Replace setupRightClickMonitoring()
+        setupGestureManager()
     }
     
-    // NEW: Setup GestureManager
+    // MARK: - Gesture Manager Setup
+    
     private func setupGestureManager() {
         print("🖱️ Setting up GestureManager")
         
         gestureManager = GestureManager()
         
+        // Use centralized event handler
         gestureManager?.onGesture = { [weak self] event in
-            guard let self = self, self.isVisible else { return }
-            
-            switch event.type {
-            case .click(.right):
-                print("🖱️ Right-click detected at \(event.position)")
-                self.handleRightClick(event: event)
-                
-            case .click(.middle):
-                print("🖱️ Middle-click detected at \(event.position)")
-                self.handleMiddleClick(event: event)
-                
-            case .click(.left):
-                // Left-click is handled by CircularUIView's tap gesture
-                // but we could add global left-click handling here if needed
-                break
-                
-            default:
-                break
-            }
+            self?.handleGestureEvent(event)
         }
         
         print("✅ GestureManager ready")
     }
     
-    // NEW: Handle right-click gesture
-    private func handleRightClick(event: GestureManager.GestureEvent) {
-        // Post notification for CircularUIView to handle
-        // (CircularUIView knows the UI context better)
-        NotificationCenter.default.post(
-            name: NSNotification.Name("CircularUIRightClick"),
-            object: nil,
-            userInfo: [
-                "position": event.position,
-                "timestamp": event.timestamp
-            ]
-        )
+    // MARK: - Gesture Event Handler
+    
+    private func handleGestureEvent(_ event: GestureManager.GestureEvent) {
+        guard isVisible else { return }
+        
+        switch event.type {
+        case .click(.left):
+            // Pass through to SwiftUI - handled in CircularUIView
+            break
+            
+        case .click(.right):
+            print("🖱️ Right-click detected at \(event.position)")
+            handleRightClick(event: event)
+            
+        case .click(.middle):
+            print("🖱️ Middle-click detected at \(event.position)")
+            handleMiddleClick(event: event)
+            
+        case .dragStarted(let button, let startPoint):
+            if button == .left {
+                handleDragStarted(at: event.position, startPoint: startPoint)
+            }
+            
+        case .dragMoved(let currentPoint, let delta):
+            handleDragMoved(to: currentPoint, delta: delta)
+            
+        case .dragEnded(let endPoint, let didComplete):
+            handleDragEnded(at: endPoint, completed: didComplete)
+            
+        default:
+            break
+        }
     }
     
-    // NEW: Handle middle-click gesture
-    private func handleMiddleClick(event: GestureManager.GestureEvent) {
-        // Post notification for CircularUIView to handle
-        NotificationCenter.default.post(
-            name: NSNotification.Name("CircularUIMiddleClick"),
-            object: nil,
-            userInfo: [
-                "position": event.position,
-                "timestamp": event.timestamp
-            ]
-        )
+    // MARK: - Drag Handlers
+    
+    private func handleDragStarted(at position: CGPoint, startPoint: CGPoint) {
+        // Get the currently hovered node from FunctionManager
+        guard let functionManager = functionManager else {
+            print("🎯 No FunctionManager available")
+            return
+        }
+        
+        let activeRingLevel = functionManager.activeRingLevel
+        guard activeRingLevel < functionManager.rings.count else {
+            print("🎯 No active ring for drag")
+            return
+        }
+        
+        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
+            print("🎯 No node currently hovered for drag")
+            return
+        }
+        
+        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
+            print("🎯 Invalid hovered index for drag")
+            return
+        }
+        
+        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
+        
+        guard node.isDraggable, let provider = node.onDrag.dragProvider else {
+            print("🎯 Node '\(node.name)' is not draggable")
+            return
+        }
+        
+        print("🎯 Drag started on node: \(node.name)")
+        
+        // Store the dragged node
+        draggedNode = node
+        
+        // Trigger the drag in the overlay view
+        DispatchQueue.main.async {
+            self.currentDragProvider = provider
+            self.dragStartPoint = startPoint
+        }
     }
+    
+    private func handleDragMoved(to position: CGPoint, delta: CGPoint) {
+        // Optional: Update UI during drag
+        // The AppKit layer handles the drag image
+    }
+    
+    private func handleDragEnded(at position: CGPoint, completed: Bool) {
+        if completed {
+            print("✅ Drag completed successfully for: \(draggedNode?.name ?? "unknown")")
+        } else {
+            print("❌ Drag cancelled for: \(draggedNode?.name ?? "unknown")")
+        }
+        
+        // Clean up
+        draggedNode = nil
+        currentDragProvider = nil
+        dragStartPoint = nil
+    }
+    
+    // MARK: - Click Handlers
+    
+    private func handleRightClick(event: GestureManager.GestureEvent) {
+        // Get the currently hovered node from FunctionManager
+        guard let functionManager = functionManager else { return }
+        
+        let activeRingLevel = functionManager.activeRingLevel
+        guard activeRingLevel < functionManager.rings.count else { return }
+        
+        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
+            print("⚠️ No item currently hovered for right-click")
+            return
+        }
+        
+        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
+            print("⚠️ Invalid hovered index for right-click")
+            return
+        }
+        
+        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
+        
+        print("🖱️ [Right Click] On item: '\(node.name)'")
+        
+        switch node.onRightClick {
+        case .expand:
+            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+        case .execute(let action):
+            action()
+            hide()
+        case .executeKeepOpen(let action):
+            action()
+        default:
+            break
+        }
+    }
+    
+    private func handleMiddleClick(event: GestureManager.GestureEvent) {
+        // Get the currently hovered node from FunctionManager
+        guard let functionManager = functionManager else { return }
+        
+        let activeRingLevel = functionManager.activeRingLevel
+        guard activeRingLevel < functionManager.rings.count else { return }
+        
+        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
+            print("⚠️ No item currently hovered for middle-click")
+            return
+        }
+        
+        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
+            print("⚠️ Invalid hovered index for middle-click")
+            return
+        }
+        
+        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
+        
+        print("🖱️ [Middle Click] On item: '\(node.name)'")
+        
+        switch node.onMiddleClick {
+        case .execute(let action):
+            action()
+            hide()
+        case .executeKeepOpen(let action):
+            action()
+        default:
+            break
+        }
+    }
+    
+    // MARK: - Global Hotkeys
     
     // Setup keyboard shortcut listener
     private func setupGlobalHotkeys() {
@@ -223,12 +351,14 @@ class CircularUIManager: ObservableObject {
         return event
     }
     
+    // MARK: - Overlay Window
+    
     private func setupOverlayWindow() {
         guard let functionManager = functionManager else { return }
         
         overlayWindow = OverlayWindow()
         
-        // NEW: Set up focus loss callback
+        // Set up focus loss callback
         overlayWindow?.onLostFocus = { [weak self] in
             self?.hide()
         }
@@ -241,6 +371,8 @@ class CircularUIManager: ObservableObject {
         
         print("Overlay window created and configured")
     }
+    
+    // MARK: - Show/Hide
     
     func show() {
         guard let functionManager = functionManager else {
@@ -281,14 +413,14 @@ class CircularUIManager: ObservableObject {
         overlayWindow?.showOverlay(at: mousePosition)
         
         mouseTracker?.startTrackingMouse()
-        gestureManager?.startMonitoring()  // ← NEW: Start gesture monitoring
+        gestureManager?.startMonitoring()
         
         print("Showing circular UI at position: \(mousePosition)")
     }
     
     func hide() {
         mouseTracker?.stopTrackingMouse()
-        gestureManager?.stopMonitoring()  // ← NEW: Stop gesture monitoring
+        gestureManager?.stopMonitoring()
         
         isVisible = false
         overlayWindow?.hideOverlay()

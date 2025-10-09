@@ -2,14 +2,9 @@
 //  FinderLogic.swift
 //  Jason
 //
-//  Shows open Finder windows in a simple list
-//  - Ring 0: Single "Finder" item
-//    - Click: Expands to show windows
-//    - Right-click: Opens new Finder window
-//    - Hover+outward: Shows all open windows + "New Window" option
-//
-//  - Ring 1: Open Finder windows (simple list)
-//    - Click: Brings that window to front
+//  Shows open Finder windows + Desktop files
+//  - Ring 0: "Finder Windows" and "Desktop Files"
+//  - Ring 1: Open Finder windows OR Desktop files
 //
 
 import Foundation
@@ -30,22 +25,33 @@ class FinderLogic: FunctionProvider {
     func provideFunctions() -> [FunctionNode] {
         print("🔍 [FinderLogic] provideFunctions() called")
         
-        // Get all open Finder windows
+        // Create both sections
+        let finderWindowsNode = createFinderWindowsNode()
+        let desktopFilesNode = createDesktopFilesNode()
+        
+        return [finderWindowsNode, desktopFilesNode]
+    }
+    
+    func refresh() {
+        print("🔄 [FinderLogic] refresh() called")
+    }
+    
+    // MARK: - Finder Windows Section
+    
+    private func createFinderWindowsNode() -> FunctionNode {
         let finderWindows = getOpenFinderWindows()
         print("🔍 [FinderLogic] Found \(finderWindows.count) open Finder window(s)")
         
-        // Create simple nodes for each window (no children)
         var windowNodes = finderWindows.compactMap { windowInfo in
             createFinderWindowNode(for: windowInfo)
         }
         
-        // Add "New Window" action at the end
+        // Add "New Window" action
         windowNodes.append(FunctionNode(
             id: "new-finder-window",
             name: "New Window",
             icon: NSImage(systemSymbolName: "plus.rectangle", accessibilityDescription: nil) ?? NSImage(),
             preferredLayout: nil,
-            // EXPLICIT INTERACTION MODEL:
             onLeftClick: .execute { [weak self] in
                 self?.openNewFinderWindow()
             },
@@ -54,29 +60,185 @@ class FinderLogic: FunctionProvider {
             }
         ))
         
-        // Return as single "Finder" category
-        return [
-            FunctionNode(
-                id: providerId,
-                name: providerName,
-                icon: providerIcon,
-                children: windowNodes,
-                preferredLayout: .partialSlice,
-                // EXPLICIT INTERACTION MODEL:
-                onLeftClick: .expand,           // Click to show windows list
-                onRightClick: .execute { [weak self] in
-                    // Right-click: Quick action to open new window
-                    print("📂 Opening new Finder window (right-click)")
-                    self?.openNewFinderWindow()
-                },
-                onMiddleClick: .expand,         // Middle-click to expand
-                onBoundaryCross: .expand        // Auto-expand on boundary cross
-            )
-        ]
+        return FunctionNode(
+            id: "finder-windows-section",
+            name: "Finder Windows",
+            icon: providerIcon,
+            children: windowNodes,
+            preferredLayout: .partialSlice,
+            onLeftClick: .expand,
+            onRightClick: .execute { [weak self] in
+                self?.openNewFinderWindow()
+            },
+            onMiddleClick: .expand,
+            onBoundaryCross: .expand
+        )
     }
     
-    func refresh() {
-        print("🔄 [FinderLogic] refresh() called")
+    // MARK: - Desktop Files Section (DRAGGABLE!)
+    
+    private func createDesktopFilesNode() -> FunctionNode {
+        let desktopFiles = getDesktopFiles()
+        print("🖥️ [FinderLogic] Found \(desktopFiles.count) file(s) on Desktop")
+        
+        let fileNodes = desktopFiles.map { fileURL in
+            createDraggableFileNode(for: fileURL)
+        }
+        
+        return FunctionNode(
+            id: "desktop-files-section",
+            name: "Desktop Files",
+            icon: NSImage(systemSymbolName: "folder", accessibilityDescription: nil) ?? NSImage(),
+            children: fileNodes,
+            preferredLayout: .partialSlice,
+            onLeftClick: .expand,
+            onRightClick: .expand,
+            onMiddleClick: .expand,
+            onBoundaryCross: .expand
+        )
+    }
+    
+    private func getDesktopFiles() -> [URL] {
+        let desktopURL = FileManager.default.urls(
+            for: .desktopDirectory,
+            in: .userDomainMask
+        ).first!
+        
+        do {
+            let files = try FileManager.default.contentsOfDirectory(
+                at: desktopURL,
+                includingPropertiesForKeys: [.isDirectoryKey, .nameKey],
+                options: [.skipsHiddenFiles]
+            )
+            
+            // Sort by name
+            return files.sorted { $0.lastPathComponent < $1.lastPathComponent }
+        } catch {
+            print("❌ Failed to read Desktop: \(error)")
+            return []
+        }
+    }
+    
+    private func createDraggableFileNode(for url: URL) -> FunctionNode {
+        let fileName = url.lastPathComponent
+        let fileIcon = NSWorkspace.shared.icon(forFile: url.path)
+        
+        // Create thumbnail for images
+        let dragImage = createThumbnail(for: url)
+        
+        print("📄 [FinderLogic] Creating draggable node for: \(fileName)")
+        
+        return FunctionNode(
+            id: "desktop-file-\(url.path)",
+            name: fileName,
+            icon: fileIcon,
+            
+            // Context actions (right-click menu)
+            contextActions: [
+                FunctionNode(
+                    id: "open-\(url.path)",
+                    name: "Open",
+                    icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
+                    preferredLayout: nil,
+                    onLeftClick: .execute {
+                        NSWorkspace.shared.open(url)
+                    },
+                    onMiddleClick: .executeKeepOpen {
+                        NSWorkspace.shared.open(url)
+                    }
+                ),
+                
+                FunctionNode(
+                    id: "show-in-finder-\(url.path)",
+                    name: "Show in Finder",
+                    icon: NSImage(systemSymbolName: "folder", accessibilityDescription: nil) ?? NSImage(),
+                    preferredLayout: nil,
+                    onLeftClick: .execute {
+                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                    },
+                    onMiddleClick: .executeKeepOpen {
+                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                    }
+                ),
+                
+                FunctionNode(
+                    id: "copy-path-\(url.path)",
+                    name: "Copy Path",
+                    icon: NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil) ?? NSImage(),
+                    preferredLayout: nil,
+                    onLeftClick: .executeKeepOpen {
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        pasteboard.setString(url.path, forType: .string)
+                        print("📋 Copied path: \(url.path)")
+                    },
+                    onMiddleClick: .executeKeepOpen {
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        pasteboard.setString(url.path, forType: .string)
+                    }
+                )
+            ],
+            
+            preferredLayout: .partialSlice,
+            
+            // 🎯 LEFT CLICK = DRAG THE FILE!
+            onLeftClick: .drag(DragProvider(
+                fileURLs: [url],
+                dragImage: dragImage,
+                allowedOperations: [.copy, .move],
+                onDragStarted: {
+                    print("📦 Started dragging: \(fileName)")
+                },
+                onDragCompleted: { success in
+                    if success {
+                        print("✅ Successfully dragged: \(fileName)")
+                    } else {
+                        print("❌ Drag cancelled: \(fileName)")
+                    }
+                }
+            )),
+            
+            // RIGHT CLICK = SHOW CONTEXT MENU
+            onRightClick: .expand,
+            
+            // MIDDLE CLICK = QUICK OPEN
+            onMiddleClick: .executeKeepOpen {
+                print("🖱️ Middle-click opening: \(fileName)")
+                NSWorkspace.shared.open(url)
+            },
+            
+            // DON'T AUTO-EXPAND CONTEXT MENU
+            onBoundaryCross: .doNothing
+        )
+    }
+    
+    // Helper: Create thumbnail for images
+    private func createThumbnail(for url: URL) -> NSImage? {
+        // Check if it's an image file
+        let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
+        let fileExtension = url.pathExtension.lowercased()
+        
+        if imageExtensions.contains(fileExtension) {
+            if let image = NSImage(contentsOf: url) {
+                let thumbnailSize = NSSize(width: 64, height: 64)
+                let thumbnail = NSImage(size: thumbnailSize)
+                
+                thumbnail.lockFocus()
+                image.draw(
+                    in: NSRect(origin: .zero, size: thumbnailSize),
+                    from: NSRect(origin: .zero, size: image.size),
+                    operation: .sourceOver,
+                    fraction: 1.0
+                )
+                thumbnail.unlockFocus()
+                
+                return thumbnail
+            }
+        }
+        
+        // For non-images, return the file icon
+        return NSWorkspace.shared.icon(forFile: url.path)
     }
     
     // MARK: - Finder Window Discovery
@@ -90,7 +252,6 @@ class FinderLogic: FunctionProvider {
     private func getOpenFinderWindows() -> [FinderWindowInfo] {
         print("🔍 [FinderLogic] Querying Finder for open windows...")
         
-        // Use System Events to query Finder windows (more reliable)
         let script = """
         tell application "System Events"
             tell process "Finder"
@@ -128,44 +289,25 @@ class FinderLogic: FunctionProvider {
         
         if let error = error {
             print("❌ AppleScript error: \(error)")
-            if let errorMessage = error["NSAppleScriptErrorMessage"] as? String {
-                print("   Error message: \(errorMessage)")
-            }
             return []
         }
         
-        print("✅ AppleScript executed successfully")
-        print("   Result type: \(result.descriptorType)")
-        print("   Number of items: \(result.numberOfItems)")
-        
-        // Parse the result - each item is just a window name
         if result.numberOfItems > 0 {
             for i in 1...result.numberOfItems {
-                guard let item = result.atIndex(i) else {
-                    print("   ⚠️ Could not get item at index \(i)")
+                guard let item = result.atIndex(i),
+                      let windowName = item.stringValue else {
                     continue
                 }
                 
-                if let windowName = item.stringValue {
-                    print("   ✅ Found window: \(windowName)")
-                    
-                    // Try to guess the path from the window name
-                    let url = guessURLFromWindowName(windowName)
-                    windows.append(FinderWindowInfo(name: windowName, url: url, index: i))
-                } else {
-                    print("   ⚠️ Could not get string value for item \(i)")
-                }
+                let url = guessURLFromWindowName(windowName)
+                windows.append(FinderWindowInfo(name: windowName, url: url, index: i))
             }
-        } else {
-            print("   ℹ️ No Finder windows currently open")
         }
         
-        print("🔍 [FinderLogic] Returning \(windows.count) window(s)")
         return windows
     }
     
     private func guessURLFromWindowName(_ windowName: String) -> URL {
-        // Try common locations first
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
         
         let commonPaths: [String: String] = [
@@ -187,21 +329,15 @@ class FinderLogic: FunctionProvider {
             }
         }
         
-        // If not a common name, try as subfolder of home directory
         let guessedPath = homeDir.appendingPathComponent(windowName)
         if FileManager.default.fileExists(atPath: guessedPath.path) {
             return guessedPath
         }
         
-        // Fallback to home directory
-        print("   ⚠️ Could not determine path for window '\(windowName)', using home directory")
         return homeDir
     }
     
     private func createFinderWindowNode(for windowInfo: FinderWindowInfo) -> FunctionNode? {
-        print("🪟 [FinderLogic] Creating node for window: \(windowInfo.name)")
-        
-        // Simple node with context action to close
         return FunctionNode(
             id: "finder-window-\(windowInfo.index)",
             name: windowInfo.name,
@@ -212,7 +348,6 @@ class FinderLogic: FunctionProvider {
                     name: "Close Window",
                     icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
                     preferredLayout: nil,
-                    // EXPLICIT INTERACTION MODEL:
                     onLeftClick: .execute { [weak self] in
                         self?.closeFinderWindow(windowInfo.index)
                     },
@@ -222,17 +357,14 @@ class FinderLogic: FunctionProvider {
                 )
             ],
             preferredLayout: .partialSlice,
-            // EXPLICIT INTERACTION MODEL:
             onLeftClick: .execute { [weak self] in
-                // Primary action: Bring this Finder window to front
                 self?.bringFinderWindowToFront(windowInfo.index)
             },
-            onRightClick: .expand,  // Right-click: Show context menu (close window)
+            onRightClick: .expand,
             onMiddleClick: .executeKeepOpen { [weak self] in
-                // Middle-click: Bring window to front, keep UI open
                 self?.bringFinderWindowToFront(windowInfo.index)
             },
-            onBoundaryCross: .doNothing  // Don't auto-expand context menus
+            onBoundaryCross: .doNothing
         )
     }
     
@@ -279,7 +411,6 @@ class FinderLogic: FunctionProvider {
             if let error = error {
                 print("❌ Failed to bring window to front: \(error)")
                 
-                // Fallback: try the Finder approach
                 let fallbackScript = """
                 tell application "Finder"
                     activate

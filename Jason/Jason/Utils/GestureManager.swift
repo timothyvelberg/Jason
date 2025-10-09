@@ -14,7 +14,7 @@ class GestureManager {
     
     // MARK: - Gesture Types
     
-    enum MouseButton {
+    enum MouseButton: Equatable {
         case left
         case right
         case middle
@@ -35,10 +35,10 @@ class GestureManager {
         case doubleClick(MouseButton)
         case mouseDown(MouseButton)
         case mouseUp(MouseButton)
-        // Future extensibility:
-        // case scroll(CGFloat)
-        // case drag(from: CGPoint, to: CGPoint)
-        // case longPress(MouseButton)
+        // NEW: Drag support
+        case dragStarted(MouseButton, startPoint: CGPoint)
+        case dragMoved(currentPoint: CGPoint, delta: CGPoint)
+        case dragEnded(endPoint: CGPoint, didComplete: Bool)
     }
     
     // MARK: - Gesture Event
@@ -56,6 +56,10 @@ class GestureManager {
                  .mouseDown(let button),
                  .mouseUp(let button):
                 return button
+            case .dragStarted(let button, _):
+                return button
+            case .dragMoved, .dragEnded:
+                return .left  // Drags are typically left button
             }
         }
         
@@ -74,6 +78,21 @@ class GestureManager {
             return false
         }
     }
+    
+    // MARK: - Drag State
+    
+    private struct DragState {
+        let button: MouseButton
+        let startPoint: CGPoint
+        let startTime: Date
+        var hasMoved: Bool = false
+    }
+    
+    private var currentDrag: DragState?
+    
+    // Drag configuration
+    private let dragThreshold: CGFloat = 5.0        // Pixels to move before drag starts
+    private let dragTimeThreshold: TimeInterval = 0.15  // Seconds to wait before considering drag
     
     // MARK: - State
     
@@ -106,7 +125,7 @@ class GestureManager {
         setupLocalMonitors()
         
         isMonitoring = true
-        print("✅ GestureManager started monitoring")
+        print("✅ GestureManager started monitoring (with drag support)")
     }
     
     func stopMonitoring() {
@@ -122,6 +141,7 @@ class GestureManager {
         
         globalMonitors.removeAll()
         localMonitors.removeAll()
+        currentDrag = nil
         
         isMonitoring = false
         print("🛑 GestureManager stopped monitoring")
@@ -130,6 +150,25 @@ class GestureManager {
     // MARK: - Monitor Setup
     
     private func setupGlobalMonitors() {
+        // Left mouse button - track down, drag, up for drag detection
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
+            self?.handleMouseDown(event, button: .left)
+        } {
+            globalMonitors.append(monitor)
+        }
+        
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged]) { [weak self] event in
+            self?.handleMouseDragged(event, button: .left)
+        } {
+            globalMonitors.append(monitor)
+        }
+        
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] event in
+            self?.handleMouseUp(event, button: .left)
+        } {
+            globalMonitors.append(monitor)
+        }
+        
         // Right mouse button
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.rightMouseDown]) { [weak self] event in
             self?.handleMouseEvent(event, type: .click(.right))
@@ -145,17 +184,31 @@ class GestureManager {
         } {
             globalMonitors.append(monitor)
         }
-        
-        // Left mouse button (for completeness, though we handle this in CircularUIView)
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
-            self?.handleMouseEvent(event, type: .click(.left))
-        } {
-            globalMonitors.append(monitor)
-        }
     }
     
-    // In GestureManager.swift, find setupLocalMonitors() method
     private func setupLocalMonitors() {
+        // Left mouse button - track down, drag, up for drag detection
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
+            self?.handleMouseDown(event, button: .left)
+            return event  // Let it pass through to SwiftUI
+        } {
+            localMonitors.append(monitor)
+        }
+        
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDragged]) { [weak self] event in
+            self?.handleMouseDragged(event, button: .left)
+            return event  // Let it pass through
+        } {
+            localMonitors.append(monitor)
+        }
+        
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] event in
+            self?.handleMouseUp(event, button: .left)
+            return event  // Let it pass through
+        } {
+            localMonitors.append(monitor)
+        }
+        
         // Right mouse button
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown]) { [weak self] event in
             self?.handleMouseEvent(event, type: .click(.right))
@@ -174,14 +227,109 @@ class GestureManager {
         } {
             localMonitors.append(monitor)
         }
+    }
+    
+    // MARK: - Drag Detection
+    
+    private func handleMouseDown(_ event: NSEvent, button: MouseButton) {
+        let position = NSEvent.mouseLocation
         
-        // Left mouse button - DON'T consume it, let SwiftUI tap gesture handle it
-        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
-            self?.handleMouseEvent(event, type: .click(.left))
-            return event  // ← CHANGED: DON'T consume - let it pass through to CircularUIView
-        } {
-            localMonitors.append(monitor)
+        // Start potential drag
+        currentDrag = DragState(
+            button: button,
+            startPoint: position,
+            startTime: Date(),
+            hasMoved: false
+        )
+        
+        print("🖱️ Mouse down at \(position) - potential drag started")
+    }
+    
+    private func handleMouseDragged(_ event: NSEvent, button: MouseButton) {
+        guard var drag = currentDrag, drag.button == button else {
+            return
         }
+        
+        let position = NSEvent.mouseLocation
+        let distance = hypot(position.x - drag.startPoint.x, position.y - drag.startPoint.y)
+        let elapsed = Date().timeIntervalSince(drag.startTime)
+        
+        // Check if we've crossed the drag threshold
+        if !drag.hasMoved && distance > dragThreshold && elapsed > dragTimeThreshold {
+            // Drag started!
+            drag.hasMoved = true
+            currentDrag = drag
+            
+            let gestureEvent = GestureEvent(
+                type: .dragStarted(button, startPoint: drag.startPoint),
+                position: position,
+                timestamp: Date(),
+                modifierFlags: event.modifierFlags
+            )
+            
+            print("🎯 Drag started from \(drag.startPoint) to \(position) (distance: \(distance)px)")
+            onGesture?(gestureEvent)
+            
+        } else if drag.hasMoved {
+            // Drag in progress
+            let delta = CGPoint(
+                x: position.x - drag.startPoint.x,
+                y: position.y - drag.startPoint.y
+            )
+            
+            let gestureEvent = GestureEvent(
+                type: .dragMoved(currentPoint: position, delta: delta),
+                position: position,
+                timestamp: Date(),
+                modifierFlags: event.modifierFlags
+            )
+            
+            onGesture?(gestureEvent)
+        }
+    }
+    
+    private func handleMouseUp(_ event: NSEvent, button: MouseButton) {
+        let position = NSEvent.mouseLocation
+        
+        guard let drag = currentDrag, drag.button == button else {
+            // No drag state - this is just a click
+            handleMouseEvent(event, type: .click(button))
+            return
+        }
+        
+        if drag.hasMoved {
+            // Drag ended
+            let gestureEvent = GestureEvent(
+                type: .dragEnded(endPoint: position, didComplete: true),
+                position: position,
+                timestamp: Date(),
+                modifierFlags: event.modifierFlags
+            )
+            
+            print("🎯 Drag ended at \(position)")
+            onGesture?(gestureEvent)
+            
+        } else {
+            // Never moved enough - treat as click
+            handleMouseEvent(event, type: .click(button))
+        }
+        
+        currentDrag = nil
+    }
+    
+    // MARK: - Cancel Drag
+    
+    func cancelCurrentDrag() {
+        if let drag = currentDrag, drag.hasMoved {
+            let gestureEvent = GestureEvent(
+                type: .dragEnded(endPoint: drag.startPoint, didComplete: false),
+                position: drag.startPoint,
+                timestamp: Date(),
+                modifierFlags: NSEvent.modifierFlags
+            )
+            onGesture?(gestureEvent)
+        }
+        currentDrag = nil
     }
     
     // MARK: - Event Handling
@@ -202,9 +350,15 @@ class GestureManager {
              .mouseDown(let button),
              .mouseUp(let button):
             buttonName = "\(button)"
+        case .dragStarted(let button, _):
+            buttonName = "\(button)"
+        case .dragMoved:
+            buttonName = "drag"
+        case .dragEnded:
+            buttonName = "drag"
         }
         
-        print("🖱️ GestureManager: \(buttonName) click at \(gestureEvent.position)")
+        print("🖱️ GestureManager: \(buttonName) at \(gestureEvent.position)")
         
         // Fire callback
         onGesture?(gestureEvent)
