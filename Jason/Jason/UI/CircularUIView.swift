@@ -50,7 +50,6 @@ struct CircularUIView: View {
                     )
                     .transition(.customScale(from: 0.7))
                     .id("\(ring.level)-\(functionManager.ringResetTrigger)")
-                    .allowsHitTesting(false)  // Disable individual ring clicks, use global handler
                 }
             }
             .animation(.easeOut(duration: 0.1), value: rings.count)
@@ -58,11 +57,50 @@ struct CircularUIView: View {
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
         }
         .ignoresSafeArea()
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CircularUIRightClick"))) { _ in
+            handleGlobalRightClick()
+        }
     }
     
     private func shouldDimRing(_ level: Int) -> Bool {
         // Dim all rings except the active one
         return level != functionManager.activeRingLevel
+    }
+    
+    // NEW: Global right-click handler - shows context menu if available
+    private func handleGlobalRightClick() {
+        let activeRingLevel = functionManager.activeRingLevel
+        
+        guard activeRingLevel < functionManager.rings.count else {
+            print("⚠️ No active ring for right-click")
+            return
+        }
+        
+        // Get the currently hovered item
+        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
+            print("⚠️ No item currently hovered for right-click")
+            return
+        }
+        
+        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
+            print("⚠️ Invalid hovered index for right-click")
+            return
+        }
+        
+        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
+        
+        print("🖱️ [Right Click] On item: '\(node.name)' at ring \(activeRingLevel), index \(hoveredIndex)")
+        
+        // Check if this node has context actions
+        if node.isContextMenu {
+            print("   ✅ Has context menu - expanding")
+            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+        } else if node.shouldAutoExpand {
+            print("   ✅ Has children - expanding")
+            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+        } else {
+            print("   ⚠️ No context menu or children available")
+        }
     }
     
     // NEW: Global click handler - executes currently hovered item
@@ -98,9 +136,19 @@ struct CircularUIView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 circularUI.hide()
             }
-        } else if node.isBranch {
-            // Branch node - expand category
+        } else if node.shouldAutoExpand {
+            // Regular branch node - expand category
             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+        } else if node.isContextMenu {
+            // Context menu node - left-click executes primary action if available
+            if let action = node.onSelect {
+                action()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    circularUI.hide()
+                }
+            } else {
+                print("   💡 Use right-click to show context menu")
+            }
         }
     }
     

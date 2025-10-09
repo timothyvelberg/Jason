@@ -160,7 +160,7 @@ class MouseTracker {
                     if nodes.indices.contains(pieIndex) {
                         let node = nodes[pieIndex]
                         
-                        if node.isBranch {
+                        if node.shouldAutoExpand {  // ← CHANGED: was node.isBranch
                             print("🔵 Beyond boundary (\(distance) > \(activeRingOuterRadius)) but in angle range - expanding '\(node.name)'")
                             functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)
                             
@@ -168,6 +168,8 @@ class MouseTracker {
                             lastFunctionIndex = pieIndex
                             lastRingLevel = activeRingLevel
                             return
+                        } else if node.isContextMenu {  // ← NEW: Inform user about context menu
+                            print("⚠️ Beyond boundary hovering context menu '\(node.name)', use right-click to open")
                         } else {
                             print("⚠️ Beyond boundary hovering leaf node '\(node.name)', not expanding")
                         }
@@ -193,8 +195,8 @@ class MouseTracker {
                     let node = nodes[hoveredIndex]
                     let currentSelectedIndex = functionManager.rings[activeRingLevel].selectedIndex
                     
-                    // If hovering over a different category and there's an expanded ring above
-                    if node.isBranch && hoveredIndex != currentSelectedIndex && functionManager.rings.count > activeRingLevel + 1 {
+                    // If hovering over a different category (with children, not context menu) and there's an expanded ring above
+                    if node.children != nil && node.children!.count > 0 && hoveredIndex != currentSelectedIndex && functionManager.rings.count > activeRingLevel + 1 {
                         print("🔄 Switching to category '\(node.name)'")
                         functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
                     }

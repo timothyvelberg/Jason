@@ -62,6 +62,7 @@ class CircularUIManager: ObservableObject {
         
         setupOverlayWindow()
         setupGlobalHotkeys()
+        setupRightClickMonitoring()
     }
     
     // Setup keyboard shortcut listener
@@ -117,6 +118,28 @@ class CircularUIManager: ObservableObject {
             print("⌨️ [GLOBAL] Escape pressed - hiding circular UI")
             hide()
         }
+    }
+    
+    // Add this method after setupGlobalHotkeys()
+    private func setupRightClickMonitoring() {
+        print("🖱️ Setting up right-click monitoring")
+        
+        // Listen for global right-click events
+        NSEvent.addGlobalMonitorForEvents(matching: [.rightMouseDown]) { [weak self] event in
+            guard let self = self, self.isVisible else { return }
+            print("🖱️ [GLOBAL] Right-click detected while UI visible")
+            NotificationCenter.default.post(name: NSNotification.Name("CircularUIRightClick"), object: nil)
+        }
+        
+        // Also listen for local right-clicks
+        NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown]) { [weak self] event in
+            guard let self = self, self.isVisible else { return event }
+            print("🖱️ [LOCAL] Right-click detected while UI visible")
+            NotificationCenter.default.post(name: NSNotification.Name("CircularUIRightClick"), object: nil)
+            return nil  // Consume the event
+        }
+        
+        print("✅ Right-click monitoring started")
     }
     
     // Handle local keyboard events (when Jason is in focus)

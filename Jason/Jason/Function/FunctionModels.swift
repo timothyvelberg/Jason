@@ -27,7 +27,7 @@ class FunctionNode: Identifiable, ObservableObject {
     let onHover: (() -> Void)?
     let onHoverExit: (() -> Void)?
     let maxDisplayedChildren: Int?
-    let preferredLayout: LayoutStyle?  // NEW: Layout preference for this node's children
+    let preferredLayout: LayoutStyle?
     
     init(
         id: String,
@@ -39,7 +39,7 @@ class FunctionNode: Identifiable, ObservableObject {
         onHover: (() -> Void)? = nil,
         onHoverExit: (() -> Void)? = nil,
         maxDisplayedChildren: Int? = nil,
-        preferredLayout: LayoutStyle? = nil  // NEW parameter
+        preferredLayout: LayoutStyle? = nil
     ) {
         self.id = id
         self.name = name
@@ -66,6 +66,18 @@ class FunctionNode: Identifiable, ObservableObject {
     // Branch = has children OR contextActions
     var isBranch: Bool {
         return children != nil || contextActions != nil
+    }
+    
+    // NEW: Is this a context menu (has contextActions, not regular children)?
+    var isContextMenu: Bool {
+        return contextActions != nil && children == nil
+    }
+    
+    // NEW: Should this auto-expand on boundary cross?
+    // Regular categories (children) = yes
+    // Context menus (contextActions) = no (right-click only)
+    var shouldAutoExpand: Bool {
+        return children != nil && children!.count > 0
     }
     
     // Is this a valid branch (has actual children or context actions)?
