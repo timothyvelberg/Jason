@@ -12,7 +12,7 @@ class OverlayWindow: NSWindow {
     
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 800, height: 800),  // Increased from 600x400
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 800),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -29,7 +29,7 @@ class OverlayWindow: NSWindow {
         
         // CRITICAL: Accept mouse events (both movement and clicks)
         self.acceptsMouseMovedEvents = true
-        self.ignoresMouseEvents = false  // NEW: Must be false to accept clicks!
+        self.ignoresMouseEvents = false
         
         print("🪟 [OverlayWindow] ignoresMouseEvents set to: \(self.ignoresMouseEvents)")
         
@@ -79,14 +79,30 @@ class OverlayWindow: NSWindow {
         hideOverlay()
     }
     
-    // Handle escape key and clicks outside
+    // Handle keyboard events - FIXED: Don't call super to prevent beep
     override func keyDown(with event: NSEvent) {
         print("🎯 OverlayWindow received key: \(event.keyCode)")
+        
+        let isCtrlPressed = event.modifierFlags.contains(.control)
+        let isShiftPressed = event.modifierFlags.contains(.shift)
+        let isKKey = event.keyCode == 40  // K key
+        
+        // Handle Escape
         if event.keyCode == 53 { // Escape
             hideOverlay()
-        } else {
-            super.keyDown(with: event)
+            return  // Consumed - no beep
         }
+        
+        // Handle our shortcut Ctrl+Shift+K
+        if isCtrlPressed && isShiftPressed && isKKey {
+            // Shortcut is being handled by CircularUIManager
+            // Just consume it here to prevent beep
+            print("🎯 OverlayWindow consuming Ctrl+Shift+K (no beep)")
+            return  // Consumed - no beep
+        }
+        
+        // IMPORTANT: Don't call super.keyDown() - this prevents the beep!
+        // All other keys are silently consumed
     }
     
     // Log mouse events for debugging

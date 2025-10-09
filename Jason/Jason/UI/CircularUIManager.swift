@@ -17,7 +17,7 @@ class CircularUIManager: ObservableObject {
     private var appSwitcher: AppSwitcherManager?
     var functionManager: FunctionManager?
     private var mouseTracker: MouseTracker?
-    private var isCtrlPressed: Bool = false  // NEW: Track Ctrl key state
+    private var isHandlingShortcut: Bool = false  // Prevent double-handling
     
     init() {
         print("CircularUIManager initialized")
@@ -61,63 +61,106 @@ class CircularUIManager: ObservableObject {
         }
         
         setupOverlayWindow()
-        setupGlobalHotkeys()  // NEW: Setup keyboard shortcuts
+        setupGlobalHotkeys()
     }
     
-    // NEW: Setup keyboard shortcut listener
+    // Setup keyboard shortcut listener
     private func setupGlobalHotkeys() {
-        print("⌨️ Setting up circular UI hotkeys")
+        print("⌨️ Setting up circular UI hotkeys (Ctrl+Shift+K)")
         
-        // Listen for global key events (keyDown and flagsChanged)
-        NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+        // Listen for global key events (keyDown only)
+        NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             self?.handleGlobalKeyEvent(event)
         }
         
         // Also listen for local events
-        NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
-            self?.handleLocalKeyEvent(event)
-            return event
+        NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+            return self?.handleLocalKeyEvent(event) ?? event
         }
         
         print("✅ Circular UI hotkey monitoring started")
     }
     
-    // NEW: Handle global keyboard events
+    // Handle global keyboard events (when Jason is NOT in focus)
     private func handleGlobalKeyEvent(_ event: NSEvent) {
-        let isCtrlCurrentlyPressed = event.modifierFlags.contains(.control)
+        let isCtrlPressed = event.modifierFlags.contains(.control)
         let isShiftPressed = event.modifierFlags.contains(.shift)
-        let isTildeKey = event.keyCode == 50
+        let isKKey = event.keyCode == 40  // K key
         
-        // Show UI when Ctrl + Shift + Tilde is pressed
-        if event.type == .keyDown && isCtrlCurrentlyPressed && isShiftPressed && isTildeKey && !isVisible {
-            print("⌨️ Ctrl+Shift+~ detected - showing circular UI")
-            isCtrlPressed = true
-            show()
+        // Toggle UI when Ctrl + Shift + K is pressed
+        if event.type == .keyDown && isCtrlPressed && isShiftPressed && isKKey {
+            // Prevent double-handling
+            guard !isHandlingShortcut else {
+                print("⚠️ Already handling shortcut, ignoring duplicate")
+                return
+            }
+            
+            isHandlingShortcut = true
+            print("⌨️ [GLOBAL] Ctrl+Shift+K detected - toggling UI")
+            
+            if isVisible {
+                hide()
+            } else {
+                show()
+            }
+            
+            // Reset flag after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.isHandlingShortcut = false
+            }
+            
             return
         }
         
-        // Track Ctrl key state changes
-        if event.type == .flagsChanged {
-            let wasCtrlPressed = isCtrlPressed
-            isCtrlPressed = isCtrlCurrentlyPressed
-            
-            // If Ctrl was released and UI is visible, hide it
-            if wasCtrlPressed && !isCtrlCurrentlyPressed && isVisible {
-                print("⌨️ Ctrl released - hiding circular UI")
-                hide()
-            }
-        }
-        
-        // Hide UI on Escape
+        // Hide UI on Escape (when visible)
         if event.type == .keyDown && event.keyCode == 53 && isVisible {
-            print("⌨️ Escape pressed - hiding circular UI")
+            print("⌨️ [GLOBAL] Escape pressed - hiding circular UI")
             hide()
         }
     }
     
-    // NEW: Handle local keyboard events
-    private func handleLocalKeyEvent(_ event: NSEvent) {
-        handleGlobalKeyEvent(event)
+    // Handle local keyboard events (when Jason is in focus)
+    private func handleLocalKeyEvent(_ event: NSEvent) -> NSEvent? {
+        let isCtrlPressed = event.modifierFlags.contains(.control)
+        let isShiftPressed = event.modifierFlags.contains(.shift)
+        let isKKey = event.keyCode == 40  // K key
+        let isEscapeKey = event.keyCode == 53
+        
+        // Check if this is our shortcut (Ctrl+Shift+K)
+        if event.type == .keyDown && isCtrlPressed && isShiftPressed && isKKey {
+            // Prevent double-handling
+            guard !isHandlingShortcut else {
+                print("⚠️ Already handling shortcut, ignoring duplicate")
+                return nil
+            }
+            
+            isHandlingShortcut = true
+            print("⌨️ [LOCAL] Ctrl+Shift+K detected - toggling UI")
+            
+            // Handle the toggle
+            if isVisible {
+                hide()
+            } else {
+                show()
+            }
+            
+            // Reset flag after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.isHandlingShortcut = false
+            }
+            
+            return nil  // Consume the event - prevents system beep!
+        }
+        
+        // Check if this is Escape and UI is visible
+        if event.type == .keyDown && isEscapeKey && isVisible {
+            print("⌨️ [LOCAL] Escape pressed - hiding circular UI")
+            hide()
+            return nil  // Consume the event
+        }
+        
+        // Not our shortcut - let the system handle it
+        return event
     }
     
     private func setupOverlayWindow() {
@@ -181,7 +224,6 @@ class CircularUIManager: ObservableObject {
         mouseTracker?.stopTrackingMouse()
         
         isVisible = false
-        isCtrlPressed = false  // NEW: Reset Ctrl state
         overlayWindow?.hideOverlay()
         
         // Reset all state for clean slate on next show
