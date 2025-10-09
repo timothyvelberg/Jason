@@ -431,7 +431,7 @@ extension AppSwitcherManager: FunctionProvider {
                     self?.openApplicationsFolder()
                 },
                 maxDisplayedChildren: 12,  // Limit to 12 apps in the pie slice
-                preferredLayout: .fullCircle  // ← NEW: Use full circle for many apps!
+                preferredLayout: .partialSlice  // ← NEW: Use full circle for many apps!
             )
         ]
     }
