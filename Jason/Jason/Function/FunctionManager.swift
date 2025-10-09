@@ -70,14 +70,20 @@ class FunctionManager: ObservableObject {
                 // Get the parent node to check its layout preference
                 let parentNode = parentRing.nodes[parentSelectedIndex]
                 let preferredLayout = parentNode.preferredLayout ?? .partialSlice  // Default to partial
+                let itemCount = ringState.nodes.count
                 
-                if preferredLayout == .fullCircle {
+                // SMART FALLBACK: If partial slice has 12+ items, use full circle instead
+                // Reason: 12 items × 30° = 360° (already a full circle)
+                if preferredLayout == .partialSlice && itemCount >= 12 {
+                    print("🔵 Ring \(index): Auto-converting to FULL CIRCLE (too many items: \(itemCount) >= 12)")
+                    sliceConfig = .fullCircle(itemCount: itemCount)
+                } else if preferredLayout == .fullCircle {
                     // Parent wants children as full circle
                     print("🔵 Ring \(index): Using FULL CIRCLE layout (parent '\(parentNode.name)' preference)")
-                    sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                    sliceConfig = .fullCircle(itemCount: itemCount)
                 } else {
-                    // Parent wants children as partial slice
-                    print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentNode.name)' preference)")
+                    // Parent wants children as partial slice (and itemCount < 12)
+                    print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentNode.name)' preference, \(itemCount) items)")
                     
                     // Get the parent's slice config to calculate correct angle
                     let parentSliceConfig: PieSliceConfig
@@ -100,8 +106,6 @@ class FunctionManager: ObservableObject {
                         let itemAngle = parentSliceConfig.itemAngle
                         parentAngle = baseAngle + (Double(parentSelectedIndex) * itemAngle)
                     }
-                    
-                    let itemCount = ringState.nodes.count
                     
                     // If parent only has 1 child, use parent's angle width
                     if itemCount == 1 {

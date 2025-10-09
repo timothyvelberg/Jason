@@ -50,7 +50,7 @@ class MockFunctionProvider: FunctionProvider {
     func provideFunctions() -> [FunctionNode] {
         
         // Example: Category with FEW items - use partial slice
-        let fewLeaves = (1...3).map { index in
+        let fewLeaves = (1...9).map { index in
             FunctionNode(
                 id: "mock-few-func-\(index)",
                 name: "Quick \(index)",
