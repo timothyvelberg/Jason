@@ -228,9 +228,17 @@ struct CircularUIView: View {
             print("   ✅ Expanding category")
             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
             
-        case .drag:
-            print("   🎯 Draggable item clicked (drag will be handled by gesture system)")
-            // Drag is handled by GestureManager, not by click
+        case .drag(let provider):
+            // NEW: Execute onClick action if provided
+            if let onClick = provider.onClick {
+                print("   ✅ Executing click action on draggable item")
+                onClick()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    circularUI.hide()
+                }
+            } else {
+                print("   🎯 Draggable item clicked (no click action defined)")
+            }
             
         case .doNothing:
             print("   ⚠️ No left-click action defined")
@@ -269,9 +277,17 @@ struct CircularUIView: View {
             print("   ✅ Expanding category")
             functionManager.expandCategory(ringLevel: level, index: index)
             
-        case .drag:
-            print("   🎯 Draggable item tapped (drag will be handled by gesture system)")
-            // Drag is handled by GestureManager, not by tap
+        case .drag(let provider):
+            // NEW: Execute onClick action if provided
+            if let onClick = provider.onClick {
+                print("   ✅ Executing click action on draggable item")
+                onClick()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    circularUI.hide()
+                }
+            } else {
+                print("   🎯 Draggable item tapped (no click action defined)")
+            }
             
         case .doNothing:
             print("   ⚠️ No left-click action defined")

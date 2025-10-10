@@ -17,20 +17,23 @@ enum LayoutStyle {
 
 // MARK: - Drag Provider
 struct DragProvider {
-    let fileURLs: [URL]                          // Files to drag
-    let dragImage: NSImage?                      // Optional custom drag image
-    let allowedOperations: NSDragOperation       // copy, move, link, etc.
-    let onDragStarted: (() -> Void)?            // Called when drag begins
-    let onDragCompleted: ((Bool) -> Void)?      // Called when drag ends (success)
+    let fileURLs: [URL]
+    let dragImage: NSImage?
+    let allowedOperations: NSDragOperation
+    let onClick: (() -> Void)?
+    let onDragStarted: (() -> Void)?
+    let onDragCompleted: ((Bool) -> Void)?
     
     init(fileURLs: [URL],
          dragImage: NSImage? = nil,
          allowedOperations: NSDragOperation = [.copy, .move],
+         onClick: (() -> Void)? = nil,          
          onDragStarted: (() -> Void)? = nil,
          onDragCompleted: ((Bool) -> Void)? = nil) {
         self.fileURLs = fileURLs
         self.dragImage = dragImage
         self.allowedOperations = allowedOperations
+        self.onClick = onClick
         self.onDragStarted = onDragStarted
         self.onDragCompleted = onDragCompleted
     }

@@ -118,7 +118,7 @@ class FinderLogic: FunctionProvider {
             return []
         }
     }
-    
+
     private func createDraggableFileNode(for url: URL) -> FunctionNode {
         let fileName = url.lastPathComponent
         let fileIcon = NSWorkspace.shared.icon(forFile: url.path)
@@ -131,7 +131,7 @@ class FinderLogic: FunctionProvider {
         return FunctionNode(
             id: "desktop-file-\(url.path)",
             name: fileName,
-            icon: fileIcon,
+            icon: dragImage,
             
             // Context actions (right-click menu)
             contextActions: [
@@ -182,11 +182,16 @@ class FinderLogic: FunctionProvider {
             
             preferredLayout: .partialSlice,
             
-            // 🎯 LEFT CLICK = DRAG THE FILE!
+            // 🎯 LEFT CLICK = OPEN FILE (or drag if you move the mouse!)
             onLeftClick: .drag(DragProvider(
                 fileURLs: [url],
                 dragImage: dragImage,
                 allowedOperations: [.copy, .move],
+                onClick: {
+                    // NEW: This fires when clicked WITHOUT dragging
+                    print("📂 Opening file: \(fileName)")
+                    NSWorkspace.shared.open(url)
+                },
                 onDragStarted: {
                     print("📦 Started dragging: \(fileName)")
                 },
@@ -213,32 +218,77 @@ class FinderLogic: FunctionProvider {
         )
     }
     
+    // Helper method to create rounded icon for non-image files
+    private func createRoundedIcon(for url: URL, size: NSSize, cornerRadius: CGFloat) -> NSImage {
+        let fileIcon = NSWorkspace.shared.icon(forFile: url.path)
+        let roundedIcon = NSImage(size: size)
+        
+        roundedIcon.lockFocus()
+        
+        // Draw background with rounded corners
+        let rect = NSRect(origin: .zero, size: size)
+        let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
+        
+        // Optional: Add subtle background color
+        NSColor.controlBackgroundColor.withAlphaComponent(0.1).setFill()
+        path.fill()
+        
+        // Clip to rounded rect
+        path.addClip()
+        
+        // Draw the icon slightly smaller to add padding
+        let padding: CGFloat = 8
+        let iconRect = rect.insetBy(dx: padding, dy: padding)
+        fileIcon.draw(
+            in: iconRect,
+            from: NSRect(origin: .zero, size: fileIcon.size),
+            operation: .sourceOver,
+            fraction: 1.0
+        )
+        
+        roundedIcon.unlockFocus()
+        
+        return roundedIcon
+    }
+    
     // Helper: Create thumbnail for images
-    private func createThumbnail(for url: URL) -> NSImage? {
+    private func createThumbnail(for url: URL) -> NSImage {
+        let thumbnailSize = NSSize(width: 64, height: 64)
+        let cornerRadius: CGFloat = 8  // Rounded corners!
+        
         // Check if it's an image file
         let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
         let fileExtension = url.pathExtension.lowercased()
         
         if imageExtensions.contains(fileExtension) {
             if let image = NSImage(contentsOf: url) {
-                let thumbnailSize = NSSize(width: 64, height: 64)
                 let thumbnail = NSImage(size: thumbnailSize)
                 
                 thumbnail.lockFocus()
+                
+                // Create rounded rect path
+                let rect = NSRect(origin: .zero, size: thumbnailSize)
+                let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
+                
+                // Clip to rounded rect
+                path.addClip()
+                
+                // Draw image within rounded rect
                 image.draw(
-                    in: NSRect(origin: .zero, size: thumbnailSize),
+                    in: rect,
                     from: NSRect(origin: .zero, size: image.size),
                     operation: .sourceOver,
                     fraction: 1.0
                 )
+                
                 thumbnail.unlockFocus()
                 
                 return thumbnail
             }
         }
         
-        // For non-images, return the file icon
-        return NSWorkspace.shared.icon(forFile: url.path)
+        // For non-images, create rounded icon
+        return createRoundedIcon(for: url, size: thumbnailSize, cornerRadius: cornerRadius)
     }
     
     // MARK: - Finder Window Discovery
