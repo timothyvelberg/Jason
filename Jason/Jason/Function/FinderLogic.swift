@@ -186,9 +186,8 @@ class FinderLogic: FunctionProvider {
             onLeftClick: .drag(DragProvider(
                 fileURLs: [url],
                 dragImage: dragImage,
-                allowedOperations: [.copy, .move],
+                allowedOperations: .move,  // ← Changed from [.copy, .move] to just .move
                 onClick: {
-                    // NEW: This fires when clicked WITHOUT dragging
                     print("📂 Opening file: \(fileName)")
                     NSWorkspace.shared.open(url)
                 },
@@ -289,7 +288,7 @@ class FinderLogic: FunctionProvider {
         
         // For non-images, create rounded icon
         return createRoundedIcon(for: url, size: thumbnailSize, cornerRadius: cornerRadius)
-    }
+    }   
     
     // MARK: - Finder Window Discovery
     

@@ -176,21 +176,65 @@ class DraggableOverlayView: NSView {
 // MARK: - NSDraggingSource
 extension DraggableOverlayView: NSDraggingSource {
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
-        return dragProvider?.allowedOperations ?? [.copy, .move]
+        // CRITICAL: Return a MASK of allowed operations, not just one!
+        // This tells macOS "these operations are allowed, pick one based on modifiers"
+        
+        if context == .outsideApplication {
+            // Dragging outside the app - allow both move and copy
+            return [.move, .copy]
+        } else {
+            // Dragging within the app - allow both move and copy
+            return [.move, .copy]
+        }
+        
+        // macOS will automatically choose:
+        // - .move if no modifiers
+        // - .copy if Option is held
+        // The cursor updates automatically!
     }
     
     func draggingSession(_ session: NSDraggingSession, willBeginAt screenPoint: NSPoint) {
         print("🎯 Drag session beginning at \(screenPoint)")
+        
+        // Log the initial operation
+        let currentModifiers = NSEvent.modifierFlags
+        if currentModifiers.contains(.option) {
+            print("   → Starting with: COPY (Option held)")
+        } else {
+            print("   → Starting with: MOVE (no modifiers)")
+        }
     }
     
     func draggingSession(_ session: NSDraggingSession, movedTo screenPoint: NSPoint) {
-        // Track drag movement if needed
+        // Optional: Log modifier changes in real-time (for debugging)
+        // Uncomment to see live modifier detection:
+        /*
+        let currentModifiers = NSEvent.modifierFlags
+        if currentModifiers.contains(.option) {
+            print("   → Currently: COPY (Option held)")
+        } else {
+            print("   → Currently: MOVE (no modifiers)")
+        }
+        */
     }
     
     func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
         let success = operation != []
         
-        print("🎯 Drag session ended at \(screenPoint) - success: \(success)")
+        // Log what actually happened
+        var operationType = "unknown"
+        if operation.contains(.copy) {
+            operationType = "COPY"
+        } else if operation.contains(.move) {
+            operationType = "MOVE"
+        } else if operation.contains(.link) {
+            operationType = "LINK"
+        } else if operation == [] {
+            operationType = "cancelled"
+        }
+        
+        print("🎯 Drag session ended at \(screenPoint)")
+        print("   → Success: \(success), Final Operation: \(operationType)")
         
         // Call completion callback
         dragProvider?.onDragCompleted?(success)
@@ -201,6 +245,7 @@ extension DraggableOverlayView: NSDraggingSource {
     }
     
     func ignoreModifierKeys(for session: NSDraggingSession) -> Bool {
+        // CRITICAL: Return false so modifier changes are detected during drag!
         return false
     }
 }

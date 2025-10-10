@@ -147,12 +147,24 @@ class CircularUIManager: ObservableObject {
         
         let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
         
-        guard node.isDraggable, let provider = node.onDrag.dragProvider else {
+        guard node.isDraggable, var provider = node.onDrag.dragProvider else {
             print("🎯 Node '\(node.name)' is not draggable")
             return
         }
         
-        print("🎯 Drag started on node: \(node.name)")
+        // NEW: Capture current modifier flags
+        let currentModifiers = NSEvent.modifierFlags
+        provider.modifierFlags = currentModifiers
+        
+        // Log modifiers for debugging
+        var modifierNames: [String] = []
+        if currentModifiers.contains(.option) { modifierNames.append("Option") }
+        if currentModifiers.contains(.command) { modifierNames.append("Cmd") }
+        if currentModifiers.contains(.shift) { modifierNames.append("Shift") }
+        if currentModifiers.contains(.control) { modifierNames.append("Control") }
+        
+        let modifierText = modifierNames.isEmpty ? "none" : modifierNames.joined(separator: "+")
+        print("🎯 Drag started on node: \(node.name) with modifiers: \(modifierText)")
         
         // Store the dragged node
         draggedNode = node
