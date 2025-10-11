@@ -37,7 +37,13 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         "com.openai.chat",
         "com.spotify.client",
         "com.seriflabs.affinitydesigner2",
-        "com.seriflabs.affinityphoto2"
+        "com.seriflabs.affinityphoto2",
+        "com.apple.dt.Xcode",
+        "com.figma.Desktop",
+        "net.whatsapp.WhatsApp",
+        "com.tinyspeck.slackmacgap",
+        "co.zeit.hyper"
+        
     ]
     
     // Cache resolved apps to avoid repeated lookups

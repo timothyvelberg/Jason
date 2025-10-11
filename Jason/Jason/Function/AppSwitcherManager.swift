@@ -370,44 +370,11 @@ extension AppSwitcherManager: FunctionProvider {
     func provideFunctions() -> [FunctionNode] {
         // Convert running apps to FunctionNodes with context actions
         let appNodes = runningApps.map { app in
-            // Create context actions for each app
+            // Create context actions for each app using StandardContextActions
             let contextActions = [
-                FunctionNode(
-                    id: "activate-\(app.processIdentifier)",
-                    name: "Bring to Front",
-                    icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
-                    // EXPLICIT INTERACTION MODEL:
-                    onLeftClick: .execute { [weak self] in
-                        self?.switchToApp(app)
-                    },
-                    onMiddleClick: .executeKeepOpen { [weak self] in
-                        self?.switchToApp(app)
-                    }
-                ),
-                FunctionNode(
-                    id: "hide-\(app.processIdentifier)",
-                    name: "Hide",
-                    icon: NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil) ?? NSImage(),
-                    // EXPLICIT INTERACTION MODEL:
-                    onLeftClick: .execute { [weak self] in
-                        self?.hideApp(app)
-                    },
-                    onMiddleClick: .executeKeepOpen { [weak self] in
-                        self?.hideApp(app)
-                    }
-                ),
-                FunctionNode(
-                    id: "quit-\(app.processIdentifier)",
-                    name: "Quit",
-                    icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
-                    // EXPLICIT INTERACTION MODEL:
-                    onLeftClick: .execute { [weak self] in
-                        self?.quitApp(app)
-                    },
-                    onMiddleClick: .executeKeepOpen { [weak self] in
-                        self?.quitApp(app)
-                    }
-                )
+                StandardContextActions.quitApp(app, manager: self),
+                StandardContextActions.bringToFront(app, manager: self),
+                StandardContextActions.hideApp(app, manager: self)
             ]
             
             return FunctionNode(

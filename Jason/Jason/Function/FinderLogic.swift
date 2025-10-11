@@ -2,9 +2,9 @@
 //  FinderLogic.swift
 //  Jason
 //
-//  Shows open Finder windows + Desktop files
-//  - Ring 0: "Finder Windows" and "Desktop Files"
-//  - Ring 1: Open Finder windows OR Desktop files
+//  Shows open Finder windows + Downloads files
+//  - Ring 0: "Finder Windows" and "Downloads"
+//  - Ring 1: Open Finder windows OR Downloads files (last 10)
 //
 
 import Foundation
@@ -27,9 +27,9 @@ class FinderLogic: FunctionProvider {
         
         // Create both sections
         let finderWindowsNode = createFinderWindowsNode()
-        let desktopFilesNode = createDesktopFilesNode()
+        let downloadsFilesNode = createDownloadsFilesNode()
         
-        return [finderWindowsNode, desktopFilesNode]
+        return [finderWindowsNode, downloadsFilesNode]
     }
     
     func refresh() {
@@ -75,20 +75,20 @@ class FinderLogic: FunctionProvider {
         )
     }
     
-    // MARK: - Desktop Files Section (DRAGGABLE!)
+    // MARK: - Downloads Files Section (DRAGGABLE!)
     
-    private func createDesktopFilesNode() -> FunctionNode {
-        let desktopFiles = getDesktopFiles()
-        print("🖥️ [FinderLogic] Found \(desktopFiles.count) file(s) on Desktop")
+    private func createDownloadsFilesNode() -> FunctionNode {
+        let downloadsFiles = getDownloadsFiles()
+        print("📥 [FinderLogic] Found \(downloadsFiles.count) file(s) in Downloads (showing last 10)")
         
-        let fileNodes = desktopFiles.map { fileURL in
+        let fileNodes = downloadsFiles.map { fileURL in
             createDraggableFileNode(for: fileURL)
         }
         
         return FunctionNode(
-            id: "desktop-files-section",
-            name: "Desktop Files",
-            icon: NSImage(systemSymbolName: "folder", accessibilityDescription: nil) ?? NSImage(),
+            id: "downloads-files-section",
+            name: "Downloads",
+            icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage(),
             children: fileNodes,
             preferredLayout: .partialSlice,
             onLeftClick: .expand,
@@ -98,23 +98,32 @@ class FinderLogic: FunctionProvider {
         )
     }
     
-    private func getDesktopFiles() -> [URL] {
-        let desktopURL = FileManager.default.urls(
-            for: .desktopDirectory,
+    private func getDownloadsFiles() -> [URL] {
+        let downloadsURL = FileManager.default.urls(
+            for: .downloadsDirectory,
             in: .userDomainMask
         ).first!
         
         do {
             let files = try FileManager.default.contentsOfDirectory(
-                at: desktopURL,
-                includingPropertiesForKeys: [.isDirectoryKey, .nameKey],
+                at: downloadsURL,
+                includingPropertiesForKeys: [.isDirectoryKey, .nameKey, .contentModificationDateKey],
                 options: [.skipsHiddenFiles]
             )
             
-            // Sort by name
-            return files.sorted { $0.lastPathComponent < $1.lastPathComponent }
+            // Sort by modification date (newest first)
+            let sortedFiles = files.sorted { url1, url2 in
+                guard let date1 = try? url1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                      let date2 = try? url2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
+                    return false
+                }
+                return date1 > date2
+            }
+            
+            // Return only the last 10 files
+            return Array(sortedFiles.prefix(10))
         } catch {
-            print("❌ Failed to read Desktop: \(error)")
+            print("❌ Failed to read Downloads: \(error)")
             return []
         }
     }
@@ -129,12 +138,24 @@ class FinderLogic: FunctionProvider {
         print("📄 [FinderLogic] Creating draggable node for: \(fileName)")
         
         return FunctionNode(
-            id: "desktop-file-\(url.path)",
+            id: "downloads-file-\(url.path)",
             name: fileName,
             icon: dragImage,
             
             // Context actions (right-click menu)
             contextActions: [
+                FunctionNode(
+                    id: "delete-\(url.path)",
+                    name: "Delete",
+                    icon: NSImage(systemSymbolName: "trash", accessibilityDescription: nil) ?? NSImage(),
+                    preferredLayout: nil,
+                    onLeftClick: .execute {
+                        self.deleteFile(url)
+                    },
+                    onMiddleClick: .executeKeepOpen {
+                        self.deleteFile(url)
+                    }
+                ),
                 FunctionNode(
                     id: "open-\(url.path)",
                     name: "Open",
@@ -159,24 +180,6 @@ class FinderLogic: FunctionProvider {
                     onMiddleClick: .executeKeepOpen {
                         NSWorkspace.shared.activateFileViewerSelecting([url])
                     }
-                ),
-                
-                FunctionNode(
-                    id: "copy-path-\(url.path)",
-                    name: "Copy Path",
-                    icon: NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil) ?? NSImage(),
-                    preferredLayout: nil,
-                    onLeftClick: .executeKeepOpen {
-                        let pasteboard = NSPasteboard.general
-                        pasteboard.clearContents()
-                        pasteboard.setString(url.path, forType: .string)
-                        print("📋 Copied path: \(url.path)")
-                    },
-                    onMiddleClick: .executeKeepOpen {
-                        let pasteboard = NSPasteboard.general
-                        pasteboard.clearContents()
-                        pasteboard.setString(url.path, forType: .string)
-                    }
                 )
             ],
             
@@ -186,7 +189,7 @@ class FinderLogic: FunctionProvider {
             onLeftClick: .drag(DragProvider(
                 fileURLs: [url],
                 dragImage: dragImage,
-                allowedOperations: .move,  // ← Changed from [.copy, .move] to just .move
+                allowedOperations: .move,
                 onClick: {
                     print("📂 Opening file: \(fileName)")
                     NSWorkspace.shared.open(url)
@@ -250,6 +253,20 @@ class FinderLogic: FunctionProvider {
         return roundedIcon
     }
     
+    // MARK: - File Actions
+
+    private func deleteFile(_ url: URL) {
+        print("🗑️ Moving to trash: \(url.lastPathComponent)")
+        
+        NSWorkspace.shared.recycle([url]) { trashedURLs, error in
+            if let error = error {
+                print("❌ Failed to delete file: \(error.localizedDescription)")
+            } else {
+                print("✅ File moved to trash: \(url.lastPathComponent)")
+            }
+        }
+    }
+    
     // Helper: Create thumbnail for images
     private func createThumbnail(for url: URL) -> NSImage {
         let thumbnailSize = NSSize(width: 64, height: 64)
@@ -288,7 +305,7 @@ class FinderLogic: FunctionProvider {
         
         // For non-images, create rounded icon
         return createRoundedIcon(for: url, size: thumbnailSize, cornerRadius: cornerRadius)
-    }   
+    }
     
     // MARK: - Finder Window Discovery
     
