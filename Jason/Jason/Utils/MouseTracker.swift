@@ -173,10 +173,10 @@ class MouseTracker {
                         case .doNothing:
                             print("⚠️ Beyond boundary hovering '\(node.name)' - no auto-expand (use right-click)")
                             
-                        case .execute(let action):
+                        case .execute:
                             print("⚠️ Beyond boundary hovering '\(node.name)' - would execute action (unusual for boundary cross)")
                             
-                        case .executeKeepOpen(let action):
+                        case .executeKeepOpen:
                             print("⚠️ Beyond boundary hovering '\(node.name)' - would execute and keep open (unusual for boundary cross)")
                             
                         case .drag:

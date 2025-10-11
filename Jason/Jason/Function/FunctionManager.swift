@@ -107,19 +107,51 @@ class FunctionManager: ObservableObject {
                         parentAngle = baseAngle + (Double(parentSelectedIndex) * itemAngle)
                     }
                     
-                    // If parent only has 1 child, use parent's angle width
+                    // NEW: Determine direction based on parent position
+                    // Upper half (0-180°): open clockwise
+                    // Lower half (180-360°): open counter-clockwise
+                    let shouldOpenClockwise = parentAngle < 180.0
+                    
+                    // Calculate total angle for children
+                    let defaultItemAngle = 30.0
+                    let totalAngle = min(Double(itemCount) * defaultItemAngle, 360.0)
+                    
+                    let startAngle: Double
+                    let endAngle: Double
+                    let itemAngle: Double
+                    
                     if itemCount == 1 {
-                        sliceConfig = .partialSlice(
-                            itemCount: itemCount,
-                            centeredAt: parentAngle,
-                            defaultItemAngle: parentSliceConfig.itemAngle
-                        )
+                        // Single item: use parent's angle width
+                        itemAngle = parentSliceConfig.itemAngle
+                        if shouldOpenClockwise {
+                            startAngle = parentAngle
+                            endAngle = (parentAngle + itemAngle).truncatingRemainder(dividingBy: 360)
+                        } else {
+                            endAngle = parentAngle
+                            startAngle = (parentAngle - itemAngle + 360).truncatingRemainder(dividingBy: 360)
+                        }
                     } else {
-                        sliceConfig = .partialSlice(
-                            itemCount: itemCount,
-                            centeredAt: parentAngle
-                        )
+                        // Multiple items
+                        itemAngle = totalAngle / Double(itemCount)
+                        if shouldOpenClockwise {
+                            // Clockwise: start at parent, extend forward
+                            startAngle = parentAngle
+                            endAngle = (parentAngle + totalAngle).truncatingRemainder(dividingBy: 360)
+                        } else {
+                            // Counter-clockwise: end at parent, extend backward
+                            endAngle = parentAngle
+                            startAngle = (parentAngle - totalAngle + 360).truncatingRemainder(dividingBy: 360)
+                        }
                     }
+                    
+                    sliceConfig = PieSliceConfig(
+                        startAngle: startAngle,
+                        endAngle: endAngle,
+                        itemAngle: itemAngle
+                    )
+                    
+                    print("   Direction: \(shouldOpenClockwise ? "Clockwise" : "Counter-clockwise"), ParentAngle: \(parentAngle)°")
+                    print("   Slice: \(startAngle)° to \(endAngle)° (total: \(totalAngle)°)")
                 }
             }
             
