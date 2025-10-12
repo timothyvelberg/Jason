@@ -56,6 +56,7 @@ struct CurvedTextView: View {
                 .rotationEffect(angle(at: index))
             }
         }
+        .rotationEffect(-angle(at: texts.count - 1) / 2)  // NEW: Center the text at 12 o'clock
         .frame(width: frameSize, height: frameSize)
     }
     
