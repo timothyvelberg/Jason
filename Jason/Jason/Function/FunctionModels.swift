@@ -110,6 +110,7 @@ class FunctionNode: Identifiable, ObservableObject {
     let preferredLayout: LayoutStyle?
     let itemAngleSize: CGFloat?
     let previewURL: URL?
+    let showCurvedLabel: Bool
     
     // MARK: - Interaction Model (Explicit Behavior)
     let onLeftClick: InteractionBehavior
@@ -131,6 +132,7 @@ class FunctionNode: Identifiable, ObservableObject {
         preferredLayout: LayoutStyle? = nil,
         itemAngleSize: CGFloat? = nil,
         previewURL: URL? = nil,
+        showCurvedLabel: Bool = false,
         
         // Explicit interaction declarations
         onLeftClick: InteractionBehavior = .doNothing,
@@ -152,6 +154,8 @@ class FunctionNode: Identifiable, ObservableObject {
         self.preferredLayout = preferredLayout
         self.itemAngleSize = itemAngleSize
         self.previewURL = previewURL
+        self.showCurvedLabel = showCurvedLabel
+        
         
         // Set interaction behaviors
         // If old onSelect was provided, convert it to onLeftClick for backward compatibility
