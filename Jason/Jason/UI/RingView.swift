@@ -158,11 +158,11 @@ struct RingView: View {
                         CurvedTextView(
                             text: node.name,
                             radius: endRadius + 15,
+                            frameSize: totalDiameter,  // NEW: Pass the parent frame size
                             centerAngle: calculateCenterAngle(for: selectedIndex),
                             font: NSFont.systemFont(ofSize: 11, weight: .medium),
                             color: .white
                         )
-                        .position(x: totalDiameter / 2, y: -24)  // Put it at top
                     }
                 }
             }
