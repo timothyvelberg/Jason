@@ -150,6 +150,23 @@ struct RingView: View {
         .opacity(ringOpacity)
         .scaleEffect(ringScale)
         .animation(.easeInOut(duration: 0.2), value: shouldDimOpacity)
+        .overlay(
+            Group {
+                if let selectedIndex = selectedIndex {
+                    let node = nodes[selectedIndex]
+                    if node.showCurvedLabel {
+                        CurvedTextView(
+                            text: node.name,
+                            radius: endRadius + 15,
+                            centerAngle: calculateCenterAngle(for: selectedIndex),
+                            font: NSFont.systemFont(ofSize: 11, weight: .medium),
+                            color: .white
+                        )
+                        .position(x: totalDiameter / 2, y: -24)  // Put it at top
+                    }
+                }
+            }
+        )
         .onChange(of: nodes.count) {
             if let index = selectedIndex {
                 rotationIndex = index
@@ -265,5 +282,13 @@ struct RingView: View {
         let y = center.y + middleRadius * sin(angleInRadians)
         
         return CGPoint(x: x, y: y)
+    }
+    private func calculateCenterAngle(for index: Int) -> Double {
+        guard nodes.count > 0 else { return 0 }
+        
+        let itemAngle = sliceConfig.itemAngle
+        let baseAngle = sliceConfig.startAngle
+        
+        return baseAngle + (itemAngle * Double(index)) + (itemAngle / 2)
     }
 }
