@@ -144,46 +144,13 @@ class FinderLogic: FunctionProvider {
             
             // Context actions (right-click menu)
             contextActions: [
-                FunctionNode(
-                    id: "delete-\(url.path)",
-                    name: "Delete",
-                    icon: NSImage(systemSymbolName: "trash", accessibilityDescription: nil) ?? NSImage(),
-                    preferredLayout: nil,
-                    onLeftClick: .execute {
-                        self.deleteFile(url)
-                    },
-                    onMiddleClick: .executeKeepOpen {
-                        self.deleteFile(url)
-                    }
-                ),
-                FunctionNode(
-                    id: "open-\(url.path)",
-                    name: "Open",
-                    icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
-                    preferredLayout: nil,
-                    onLeftClick: .execute {
-                        NSWorkspace.shared.open(url)
-                    },
-                    onMiddleClick: .executeKeepOpen {
-                        NSWorkspace.shared.open(url)
-                    }
-                ),
-                
-                FunctionNode(
-                    id: "show-in-finder-\(url.path)",
-                    name: "Show in Finder",
-                    icon: NSImage(systemSymbolName: "folder", accessibilityDescription: nil) ?? NSImage(),
-                    preferredLayout: nil,
-                    onLeftClick: .execute {
-                        NSWorkspace.shared.activateFileViewerSelecting([url])
-                    },
-                    onMiddleClick: .executeKeepOpen {
-                        NSWorkspace.shared.activateFileViewerSelecting([url])
-                    }
-                )
+                StandardContextActions.deleteFile(url),
+                StandardContextActions.openFile(url),
+                StandardContextActions.showInFinder(url)
             ],
             
             preferredLayout: .partialSlice,
+            itemAngleSize: 20.0,
             
             // 🎯 LEFT CLICK = OPEN FILE (or drag if you move the mouse!)
             onLeftClick: .drag(DragProvider(
@@ -423,6 +390,7 @@ class FinderLogic: FunctionProvider {
                 )
             ],
             preferredLayout: .partialSlice,
+            itemAngleSize: 20.0,
             onLeftClick: .execute { [weak self] in
                 self?.bringFinderWindowToFront(windowInfo.index)
             },

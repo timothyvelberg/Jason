@@ -108,6 +108,7 @@ class FunctionNode: Identifiable, ObservableObject {
     let contextActions: [FunctionNode]?
     let maxDisplayedChildren: Int?
     let preferredLayout: LayoutStyle?
+    let itemAngleSize: CGFloat?
     
     // MARK: - Interaction Model (Explicit Behavior)
     let onLeftClick: InteractionBehavior
@@ -127,6 +128,8 @@ class FunctionNode: Identifiable, ObservableObject {
         contextActions: [FunctionNode]? = nil,
         maxDisplayedChildren: Int? = nil,
         preferredLayout: LayoutStyle? = nil,
+        itemAngleSize: CGFloat? = nil,
+        
         // Explicit interaction declarations
         onLeftClick: InteractionBehavior = .doNothing,
         onRightClick: InteractionBehavior = .doNothing,
@@ -145,6 +148,7 @@ class FunctionNode: Identifiable, ObservableObject {
         self.contextActions = contextActions
         self.maxDisplayedChildren = maxDisplayedChildren
         self.preferredLayout = preferredLayout
+        self.itemAngleSize = itemAngleSize
         
         // Set interaction behaviors
         // If old onSelect was provided, convert it to onLeftClick for backward compatibility

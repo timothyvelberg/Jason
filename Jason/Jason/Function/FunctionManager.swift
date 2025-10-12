@@ -107,17 +107,23 @@ class FunctionManager: ObservableObject {
                         parentAngle = baseAngle + (Double(parentSelectedIndex) * itemAngle)
                     }
                     
+                    // NEW: Get custom itemAngleSize from parent node, or use defaults
+                    let customAngle = parentNode.itemAngleSize ?? 30.0
+                    
+                    print("   Using custom angle size: \(customAngle)° (parent itemAngleSize: \(parentNode.itemAngleSize?.description ?? "nil"))")
+                    
                     // If parent only has 1 child, use parent's angle width
                     if itemCount == 1 {
                         sliceConfig = .partialSlice(
                             itemCount: itemCount,
                             centeredAt: parentAngle,
-                            defaultItemAngle: parentSliceConfig.itemAngle
+                            defaultItemAngle: parentNode.itemAngleSize ?? parentSliceConfig.itemAngle  // Use custom if provided
                         )
                     } else {
                         sliceConfig = .partialSlice(
                             itemCount: itemCount,
-                            centeredAt: parentAngle
+                            centeredAt: parentAngle,
+                            defaultItemAngle: customAngle  // Use custom angle size!
                         )
                     }
                 }
