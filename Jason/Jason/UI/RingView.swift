@@ -15,7 +15,7 @@ struct RingView: View {
     let selectedIndex: Int?
     let onNodeTapped: (Int) -> Void
     let shouldDimOpacity: Bool
-    let sliceConfig: PieSliceConfig  // NEW: Pie slice configuration
+    let sliceConfig: PieSliceConfig
     
     // Visual properties
     private let backgroundColor: Color = .black.opacity(0.9)
@@ -152,15 +152,16 @@ struct RingView: View {
         .animation(.easeInOut(duration: 0.2), value: shouldDimOpacity)
         .overlay(
             Group {
-                if let selectedIndex = selectedIndex {
+                if let selectedIndex = selectedIndex,
+                   !shouldDimOpacity {  // NEW: Only show on active ring
                     let node = nodes[selectedIndex]
                     if node.showCurvedLabel {
                         CurvedTextView(
                             text: node.name,
                             radius: endRadius + 15,
-                            frameSize: totalDiameter,  // NEW: Pass the parent frame size
+                            frameSize: totalDiameter,
                             centerAngle: calculateCenterAngle(for: selectedIndex),
-                            font: NSFont.systemFont(ofSize: 11, weight: .medium),
+                            font: NSFont.systemFont(ofSize: 14, weight: .medium),
                             color: .white
                         )
                     }
