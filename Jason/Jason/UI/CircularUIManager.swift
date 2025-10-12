@@ -42,7 +42,7 @@ class CircularUIManager: ObservableObject {
         functionManager?.registerProvider(FavoriteAppsProvider())
         
         // Register mock provider for testing (shows alongside real apps)
-        functionManager?.registerProvider(MockFunctionProvider())
+//        functionManager?.registerProvider(MockFunctionProvider())
         
         functionManager?.registerProvider(FinderLogic())
         
