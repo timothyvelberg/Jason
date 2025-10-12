@@ -152,6 +152,7 @@ class FinderLogic: FunctionProvider {
             preferredLayout: .partialSlice,
             itemAngleSize: 20.0,
             previewURL: url,
+            showCurvedLabel: true,
             
             // 🎯 LEFT CLICK = OPEN FILE (or drag if you move the mouse!)
             onLeftClick: .drag(DragProvider(
