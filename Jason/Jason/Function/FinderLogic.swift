@@ -121,7 +121,7 @@ class FinderLogic: FunctionProvider {
             }
             
             // Return only the last 10 files
-            return Array(sortedFiles.prefix(6))
+            return Array(sortedFiles.prefix(10))
         } catch {
             print("❌ Failed to read Downloads: \(error)")
             return []

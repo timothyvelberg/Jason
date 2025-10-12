@@ -160,7 +160,7 @@ struct RingView: View {
                             radius: endRadius + 15,
                             frameSize: totalDiameter,  // NEW: Pass the parent frame size
                             centerAngle: calculateCenterAngle(for: selectedIndex),
-                            font: NSFont.systemFont(ofSize: 11, weight: .medium),
+                            font: NSFont.systemFont(ofSize: 14, weight: .medium),
                             color: .white
                         )
                     }
