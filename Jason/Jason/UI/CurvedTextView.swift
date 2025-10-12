@@ -46,6 +46,7 @@ struct CurvedTextView: View {
                     Text(String(letter))
                         .font(Font(font))
                         .foregroundColor(color)
+                        .rotationEffect(flipRotation(at: index))  // NEW: Move flip here, to just the text
                         .background(Sizeable())
                         .onPreferenceChange(WidthPreferenceKey.self) { width in
                             textWidths[index] = width
@@ -53,11 +54,30 @@ struct CurvedTextView: View {
                         .offset(y: -(radius - frameSize / 2))
                     Spacer()
                 }
-                .rotationEffect(angle(at: index))
+                .rotationEffect(angle(at: index))  // This positions the VStack
+                // REMOVED: .rotationEffect(flipRotation(at: index)) from here
             }
         }
-        .rotationEffect(-angle(at: texts.count - 1) / 2)  // NEW: Center the text at 12 o'clock
+        .rotationEffect(-angle(at: texts.count - 1) / 2)
+        .rotationEffect(.degrees(centerAngle))
         .frame(width: frameSize, height: frameSize)
+    }
+    
+    private func flipRotation(at index: Int) -> Angle {
+        // Calculate the final angle of this character after all rotations
+        let charAngle = angle(at: index).degrees
+        let centeringRotation = -angle(at: texts.count - 1).degrees / 2
+        let finalAngle = (charAngle + centeringRotation + centerAngle).truncatingRemainder(dividingBy: 360)
+        
+        // Normalize to 0-360 range
+        let normalizedAngle = finalAngle < 0 ? finalAngle + 360 : finalAngle
+        
+        // If in bottom half (90° to 270°), flip 180°
+        if normalizedAngle > 90 && normalizedAngle < 270 {
+            return .degrees(180)
+        }
+        
+        return .degrees(0)
     }
     
     private func angle(at index: Int) -> Angle {
