@@ -79,9 +79,16 @@ class OverlayWindow: NSWindow {
     
     // NEW: Detect when window loses focus
     override func resignKey() {
-        print("🔴 [OverlayWindow] Window lost focus - triggering hide")
+        print("🔴 [OverlayWindow] Window lost focus")
         super.resignKey()
         
+        // Don't hide if Quick Look is showing - it steals focus but we want to stay visible
+        if QuickLookManager.shared.isShowing {
+            print("   👁️ Quick Look is visible - keeping UI open")
+            return
+        }
+        
+        print("   Triggering hide")
         // Call the callback to hide the UI
         onLostFocus?()
     }

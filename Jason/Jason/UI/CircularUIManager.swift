@@ -24,6 +24,7 @@ class CircularUIManager: ObservableObject {
     private var mouseTracker: MouseTracker?
     private var gestureManager: GestureManager?
     private var isHandlingShortcut: Bool = false  // Prevent double-handling
+    private var wasShiftPressed: Bool = false
     
     init() {
         print("CircularUIManager initialized")
@@ -251,6 +252,14 @@ class CircularUIManager: ObservableObject {
         
         print("🖱️ [Middle Click] On item: '\(node.name)'")
         
+        // NEW: Check if node is previewable - if so, show preview instead of executing action
+        if node.isPreviewable, let previewURL = node.previewURL {
+            print("👁️ [Middle Click] Node is previewable - showing Quick Look")
+            QuickLookManager.shared.togglePreview(for: previewURL)
+            return
+        }
+        
+        // Otherwise, execute the middle-click action
         switch node.onMiddleClick {
         case .execute(let action):
             action()
@@ -264,7 +273,6 @@ class CircularUIManager: ObservableObject {
     
     // MARK: - Global Hotkeys
     
-    // Setup keyboard shortcut listener
     private func setupGlobalHotkeys() {
         print("⌨️ Setting up circular UI hotkeys (Ctrl+Shift+K)")
         
@@ -273,9 +281,19 @@ class CircularUIManager: ObservableObject {
             self?.handleGlobalKeyEvent(event)
         }
         
+        // Listen for global modifier key changes (for SHIFT detection)
+        NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged]) { [weak self] event in
+            self?.handleGlobalFlagsChanged(event)
+        }
+        
         // Also listen for local events
         NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             return self?.handleLocalKeyEvent(event) ?? event
+        }
+        
+        // Listen for local modifier key changes
+        NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged]) { [weak self] event in
+            return self?.handleLocalFlagsChanged(event) ?? event
         }
         
         print("✅ Circular UI hotkey monitoring started")
@@ -316,6 +334,11 @@ class CircularUIManager: ObservableObject {
         if event.type == .keyDown && event.keyCode == 53 && isVisible {
             print("⌨️ [GLOBAL] Escape pressed - hiding circular UI")
             hide()
+        }
+        if event.type == .keyDown && event.keyCode == 56 && isVisible {  // 56 = Left Shift
+            print("⌨️ [GLOBAL] SHIFT pressed - checking for previewable node")
+            handlePreviewRequest()
+            return
         }
     }
     
@@ -358,7 +381,14 @@ class CircularUIManager: ObservableObject {
             hide()
             return nil  // Consume the event
         }
-        
+
+        // NEW: Check if this is SHIFT and UI is visible
+        if event.type == .keyDown && event.keyCode == 56 && isVisible {  // 56 = Left Shift
+            print("⌨️ [LOCAL] SHIFT pressed - checking for previewable node")
+            handlePreviewRequest()
+            return nil  // Consume the event
+        }
+
         // Not our shortcut - let the system handle it
         return event
     }
@@ -382,6 +412,72 @@ class CircularUIManager: ObservableObject {
         overlayWindow?.contentView = NSHostingView(rootView: contentView)
         
         print("Overlay window created and configured")
+    }
+    
+    // MARK: - Preview Handler
+
+    private func handlePreviewRequest() {
+        guard let functionManager = functionManager else { return }
+        
+        let activeRingLevel = functionManager.activeRingLevel
+        guard activeRingLevel < functionManager.rings.count else {
+            print("⚠️ No active ring for preview")
+            return
+        }
+        
+        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
+            print("⚠️ No item currently hovered for preview")
+            return
+        }
+        
+        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
+            print("⚠️ Invalid hovered index for preview")
+            return
+        }
+        
+        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
+        
+        // Check if node is previewable
+        guard node.isPreviewable, let previewURL = node.previewURL else {
+            print("⚠️ Node '\(node.name)' is not previewable")
+            return
+        }
+        
+        print("👁️ [Preview] Showing Quick Look for: \(node.name)")
+        QuickLookManager.shared.togglePreview(for: previewURL)
+    }
+    
+    // Handle global flag changes (modifier keys like SHIFT)
+    private func handleGlobalFlagsChanged(_ event: NSEvent) {
+        guard isVisible else { return }
+        
+        let isShiftPressed = event.modifierFlags.contains(.shift)
+        
+        // Only trigger on SHIFT press (transition from not-pressed to pressed)
+        if isShiftPressed && !wasShiftPressed {
+            print("⌨️ [GLOBAL] SHIFT pressed - toggling preview")
+            handlePreviewRequest()
+        }
+        
+        wasShiftPressed = isShiftPressed
+    }
+
+    // Handle local flag changes (modifier keys like SHIFT)
+    private func handleLocalFlagsChanged(_ event: NSEvent) -> NSEvent? {
+        guard isVisible else { return event }
+        
+        let isShiftPressed = event.modifierFlags.contains(.shift)
+        
+        // Only trigger on SHIFT press (transition from not-pressed to pressed)
+        if isShiftPressed && !wasShiftPressed {
+            print("⌨️ [LOCAL] SHIFT pressed - toggling preview")
+            handlePreviewRequest()
+            wasShiftPressed = isShiftPressed
+            return nil  // Consume the event
+        }
+        
+        wasShiftPressed = isShiftPressed
+        return event
     }
     
     // MARK: - Show/Hide
@@ -422,6 +518,7 @@ class CircularUIManager: ObservableObject {
         
         mousePosition = NSEvent.mouseLocation
         isVisible = true
+        wasShiftPressed = false
         overlayWindow?.showOverlay(at: mousePosition)
         
         mouseTracker?.startTrackingMouse()
@@ -439,6 +536,10 @@ class CircularUIManager: ObservableObject {
         
         // Reset all state for clean slate on next show
         functionManager?.reset()
+        
+        // NEW: Close any open preview
+        QuickLookManager.shared.hidePreview()
+        wasShiftPressed = false  // Reset SHIFT state
         
         print("Hiding circular UI")
     }

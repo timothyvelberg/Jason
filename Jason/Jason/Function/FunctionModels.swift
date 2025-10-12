@@ -109,6 +109,7 @@ class FunctionNode: Identifiable, ObservableObject {
     let maxDisplayedChildren: Int?
     let preferredLayout: LayoutStyle?
     let itemAngleSize: CGFloat?
+    let previewURL: URL?
     
     // MARK: - Interaction Model (Explicit Behavior)
     let onLeftClick: InteractionBehavior
@@ -129,6 +130,7 @@ class FunctionNode: Identifiable, ObservableObject {
         maxDisplayedChildren: Int? = nil,
         preferredLayout: LayoutStyle? = nil,
         itemAngleSize: CGFloat? = nil,
+        previewURL: URL? = nil,
         
         // Explicit interaction declarations
         onLeftClick: InteractionBehavior = .doNothing,
@@ -149,6 +151,7 @@ class FunctionNode: Identifiable, ObservableObject {
         self.maxDisplayedChildren = maxDisplayedChildren
         self.preferredLayout = preferredLayout
         self.itemAngleSize = itemAngleSize
+        self.previewURL = previewURL
         
         // Set interaction behaviors
         // If old onSelect was provided, convert it to onLeftClick for backward compatibility
@@ -168,10 +171,10 @@ class FunctionNode: Identifiable, ObservableObject {
     
     // MARK: - Computed Properties
     
-    // DEPRECATED: For backward compatibility only
-    var action: (() -> Void)? {
-        return nil  // Use onLeftClick instead
+    var isPreviewable: Bool {
+        return previewURL != nil
     }
+    
     
     var onSelect: (() -> Void)? {
         return nil  // Use onLeftClick instead
