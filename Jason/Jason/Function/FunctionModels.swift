@@ -269,16 +269,6 @@ struct PieSliceConfig {
         )
     }
 }
-
-// MARK: - FunctionItem (for backward compatibility)
-
-struct FunctionItem {
-    let id: String
-    let name: String
-    let icon: NSImage
-    let action: () -> Void
-}
-
 // MARK: - Drag behavior extension
 extension FunctionNode {
     // Add drag behavior property

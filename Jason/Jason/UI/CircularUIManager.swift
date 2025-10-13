@@ -555,7 +555,7 @@ class CircularUIManager: ObservableObject {
             functionManager.loadMockFunctions()
         }
         
-        guard !functionManager.currentFunctionList.isEmpty else {
+        guard !functionManager.rings.isEmpty && !functionManager.rings[0].nodes.isEmpty else {
             print("No functions to display")
             return
         }

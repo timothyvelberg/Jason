@@ -201,31 +201,6 @@ class FunctionManager: ObservableObject {
         return ParentInfo(angle: parentAngle, node: parentNode, parentItemAngle: parentItemAngle)
     }
     
-    var currentFunctionList: [FunctionItem] {
-        guard !rings.isEmpty else { return [] }
-        return rings[0].nodes.map { node in
-            FunctionItem(
-                id: node.id,
-                name: node.name,
-                icon: node.icon,
-                action: {
-                    // Use explicit interaction model
-                    switch node.onLeftClick {
-                    case .execute(let action), .executeKeepOpen(let action):
-                        action()
-                    case .expand:
-                        self.navigateInto(node)
-                    case .drag:
-                        // Drag is handled by GestureManager, not by action()
-                        print("Draggable item '\(node.name)' - use click+drag gesture")
-                    case .doNothing:
-                        print("No action defined for '\(node.name)'")
-                    }
-                }
-            )
-        }
-    }
-    
     // MARK: - Initialization
     
     init(providers: [FunctionProvider] = []) {

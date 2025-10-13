@@ -91,7 +91,10 @@ class FinderLogic: FunctionProvider {
             icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage(),
             children: fileNodes,
             preferredLayout: .fullCircle,
-            childIconSize: 32,
+            
+            childRingThickness: 16,
+            childIconSize: 8,
+            
             onLeftClick: .expand,
             onRightClick: .expand,
             onMiddleClick: .expand,
