@@ -110,7 +110,7 @@ class FunctionNode: Identifiable, ObservableObject {
     let preferredLayout: LayoutStyle?
     let itemAngleSize: CGFloat?
     let previewURL: URL?
-    let showCurvedLabel: Bool
+    let showLabel: Bool
     
     let childRingThickness: CGFloat?  // Thickness of ring containing children
     let childIconSize: CGFloat?
@@ -135,7 +135,7 @@ class FunctionNode: Identifiable, ObservableObject {
         preferredLayout: LayoutStyle? = nil,
         itemAngleSize: CGFloat? = nil,
         previewURL: URL? = nil,
-        showCurvedLabel: Bool = false,
+        showLabel: Bool = false,
         
         childRingThickness: CGFloat? = nil,
         childIconSize: CGFloat? = nil,
@@ -160,7 +160,7 @@ class FunctionNode: Identifiable, ObservableObject {
         self.preferredLayout = preferredLayout
         self.itemAngleSize = itemAngleSize
         self.previewURL = previewURL
-        self.showCurvedLabel = showCurvedLabel
+        self.showLabel = showLabel
         
         self.childRingThickness = childRingThickness
         self.childIconSize = childIconSize

@@ -1,12 +1,12 @@
 //
-//  CurvedTextView.swift
+//  TitleTextView.swift
 //  Jason
 //
 //  Created by Timothy Velberg on 12/10/2025.
 
 import SwiftUI
 
-struct CurvedTextView: View {
+struct TitleTextView: View {
     let text: String
     let radius: CGFloat
     let frameSize: CGFloat
@@ -22,7 +22,7 @@ struct CurvedTextView: View {
             .truncationMode(.tail)
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
-            .background(Color.black.opacity(0.8))
+            .background(Color.black.opacity(0.95))
             .cornerRadius(4)
             .position(x: frameSize / 2, y: frameSize / 2 - radius - 16)
     }

@@ -118,6 +118,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
                 name: appInfo.name,
                 icon: appInfo.icon,
                 preferredLayout: nil,
+                showLabel: true,
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .execute { [weak self] in
                     self?.launchApp(appInfo)
@@ -143,7 +144,9 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
                 name: providerName,
                 icon: providerIcon,
                 children: appNodes,
+                
                 preferredLayout: .partialSlice,  // Use partial slice for compact display
+
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .expand,           // Click to expand favorites
                 onRightClick: .expand,          // Right-click also expands

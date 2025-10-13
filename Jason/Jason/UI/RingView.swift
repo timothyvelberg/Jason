@@ -94,7 +94,7 @@ struct RingView: View {
                 let sliceStart = baseAngle + (itemAngle * Double(index))
                 let sliceEnd = sliceStart + itemAngle
                 
-                let _ = print("   Creating clickable slice \(index): \(sliceStart)° to \(sliceEnd)° for '\(node.name)'")
+//                let _ = print("   Creating clickable slice \(index): \(sliceStart)° to \(sliceEnd)° for '\(node.name)'")
                 
                 PieSliceShape(
                     startAngle: .degrees(sliceStart - 90),
@@ -155,8 +155,8 @@ struct RingView: View {
                 if let selectedIndex = selectedIndex,
                    !shouldDimOpacity {  // NEW: Only show on active ring
                     let node = nodes[selectedIndex]
-                    if node.showCurvedLabel {
-                        CurvedTextView(
+                    if node.showLabel {
+                        TitleTextView(
                             text: node.name,
                             radius: endRadius + 15,
                             frameSize: totalDiameter,

@@ -18,11 +18,6 @@ class MouseTracker {
 
     var mouseAngleOffset: CGFloat = 0
     
-    // Ring configuration (must match CircularUIView and FunctionManager)
-    private let centerHoleRadius: CGFloat = 50
-    private let ringThickness: CGFloat = 80
-    private let ringMargin: CGFloat = 2
-    
     init(functionManager: FunctionManager) {
         self.functionManager = functionManager
     }
@@ -104,21 +99,19 @@ class MouseTracker {
     }
     
     private func determineRingLevel(distance: CGFloat) -> Int? {
-        var currentRadius = centerHoleRadius
+        // Use actual ring configurations from FunctionManager
+        let configs = functionManager.ringConfigurations
         
         // Check each ring's boundary
-        for ringLevel in 0..<functionManager.rings.count {
-            let ringOuterRadius = currentRadius + ringThickness
+        for config in configs {
+            let ringOuterRadius = config.startRadius + config.thickness
             
             if distance <= ringOuterRadius {
-                return ringLevel
+                return config.level
             }
-            
-            currentRadius = ringOuterRadius + ringMargin
         }
         
         // If beyond all rings, treat as being in the active (outermost) ring
-        // This allows continuous outward expansion based on angle tracking
         if functionManager.rings.count > 0 {
             print("🎯 Beyond all rings at distance \(distance), treating as active ring \(functionManager.activeRingLevel)")
             return functionManager.activeRingLevel
@@ -130,14 +123,12 @@ class MouseTracker {
     private func handleBoundaryCrossing(distance: CGFloat, currentRingLevel: Int?, angle: CGFloat) {
         let activeRingLevel = functionManager.activeRingLevel
         
-        // Calculate the outer boundary of the active ring
-        var activeRingOuterRadius = centerHoleRadius
-        for i in 0...activeRingLevel {
-            activeRingOuterRadius += ringThickness
-            if i < activeRingLevel {
-                activeRingOuterRadius += ringMargin
-            }
-        }
+        // Calculate the outer boundary of the active ring using actual config
+        let configs = functionManager.ringConfigurations
+        guard activeRingLevel < configs.count else { return }
+        
+        let activeRingConfig = configs[activeRingLevel]
+        let activeRingOuterRadius = activeRingConfig.startRadius + activeRingConfig.thickness
         
         // Check if we're beyond the active ring's boundary
         if let currentRingLevel = currentRingLevel,

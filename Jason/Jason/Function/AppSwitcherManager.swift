@@ -383,7 +383,9 @@ extension AppSwitcherManager: FunctionProvider {
                 icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
                 contextActions: contextActions,
                 preferredLayout: .partialSlice,
-                itemAngleSize: 20.0,
+                itemAngleSize: 12,
+                childRingThickness: 40,
+                childIconSize: 16,
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .execute { [weak self] in
                     // Primary action: switch to app and close UI

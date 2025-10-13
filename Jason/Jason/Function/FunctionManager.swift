@@ -27,16 +27,22 @@ class FunctionManager: ObservableObject {
     
     // MARK: - Published State
     
-    @Published var rings: [RingState] = []
+    @Published var rings: [RingState] = [] {
+        didSet {
+            // Invalidate cache when rings change
+            lastRingsHash = 0
+        }
+    }
     @Published var activeRingLevel: Int = 0
     @Published var ringResetTrigger: UUID = UUID()
-    
     
     // MARK: - Private State
     
     private var rootNodes: [FunctionNode] = []
     private var navigationStack: [FunctionNode] = []
     private var providers: [FunctionProvider] = []
+    
+    // MARK: - Cache for Ring Configurations
     
     private var cachedConfigurations: [RingConfiguration] = []
     private var lastRingsHash: Int = 0
@@ -52,6 +58,21 @@ class FunctionManager: ObservableObject {
     // MARK: - Computed Properties for UI
     
     var ringConfigurations: [RingConfiguration] {
+        // Create a hash of current state to detect changes
+        let currentHash = rings.map { $0.nodes.count }.reduce(0, ^) ^
+                         activeRingLevel ^
+                         rings.compactMap { $0.selectedIndex }.reduce(0, ^)
+        
+        // Only recalculate if state changed
+        if currentHash != lastRingsHash || cachedConfigurations.isEmpty {
+            cachedConfigurations = calculateRingConfigurations()
+            lastRingsHash = currentHash
+        }
+        
+        return cachedConfigurations
+    }
+    
+    private func calculateRingConfigurations() -> [RingConfiguration] {
         var configs: [RingConfiguration] = []
         let centerHoleRadius: CGFloat = 50
         let defaultRingThickness: CGFloat = 80
@@ -62,17 +83,17 @@ class FunctionManager: ObservableObject {
         for (index, ringState) in rings.enumerated() {
             let sliceConfig: PieSliceConfig
             
-            // NEW: Get thickness and icon size from parent node
+            // Determine thickness and icon size
             let ringThickness: CGFloat
             let iconSize: CGFloat
             
             if index == 0 {
-                // Ring 0 uses default sizes
+                // Ring 0 is always a full circle starting at 0° with default sizes
                 ringThickness = defaultRingThickness
                 iconSize = defaultIconSize
                 sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
             } else {
-                // Ring 1+ - get parent info and customization
+                // Ring 1+ - get parent info
                 guard let parentInfo = getParentInfo(for: index, configs: configs) else {
                     ringThickness = defaultRingThickness
                     iconSize = defaultIconSize
@@ -87,16 +108,19 @@ class FunctionManager: ObservableObject {
                 let itemCount = ringState.nodes.count
                 let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
                 
-                // ... rest of slice config logic stays the same
+                // Decide slice type based on preference and item count
                 if preferredLayout == .partialSlice && itemCount >= 12 {
+                    // Auto-convert to full circle (too many items)
                     print("🔵 Ring \(index): Auto-converting to FULL CIRCLE (too many items: \(itemCount) >= 12)")
                     sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
                     
                 } else if preferredLayout == .fullCircle {
+                    // Explicit full circle request
                     print("🔵 Ring \(index): Using FULL CIRCLE layout (parent '\(parentInfo.node.name)' preference)")
                     sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
                     
                 } else {
+                    // Partial slice
                     print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentInfo.node.name)' preference, \(itemCount) items)")
                     
                     print("🎯 Ring \(index) alignment:")
@@ -129,7 +153,7 @@ class FunctionManager: ObservableObject {
                 nodes: ringState.nodes,
                 selectedIndex: ringState.hoveredIndex,
                 sliceConfig: sliceConfig,
-                iconSize: iconSize  // NEW
+                iconSize: iconSize
             ))
             currentRadius += ringThickness + ringMargin
         }
@@ -228,6 +252,8 @@ class FunctionManager: ObservableObject {
         rings.removeAll()
         activeRingLevel = 0
         ringResetTrigger = UUID()
+        cachedConfigurations.removeAll()
+        lastRingsHash = 0
         print("FunctionManager state reset")
     }
     

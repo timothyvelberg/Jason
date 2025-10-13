@@ -150,11 +150,11 @@ class FinderLogic: FunctionProvider {
             ],
             
             preferredLayout: .partialSlice,
-            itemAngleSize: 12,
+            itemAngleSize: 15,
             previewURL: url,
-            showCurvedLabel: true,
-            childRingThickness: 40,
-            childIconSize: 16,
+            showLabel: true,
+            childRingThickness: 48,
+            childIconSize: 24,
             
             
 
