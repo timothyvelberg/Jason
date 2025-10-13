@@ -32,18 +32,19 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
     @Published var favoriteAppBundleIds: [String] = [
         // Default favorites - customize these!
         "com.vivaldi.Vivaldi",
+        "net.whatsapp.WhatsApp",
+        "com.anthropic.claudefordesktop",
         "org.blenderfoundation.blender",
         "com.bambulab.bambu-studio",
         "com.openai.chat",
         "com.spotify.client",
         "com.seriflabs.affinitydesigner2",
         "com.seriflabs.affinityphoto2",
-        "com.apple.dt.Xcode",
-        "com.figma.Desktop",
-        "net.whatsapp.WhatsApp",
         "com.tinyspeck.slackmacgap",
         "co.zeit.hyper",
-        "com.anthropic.claudefordesktop"
+        "com.apple.dt.Xcode",
+        "com.figma.Desktop",
+
         
     ]
     

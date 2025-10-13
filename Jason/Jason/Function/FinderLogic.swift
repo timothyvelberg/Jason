@@ -150,10 +150,14 @@ class FinderLogic: FunctionProvider {
             ],
             
             preferredLayout: .partialSlice,
+            itemAngleSize: 12,
             previewURL: url,
             showCurvedLabel: true,
-        
+            childRingThickness: 40,
+            childIconSize: 16,
             
+            
+
             // 🎯 LEFT CLICK = OPEN FILE (or drag if you move the mouse!)
             onLeftClick: .drag(DragProvider(
                 fileURLs: [url],
@@ -184,7 +188,6 @@ class FinderLogic: FunctionProvider {
                 NSWorkspace.shared.open(url)
             },
             
-            // DON'T AUTO-EXPAND CONTEXT MENU
             onBoundaryCross: .doNothing
         )
     }

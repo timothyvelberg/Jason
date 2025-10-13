@@ -31,11 +31,15 @@ class FunctionManager: ObservableObject {
     @Published var activeRingLevel: Int = 0
     @Published var ringResetTrigger: UUID = UUID()
     
+    
     // MARK: - Private State
     
     private var rootNodes: [FunctionNode] = []
     private var navigationStack: [FunctionNode] = []
     private var providers: [FunctionProvider] = []
+    
+    private var cachedConfigurations: [RingConfiguration] = []
+    private var lastRingsHash: Int = 0
     
     // MARK: - Helper Types
     
@@ -50,39 +54,49 @@ class FunctionManager: ObservableObject {
     var ringConfigurations: [RingConfiguration] {
         var configs: [RingConfiguration] = []
         let centerHoleRadius: CGFloat = 50
-        let ringThickness: CGFloat = 80
+        let defaultRingThickness: CGFloat = 80
+        let defaultIconSize: CGFloat = 32
         let ringMargin: CGFloat = 2
         var currentRadius = centerHoleRadius
         
         for (index, ringState) in rings.enumerated() {
             let sliceConfig: PieSliceConfig
             
+            // NEW: Get thickness and icon size from parent node
+            let ringThickness: CGFloat
+            let iconSize: CGFloat
+            
             if index == 0 {
-                // Ring 0 is always a full circle starting at 0°
+                // Ring 0 uses default sizes
+                ringThickness = defaultRingThickness
+                iconSize = defaultIconSize
                 sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
             } else {
-                // Ring 1+ - get parent info
+                // Ring 1+ - get parent info and customization
                 guard let parentInfo = getParentInfo(for: index, configs: configs) else {
+                    ringThickness = defaultRingThickness
+                    iconSize = defaultIconSize
                     sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
                     continue
                 }
                 
+                // Use parent's specified sizes or defaults
+                ringThickness = parentInfo.node.childRingThickness ?? defaultRingThickness
+                iconSize = parentInfo.node.childIconSize ?? defaultIconSize
+                
                 let itemCount = ringState.nodes.count
                 let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
                 
-                // Decide slice type based on preference and item count
+                // ... rest of slice config logic stays the same
                 if preferredLayout == .partialSlice && itemCount >= 12 {
-                    // Auto-convert to full circle (too many items)
                     print("🔵 Ring \(index): Auto-converting to FULL CIRCLE (too many items: \(itemCount) >= 12)")
                     sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
                     
                 } else if preferredLayout == .fullCircle {
-                    // Explicit full circle request
                     print("🔵 Ring \(index): Using FULL CIRCLE layout (parent '\(parentInfo.node.name)' preference)")
                     sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
                     
                 } else {
-                    // Partial slice
                     print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentInfo.node.name)' preference, \(itemCount) items)")
                     
                     print("🎯 Ring \(index) alignment:")
@@ -114,7 +128,8 @@ class FunctionManager: ObservableObject {
                 thickness: ringThickness,
                 nodes: ringState.nodes,
                 selectedIndex: ringState.hoveredIndex,
-                sliceConfig: sliceConfig
+                sliceConfig: sliceConfig,
+                iconSize: iconSize  // NEW
             ))
             currentRadius += ringThickness + ringMargin
         }

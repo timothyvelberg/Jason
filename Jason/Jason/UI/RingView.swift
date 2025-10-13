@@ -16,10 +16,10 @@ struct RingView: View {
     let onNodeTapped: (Int) -> Void
     let shouldDimOpacity: Bool
     let sliceConfig: PieSliceConfig
+    let iconSize: CGFloat
     
     // Visual properties
     private let backgroundColor: Color = .black.opacity(0.9)
-    private let iconSize: CGFloat = 32
     
     // Animation state
     @State private var startAngle: Angle = .degrees(0)

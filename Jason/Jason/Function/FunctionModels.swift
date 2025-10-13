@@ -112,6 +112,9 @@ class FunctionNode: Identifiable, ObservableObject {
     let previewURL: URL?
     let showCurvedLabel: Bool
     
+    let childRingThickness: CGFloat?  // Thickness of ring containing children
+    let childIconSize: CGFloat?
+    
     // MARK: - Interaction Model (Explicit Behavior)
     let onLeftClick: InteractionBehavior
     let onRightClick: InteractionBehavior
@@ -134,6 +137,9 @@ class FunctionNode: Identifiable, ObservableObject {
         previewURL: URL? = nil,
         showCurvedLabel: Bool = false,
         
+        childRingThickness: CGFloat? = nil,
+        childIconSize: CGFloat? = nil,
+        
         // Explicit interaction declarations
         onLeftClick: InteractionBehavior = .doNothing,
         onRightClick: InteractionBehavior = .doNothing,
@@ -155,6 +161,9 @@ class FunctionNode: Identifiable, ObservableObject {
         self.itemAngleSize = itemAngleSize
         self.previewURL = previewURL
         self.showCurvedLabel = showCurvedLabel
+        
+        self.childRingThickness = childRingThickness
+        self.childIconSize = childIconSize
         
         // Set interaction behaviors
         // If old onSelect was provided, convert it to onLeftClick for backward compatibility
