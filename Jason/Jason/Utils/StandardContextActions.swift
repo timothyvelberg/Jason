@@ -123,4 +123,28 @@ struct StandardContextActions {
             }
         )
     }
+    
+    /// Create a "Copy" action for a file/folder (copies to clipboard)
+    static func copyFile(_ url: URL) -> FunctionNode {
+        let fileName = url.lastPathComponent
+        return FunctionNode(
+            id: "copy-\(url.path)",
+            name: "Copy",
+            icon: NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil) ?? NSImage(),
+            onLeftClick: .execute {
+                print("📋 Copying to clipboard: \(fileName)")
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.writeObjects([url as NSURL])
+                print("✅ File copied to clipboard: \(fileName)")
+            },
+            onMiddleClick: .executeKeepOpen {
+                print("📋 Copying to clipboard (UI stays open): \(fileName)")
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.writeObjects([url as NSURL])
+                print("✅ File copied to clipboard: \(fileName)")
+            }
+        )
+    }
 }

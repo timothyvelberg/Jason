@@ -91,6 +91,7 @@ class FinderLogic: FunctionProvider {
             icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage(),
             children: fileNodes,
             preferredLayout: .fullCircle,
+            childIconSize: 16,
             onLeftClick: .expand,
             onRightClick: .expand,
             onMiddleClick: .expand,
@@ -121,7 +122,7 @@ class FinderLogic: FunctionProvider {
             }
             
             // Return only the last 10 files
-            return Array(sortedFiles.prefix(10))
+            return Array(sortedFiles.prefix(40))
         } catch {
             print("❌ Failed to read Downloads: \(error)")
             return []
@@ -130,7 +131,6 @@ class FinderLogic: FunctionProvider {
 
     private func createDraggableFileNode(for url: URL) -> FunctionNode {
         let fileName = url.lastPathComponent
-        let fileIcon = NSWorkspace.shared.icon(forFile: url.path)
         
         // Create thumbnail for images
         let dragImage = createThumbnail(for: url)
@@ -145,7 +145,7 @@ class FinderLogic: FunctionProvider {
             // Context actions (right-click menu)
             contextActions: [
                 StandardContextActions.deleteFile(url),
-                StandardContextActions.openFile(url),
+                StandardContextActions.copyFile(url),
                 StandardContextActions.showInFinder(url)
             ],
             
