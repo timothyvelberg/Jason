@@ -20,6 +20,9 @@ class FinderLogic: FunctionProvider {
         return NSWorkspace.shared.icon(forFile: "/System/Library/CoreServices/Finder.app")
     }
     
+    // ADD: Callback for collapse toggle
+    var onCollapseToggle: (() -> Void)?
+    
     // MARK: - Provide Functions
     
     func provideFunctions() -> [FunctionNode] {
@@ -27,7 +30,11 @@ class FinderLogic: FunctionProvider {
         
         // Create both sections
         let finderWindowsNode = createFinderWindowsNode()
-        let downloadsFilesNode = createDownloadsFilesNode()
+        let downloadsFilesNode = createDownloadsFilesNode(
+            onCollapseToggle: onCollapseToggle ?? {
+                print("⚠️ No collapse callback set")
+            }
+        )
         
         return [finderWindowsNode, downloadsFilesNode]
     }
@@ -77,13 +84,28 @@ class FinderLogic: FunctionProvider {
     
     // MARK: - Downloads Files Section (DRAGGABLE!)
     
-    private func createDownloadsFilesNode() -> FunctionNode {
+    private func createDownloadsFilesNode(onCollapseToggle: @escaping () -> Void) -> FunctionNode {
         let downloadsFiles = getDownloadsFiles()
         print("📥 [FinderLogic] Found \(downloadsFiles.count) file(s) in Downloads (showing last 10)")
         
-        let fileNodes = downloadsFiles.map { fileURL in
+        var fileNodes = downloadsFiles.map { fileURL in
             createDraggableFileNode(for: fileURL)
         }
+        
+        // ADD: Bolt item for collapse test
+        let boltNode = FunctionNode(
+            id: "collapse-test-bolt",
+            name: "Collapse",
+            icon: NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: nil) ?? NSImage(),
+            preferredLayout: nil,
+            onLeftClick: .executeKeepOpen {
+                print("⚡ Collapse bolt clicked!")
+                onCollapseToggle()
+            }
+        )
+        
+        // Add bolt at the beginning (or end, your choice)
+        fileNodes.insert(boltNode, at: 0)
         
         return FunctionNode(
             id: "downloads-files-section",
@@ -91,10 +113,6 @@ class FinderLogic: FunctionProvider {
             icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage(),
             children: fileNodes,
             preferredLayout: .fullCircle,
-            
-            childRingThickness: 16,
-            childIconSize: 8,
-            
             onLeftClick: .expand,
             onRightClick: .expand,
             onMiddleClick: .expand,

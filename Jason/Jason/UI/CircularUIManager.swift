@@ -550,10 +550,10 @@ class CircularUIManager: ObservableObject {
             return false
         }()
         
-        if !hasValidData {
-            print("No valid function data, loading mock data for testing")
-            functionManager.loadMockFunctions()
-        }
+//        if !hasValidData {
+//            print("No valid function data, loading mock data for testing")
+//            functionManager.loadMockFunctions()
+//        }
         
         guard !functionManager.rings.isEmpty && !functionManager.rings[0].nodes.isEmpty else {
             print("No functions to display")

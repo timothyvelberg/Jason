@@ -36,6 +36,14 @@ class FunctionManager: ObservableObject {
     @Published var activeRingLevel: Int = 0
     @Published var ringResetTrigger: UUID = UUID()
     
+    @Published var isRing1Collapsed: Bool = false {
+        didSet {
+            // Invalidate cache when collapse state changes
+            lastRingsHash = 0
+            print("⚡ Ring 1 collapsed state changed to: \(isRing1Collapsed)")
+        }
+    }
+    
     // MARK: - Private State
     
     private var rootNodes: [FunctionNode] = []
@@ -92,12 +100,77 @@ class FunctionManager: ObservableObject {
                 ringThickness = defaultRingThickness
                 iconSize = defaultIconSize
                 sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                
+            } else if index == 1 && isRing1Collapsed {
+                // Ring 1 in collapsed state - use small dimensions
+                ringThickness = 16
+                iconSize = 8
+                print("⚡ Ring 1 using COLLAPSED dimensions: thickness=16, iconSize=8")
+                
+                // Still need to determine slice config based on parent
+                guard let parentInfo = getParentInfo(for: index, configs: configs) else {
+                    sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                    configs.append(RingConfiguration(
+                        level: index,
+                        startRadius: currentRadius,
+                        thickness: ringThickness,
+                        nodes: ringState.nodes,
+                        selectedIndex: ringState.hoveredIndex,
+                        sliceConfig: sliceConfig,
+                        iconSize: iconSize
+                    ))
+                    currentRadius += ringThickness + ringMargin
+                    continue
+                }
+                
+                let itemCount = ringState.nodes.count
+                let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
+                
+                // Decide slice type based on preference and item count
+                if preferredLayout == .partialSlice && itemCount >= 12 {
+                    print("🔵 Ring \(index): Auto-converting to FULL CIRCLE (too many items: \(itemCount) >= 12)")
+                    sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
+                    
+                } else if preferredLayout == .fullCircle {
+                    print("🔵 Ring \(index): Using FULL CIRCLE layout (parent '\(parentInfo.node.name)' preference)")
+                    sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
+                    
+                } else {
+                    print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentInfo.node.name)' preference, \(itemCount) items)")
+                    
+                    let customAngle = parentInfo.node.itemAngleSize ?? 30.0
+                    
+                    if itemCount == 1 {
+                        sliceConfig = .partialSlice(
+                            itemCount: 1,
+                            centeredAt: parentInfo.angle,
+                            defaultItemAngle: parentInfo.node.itemAngleSize ?? parentInfo.parentItemAngle
+                        )
+                    } else {
+                        sliceConfig = .partialSlice(
+                            itemCount: itemCount,
+                            centeredAt: parentInfo.angle,
+                            defaultItemAngle: customAngle
+                        )
+                    }
+                }
+                
             } else {
-                // Ring 1+ - get parent info
+                // Ring 1+ (not collapsed) - get parent info
                 guard let parentInfo = getParentInfo(for: index, configs: configs) else {
                     ringThickness = defaultRingThickness
                     iconSize = defaultIconSize
                     sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                    configs.append(RingConfiguration(
+                        level: index,
+                        startRadius: currentRadius,
+                        thickness: ringThickness,
+                        nodes: ringState.nodes,
+                        selectedIndex: ringState.hoveredIndex,
+                        sliceConfig: sliceConfig,
+                        iconSize: iconSize
+                    ))
+                    currentRadius += ringThickness + ringMargin
                     continue
                 }
                 
@@ -110,19 +183,15 @@ class FunctionManager: ObservableObject {
                 
                 // Decide slice type based on preference and item count
                 if preferredLayout == .partialSlice && itemCount >= 12 {
-                    // Auto-convert to full circle (too many items)
                     print("🔵 Ring \(index): Auto-converting to FULL CIRCLE (too many items: \(itemCount) >= 12)")
                     sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
                     
                 } else if preferredLayout == .fullCircle {
-                    // Explicit full circle request
                     print("🔵 Ring \(index): Using FULL CIRCLE layout (parent '\(parentInfo.node.name)' preference)")
                     sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
                     
                 } else {
-                    // Partial slice
                     print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentInfo.node.name)' preference, \(itemCount) items)")
-                    
                     print("🎯 Ring \(index) alignment:")
                     print("   Parent angle: \(parentInfo.angle)°")
                     print("   Child slice will start at: \(parentInfo.angle)°")
@@ -371,6 +440,14 @@ class FunctionManager: ObservableObject {
         // Refresh all providers to get latest data
         for provider in providers {
             provider.refresh()
+            
+            // ADD: Set collapse callback for FinderLogic
+            if let finderLogic = provider as? FinderLogic {
+                finderLogic.onCollapseToggle = { [weak self] in
+                    self?.toggleRing1Collapse()
+                }
+                print("✅ Set collapse callback on FinderLogic")
+            }
         }
         
         // Collect functions from all providers
@@ -383,14 +460,8 @@ class FunctionManager: ObservableObject {
         rebuildRings()
         print("Loaded \(rootNodes.count) total root nodes from \(providers.count) provider(s)")
     }
-    
-    // DEPRECATED: Use providers instead
-    func loadMockFunctions() {
-        print("⚠️ loadMockFunctions() is deprecated. Register MockFunctionProvider instead.")
-        
-        // For backward compatibility, create a mock provider
-        let mockProvider = MockFunctionProvider()
-        providers = [mockProvider]
-        loadFunctions()
+    func toggleRing1Collapse() {
+        isRing1Collapsed.toggle()
+        print("⚡ Toggling Ring 1 collapse: \(isRing1Collapsed)")
     }
 }
