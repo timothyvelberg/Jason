@@ -42,7 +42,8 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         "com.figma.Desktop",
         "net.whatsapp.WhatsApp",
         "com.tinyspeck.slackmacgap",
-        "co.zeit.hyper"
+        "co.zeit.hyper",
+        "com.anthropic.claudefordesktop"
         
     ]
     

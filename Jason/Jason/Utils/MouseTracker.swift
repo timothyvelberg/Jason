@@ -252,21 +252,22 @@ class MouseTracker {
         guard totalCount > 0 else { return -1 }
         
         let itemAngle = CGFloat(sliceConfig.itemAngle)
+        let sliceStart = CGFloat(sliceConfig.startAngle)  // ✅ Get the start angle
         
         if sliceConfig.isFullCircle {
-            // Full circle: items centered at 22.5°, 67.5°, etc.
-            // Zones should be: [0° to 45°], [45° to 90°], etc.
-            
+            // Full circle: account for start angle offset
             var adjustedAngle = angle
             if adjustedAngle < 0 { adjustedAngle += 360 }
             
-            // Don't add any offset - zones start at 0° boundaries
-            let index = Int(adjustedAngle / itemAngle) % totalCount
+            // ✅ Subtract the start angle to get relative position
+            var relativeAngle = adjustedAngle - sliceStart
+            if relativeAngle < 0 { relativeAngle += 360 }
+            if relativeAngle >= 360 { relativeAngle -= 360 }
+            
+            let index = Int(relativeAngle / itemAngle) % totalCount
             return index
         } else {
             // Partial slice: items centered in their slices
-            let sliceStart = CGFloat(sliceConfig.startAngle)
-            
             var normalizedAngle = angle
             if normalizedAngle < 0 { normalizedAngle += 360 }
             

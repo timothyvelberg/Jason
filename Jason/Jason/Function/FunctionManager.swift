@@ -37,6 +37,14 @@ class FunctionManager: ObservableObject {
     private var navigationStack: [FunctionNode] = []
     private var providers: [FunctionProvider] = []
     
+    // MARK: - Helper Types
+    
+    private struct ParentInfo {
+        let angle: Double
+        let node: FunctionNode
+        let parentItemAngle: Double
+    }
+    
     // MARK: - Computed Properties for UI
     
     var ringConfigurations: [RingConfiguration] {
@@ -47,83 +55,54 @@ class FunctionManager: ObservableObject {
         var currentRadius = centerHoleRadius
         
         for (index, ringState) in rings.enumerated() {
-            // Calculate slice configuration
             let sliceConfig: PieSliceConfig
             
             if index == 0 {
-                // Ring 0 is always a full circle (mixes different providers)
+                // Ring 0 is always a full circle starting at 0°
                 sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
             } else {
-                // Ring 1+ - check parent node's layout preference
-                guard index > 0, rings.indices.contains(index - 1) else {
+                // Ring 1+ - get parent info
+                guard let parentInfo = getParentInfo(for: index, configs: configs) else {
                     sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
                     continue
                 }
                 
-                let parentRing = rings[index - 1]
-                guard let parentSelectedIndex = parentRing.selectedIndex,
-                      parentSelectedIndex < parentRing.nodes.count else {
-                    sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
-                    continue
-                }
-                
-                // Get the parent node to check its layout preference
-                let parentNode = parentRing.nodes[parentSelectedIndex]
-                let preferredLayout = parentNode.preferredLayout ?? .partialSlice  // Default to partial
                 let itemCount = ringState.nodes.count
+                let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
                 
-                // SMART FALLBACK: If partial slice has 12+ items, use full circle instead
-                // Reason: 12 items × 30° = 360° (already a full circle)
+                // Decide slice type based on preference and item count
                 if preferredLayout == .partialSlice && itemCount >= 12 {
+                    // Auto-convert to full circle (too many items)
                     print("🔵 Ring \(index): Auto-converting to FULL CIRCLE (too many items: \(itemCount) >= 12)")
-                    sliceConfig = .fullCircle(itemCount: itemCount)
+                    sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
+                    
                 } else if preferredLayout == .fullCircle {
-                    // Parent wants children as full circle
-                    print("🔵 Ring \(index): Using FULL CIRCLE layout (parent '\(parentNode.name)' preference)")
-                    sliceConfig = .fullCircle(itemCount: itemCount)
+                    // Explicit full circle request
+                    print("🔵 Ring \(index): Using FULL CIRCLE layout (parent '\(parentInfo.node.name)' preference)")
+                    sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
+                    
                 } else {
-                    // Parent wants children as partial slice (and itemCount < 12)
-                    print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentNode.name)' preference, \(itemCount) items)")
+                    // Partial slice
+                    print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentInfo.node.name)' preference, \(itemCount) items)")
                     
-                    // Get the parent's slice config to calculate correct angle
-                    let parentSliceConfig: PieSliceConfig
-                    if index - 1 < configs.count {
-                        parentSliceConfig = configs[index - 1].sliceConfig
-                    } else {
-                        // Fallback: parent is Ring 0 (full circle)
-                        parentSliceConfig = .fullCircle(itemCount: parentRing.nodes.count)
-                    }
+                    print("🎯 Ring \(index) alignment:")
+                    print("   Parent angle: \(parentInfo.angle)°")
+                    print("   Child slice will start at: \(parentInfo.angle)°")
                     
-                    // Calculate parent's actual angle position
-                    let parentAngle: Double
-                    if parentSliceConfig.isFullCircle {
-                        // Parent is full circle - use START of parent item slice
-                        let parentItemAngle = 360.0 / Double(parentRing.nodes.count)
-                        parentAngle = Double(parentSelectedIndex) * parentItemAngle
-                    } else {
-                        // Parent is partial slice - align to START of parent item
-                        let baseAngle = parentSliceConfig.startAngle
-                        let itemAngle = parentSliceConfig.itemAngle
-                        parentAngle = baseAngle + (Double(parentSelectedIndex) * itemAngle)
-                    }
+                    let customAngle = parentInfo.node.itemAngleSize ?? 30.0
+                    print("   Using custom angle size: \(customAngle)° (parent itemAngleSize: \(parentInfo.node.itemAngleSize?.description ?? "nil"))")
                     
-                    // NEW: Get custom itemAngleSize from parent node, or use defaults
-                    let customAngle = parentNode.itemAngleSize ?? 30.0
-                    
-                    print("   Using custom angle size: \(customAngle)° (parent itemAngleSize: \(parentNode.itemAngleSize?.description ?? "nil"))")
-                    
-                    // If parent only has 1 child, use parent's angle width
                     if itemCount == 1 {
                         sliceConfig = .partialSlice(
-                            itemCount: itemCount,
-                            centeredAt: parentAngle,
-                            defaultItemAngle: parentNode.itemAngleSize ?? parentSliceConfig.itemAngle  // Use custom if provided
+                            itemCount: 1,
+                            centeredAt: parentInfo.angle,
+                            defaultItemAngle: parentInfo.node.itemAngleSize ?? parentInfo.parentItemAngle
                         )
                     } else {
                         sliceConfig = .partialSlice(
                             itemCount: itemCount,
-                            centeredAt: parentAngle,
-                            defaultItemAngle: customAngle  // Use custom angle size!
+                            centeredAt: parentInfo.angle,
+                            defaultItemAngle: customAngle
                         )
                     }
                 }
@@ -141,6 +120,46 @@ class FunctionManager: ObservableObject {
         }
         
         return configs
+    }
+    
+    private func getParentInfo(for ringIndex: Int, configs: [RingConfiguration]) -> ParentInfo? {
+        guard ringIndex > 0, rings.indices.contains(ringIndex - 1) else {
+            return nil
+        }
+        
+        let parentRing = rings[ringIndex - 1]
+        guard let parentSelectedIndex = parentRing.selectedIndex,
+              parentSelectedIndex < parentRing.nodes.count else {
+            return nil
+        }
+        
+        let parentNode = parentRing.nodes[parentSelectedIndex]
+        
+        // Calculate parent's angle
+        let parentAngle: Double
+        let parentItemAngle: Double
+        
+        if ringIndex - 1 < configs.count {
+            let parentSliceConfig = configs[ringIndex - 1].sliceConfig
+            
+            if parentSliceConfig.isFullCircle {
+                // Parent is full circle - account for its start angle
+                parentItemAngle = 360.0 / Double(parentRing.nodes.count)
+                let parentStartAngle = parentSliceConfig.startAngle
+                parentAngle = parentStartAngle + (Double(parentSelectedIndex) * parentItemAngle)
+            } else {
+                // Parent is partial slice - align to START of parent item
+                let baseAngle = parentSliceConfig.startAngle
+                parentItemAngle = parentSliceConfig.itemAngle
+                parentAngle = baseAngle + (Double(parentSelectedIndex) * parentItemAngle)
+            }
+        } else {
+            // Fallback (shouldn't happen normally)
+            parentItemAngle = 360.0 / Double(max(parentRing.nodes.count, 1))
+            parentAngle = Double(parentSelectedIndex) * parentItemAngle
+        }
+        
+        return ParentInfo(angle: parentAngle, node: parentNode, parentItemAngle: parentItemAngle)
     }
     
     var currentFunctionList: [FunctionItem] {

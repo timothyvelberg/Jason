@@ -269,6 +269,14 @@ struct PieSliceConfig {
             itemAngle: itemAngle
         )
     }
+    static func fullCircle(itemCount: Int, startingAt angle: Double = 0) -> PieSliceConfig {
+        let itemAngle = 360.0 / Double(max(itemCount, 1))
+        return PieSliceConfig(
+            startAngle: angle,
+            endAngle: angle + 360,  // Don't use modulo - we need 360° span!
+            itemAngle: itemAngle
+        )
+    }
 }
 
 
