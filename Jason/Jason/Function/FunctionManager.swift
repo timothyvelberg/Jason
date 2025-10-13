@@ -390,42 +390,6 @@ class FunctionManager: ObservableObject {
         }
     }
     
-    // MARK: - Execution
-    
-    func executeSelected() {
-        guard activeRingLevel < rings.count else { return }
-        guard let selectedIndex = rings[activeRingLevel].selectedIndex else { return }
-        guard rings[activeRingLevel].nodes.indices.contains(selectedIndex) else { return }
-        
-        let node = rings[activeRingLevel].nodes[selectedIndex]
-        
-        print("Executing node: \(node.name)")
-        
-        // USE EXPLICIT INTERACTION MODEL
-        switch node.onLeftClick {
-        case .execute(let action):
-            print("   ✅ Executing action (will close UI)")
-            action()
-            
-        case .executeKeepOpen(let action):
-            print("   ✅ Executing action (UI stays open)")
-            action()
-            
-        case .expand:
-            print("   ✅ Navigating/expanding into: \(node.name)")
-            if node.isBranch {
-                navigateInto(node)
-            }
-            
-        case .drag:
-            print("   🎯 Draggable item '\(node.name)' - use click+drag gesture to drag")
-            // Drag is handled by GestureManager, not by executeSelected()
-            
-        case .doNothing:
-            print("   ⚠️ No action defined for '\(node.name)'")
-        }
-    }
-
     // MARK: - Data Loading
     
     func loadFunctions() {

@@ -91,7 +91,7 @@ class FinderLogic: FunctionProvider {
             icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage(),
             children: fileNodes,
             preferredLayout: .fullCircle,
-            childIconSize: 16,
+            childIconSize: 32,
             onLeftClick: .expand,
             onRightClick: .expand,
             onMiddleClick: .expand,
@@ -122,7 +122,7 @@ class FinderLogic: FunctionProvider {
             }
             
             // Return only the last 10 files
-            return Array(sortedFiles.prefix(40))
+            return Array(sortedFiles.prefix(10))
         } catch {
             print("❌ Failed to read Downloads: \(error)")
             return []

@@ -13,7 +13,6 @@ struct RingView: View {
     let thickness: CGFloat
     let nodes: [FunctionNode]
     let selectedIndex: Int?
-    let onNodeTapped: (Int) -> Void
     let shouldDimOpacity: Bool
     let sliceConfig: PieSliceConfig
     let iconSize: CGFloat
@@ -73,7 +72,7 @@ struct RingView: View {
                 )
                 .fill(backgroundColor, style: FillStyle(eoFill: true))
                 .frame(width: totalDiameter, height: totalDiameter)
-                .allowsHitTesting(false)  // Don't block clicks, let slices handle them
+                .allowsHitTesting(false)  // Don't block clicks
             } else {
                 // Partial slice background
                 PieSliceShape(
@@ -84,40 +83,7 @@ struct RingView: View {
                 )
                 .fill(backgroundColor, style: FillStyle(eoFill: true))
                 .frame(width: totalDiameter, height: totalDiameter)
-                .allowsHitTesting(false)  // Don't block clicks, let slices handle them
-            }
-            
-            // Individual clickable slices for each node
-            ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
-                let itemAngle = sliceConfig.itemAngle
-                let baseAngle = sliceConfig.startAngle
-                let sliceStart = baseAngle + (itemAngle * Double(index))
-                let sliceEnd = sliceStart + itemAngle
-                
-//                let _ = print("   Creating clickable slice \(index): \(sliceStart)° to \(sliceEnd)° for '\(node.name)'")
-                
-                PieSliceShape(
-                    startAngle: .degrees(sliceStart - 90),
-                    endAngle: .degrees(sliceEnd - 90),
-                    innerRadiusRatio: innerRadiusRatio,
-                    outerRadiusRatio: 1.0
-                )
-                .fill(Color.clear)  // Transparent but still clickable
-                // TEMPORARY DEBUG: Make slices visible to verify they exist
-                // .fill(Color.red.opacity(0.2))  // Uncomment to see the clickable areas
-                .contentShape(PieSliceShape(  // CRITICAL: Tell SwiftUI this shape is tappable
-                    startAngle: .degrees(sliceStart - 90),
-                    endAngle: .degrees(sliceEnd - 90),
-                    innerRadiusRatio: innerRadiusRatio,
-                    outerRadiusRatio: 1.0
-                ))
-                .frame(width: totalDiameter, height: totalDiameter)
-                .onTapGesture {
-                    print("🖱️ [RingView] Slice tapped - Index: \(index), Node: \(node.name)")
-                    print("   Slice angles: \(sliceStart)° to \(sliceEnd)°")
-                    print("   Calling onNodeTapped(\(index))")
-                    onNodeTapped(index)
-                }
+                .allowsHitTesting(false)  // Don't block clicks
             }
             
             // Animated selection indicator
@@ -130,7 +96,7 @@ struct RingView: View {
                 )
                 .fill(selectionColor, style: FillStyle(eoFill: true))
                 .frame(width: totalDiameter, height: totalDiameter)
-                .allowsHitTesting(false)  // CRITICAL: Don't block clicks to slices below!
+                .allowsHitTesting(false)  // Don't block clicks
             }
             
             // Icons positioned around the ring (non-interactive, just visual)
@@ -140,10 +106,7 @@ struct RingView: View {
                     .scaledToFit()
                     .frame(width: iconSize, height: iconSize)
                     .position(iconPosition(for: index))
-                    .allowsHitTesting(false)  // Prevent double-handling, let slices handle taps
-                    .onTapGesture {
-                        print("⚠️ [RingView] Icon tapped (shouldn't happen!) - Index: \(index)")
-                    }
+                    .allowsHitTesting(false)  // Icons don't intercept clicks
             }
         }
         .frame(width: totalDiameter, height: totalDiameter)
@@ -153,7 +116,7 @@ struct RingView: View {
         .overlay(
             Group {
                 if let selectedIndex = selectedIndex,
-                   !shouldDimOpacity {  // NEW: Only show on active ring
+                   !shouldDimOpacity {  // Only show on active ring
                     let node = nodes[selectedIndex]
                     if node.showLabel {
                         TitleTextView(
@@ -284,6 +247,7 @@ struct RingView: View {
         
         return CGPoint(x: x, y: y)
     }
+    
     private func calculateCenterAngle(for index: Int) -> Double {
         guard nodes.count > 0 else { return 0 }
         

@@ -98,8 +98,6 @@ enum InteractionBehavior {
 
 // MARK: - FunctionNode (Tree Structure)
 
-// MARK: - FunctionNode (Tree Structure)
-
 class FunctionNode: Identifiable, ObservableObject {
     let id: String
     let name: String
@@ -121,7 +119,7 @@ class FunctionNode: Identifiable, ObservableObject {
     let onMiddleClick: InteractionBehavior
     let onBoundaryCross: InteractionBehavior
     
-    // MARK: - Legacy Events (Deprecated - use interaction model instead)
+    // MARK: - Events
     let onHover: (() -> Void)?
     let onHoverExit: (() -> Void)?
     
@@ -145,11 +143,9 @@ class FunctionNode: Identifiable, ObservableObject {
         onRightClick: InteractionBehavior = .doNothing,
         onMiddleClick: InteractionBehavior = .doNothing,
         onBoundaryCross: InteractionBehavior = .doNothing,
-        // Legacy
+        
         onHover: (() -> Void)? = nil,
-        onHoverExit: (() -> Void)? = nil,
-        // DEPRECATED: Old onSelect parameter
-        onSelect: (() -> Void)? = nil
+        onHoverExit: (() -> Void)? = nil
     ) {
         self.id = id
         self.name = name
@@ -165,14 +161,7 @@ class FunctionNode: Identifiable, ObservableObject {
         self.childRingThickness = childRingThickness
         self.childIconSize = childIconSize
         
-        // Set interaction behaviors
-        // If old onSelect was provided, convert it to onLeftClick for backward compatibility
-        if let onSelect = onSelect {
-            self.onLeftClick = .execute(onSelect)
-        } else {
-            self.onLeftClick = onLeftClick
-        }
-        
+        self.onLeftClick = onLeftClick
         self.onRightClick = onRightClick
         self.onMiddleClick = onMiddleClick
         self.onBoundaryCross = onBoundaryCross
@@ -187,11 +176,6 @@ class FunctionNode: Identifiable, ObservableObject {
         return previewURL != nil
     }
     
-    
-    var onSelect: (() -> Void)? {
-        return nil  // Use onLeftClick instead
-    }
-    
     // Leaf = has executable left-click action, no children or contextActions
     var isLeaf: Bool {
         return children == nil && contextActions == nil && onLeftClick.shouldExecute
@@ -201,9 +185,6 @@ class FunctionNode: Identifiable, ObservableObject {
     var isBranch: Bool {
         return children != nil || contextActions != nil
     }
-    
-    // REMOVED: isContextMenu - use onRightClick behavior instead
-    // REMOVED: shouldAutoExpand - use onBoundaryCross behavior instead
     
     // Is this a valid branch (has actual children or context actions)?
     var hasChildren: Bool {
@@ -278,6 +259,7 @@ struct PieSliceConfig {
             itemAngle: itemAngle
         )
     }
+    
     static func fullCircle(itemCount: Int, startingAt angle: Double = 0) -> PieSliceConfig {
         let itemAngle = 360.0 / Double(max(itemCount, 1))
         return PieSliceConfig(
@@ -288,9 +270,7 @@ struct PieSliceConfig {
     }
 }
 
-
-
-// MARK: - Legacy Structures (to be removed after migration)
+// MARK: - FunctionItem (for backward compatibility)
 
 struct FunctionItem {
     let id: String
@@ -299,14 +279,7 @@ struct FunctionItem {
     let action: () -> Void
 }
 
-struct FunctionCategory {
-    let id: String
-    let name: String
-    let icon: NSImage
-    let functions: [FunctionItem]
-}
-
-// MARK: - Updated FunctionNode
+// MARK: - Drag behavior extension
 extension FunctionNode {
     // Add drag behavior property
     var onDrag: InteractionBehavior {

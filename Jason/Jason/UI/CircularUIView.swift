@@ -25,20 +25,11 @@ struct CircularUIView: View {
     }
     
     var body: some View {
-        // NEW: Wrap everything in ZStack to add drag overlay on top
+        // Wrap everything in ZStack to add drag overlay on top
         ZStack {
             // Existing circular UI content
             GeometryReader { geometry in
                 ZStack {
-                    // Global click handler - executes currently hovered item
-                    // This allows clicking ANYWHERE to execute the hovered item
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .onTapGesture {
-                            handleGlobalClick()
-                        }
-                    
                     // Generate rings dynamically
                     ForEach(rings) { ring in
                         RingView(
@@ -46,13 +37,9 @@ struct CircularUIView: View {
                             thickness: ring.thickness,
                             nodes: ring.nodes,
                             selectedIndex: ring.selectedIndex,
-                            onNodeTapped: { index in
-                                handleRingTap(level: ring.level, index: index)
-                            },
                             shouldDimOpacity: shouldDimRing(ring.level),
                             sliceConfig: ring.sliceConfig,
                             iconSize: ring.iconSize
-                            
                         )
                         .transition(.customScale(from: 0.7))
                         .id("\(ring.level)-\(functionManager.ringResetTrigger)")
@@ -63,14 +50,8 @@ struct CircularUIView: View {
                 .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
             }
             .ignoresSafeArea()
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CircularUIRightClick"))) { _ in
-                handleGlobalRightClick()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("CircularUIMiddleClick"))) { _ in
-                handleGlobalMiddleClick()
-            }
             
-            // NEW: Drag overlay - sits on top to handle drag gestures
+            // Drag overlay - sits on top to handle drag gestures
             DraggableOverlay(
                 dragProvider: $circularUI.currentDragProvider,
                 dragStartPoint: $circularUI.dragStartPoint
@@ -83,217 +64,6 @@ struct CircularUIView: View {
     private func shouldDimRing(_ level: Int) -> Bool {
         // Dim all rings except the active one
         return level != functionManager.activeRingLevel
-    }
-    
-    // MARK: - Middle Click Handler
-    
-    private func handleGlobalMiddleClick() {
-        let activeRingLevel = functionManager.activeRingLevel
-        
-        guard activeRingLevel < functionManager.rings.count else {
-            print("⚠️ No active ring for middle-click")
-            return
-        }
-        
-        // Get the currently hovered item
-        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
-            print("⚠️ No item currently hovered for middle-click")
-            return
-        }
-        
-        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
-            print("⚠️ Invalid hovered index for middle-click")
-            return
-        }
-        
-        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
-        
-        print("🖱️ [Middle Click] On item: '\(node.name)' at ring \(activeRingLevel), index \(hoveredIndex)")
-        
-        // USE EXPLICIT INTERACTION MODEL
-        switch node.onMiddleClick {
-        case .execute(let action):
-            print("   ✅ Executing action (will close UI)")
-            action()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                circularUI.hide()
-            }
-            
-        case .executeKeepOpen(let action):
-            print("   ✅ Executing action (UI stays open)")
-            action()
-            // Don't hide UI
-            
-        case .expand:
-            print("   ✅ Expanding")
-            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
-            
-        case .doNothing:
-            print("   ⚠️ No middle-click action defined")
-            
-        case .drag:
-            print("   ⚠️ Middle-click on draggable item (drag not supported on middle-click)")
-        }
-    }
-    
-    // MARK: - Right Click Handler
-    
-    private func handleGlobalRightClick() {
-        let activeRingLevel = functionManager.activeRingLevel
-        
-        guard activeRingLevel < functionManager.rings.count else {
-            print("⚠️ No active ring for right-click")
-            return
-        }
-        
-        // Get the currently hovered item
-        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
-            print("⚠️ No item currently hovered for right-click")
-            return
-        }
-        
-        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
-            print("⚠️ Invalid hovered index for right-click")
-            return
-        }
-        
-        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
-        
-        print("🖱️ [Right Click] On item: '\(node.name)' at ring \(activeRingLevel), index \(hoveredIndex)")
-        
-        // USE EXPLICIT INTERACTION MODEL
-        switch node.onRightClick {
-        case .execute(let action):
-            print("   ✅ Executing action (will close UI)")
-            action()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                circularUI.hide()
-            }
-            
-        case .executeKeepOpen(let action):
-            print("   ✅ Executing action (UI stays open)")
-            action()
-            // Don't hide UI
-            
-        case .expand:
-            print("   ✅ Expanding")
-            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
-            
-        case .doNothing:
-            print("   ⚠️ No right-click action defined")
-            
-        case .drag:
-            print("   ⚠️ Right-click on draggable item (drag not supported on right-click)")
-        }
-    }
-    
-    // MARK: - Left Click Handler (Global)
-    
-    private func handleGlobalClick() {
-        let activeRingLevel = functionManager.activeRingLevel
-        
-        guard activeRingLevel < functionManager.rings.count else {
-            print("⚠️ No active ring to execute")
-            return
-        }
-        
-        // Get the currently hovered item
-        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
-            print("⚠️ No item currently hovered")
-            return
-        }
-        
-        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
-            print("⚠️ Invalid hovered index")
-            return
-        }
-        
-        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
-        
-        print("🖱️ [Global Click] Executing hovered item: '\(node.name)' at ring \(activeRingLevel), index \(hoveredIndex)")
-        
-        // USE EXPLICIT INTERACTION MODEL
-        switch node.onLeftClick {
-        case .execute(let action):
-            print("   ✅ Executing action (will close UI)")
-            action()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                circularUI.hide()
-            }
-            
-        case .executeKeepOpen(let action):
-            print("   ✅ Executing action (UI stays open)")
-            action()
-            // Don't hide UI
-            
-        case .expand:
-            print("   ✅ Expanding category")
-            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
-            
-        case .drag(let provider):
-            // NEW: Execute onClick action if provided
-            if let onClick = provider.onClick {
-                print("   ✅ Executing click action on draggable item")
-                onClick()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    circularUI.hide()
-                }
-            } else {
-                print("   🎯 Draggable item clicked (no click action defined)")
-            }
-            
-        case .doNothing:
-            print("   ⚠️ No left-click action defined")
-        }
-    }
-    
-    // MARK: - Ring Tap Handler (Legacy/Compatibility)
-    
-    private func handleRingTap(level: Int, index: Int) {
-        // Select the node
-        functionManager.selectNode(ringLevel: level, index: index)
-        
-        // Get the node to check what to do
-        guard level < functionManager.rings.count else { return }
-        guard index < functionManager.rings[level].nodes.count else { return }
-        
-        let node = functionManager.rings[level].nodes[index]
-        
-        print("🖱️ [Ring Tap] Clicked: '\(node.name)' at ring \(level), index \(index)")
-        
-        // USE EXPLICIT INTERACTION MODEL (same as global click)
-        switch node.onLeftClick {
-        case .execute(let action):
-            print("   ✅ Executing action (will close UI)")
-            action()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                circularUI.hide()
-            }
-            
-        case .executeKeepOpen(let action):
-            print("   ✅ Executing action (UI stays open)")
-            action()
-            // Don't hide UI
-            
-        case .expand:
-            print("   ✅ Expanding category")
-            functionManager.expandCategory(ringLevel: level, index: index)
-            
-        case .drag(let provider):
-            // NEW: Execute onClick action if provided
-            if let onClick = provider.onClick {
-                print("   ✅ Executing click action on draggable item")
-                onClick()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    circularUI.hide()
-                }
-            } else {
-                print("   🎯 Draggable item tapped (no click action defined)")
-            }
-            
-        case .doNothing:
-            print("   ⚠️ No left-click action defined")
-        }
     }
 }
 

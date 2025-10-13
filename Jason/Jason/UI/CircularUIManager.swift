@@ -94,8 +94,8 @@ class CircularUIManager: ObservableObject {
         
         switch event.type {
         case .click(.left):
-            // Pass through to SwiftUI - handled in CircularUIView
-            break
+            print("🖱️ Left-click detected at \(event.position)")
+            handleLeftClick(event: event)
             
         case .click(.right):
             print("🖱️ Right-click detected at \(event.position)")
@@ -116,6 +116,50 @@ class CircularUIManager: ObservableObject {
         case .dragEnded(let endPoint, let didComplete):
             handleDragEnded(at: endPoint, completed: didComplete)
             
+        default:
+            break
+        }
+    }
+    
+    // MARK: - Left Click Handler
+    
+    private func handleLeftClick(event: GestureManager.GestureEvent) {
+        guard let functionManager = functionManager else { return }
+        
+        let activeRingLevel = functionManager.activeRingLevel
+        guard activeRingLevel < functionManager.rings.count else {
+            print("⚠️ No active ring for left-click")
+            return
+        }
+        
+        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
+            print("⚠️ No item currently hovered for left-click")
+            return
+        }
+        
+        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
+            print("⚠️ Invalid hovered index for left-click")
+            return
+        }
+        
+        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
+        
+        print("🖱️ [Left Click] On item: '\(node.name)'")
+        
+        switch node.onLeftClick {
+        case .execute(let action):
+            action()
+            hide()
+        case .executeKeepOpen(let action):
+            action()
+        case .expand:
+            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+        case .drag(let provider):
+            // Execute onClick if provided
+            if let onClick = provider.onClick {
+                onClick()
+                hide()
+            }
         default:
             break
         }
@@ -542,10 +586,5 @@ class CircularUIManager: ObservableObject {
         wasShiftPressed = false  // Reset SHIFT state
         
         print("Hiding circular UI")
-    }
-    
-    func executeSelectedFunction() {
-        guard let functionManager = functionManager else { return }
-        functionManager.executeSelected()
     }
 }

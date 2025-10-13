@@ -129,15 +129,4 @@ class OverlayWindow: NSWindow {
         print("🖱️ [OverlayWindow] mouseDown detected at: \(event.locationInWindow)")
         super.mouseDown(with: event)
     }
-    
-    // Handle right-click (secondary mouse button)
-    override func rightMouseDown(with event: NSEvent) {
-        print("🖱️ [OverlayWindow] rightMouseDown detected at: \(event.locationInWindow)")
-        // Post a notification that the UI can listen to
-        NotificationCenter.default.post(
-            name: NSNotification.Name("CircularUIRightClick"),
-            object: nil,
-            userInfo: ["location": event.locationInWindow]
-        )
-    }
 }
