@@ -160,14 +160,22 @@ class MouseTracker {
                             lastFunctionIndex = pieIndex
                             lastRingLevel = activeRingLevel
                             return
+                        
+                        case .navigateInto:  // NEW: Handle folder navigation on boundary cross
+                            print("📂 Beyond boundary (\(distance) > \(activeRingOuterRadius)) - navigating into '\(node.name)'")
+                            functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: pieIndex)
+                            
+                            lastFunctionIndex = pieIndex
+                            lastRingLevel = activeRingLevel
+                            return
                             
                         case .doNothing:
                             print("⚠️ Beyond boundary hovering '\(node.name)' - no auto-expand (use right-click)")
                             
-                        case .execute(let action):
+                        case .execute:
                             print("⚠️ Beyond boundary hovering '\(node.name)' - would execute action (unusual for boundary cross)")
                             
-                        case .executeKeepOpen(let action):
+                        case .executeKeepOpen:
                             print("⚠️ Beyond boundary hovering '\(node.name)' - would execute and keep open (unusual for boundary cross)")
                             
                         case .drag:
@@ -197,14 +205,17 @@ class MouseTracker {
                     let currentSelectedIndex = functionManager.rings[activeRingLevel].selectedIndex
                     
                     // If hovering over a different category and there's an expanded ring above
-                    // Check if this node wants to auto-expand
+                    // Check if this node wants to auto-expand or auto-navigate
                     if hoveredIndex != currentSelectedIndex && functionManager.rings.count > activeRingLevel + 1 {
                         switch node.onBoundaryCross {
                         case .expand:
                             print("🔄 Switching to category '\(node.name)'")
                             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+                        case .navigateInto:  // NEW: Handle switching folders
+                            print("📂 Switching to folder '\(node.name)'")
+                            functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: hoveredIndex)
                         case .doNothing, .execute, .executeKeepOpen, .drag:
-                            // Don't switch if node doesn't want auto-expansion
+                            // Don't switch if node doesn't want auto-expansion/navigation
                             break
                         }
                     }

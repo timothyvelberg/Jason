@@ -122,7 +122,7 @@ class CircularUIManager: ObservableObject {
     }
     
     // MARK: - Left Click Handler
-    
+
     private func handleLeftClick(event: GestureManager.GestureEvent) {
         guard let functionManager = functionManager else { return }
         
@@ -154,6 +154,9 @@ class CircularUIManager: ObservableObject {
             action()
         case .expand:
             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+        case .navigateInto:  // NEW: Handle folder navigation
+            print("📂 Navigating into folder: '\(node.name)'")
+            functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: hoveredIndex)
         case .drag(let provider):
             // Execute onClick if provided
             if let onClick = provider.onClick {
@@ -265,6 +268,9 @@ class CircularUIManager: ObservableObject {
         switch node.onRightClick {
         case .expand:
             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+        case .navigateInto:  // NEW: Support navigation on right-click
+            print("📂 Navigating into folder: '\(node.name)'")
+            functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: hoveredIndex)
         case .execute(let action):
             action()
             hide()

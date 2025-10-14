@@ -112,7 +112,7 @@ struct RingView: View {
         .frame(width: totalDiameter, height: totalDiameter)
         .opacity(ringOpacity)
         .scaleEffect(ringScale)
-        .animation(.easeInOut(duration: 0.2), value: shouldDimOpacity)
+//        .animation(.easeInOut(duration: 0.2), value: shouldDimOpacity)
         .overlay(
             Group {
                 if let selectedIndex = selectedIndex,

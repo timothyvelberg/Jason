@@ -17,11 +17,13 @@ class FunctionManager: ObservableObject {
         var nodes: [FunctionNode]
         var hoveredIndex: Int?
         var selectedIndex: Int?
+        var isCollapsed: Bool = false
         
-        init(nodes: [FunctionNode]) {
+        init(nodes: [FunctionNode], isCollapsed: Bool = false) {
             self.nodes = nodes
             self.hoveredIndex = nil
             self.selectedIndex = nil
+            self.isCollapsed = isCollapsed
         }
     }
     
@@ -77,6 +79,8 @@ class FunctionManager: ObservableObject {
         let centerHoleRadius: CGFloat = 50
         let defaultRingThickness: CGFloat = 80
         let defaultIconSize: CGFloat = 32
+        let collapsedRingThickness: CGFloat = 16
+        let collapsedIconSize: CGFloat = 8
         let ringMargin: CGFloat = 2
         var currentRadius = centerHoleRadius
         
@@ -87,17 +91,77 @@ class FunctionManager: ObservableObject {
             let ringThickness: CGFloat
             let iconSize: CGFloat
             
-            if index == 0 {
+            // NEW: Check if ring is collapsed
+            if ringState.isCollapsed {
+                ringThickness = collapsedRingThickness
+                iconSize = collapsedIconSize
+                print("📦 Ring \(index) is COLLAPSED: thickness=\(ringThickness), iconSize=\(iconSize)")
+                
+                // Collapsed rings use their existing slice config
+                // We need to determine the slice config based on parent (if Ring 1+)
+                if index == 0 {
+                    sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                } else {
+                    guard let parentInfo = getParentInfo(for: index, configs: configs) else {
+                        sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                        configs.append(RingConfiguration(
+                            level: index,
+                            startRadius: currentRadius,
+                            thickness: ringThickness,
+                            nodes: ringState.nodes,
+                            selectedIndex: ringState.hoveredIndex,
+                            sliceConfig: sliceConfig,
+                            iconSize: iconSize
+                        ))
+                        currentRadius += ringThickness + ringMargin
+                        continue
+                    }
+                    
+                    let itemCount = ringState.nodes.count
+                    let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
+                    
+                    if preferredLayout == .partialSlice && itemCount >= 12 {
+                        sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
+                    } else if preferredLayout == .fullCircle {
+                        sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
+                    } else {
+                        let customAngle = parentInfo.node.itemAngleSize ?? 30.0
+                        if itemCount == 1 {
+                            sliceConfig = .partialSlice(
+                                itemCount: 1,
+                                centeredAt: parentInfo.angle,
+                                defaultItemAngle: parentInfo.node.itemAngleSize ?? parentInfo.parentItemAngle
+                            )
+                        } else {
+                            sliceConfig = .partialSlice(
+                                itemCount: itemCount,
+                                centeredAt: parentInfo.angle,
+                                defaultItemAngle: customAngle
+                            )
+                        }
+                    }
+                }
+            } else if index == 0 {
                 // Ring 0 is always a full circle starting at 0° with default sizes
                 ringThickness = defaultRingThickness
                 iconSize = defaultIconSize
                 sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
             } else {
-                // Ring 1+ - get parent info
+                // Ring 1+ - get parent info (existing logic)
                 guard let parentInfo = getParentInfo(for: index, configs: configs) else {
                     ringThickness = defaultRingThickness
                     iconSize = defaultIconSize
                     sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                    configs.append(RingConfiguration(
+                        level: index,
+                        startRadius: currentRadius,
+                        thickness: ringThickness,
+                        nodes: ringState.nodes,
+                        selectedIndex: ringState.hoveredIndex,
+                        sliceConfig: sliceConfig,
+                        iconSize: iconSize
+                    ))
+                    currentRadius += ringThickness + ringMargin
                     continue
                 }
                 
@@ -110,17 +174,14 @@ class FunctionManager: ObservableObject {
                 
                 // Decide slice type based on preference and item count
                 if preferredLayout == .partialSlice && itemCount >= 12 {
-                    // Auto-convert to full circle (too many items)
                     print("🔵 Ring \(index): Auto-converting to FULL CIRCLE (too many items: \(itemCount) >= 12)")
                     sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
                     
                 } else if preferredLayout == .fullCircle {
-                    // Explicit full circle request
                     print("🔵 Ring \(index): Using FULL CIRCLE layout (parent '\(parentInfo.node.name)' preference)")
                     sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
                     
                 } else {
-                    // Partial slice
                     print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentInfo.node.name)' preference, \(itemCount) items)")
                     
                     print("🎯 Ring \(index) alignment:")
@@ -353,8 +414,62 @@ class FunctionManager: ObservableObject {
         print("Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes")
     }
     
+    func navigateIntoFolder(ringLevel: Int, index: Int) {
+        print("📂 navigateIntoFolder called: ringLevel=\(ringLevel), index=\(index)")
+        
+        guard rings.indices.contains(ringLevel) else {
+            print("❌ Invalid ring level: \(ringLevel)")
+            return
+        }
+        guard rings[ringLevel].nodes.indices.contains(index) else {
+            print("❌ Invalid node index: \(index) for ring level: \(ringLevel)")
+            return
+        }
+        
+        let node = rings[ringLevel].nodes[index]
+        
+        // Use displayedChildren which respects maxDisplayedChildren limit
+        let displayedChildren = node.displayedChildren
+        
+        guard node.isBranch, !displayedChildren.isEmpty else {
+            print("Cannot navigate into non-folder or empty folder: \(node.name)")
+            return
+        }
+        
+        // Select the node at this level
+        rings[ringLevel].selectedIndex = index
+        rings[ringLevel].hoveredIndex = index
+        
+        // CRITICAL: Mark current ring as collapsed (if it's not Ring 0)
+        if ringLevel > 0 {
+            rings[ringLevel].isCollapsed = true
+            print("📦 Collapsed ring \(ringLevel)")
+        }
+        
+        // Remove any rings beyond this level
+        if ringLevel + 1 < rings.count {
+            let removed = rings.count - (ringLevel + 1)
+            rings.removeSubrange((ringLevel + 1)...)
+            print("🗑️ Removed \(removed) ring(s) beyond level \(ringLevel)")
+        }
+        
+        // Add new ring with displayed children (this becomes the new active ring)
+        rings.append(RingState(nodes: displayedChildren, isCollapsed: false))
+        activeRingLevel = ringLevel + 1
+        
+        print("✅ Navigated into folder '\(node.name)' at ring \(ringLevel)")
+        print("   Created ring \(ringLevel + 1) with \(displayedChildren.count) nodes")
+        print("   Active ring is now: \(activeRingLevel)")
+    }
+    
     func collapseToRing(level: Int) {
         guard level >= 0, level < rings.count else { return }
+        
+        // Uncollapse the target ring (we're returning to it)
+        if level > 0 {  // Don't try to uncollapse Ring 0 (it's never collapsed)
+            rings[level].isCollapsed = false
+            print("📦 Uncollapsed ring \(level) - returning to normal size")
+        }
         
         // Remove all rings after the specified level
         if level + 1 < rings.count {

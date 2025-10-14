@@ -28,7 +28,7 @@ class FinderLogic: FunctionProvider {
         // Create both sections
         let finderWindowsNode = createFinderWindowsNode()
         let downloadsFilesNode = createDownloadsFilesNode()
-        
+        let gitFolderNode = createGitFolderNode()
         return [finderWindowsNode, downloadsFilesNode]
     }
     
@@ -91,9 +91,7 @@ class FinderLogic: FunctionProvider {
             icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage(),
             children: fileNodes,
             preferredLayout: .fullCircle,
-            
-            childRingThickness: 16,
-            childIconSize: 8,
+
             
             onLeftClick: .expand,
             onRightClick: .expand,
@@ -135,17 +133,103 @@ class FinderLogic: FunctionProvider {
     private func createDraggableFileNode(for url: URL) -> FunctionNode {
         let fileName = url.lastPathComponent
         
-        // Create thumbnail for images
-        let dragImage = createThumbnail(for: url)
+        // Check if this is a directory
+        var isDirectory: ObjCBool = false
+        FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
         
-        print("📄 [FinderLogic] Creating draggable node for: \(fileName)")
+        if isDirectory.boolValue {
+            // This is a FOLDER - create navigable folder node
+            return createFolderNode(for: url)
+        } else {
+            // This is a FILE - create draggable file node
+            return createFileNode(for: url)
+        }
+    }
+
+    // NEW: Create folder node with navigation capability
+    private func createFolderNode(for url: URL) -> FunctionNode {
+        let folderName = url.lastPathComponent
+        let folderIcon = NSWorkspace.shared.icon(forFile: url.path)
+        
+        // Load folder contents
+        let folderContents = getFolderContents(at: url)
+        
+        print("📁 [FinderLogic] Creating folder node for: \(folderName) with \(folderContents.count) items")
         
         return FunctionNode(
-            id: "downloads-file-\(url.path)",
+            id: "folder-\(url.path)",
+            name: folderName,
+            icon: folderIcon,
+            children: folderContents,
+            contextActions: [
+                StandardContextActions.showInFinder(url),
+                StandardContextActions.deleteFile(url)
+            ],
+            preferredLayout: .fullCircle,
+            itemAngleSize: 15,
+            previewURL: url,
+            showLabel: true,
+            
+            // 🎯 LEFT CLICK = NAVIGATE INTO FOLDER
+            onLeftClick: .navigateInto,
+            
+            // RIGHT CLICK = SHOW CONTEXT MENU
+            onRightClick: .expand,
+            
+            // MIDDLE CLICK = OPEN IN FINDER
+            onMiddleClick: .executeKeepOpen {
+                print("📂 Middle-click opening folder: \(folderName)")
+                NSWorkspace.shared.open(url)
+            },
+            
+            // BOUNDARY CROSS = NAVIGATE INTO
+            onBoundaryCross: .navigateInto
+        )
+    }
+
+    // NEW: Get folder contents (files and subfolders)
+    private func getFolderContents(at url: URL) -> [FunctionNode] {
+        do {
+            let contents = try FileManager.default.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: [.isDirectoryKey, .nameKey, .contentModificationDateKey],
+                options: [.skipsHiddenFiles]
+            )
+            
+            // Sort by modification date (newest first)
+            let sortedContents = contents.sorted { url1, url2 in
+                guard let date1 = try? url1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                      let date2 = try? url2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
+                    return false
+                }
+                return date1 > date2
+            }
+            
+            // Limit to 20 items to avoid performance issues
+            let limitedContents = Array(sortedContents.prefix(20))
+            
+            // Recursively create nodes for contents
+            return limitedContents.map { contentURL in
+                createDraggableFileNode(for: contentURL)
+            }
+        } catch {
+            print("❌ Failed to read folder contents: \(error)")
+            return []
+        }
+    }
+
+    // RENAMED: Extract file node creation to separate method
+    private func createFileNode(for url: URL) -> FunctionNode {
+        let fileName = url.lastPathComponent
+        let dragImage = createThumbnail(for: url)
+        
+        print("📄 [FinderLogic] Creating file node for: \(fileName)")
+        
+        return FunctionNode(
+            id: "file-\(url.path)",
             name: fileName,
             icon: dragImage,
             
-            // Context actions (right-click menu)
             contextActions: [
                 StandardContextActions.deleteFile(url),
                 StandardContextActions.copyFile(url),
@@ -159,8 +243,6 @@ class FinderLogic: FunctionProvider {
             childRingThickness: 48,
             childIconSize: 24,
             
-            
-
             // 🎯 LEFT CLICK = OPEN FILE (or drag if you move the mouse!)
             onLeftClick: .drag(DragProvider(
                 fileURLs: [url],

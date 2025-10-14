@@ -43,10 +43,12 @@ struct DragProvider {
 }
 
 // MARK: - Extended InteractionBehavior
+// MARK: - Extended InteractionBehavior
 enum InteractionBehavior {
     case execute(() -> Void)           // Execute action, close UI
     case executeKeepOpen(() -> Void)   // Execute action, keep UI open
     case expand                         // Show children/contextActions
+    case navigateInto                   // Navigate into folder, collapse previous ring
     case drag(DragProvider)            // Enable drag-and-drop
     case doNothing                      // No interaction
     
@@ -63,7 +65,7 @@ enum InteractionBehavior {
         switch self {
         case .execute:
             return true
-        case .executeKeepOpen, .expand, .drag, .doNothing:
+        case .executeKeepOpen, .expand, .navigateInto, .drag, .doNothing:
             return false
         }
     }
@@ -88,6 +90,8 @@ enum InteractionBehavior {
             action()
         case .expand:
             print("⚠️ Expand should be handled by UI layer")
+        case .navigateInto:
+            print("⚠️ NavigateInto should be handled by UI layer")
         case .drag:
             print("⚠️ Drag should be handled by gesture system")
         case .doNothing:
