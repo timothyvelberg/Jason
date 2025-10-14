@@ -45,7 +45,7 @@ struct CircularUIView: View {
                         .id("\(ring.level)-\(functionManager.ringResetTrigger)")
                     }
                 }
-//                .animation(.easeOut(duration: 0.1), value: rings.count)
+                .animation(.easeOut(duration: 0.2), value: rings.count)
                 .frame(width: totalSize, height: totalSize)
                 .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
             }
