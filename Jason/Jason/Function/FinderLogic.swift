@@ -31,7 +31,7 @@ class FinderLogic: FunctionProvider {
         case size
     }
     
-    private let maxItemsPerFolder: Int = 32
+    private let maxItemsPerFolder: Int = 20
     private let sortOrder: SortOrder = .dateModifiedNewest
     
     private var nodeCache: [String: [FunctionNode]] = [:]
@@ -81,7 +81,9 @@ class FinderLogic: FunctionProvider {
         // Create both sections
         let finderWindowsNode = createFinderWindowsNode()
         let downloadsFilesNode = createDownloadsFilesNode()
-        return [finderWindowsNode, downloadsFilesNode]
+        let gitFolderNode = createGitFolderNode()
+
+        return [finderWindowsNode, downloadsFilesNode, gitFolderNode]
     }
     
     func clearCache() {
@@ -198,34 +200,26 @@ class FinderLogic: FunctionProvider {
             id: "folder-\(url.path)",
             name: folderName,
             icon: folderIcon,
-            children: nil,  // No static children
+            children: nil,
             contextActions: [
                 StandardContextActions.showInFinder(url),
                 StandardContextActions.deleteFile(url)
             ],
-            preferredLayout: .fullCircle,
+            preferredLayout: .partialSlice,  // Changed from .fullCircle
             itemAngleSize: 15,
             previewURL: url,
             showLabel: true,
             
-            // NEW: Store metadata for dynamic loading
             metadata: ["folderURL": url.path],
             providerId: self.providerId,
             
-            // 🎯 LEFT CLICK = NAVIGATE INTO FOLDER
             onLeftClick: .navigateInto,
-            
-            // RIGHT CLICK = SHOW CONTEXT MENU
             onRightClick: .expand,
-            
-            // MIDDLE CLICK = OPEN IN FINDER
             onMiddleClick: .executeKeepOpen {
                 print("📂 Middle-click opening folder: \(folderName)")
                 NSWorkspace.shared.open(url)
             },
-            
-            // BOUNDARY CROSS = NAVIGATE INTO
-            onBoundaryCross: .navigateInto
+            onBoundaryCross: .doNothing
         )
     }
 
@@ -233,7 +227,6 @@ class FinderLogic: FunctionProvider {
     private func createGitFolderNode() -> FunctionNode {
         let gitURL = URL(fileURLWithPath: "/Users/timothy/Files/Git/")
         
-        // Check if the folder exists
         var isDirectory: ObjCBool = false
         let exists = FileManager.default.fileExists(atPath: gitURL.path, isDirectory: &isDirectory)
         
@@ -248,16 +241,15 @@ class FinderLogic: FunctionProvider {
             )
         }
         
-        print("📁 [FinderLogic] Creating Git folder node with metadata")
+        print("📁 [FinderLogic] Creating Git folder node")
         
         return FunctionNode(
             id: "git-folder-section",
             name: "Git",
             icon: NSImage(systemSymbolName: "chevron.left.forwardslash.chevron.right", accessibilityDescription: nil) ?? NSImage(),
-            children: nil,  // No static children
-            preferredLayout: .fullCircle,
+            children: nil,
+            preferredLayout: .partialSlice,
             
-            // NEW: Store metadata for dynamic loading
             metadata: ["folderURL": gitURL.path],
             providerId: self.providerId,
             
@@ -266,7 +258,7 @@ class FinderLogic: FunctionProvider {
             onMiddleClick: .executeKeepOpen {
                 NSWorkspace.shared.open(gitURL)
             },
-            onBoundaryCross: .navigateInto
+            onBoundaryCross: .navigateInto  // Changed back to .navigateInto for root folder
         )
     }
 
@@ -283,20 +275,15 @@ class FinderLogic: FunctionProvider {
             id: "downloads-files-section",
             name: "Downloads",
             icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage(),
-            children: nil,  // No static children
+            children: nil,
             preferredLayout: .fullCircle,
-            
-//            childRingThickness: 16,
-//            childIconSize: 8,
-            
-            // NEW: Store metadata for dynamic loading
             metadata: ["folderURL": downloadsURL.path],
             providerId: self.providerId,
             
             onLeftClick: .navigateInto,
             onRightClick: .expand,
             onMiddleClick: .expand,
-            onBoundaryCross: .navigateInto
+            onBoundaryCross: .navigateInto  // Changed back to .navigateInto for root folder
         )
     }
 
@@ -491,42 +478,44 @@ class FinderLogic: FunctionProvider {
     
     // Helper: Create thumbnail for images
     private func createThumbnail(for url: URL) -> NSImage {
-        let thumbnailSize = NSSize(width: 64, height: 64)
-        let cornerRadius: CGFloat = 8  // Rounded corners!
-        
-        // Check if it's an image file
-        let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
-        let fileExtension = url.pathExtension.lowercased()
-        
-        if imageExtensions.contains(fileExtension) {
-            if let image = NSImage(contentsOf: url) {
-                let thumbnail = NSImage(size: thumbnailSize)
-                
-                thumbnail.lockFocus()
-                
-                // Create rounded rect path
-                let rect = NSRect(origin: .zero, size: thumbnailSize)
-                let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-                
-                // Clip to rounded rect
-                path.addClip()
-                
-                // Draw image within rounded rect
-                image.draw(
-                    in: rect,
-                    from: NSRect(origin: .zero, size: image.size),
-                    operation: .sourceOver,
-                    fraction: 1.0
-                )
-                
-                thumbnail.unlockFocus()
-                
-                return thumbnail
-            }
-        }
-        
-        // For non-images, create rounded icon
-        return createRoundedIcon(for: url, size: thumbnailSize, cornerRadius: cornerRadius)
+        return NSWorkspace.shared.icon(forFile: url.path)
+//        let thumbnailSize = NSSize(width: 64, height: 64)
+//        let cornerRadius: CGFloat = 8  // Rounded corners!
+//        
+//        
+//        // Check if it's an image file
+//        let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
+//        let fileExtension = url.pathExtension.lowercased()
+//        
+//        if imageExtensions.contains(fileExtension) {
+//            if let image = NSImage(contentsOf: url) {
+//                let thumbnail = NSImage(size: thumbnailSize)
+//                
+//                thumbnail.lockFocus()
+//                
+//                // Create rounded rect path
+//                let rect = NSRect(origin: .zero, size: thumbnailSize)
+//                let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
+//                
+//                // Clip to rounded rect
+//                path.addClip()
+//                
+//                // Draw image within rounded rect
+//                image.draw(
+//                    in: rect,
+//                    from: NSRect(origin: .zero, size: image.size),
+//                    operation: .sourceOver,
+//                    fraction: 1.0
+//                )
+//                
+//                thumbnail.unlockFocus()
+//                
+//                return thumbnail
+//            }
+//        }
+//        
+//        // For non-images, create rounded icon
+//        return createRoundedIcon(for: url, size: thumbnailSize, cornerRadius: cornerRadius)
     }
     
     // MARK: - Finder Window Discovery
