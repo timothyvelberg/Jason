@@ -27,6 +27,11 @@ protocol FunctionProvider {
     /// Optional: Refresh/reload data before providing functions
     /// Useful for providers that need to fetch fresh data
     func refresh()
+    
+    /// Load children dynamically for a node
+    /// Called when navigating into a node that needs dynamic content
+    /// Returns fresh children based on node's metadata
+    func loadChildren(for node: FunctionNode) -> [FunctionNode]
 }
 
 // MARK: - Default Implementations
@@ -35,6 +40,10 @@ extension FunctionProvider {
     // Default refresh does nothing - providers can override if needed
     func refresh() {
         // No-op by default
+    }
+    func loadChildren(for node: FunctionNode) -> [FunctionNode] {
+        print("⚠️ Provider '\(providerName)' does not implement loadChildren(for:)")
+        return []
     }
 }
 

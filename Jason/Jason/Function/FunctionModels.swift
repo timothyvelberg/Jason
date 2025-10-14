@@ -114,8 +114,12 @@ class FunctionNode: Identifiable, ObservableObject {
     let previewURL: URL?
     let showLabel: Bool
     
-    let childRingThickness: CGFloat?  // Thickness of ring containing children
+    let childRingThickness: CGFloat?
     let childIconSize: CGFloat?
+    
+    //Metadata for dynamic loading
+    let metadata: [String: Any]?
+    let providerId: String?
     
     // MARK: - Interaction Model (Explicit Behavior)
     let onLeftClick: InteractionBehavior
@@ -142,6 +146,10 @@ class FunctionNode: Identifiable, ObservableObject {
         childRingThickness: CGFloat? = nil,
         childIconSize: CGFloat? = nil,
         
+        //Metadata and provider ID
+         metadata: [String: Any]? = nil,
+         providerId: String? = nil,
+        
         // Explicit interaction declarations
         onLeftClick: InteractionBehavior = .doNothing,
         onRightClick: InteractionBehavior = .doNothing,
@@ -164,6 +172,9 @@ class FunctionNode: Identifiable, ObservableObject {
         
         self.childRingThickness = childRingThickness
         self.childIconSize = childIconSize
+        
+        self.metadata = metadata
+        self.providerId = providerId
         
         self.onLeftClick = onLeftClick
         self.onRightClick = onRightClick
@@ -190,9 +201,21 @@ class FunctionNode: Identifiable, ObservableObject {
         return children != nil || contextActions != nil
     }
     
+    //Check if this node needs dynamic loading
+    var needsDynamicLoading: Bool {
+        // If it has navigateInto behavior and metadata, it needs dynamic loading
+        if case .navigateInto = onLeftClick, metadata != nil {
+            return true
+        }
+        if case .navigateInto = onBoundaryCross, metadata != nil {
+            return true
+        }
+        return false
+    }
+    
     // Is this a valid branch (has actual children or context actions)?
     var hasChildren: Bool {
-        return (children?.count ?? 0) > 0 || (contextActions?.count ?? 0) > 0
+        return (children?.count ?? 0) > 0 || (contextActions?.count ?? 0) > 0 || needsDynamicLoading
     }
     
     var childCount: Int {

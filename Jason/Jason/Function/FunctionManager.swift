@@ -428,14 +428,38 @@ class FunctionManager: ObservableObject {
         
         let node = rings[ringLevel].nodes[index]
         
-        // Use displayedChildren which respects maxDisplayedChildren limit
-        let displayedChildren = node.displayedChildren
+        // NEW: Check if node needs dynamic loading
+        let childrenToDisplay: [FunctionNode]
         
-        guard node.isBranch, !displayedChildren.isEmpty else {
-            print("Cannot navigate into non-folder or empty folder: \(node.name)")
-            return
+        if node.needsDynamicLoading {
+            print("🔄 Node '\(node.name)' needs dynamic loading")
+            
+            // Find the provider that owns this node
+            guard let providerId = node.providerId else {
+                print("❌ Node '\(node.name)' needs dynamic loading but has no providerId")
+                return
+            }
+            
+            guard let provider = providers.first(where: { $0.providerId == providerId }) else {
+                print("❌ Provider '\(providerId)' not found")
+                return
+            }
+            
+            // Load children dynamically from provider
+            print("📂 Loading children from provider '\(provider.providerName)'")
+            childrenToDisplay = provider.loadChildren(for: node)
+            print("✅ Loaded \(childrenToDisplay.count) children dynamically")
+            
+        } else {
+            // Use static children
+            childrenToDisplay = node.displayedChildren
         }
         
+        // Just check if we have children to display (we already handled the loading)
+        guard !childrenToDisplay.isEmpty else {
+            print("Cannot navigate into empty folder: \(node.name)")
+            return
+        }
         // Select the node at this level
         rings[ringLevel].selectedIndex = index
         rings[ringLevel].hoveredIndex = index
@@ -453,12 +477,12 @@ class FunctionManager: ObservableObject {
             print("🗑️ Removed \(removed) ring(s) beyond level \(ringLevel)")
         }
         
-        // Add new ring with displayed children (this becomes the new active ring)
-        rings.append(RingState(nodes: displayedChildren, isCollapsed: false))
+        // Add new ring with children (dynamically loaded or static)
+        rings.append(RingState(nodes: childrenToDisplay, isCollapsed: false))
         activeRingLevel = ringLevel + 1
         
         print("✅ Navigated into folder '\(node.name)' at ring \(ringLevel)")
-        print("   Created ring \(ringLevel + 1) with \(displayedChildren.count) nodes")
+        print("   Created ring \(ringLevel + 1) with \(childrenToDisplay.count) nodes")
         print("   Active ring is now: \(activeRingLevel)")
     }
     

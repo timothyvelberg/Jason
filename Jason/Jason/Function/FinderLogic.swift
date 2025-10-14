@@ -20,6 +20,59 @@ class FinderLogic: FunctionProvider {
         return NSWorkspace.shared.icon(forFile: "/System/Library/CoreServices/Finder.app")
     }
     
+    // MARK: - Configuration
+    enum SortOrder {
+        case nameAscending
+        case nameDescending
+        case dateModifiedNewest
+        case dateModifiedOldest
+        case dateCreatedNewest
+        case dateCreatedOldest
+        case size
+    }
+    
+    private let maxItemsPerFolder: Int = 32
+    private let sortOrder: SortOrder = .dateModifiedNewest
+    
+    private var nodeCache: [String: [FunctionNode]] = [:]
+    
+    // MARK: - Cache
+    
+    private var folderContentsCache: [String: [FunctionNode]] = [:]
+    private let cacheTimeout: TimeInterval = 30.0  // 30 seconds
+    private var cacheTimestamps: [String: Date] = [:]
+    
+    // MARK: - Dynamic Loading
+    
+    func loadChildren(for node: FunctionNode) -> [FunctionNode] {
+        print("📂 [FinderLogic] loadChildren called for: \(node.name)")
+        
+        guard let metadata = node.metadata,
+              let urlString = metadata["folderURL"] as? String else {
+            print("❌ No folderURL in metadata")
+            return []
+        }
+        
+        let folderURL = URL(fileURLWithPath: urlString)
+        let cacheKey = folderURL.path
+        
+        // Check cache first
+        if let cachedNodes = nodeCache[cacheKey] {
+            print("⚡ [FinderLogic] Using cached nodes for: \(node.name) (\(cachedNodes.count) items)")
+            return cachedNodes
+        }
+        
+        // Cache miss - load and create nodes
+        print("📂 [FinderLogic] Loading contents of: \(folderURL.path)")
+        let nodes = getFolderContents(at: folderURL)
+        
+        // Cache the nodes
+        nodeCache[cacheKey] = nodes
+        print("💾 [FinderLogic] Cached \(nodes.count) nodes for: \(node.name)")
+        
+        return nodes
+    }
+    
     // MARK: - Provide Functions
     
     func provideFunctions() -> [FunctionNode] {
@@ -28,12 +81,23 @@ class FinderLogic: FunctionProvider {
         // Create both sections
         let finderWindowsNode = createFinderWindowsNode()
         let downloadsFilesNode = createDownloadsFilesNode()
-        let gitFolderNode = createGitFolderNode()
         return [finderWindowsNode, downloadsFilesNode]
+    }
+    
+    func clearCache() {
+        nodeCache.removeAll()
+        print("🗑️ [FinderLogic] Cache cleared")
+    }
+    
+    func invalidateCache(for url: URL) {
+        let cacheKey = url.path
+        nodeCache.removeValue(forKey: cacheKey)
+        print("🗑️ [FinderLogic] Invalidated cache for: \(url.path)")
     }
     
     func refresh() {
         print("🔄 [FinderLogic] refresh() called")
+        clearCache()  // Clear cache on explicit refresh
     }
     
     // MARK: - Finder Windows Section
@@ -76,29 +140,6 @@ class FinderLogic: FunctionProvider {
     }
     
     // MARK: - Downloads Files Section (DRAGGABLE!)
-    
-    private func createDownloadsFilesNode() -> FunctionNode {
-        let downloadsFiles = getDownloadsFiles()
-        print("📥 [FinderLogic] Found \(downloadsFiles.count) file(s) in Downloads (showing last 10)")
-        
-        let fileNodes = downloadsFiles.map { fileURL in
-            createDraggableFileNode(for: fileURL)
-        }
-        
-        return FunctionNode(
-            id: "downloads-files-section",
-            name: "Downloads",
-            icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage(),
-            children: fileNodes,
-            preferredLayout: .fullCircle,
-
-            
-            onLeftClick: .expand,
-            onRightClick: .expand,
-            onMiddleClick: .expand,
-            onBoundaryCross: .expand
-        )
-    }
     
     private func getDownloadsFiles() -> [URL] {
         let downloadsURL = FileManager.default.urls(
@@ -146,21 +187,18 @@ class FinderLogic: FunctionProvider {
         }
     }
 
-    // NEW: Create folder node with navigation capability
+    // Create folder node with navigation capability
     private func createFolderNode(for url: URL) -> FunctionNode {
         let folderName = url.lastPathComponent
         let folderIcon = NSWorkspace.shared.icon(forFile: url.path)
         
-        // Load folder contents
-        let folderContents = getFolderContents(at: url)
-        
-        print("📁 [FinderLogic] Creating folder node for: \(folderName) with \(folderContents.count) items")
+        print("📁 [FinderLogic] Creating folder node with metadata for: \(folderName)")
         
         return FunctionNode(
             id: "folder-\(url.path)",
             name: folderName,
             icon: folderIcon,
-            children: folderContents,
+            children: nil,  // No static children
             contextActions: [
                 StandardContextActions.showInFinder(url),
                 StandardContextActions.deleteFile(url)
@@ -169,6 +207,10 @@ class FinderLogic: FunctionProvider {
             itemAngleSize: 15,
             previewURL: url,
             showLabel: true,
+            
+            // NEW: Store metadata for dynamic loading
+            metadata: ["folderURL": url.path],
+            providerId: self.providerId,
             
             // 🎯 LEFT CLICK = NAVIGATE INTO FOLDER
             onLeftClick: .navigateInto,
@@ -187,26 +229,93 @@ class FinderLogic: FunctionProvider {
         )
     }
 
-    // NEW: Get folder contents (files and subfolders)
+    // Update createGitFolderNode to use metadata
+    private func createGitFolderNode() -> FunctionNode {
+        let gitURL = URL(fileURLWithPath: "/Users/timothy/Files/Git/")
+        
+        // Check if the folder exists
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: gitURL.path, isDirectory: &isDirectory)
+        
+        if !exists || !isDirectory.boolValue {
+            print("⚠️ [FinderLogic] Git folder does not exist at: \(gitURL.path)")
+            return FunctionNode(
+                id: "git-folder-missing",
+                name: "Git (Not Found)",
+                icon: NSImage(systemSymbolName: "folder.badge.questionmark", accessibilityDescription: nil) ?? NSImage(),
+                preferredLayout: nil,
+                onLeftClick: .doNothing
+            )
+        }
+        
+        print("📁 [FinderLogic] Creating Git folder node with metadata")
+        
+        return FunctionNode(
+            id: "git-folder-section",
+            name: "Git",
+            icon: NSImage(systemSymbolName: "chevron.left.forwardslash.chevron.right", accessibilityDescription: nil) ?? NSImage(),
+            children: nil,  // No static children
+            preferredLayout: .fullCircle,
+            
+            // NEW: Store metadata for dynamic loading
+            metadata: ["folderURL": gitURL.path],
+            providerId: self.providerId,
+            
+            onLeftClick: .navigateInto,
+            onRightClick: .expand,
+            onMiddleClick: .executeKeepOpen {
+                NSWorkspace.shared.open(gitURL)
+            },
+            onBoundaryCross: .navigateInto
+        )
+    }
+
+    // Update createDownloadsFilesNode to use metadata
+    private func createDownloadsFilesNode() -> FunctionNode {
+        let downloadsURL = FileManager.default.urls(
+            for: .downloadsDirectory,
+            in: .userDomainMask
+        ).first!
+        
+        print("📥 [FinderLogic] Creating Downloads node with metadata")
+        
+        return FunctionNode(
+            id: "downloads-files-section",
+            name: "Downloads",
+            icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage(),
+            children: nil,  // No static children
+            preferredLayout: .fullCircle,
+            
+//            childRingThickness: 16,
+//            childIconSize: 8,
+            
+            // NEW: Store metadata for dynamic loading
+            metadata: ["folderURL": downloadsURL.path],
+            providerId: self.providerId,
+            
+            onLeftClick: .navigateInto,
+            onRightClick: .expand,
+            onMiddleClick: .expand,
+            onBoundaryCross: .navigateInto
+        )
+    }
+
+    // Get folder contents (files and subfolders)
     private func getFolderContents(at url: URL) -> [FunctionNode] {
         do {
             let contents = try FileManager.default.contentsOfDirectory(
                 at: url,
-                includingPropertiesForKeys: [.isDirectoryKey, .nameKey, .contentModificationDateKey],
+                includingPropertiesForKeys: [.isDirectoryKey, .nameKey, .contentModificationDateKey, .creationDateKey, .fileSizeKey],
                 options: [.skipsHiddenFiles]
             )
             
-            // Sort by modification date (newest first)
-            let sortedContents = contents.sorted { url1, url2 in
-                guard let date1 = try? url1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-                      let date2 = try? url2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
-                    return false
-                }
-                return date1 > date2
-            }
+            // Sort based on configuration
+            let sortedContents = sortContents(contents, by: sortOrder)
             
-            // Limit to 20 items to avoid performance issues
-            let limitedContents = Array(sortedContents.prefix(20))
+            // Limit to max items
+            let limitedContents = Array(sortedContents.prefix(maxItemsPerFolder))
+            
+            print("📂 Showing \(limitedContents.count) of \(contents.count) items (sorted by \(sortOrder))")
             
             // Recursively create nodes for contents
             return limitedContents.map { contentURL in
@@ -215,6 +324,62 @@ class FinderLogic: FunctionProvider {
         } catch {
             print("❌ Failed to read folder contents: \(error)")
             return []
+        }
+    }
+
+    // NEW: Sort contents based on sort order
+    private func sortContents(_ contents: [URL], by sortOrder: SortOrder) -> [URL] {
+        switch sortOrder {
+        case .nameAscending:
+            return contents.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+            
+        case .nameDescending:
+            return contents.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedDescending }
+            
+        case .dateModifiedNewest:
+            return contents.sorted { url1, url2 in
+                guard let date1 = try? url1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                      let date2 = try? url2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
+                    return false
+                }
+                return date1 > date2
+            }
+            
+        case .dateModifiedOldest:
+            return contents.sorted { url1, url2 in
+                guard let date1 = try? url1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                      let date2 = try? url2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
+                    return false
+                }
+                return date1 < date2
+            }
+            
+        case .dateCreatedNewest:
+            return contents.sorted { url1, url2 in
+                guard let date1 = try? url1.resourceValues(forKeys: [.creationDateKey]).creationDate,
+                      let date2 = try? url2.resourceValues(forKeys: [.creationDateKey]).creationDate else {
+                    return false
+                }
+                return date1 > date2
+            }
+            
+        case .dateCreatedOldest:
+            return contents.sorted { url1, url2 in
+                guard let date1 = try? url1.resourceValues(forKeys: [.creationDateKey]).creationDate,
+                      let date2 = try? url2.resourceValues(forKeys: [.creationDateKey]).creationDate else {
+                    return false
+                }
+                return date1 < date2
+            }
+            
+        case .size:
+            return contents.sorted { url1, url2 in
+                guard let size1 = try? url1.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                      let size2 = try? url2.resourceValues(forKeys: [.fileSizeKey]).fileSize else {
+                    return false
+                }
+                return size1 > size2
+            }
         }
     }
 
