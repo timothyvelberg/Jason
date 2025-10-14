@@ -44,7 +44,9 @@ class FinderLogic: FunctionProvider {
     
     // MARK: - Dynamic Loading
     
-    func loadChildren(for node: FunctionNode) -> [FunctionNode] {
+    // MARK: - Dynamic Loading
+
+    func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
         print("📂 [FinderLogic] loadChildren called for: \(node.name)")
         
         guard let metadata = node.metadata,
@@ -56,17 +58,22 @@ class FinderLogic: FunctionProvider {
         let folderURL = URL(fileURLWithPath: urlString)
         let cacheKey = folderURL.path
         
-        // Check cache first
+        // Check cache first (on main thread)
         if let cachedNodes = nodeCache[cacheKey] {
             print("⚡ [FinderLogic] Using cached nodes for: \(node.name) (\(cachedNodes.count) items)")
             return cachedNodes
         }
         
-        // Cache miss - load and create nodes
+        // Cache miss - load on background thread
         print("📂 [FinderLogic] Loading contents of: \(folderURL.path)")
-        let nodes = getFolderContents(at: folderURL)
         
-        // Cache the nodes
+        // Move file system operations to background with explicit return type
+        let nodes: [FunctionNode] = await Task.detached(priority: .userInitiated) { [weak self] () -> [FunctionNode] in
+            guard let self = self else { return [] }
+            return self.getFolderContents(at: folderURL)
+        }.value
+        
+        // Cache the nodes (back on main actor)
         nodeCache[cacheKey] = nodes
         print("💾 [FinderLogic] Cached \(nodes.count) nodes for: \(node.name)")
         

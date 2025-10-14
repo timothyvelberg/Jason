@@ -37,6 +37,7 @@ class FunctionManager: ObservableObject {
     }
     @Published var activeRingLevel: Int = 0
     @Published var ringResetTrigger: UUID = UUID()
+    @Published var isLoadingFolder: Bool = false
     
     // MARK: - Private State
     
@@ -428,62 +429,71 @@ class FunctionManager: ObservableObject {
         
         let node = rings[ringLevel].nodes[index]
         
-        // NEW: Check if node needs dynamic loading
-        let childrenToDisplay: [FunctionNode]
-        
-        if node.needsDynamicLoading {
-            print("🔄 Node '\(node.name)' needs dynamic loading")
+        // NEW: Launch async task for loading
+        Task { @MainActor in
+            // Set loading state
+            isLoadingFolder = true
             
-            // Find the provider that owns this node
-            guard let providerId = node.providerId else {
-                print("❌ Node '\(node.name)' needs dynamic loading but has no providerId")
+            let childrenToDisplay: [FunctionNode]
+            
+            if node.needsDynamicLoading {
+                print("🔄 Node '\(node.name)' needs dynamic loading")
+                
+                guard let providerId = node.providerId else {
+                    print("❌ Node '\(node.name)' needs dynamic loading but has no providerId")
+                    isLoadingFolder = false
+                    return
+                }
+                
+                guard let provider = providers.first(where: { $0.providerId == providerId }) else {
+                    print("❌ Provider '\(providerId)' not found")
+                    isLoadingFolder = false
+                    return
+                }
+                
+                // Load children asynchronously (non-blocking!)
+                print("📂 Loading children from provider '\(provider.providerName)'")
+                childrenToDisplay = await provider.loadChildren(for: node)
+                print("✅ Loaded \(childrenToDisplay.count) children dynamically")
+                
+            } else {
+                childrenToDisplay = node.displayedChildren
+            }
+            
+            guard !childrenToDisplay.isEmpty else {
+                print("Cannot navigate into empty folder: \(node.name)")
+                isLoadingFolder = false
                 return
             }
             
-            guard let provider = providers.first(where: { $0.providerId == providerId }) else {
-                print("❌ Provider '\(providerId)' not found")
-                return
+            // Update UI (already on MainActor)
+            rings[ringLevel].selectedIndex = index
+            rings[ringLevel].hoveredIndex = index
+            
+            // Mark current ring as collapsed (if it's not Ring 0)
+            if ringLevel > 0 {
+                rings[ringLevel].isCollapsed = true
+                print("📦 Collapsed ring \(ringLevel)")
             }
             
-            // Load children dynamically from provider
-            print("📂 Loading children from provider '\(provider.providerName)'")
-            childrenToDisplay = provider.loadChildren(for: node)
-            print("✅ Loaded \(childrenToDisplay.count) children dynamically")
+            // Remove any rings beyond this level
+            if ringLevel + 1 < rings.count {
+                let removed = rings.count - (ringLevel + 1)
+                rings.removeSubrange((ringLevel + 1)...)
+                print("🗑️ Removed \(removed) ring(s) beyond level \(ringLevel)")
+            }
             
-        } else {
-            // Use static children
-            childrenToDisplay = node.displayedChildren
+            // Add new ring with children
+            rings.append(RingState(nodes: childrenToDisplay, isCollapsed: false))
+            activeRingLevel = ringLevel + 1
+            
+            // Clear loading state
+            isLoadingFolder = false
+            
+            print("✅ Navigated into folder '\(node.name)' at ring \(ringLevel)")
+            print("   Created ring \(ringLevel + 1) with \(childrenToDisplay.count) nodes")
+            print("   Active ring is now: \(activeRingLevel)")
         }
-        
-        // Just check if we have children to display (we already handled the loading)
-        guard !childrenToDisplay.isEmpty else {
-            print("Cannot navigate into empty folder: \(node.name)")
-            return
-        }
-        // Select the node at this level
-        rings[ringLevel].selectedIndex = index
-        rings[ringLevel].hoveredIndex = index
-        
-        // CRITICAL: Mark current ring as collapsed (if it's not Ring 0)
-        if ringLevel > 0 {
-            rings[ringLevel].isCollapsed = true
-            print("📦 Collapsed ring \(ringLevel)")
-        }
-        
-        // Remove any rings beyond this level
-        if ringLevel + 1 < rings.count {
-            let removed = rings.count - (ringLevel + 1)
-            rings.removeSubrange((ringLevel + 1)...)
-            print("🗑️ Removed \(removed) ring(s) beyond level \(ringLevel)")
-        }
-        
-        // Add new ring with children (dynamically loaded or static)
-        rings.append(RingState(nodes: childrenToDisplay, isCollapsed: false))
-        activeRingLevel = ringLevel + 1
-        
-        print("✅ Navigated into folder '\(node.name)' at ring \(ringLevel)")
-        print("   Created ring \(ringLevel + 1) with \(childrenToDisplay.count) nodes")
-        print("   Active ring is now: \(activeRingLevel)")
     }
     
     func collapseToRing(level: Int) {
