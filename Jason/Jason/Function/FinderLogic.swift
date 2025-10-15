@@ -133,7 +133,7 @@ class FinderLogic: FunctionProvider {
         print("🔄 [FinderLogic] refresh() called")
         nodeCache.removeAll()
         // NEW: Also clear database cache on explicit refresh
-        DatabaseManager.shared.clearAllFolderCache()
+//        DatabaseManager.shared.clearAllFolderCache()
     }
     
     // MARK: - Dynamic Loading (WITH DATABASE INTEGRATION)
