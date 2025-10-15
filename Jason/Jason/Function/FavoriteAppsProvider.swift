@@ -75,13 +75,13 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         for bundleId in favoriteAppBundleIds {
             if let appInfo = findApp(bundleIdentifier: bundleId) {
                 resolvedApps.append(appInfo)
-                print("✅ Found favorite app: \(appInfo.name)")
+//                print("✅ Found favorite app: \(appInfo.name)")
             } else {
                 print("⚠️ Could not find app with bundle ID: \(bundleId)")
             }
         }
         
-        print("🌟 Loaded \(resolvedApps.count) favorite apps")
+//        print("🌟 Loaded \(resolvedApps.count) favorite apps")
     }
     
     private func findApp(bundleIdentifier: String) -> AppInfo? {

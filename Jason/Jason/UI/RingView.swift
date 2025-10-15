@@ -59,8 +59,8 @@ struct RingView: View {
     }
     
     var body: some View {
-        let _ = print("🔵 [RingView] Rendering - Nodes: \(nodes.count), Selected: \(selectedIndex?.description ?? "none")")
-        let _ = print("   SliceConfig - Start: \(sliceConfig.startAngle)°, End: \(sliceConfig.endAngle)°, ItemAngle: \(sliceConfig.itemAngle)°, IsFullCircle: \(sliceConfig.isFullCircle)")
+//        let _ = print("🔵 [RingView] Rendering - Nodes: \(nodes.count), Selected: \(selectedIndex?.description ?? "none")")
+//        let _ = print("   SliceConfig - Start: \(sliceConfig.startAngle)°, End: \(sliceConfig.endAngle)°, ItemAngle: \(sliceConfig.itemAngle)°, IsFullCircle: \(sliceConfig.isFullCircle)")
         
         return ZStack {
             // Ring background - either full circle or partial slice

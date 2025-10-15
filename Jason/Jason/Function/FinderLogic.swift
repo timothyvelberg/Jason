@@ -150,6 +150,9 @@ class FinderLogic: FunctionProvider {
         let folderURL = URL(fileURLWithPath: urlString)
         let cacheKey = folderURL.path
         
+        // 👇 NEW: Get custom max items from metadata
+        let customMaxItems = metadata["maxItems"] as? Int
+        
         // 1. CHECK DATABASE FIRST
         if !DatabaseManager.shared.isCacheStale(for: cacheKey) {
             if let cached = DatabaseManager.shared.getFolderCache(for: cacheKey) {
@@ -157,6 +160,11 @@ class FinderLogic: FunctionProvider {
                 
                 // Deserialize from JSON
                 if let nodes = deserializeNodes(from: cached.itemsJSON, folderURL: folderURL) {
+                    // Apply custom limit if specified
+                    if let limit = customMaxItems {
+                        print("✂️ [FinderLogic] Applying custom limit: \(limit) items")
+                        return Array(nodes.prefix(limit))
+                    }
                     return nodes
                 }
             }
@@ -172,7 +180,7 @@ class FinderLogic: FunctionProvider {
                 return []
             }
             print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
-            let result = self.getFolderContents(at: folderURL)
+            let result = self.getFolderContents(at: folderURL, maxItems: customMaxItems)  // 👈 Pass custom limit
             print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items")
             return result
         }.value
@@ -202,7 +210,8 @@ class FinderLogic: FunctionProvider {
             createFavoriteFolderEntry(
                 name: "Downloads",
                 path: FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!,
-                icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage()
+                icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage(),
+                maxItems: 20
             ),
             createFavoriteFolderEntry(
                 name: "Git",
@@ -212,7 +221,8 @@ class FinderLogic: FunctionProvider {
             createFavoriteFolderEntry(
                 name: "Screenshots",
                 path: URL(fileURLWithPath: "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots/"),
-                icon: NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: nil) ?? NSImage()
+                icon: NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: nil) ?? NSImage(),
+                maxItems: 10
             )
             // Easy to add more favorites here:
             // createFavoriteFolderEntry(name: "Documents", path: ..., icon: ...),
@@ -234,7 +244,14 @@ class FinderLogic: FunctionProvider {
     }
 
     // Helper to create individual favorite folder entries
-    private func createFavoriteFolderEntry(name: String, path: URL, icon: NSImage) -> FunctionNode {
+    private func createFavoriteFolderEntry(name: String, path: URL, icon: NSImage, maxItems: Int? = nil) -> FunctionNode {
+        var metadata: [String: Any] = ["folderURL": path.path]
+        
+        // Add custom max items if specified
+        if let maxItems = maxItems {
+            metadata["maxItems"] = maxItems
+        }
+        
         return FunctionNode(
             id: "favorite-\(path.path)",
             name: name,
@@ -242,7 +259,7 @@ class FinderLogic: FunctionProvider {
             children: nil,
             preferredLayout: .fullCircle,
             
-            metadata: ["folderURL": path.path],
+            metadata: metadata,
             providerId: self.providerId,
             
             onLeftClick: .navigateInto,
@@ -253,7 +270,6 @@ class FinderLogic: FunctionProvider {
             onBoundaryCross: .navigateInto
         )
     }
-    
     // MARK: - Finder Windows Section
     
     private func createFinderWindowsNode() -> FunctionNode {
@@ -295,36 +311,6 @@ class FinderLogic: FunctionProvider {
     
     // MARK: - Downloads Files Section (DRAGGABLE!)
     
-    private func getDownloadsFiles() -> [URL] {
-        let downloadsURL = FileManager.default.urls(
-            for: .downloadsDirectory,
-            in: .userDomainMask
-        ).first!
-        
-        do {
-            let files = try FileManager.default.contentsOfDirectory(
-                at: downloadsURL,
-                includingPropertiesForKeys: [.isDirectoryKey, .nameKey, .contentModificationDateKey],
-                options: [.skipsHiddenFiles]
-            )
-            
-            // Sort by modification date (newest first)
-            let sortedFiles = files.sorted { url1, url2 in
-                guard let date1 = try? url1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-                      let date2 = try? url2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
-                    return false
-                }
-                return date1 > date2
-            }
-            
-            // Return only the last 10 files
-            return Array(sortedFiles.prefix(10))
-        } catch {
-            print("❌ Failed to read Downloads: \(error)")
-            return []
-        }
-    }
-
     private func createDraggableFileNode(for url: URL) -> FunctionNode {
         let fileName = url.lastPathComponent
         
@@ -375,72 +361,8 @@ class FinderLogic: FunctionProvider {
         )
     }
 
-    // Update createGitFolderNode to use metadata
-    private func createGitFolderNode() -> FunctionNode {
-        let gitURL = URL(fileURLWithPath: "/Users/timothy/Files/Git/")
-        
-        var isDirectory: ObjCBool = false
-        let exists = FileManager.default.fileExists(atPath: gitURL.path, isDirectory: &isDirectory)
-        
-        if !exists || !isDirectory.boolValue {
-            print("⚠️ [FinderLogic] Git folder does not exist at: \(gitURL.path)")
-            return FunctionNode(
-                id: "git-folder-missing",
-                name: "Git (Not Found)",
-                icon: NSImage(systemSymbolName: "folder.badge.questionmark", accessibilityDescription: nil) ?? NSImage(),
-                preferredLayout: nil,
-                onLeftClick: .doNothing
-            )
-        }
-        
-        print("📁 [FinderLogic] Creating Git folder node")
-        
-        return FunctionNode(
-            id: "git-folder-section",
-            name: "Git",
-            icon: NSImage(systemSymbolName: "chevron.left.forwardslash.chevron.right", accessibilityDescription: nil) ?? NSImage(),
-            children: nil,
-            preferredLayout: .partialSlice,
-            
-            metadata: ["folderURL": gitURL.path],
-            providerId: self.providerId,
-            
-            onLeftClick: .navigateInto,
-            onRightClick: .expand,
-            onMiddleClick: .executeKeepOpen {
-                NSWorkspace.shared.open(gitURL)
-            },
-            onBoundaryCross: .navigateInto  // Changed back to .navigateInto for root folder
-        )
-    }
-
-    // Update createDownloadsFilesNode to use metadata
-    private func createDownloadsFilesNode() -> FunctionNode {
-        let downloadsURL = FileManager.default.urls(
-            for: .downloadsDirectory,
-            in: .userDomainMask
-        ).first!
-        
-        print("📥 [FinderLogic] Creating Downloads node with metadata")
-        
-        return FunctionNode(
-            id: "downloads-files-section",
-            name: "Downloads",
-            icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage(),
-            children: nil,
-            preferredLayout: .fullCircle,
-            metadata: ["folderURL": downloadsURL.path],
-            providerId: self.providerId,
-            
-            onLeftClick: .navigateInto,
-            onRightClick: .expand,
-            onMiddleClick: .expand,
-            onBoundaryCross: .navigateInto  // Changed back to .navigateInto for root folder
-        )
-    }
-
     // Get folder contents (files and subfolders)
-    private func getFolderContents(at url: URL) -> [FunctionNode] {
+    private func getFolderContents(at url: URL, maxItems: Int? = nil) -> [FunctionNode] {
         print("📂 [getFolderContents] START: \(url.path)")
         
         do {
@@ -453,9 +375,12 @@ class FinderLogic: FunctionProvider {
             print("📂 [getFolderContents] Found \(contents.count) items")
             
             let sortedContents = sortContents(contents, by: sortOrder)
-            let limitedContents = Array(sortedContents.prefix(maxItemsPerFolder))
             
-            print("📂 [getFolderContents] Processing \(limitedContents.count) items")
+            // Use custom limit if provided, otherwise use default
+            let itemLimit = maxItems ?? maxItemsPerFolder
+            let limitedContents = Array(sortedContents.prefix(itemLimit))
+            
+            print("📂 [getFolderContents] Processing \(limitedContents.count) items (limit: \(itemLimit))")
             
             var nodes: [FunctionNode] = []
             for (index, contentURL) in limitedContents.enumerated() {

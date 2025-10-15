@@ -92,12 +92,12 @@ class MouseTracker {
         }
         
         let angle = self.calculateAngle(from: start, to: current)
-        print("🔍 [Track] Distance: \(String(format: "%.1f", distance)), Angle: \(String(format: "%.1f", angle))°")
+//        print("🔍 [Track] Distance: \(String(format: "%.1f", distance)), Angle: \(String(format: "%.1f", angle))°")
         
         // Determine which ring the mouse is in based on distance
         let ringLevel = determineRingLevel(distance: distance)
         
-        print("🔍 [Track] RingLevel: \(ringLevel?.description ?? "nil"), Active: \(functionManager.activeRingLevel)")
+//        print("🔍 [Track] RingLevel: \(ringLevel?.description ?? "nil"), Active: \(functionManager.activeRingLevel)")
         
         // Handle boundary crossing between rings
         handleBoundaryCrossing(distance: distance, currentRingLevel: ringLevel, angle: angle)
@@ -107,7 +107,6 @@ class MouseTracker {
             print("⚠️ [Track] No ring level - skipping hover")
             return
         }
-        
         
         //Don't update hover for rings that aren't the active ring
         guard ringLevel == functionManager.activeRingLevel else {
@@ -159,7 +158,7 @@ class MouseTracker {
         
         // If beyond all rings, treat as being in the active (outermost) ring
         if functionManager.rings.count > 0 {
-            print("🎯 Beyond all rings at distance \(distance), treating as active ring \(functionManager.activeRingLevel)")
+//            print("🎯 Beyond all rings at distance \(distance), treating as active ring \(functionManager.activeRingLevel)")
             return functionManager.activeRingLevel
         }
         
@@ -200,7 +199,7 @@ class MouseTracker {
                         // USE EXPLICIT INTERACTION MODEL
                         switch node.onBoundaryCross {
                         case .expand:
-                            print("🔵 Beyond boundary (\(distance) > \(activeRingOuterRadius)) - expanding '\(node.name)'")
+//                            print("🔵 Beyond boundary (\(distance) > \(activeRingOuterRadius)) - expanding '\(node.name)'")
                             functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)
                             
                             lastFunctionIndex = pieIndex

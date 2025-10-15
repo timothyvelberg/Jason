@@ -181,7 +181,7 @@ class AppSwitcherManager: ObservableObject {
             }
         
         for app in newApps {
-            print("  🆕 Added new app: \(app.localizedName ?? "Unknown") (PID: \(app.processIdentifier))")
+//            print("  🆕 Added new app: \(app.localizedName ?? "Unknown") (PID: \(app.processIdentifier))")
         }
         
         sortedApps.append(contentsOf: newApps)
@@ -192,7 +192,7 @@ class AppSwitcherManager: ObservableObject {
     }
     
     private func addToUsageHistory(_ pid: pid_t) {
-        print("➕ Adding PID \(pid) to usage history")
+//        print("➕ Adding PID \(pid) to usage history")
         // Remove if already exists
         appUsageHistory.removeAll { $0 == pid }
         // Add to front (most recent)
@@ -203,7 +203,7 @@ class AppSwitcherManager: ObservableObject {
             appUsageHistory = Array(appUsageHistory.prefix(50))
         }
         
-        print("📚 Updated usage history: \(appUsageHistory.prefix(5))")
+//        print("📚 Updated usage history: \(appUsageHistory.prefix(5))")
     }
     
     private func removeFromUsageHistory(_ pid: pid_t) {
