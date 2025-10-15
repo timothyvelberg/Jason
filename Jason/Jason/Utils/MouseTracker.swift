@@ -13,10 +13,14 @@ class MouseTracker {
     private var trackingTimer: Timer?
     private var lastFunctionIndex: Int?
     private var lastRingLevel: Int?  // Can be nil when outside all rings
+    private var isPausedAfterScroll = false
+    private var lastMouseLocation: NSPoint?
+    
     var onPieHover: ((Int?) -> Void)?
     private var functionManager: FunctionManager
 
     var mouseAngleOffset: CGFloat = 0
+    
     
     init(functionManager: FunctionManager) {
         self.functionManager = functionManager
@@ -53,13 +57,41 @@ class MouseTracker {
         lastRingLevel = nil
         print("Mouse tracking stopped")
     }
+    
+    func pauseAfterScroll() {
+        isPausedAfterScroll = true
+        lastMouseLocation = NSEvent.mouseLocation  // Remember current position
+        print("⏸️ [MouseTracker] Paused tracking after scroll - waiting for mouse movement")
+    }
 
     private func trackMousePosition(distance: CGFloat) {
         guard let start = trackingStartPoint else { return }
 
         let current = NSEvent.mouseLocation
-        let angle = self.calculateAngle(from: start, to: current)
         
+        // Check if paused and if mouse moved enough to resume
+        if isPausedAfterScroll {
+            if let last = lastMouseLocation {
+                let moved = abs(current.x - last.x) > 5 || abs(current.y - last.y) > 5  // Increased threshold
+                if moved {
+                    isPausedAfterScroll = false
+                    print("▶️ [MouseTracker] Resumed tracking after mouse movement")
+                    lastMouseLocation = current  // Update now that we resumed
+                } else {
+                    // Still paused, don't track and DON'T update lastMouseLocation
+                    return
+                }
+            } else {
+                // No last position stored, resume immediately
+                isPausedAfterScroll = false
+                lastMouseLocation = current
+            }
+        } else {
+            // Update last position only when NOT paused
+            lastMouseLocation = current
+        }
+        
+        let angle = self.calculateAngle(from: start, to: current)
         print("🔍 [Track] Distance: \(String(format: "%.1f", distance)), Angle: \(String(format: "%.1f", angle))°")
         
         // Determine which ring the mouse is in based on distance

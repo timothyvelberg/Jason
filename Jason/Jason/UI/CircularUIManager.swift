@@ -100,6 +100,7 @@ class CircularUIManager: ObservableObject {
         if currentLevel > 0 {
             print("🔙 [CircularUIManager] Scrolling back from ring \(currentLevel) to \(currentLevel - 1)")
             functionManager.collapseToRing(level: currentLevel - 1)
+            mouseTracker?.pauseAfterScroll()
         } else {
             print("⚠️ [CircularUIManager] Already at Ring 0 - cannot scroll back further")
         }
