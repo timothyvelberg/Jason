@@ -29,6 +29,14 @@ struct CircularUIView: View {
         ZStack {
             // Existing circular UI content
             GeometryReader { geometry in
+                let window = NSApp.windows.first(where: { $0 is OverlayWindow }) as? OverlayWindow
+                let mouseX = window?.uiCenterLocation.x ?? geometry.size.width / 2
+                let mouseY = window?.uiCenterLocation.y ?? geometry.size.height / 2
+                let screenHeight = NSScreen.main?.frame.height ?? 1080
+                
+                // Convert Y coordinate from AppKit (Y=0 at bottom) to SwiftUI (Y=0 at top)
+                let swiftUIY = screenHeight - mouseY
+                
                 ZStack {
                     // Generate rings dynamically
                     ForEach(rings) { ring in
@@ -47,7 +55,7 @@ struct CircularUIView: View {
                 }
                 .animation(.easeOut(duration: 0.2), value: rings.count)
                 .frame(width: totalSize, height: totalSize)
-                .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                .position(x: mouseX, y: swiftUIY)
             }
             .ignoresSafeArea()
             

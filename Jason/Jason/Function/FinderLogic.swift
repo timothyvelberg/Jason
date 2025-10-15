@@ -58,22 +58,28 @@ class FinderLogic: FunctionProvider {
         let folderURL = URL(fileURLWithPath: urlString)
         let cacheKey = folderURL.path
         
-        // Check cache first (on main thread)
         if let cachedNodes = nodeCache[cacheKey] {
             print("⚡ [FinderLogic] Using cached nodes for: \(node.name) (\(cachedNodes.count) items)")
             return cachedNodes
         }
         
-        // Cache miss - load on background thread
-        print("📂 [FinderLogic] Loading contents of: \(folderURL.path)")
+        print("🔄 [START] Loading contents of: \(folderURL.path)")
+        let startTime = Date()
         
-        // Move file system operations to background with explicit return type
         let nodes: [FunctionNode] = await Task.detached(priority: .userInitiated) { [weak self] () -> [FunctionNode] in
-            guard let self = self else { return [] }
-            return self.getFolderContents(at: folderURL)
+            guard let self = self else {
+                print("❌ [FinderLogic] Self deallocated during load")
+                return []
+            }
+            print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
+            let result = self.getFolderContents(at: folderURL)
+            print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items")
+            return result
         }.value
         
-        // Cache the nodes (back on main actor)
+        let elapsed = Date().timeIntervalSince(startTime)
+        print("✅ [END] Loaded \(nodes.count) nodes in \(String(format: "%.2f", elapsed))s")
+        
         nodeCache[cacheKey] = nodes
         print("💾 [FinderLogic] Cached \(nodes.count) nodes for: \(node.name)")
         
@@ -85,12 +91,10 @@ class FinderLogic: FunctionProvider {
     func provideFunctions() -> [FunctionNode] {
         print("🔍 [FinderLogic] provideFunctions() called")
         
-        // Create both sections
         let finderWindowsNode = createFinderWindowsNode()
-        let downloadsFilesNode = createDownloadsFilesNode()
-        let gitFolderNode = createGitFolderNode()
+        let favoriteFoldersNode = createFavoriteFoldersNode()  // New!
 
-        return [finderWindowsNode, downloadsFilesNode, gitFolderNode]
+        return [finderWindowsNode, favoriteFoldersNode]  // Clean Ring 0!
     }
     
     func clearCache() {
@@ -107,6 +111,60 @@ class FinderLogic: FunctionProvider {
     func refresh() {
         print("🔄 [FinderLogic] refresh() called")
         clearCache()  // Clear cache on explicit refresh
+    }
+    
+    
+    private func createFavoriteFoldersNode() -> FunctionNode {
+        // Create child nodes for each favorite folder
+        let favoriteChildren = [
+            createFavoriteFolderEntry(
+                name: "Downloads",
+                path: FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!,
+                icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage()
+            ),
+            createFavoriteFolderEntry(
+                name: "Git",
+                path: URL(fileURLWithPath: "/Users/timothy/Files/Git/"),
+                icon: NSImage(systemSymbolName: "chevron.left.forwardslash.chevron.right", accessibilityDescription: nil) ?? NSImage()
+            )
+            // Easy to add more favorites here:
+            // createFavoriteFolderEntry(name: "Documents", path: ..., icon: ...),
+            // createFavoriteFolderEntry(name: "Desktop", path: ..., icon: ...),
+        ]
+        
+        return FunctionNode(
+            id: "favorite-folders-section",
+            name: "Folders",
+            icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
+            children: favoriteChildren,
+            preferredLayout: .partialSlice,
+            
+            onLeftClick: .expand,
+            onRightClick: .expand,
+            onMiddleClick: .expand,
+            onBoundaryCross: .expand
+        )
+    }
+
+    // Helper to create individual favorite folder entries
+    private func createFavoriteFolderEntry(name: String, path: URL, icon: NSImage) -> FunctionNode {
+        return FunctionNode(
+            id: "favorite-\(path.path)",
+            name: name,
+            icon: icon,
+            children: nil,
+            preferredLayout: .fullCircle,
+            
+            metadata: ["folderURL": path.path],
+            providerId: self.providerId,
+            
+            onLeftClick: .navigateInto,
+            onRightClick: .expand,
+            onMiddleClick: .executeKeepOpen {
+                NSWorkspace.shared.open(path)
+            },
+            onBoundaryCross: .navigateInto
+        )
     }
     
     // MARK: - Finder Windows Section
@@ -296,6 +354,8 @@ class FinderLogic: FunctionProvider {
 
     // Get folder contents (files and subfolders)
     private func getFolderContents(at url: URL) -> [FunctionNode] {
+        print("📂 [getFolderContents] START: \(url.path)")
+        
         do {
             let contents = try FileManager.default.contentsOfDirectory(
                 at: url,
@@ -303,20 +363,25 @@ class FinderLogic: FunctionProvider {
                 options: [.skipsHiddenFiles]
             )
             
-            // Sort based on configuration
-            let sortedContents = sortContents(contents, by: sortOrder)
+            print("📂 [getFolderContents] Found \(contents.count) items")
             
-            // Limit to max items
+            let sortedContents = sortContents(contents, by: sortOrder)
             let limitedContents = Array(sortedContents.prefix(maxItemsPerFolder))
             
-            print("📂 Showing \(limitedContents.count) of \(contents.count) items (sorted by \(sortOrder))")
+            print("📂 [getFolderContents] Processing \(limitedContents.count) items")
             
-            // Recursively create nodes for contents
-            return limitedContents.map { contentURL in
-                createDraggableFileNode(for: contentURL)
+            var nodes: [FunctionNode] = []
+            for (index, contentURL) in limitedContents.enumerated() {
+                print("   [\(index+1)/\(limitedContents.count)] Processing: \(contentURL.lastPathComponent)")
+                let node = createDraggableFileNode(for: contentURL)
+                nodes.append(node)
             }
+            
+            print("✅ [getFolderContents] END: Created \(nodes.count) nodes")
+            return nodes
+            
         } catch {
-            print("❌ Failed to read folder contents: \(error)")
+            print("❌ [getFolderContents] Failed: \(error)")
             return []
         }
     }

@@ -55,7 +55,7 @@ struct RingView: View {
     }
     
     private var selectionColor: Color {
-        return shouldDimOpacity ? .gray.opacity(0.25) : .blue.opacity(0.8)
+        return shouldDimOpacity ? .blue.opacity(0.7) : .blue.opacity(0.8)
     }
     
     var body: some View {

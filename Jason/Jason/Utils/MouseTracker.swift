@@ -60,15 +60,29 @@ class MouseTracker {
         let current = NSEvent.mouseLocation
         let angle = self.calculateAngle(from: start, to: current)
         
+        print("🔍 [Track] Distance: \(String(format: "%.1f", distance)), Angle: \(String(format: "%.1f", angle))°")
+        
         // Determine which ring the mouse is in based on distance
         let ringLevel = determineRingLevel(distance: distance)
+        
+        print("🔍 [Track] RingLevel: \(ringLevel?.description ?? "nil"), Active: \(functionManager.activeRingLevel)")
         
         // Handle boundary crossing between rings
         handleBoundaryCrossing(distance: distance, currentRingLevel: ringLevel, angle: angle)
         
         // Only track hover if we're inside a ring
-        guard let ringLevel = ringLevel else { return }
+        guard let ringLevel = ringLevel else {
+            print("⚠️ [Track] No ring level - skipping hover")
+            return
+        }
         
+        
+        //Don't update hover for rings that aren't the active ring
+        guard ringLevel == functionManager.activeRingLevel else {
+            print("⏭️ Skipping hover update for ring \(ringLevel) (active ring is \(functionManager.activeRingLevel))")
+            return
+        }
+
         // Get nodes for the current ring level
         guard ringLevel < functionManager.rings.count else { return }
         let nodes = functionManager.rings[ringLevel].nodes
@@ -274,12 +288,20 @@ class MouseTracker {
             return index
         } else {
             // Partial slice: items centered in their slices
-            var normalizedAngle = angle
-            if normalizedAngle < 0 { normalizedAngle += 360 }
             
-            var relativeAngle = normalizedAngle - sliceStart
+            // Normalize angle to 0-360
+            var normalizedAngle = angle
+            while normalizedAngle < 0 { normalizedAngle += 360 }
+            while normalizedAngle >= 360 { normalizedAngle -= 360 }
+            
+            // Normalize sliceStart to 0-360 (CRITICAL FIX!)
+            var normalizedStart = sliceStart
+            while normalizedStart >= 360 { normalizedStart -= 360 }
+            while normalizedStart < 0 { normalizedStart += 360 }
+            
+            // Calculate relative angle from normalized start
+            var relativeAngle = normalizedAngle - normalizedStart
             if relativeAngle < 0 { relativeAngle += 360 }
-            if relativeAngle >= 360 { relativeAngle -= 360 }
             
             let index = Int(relativeAngle / itemAngle)
             
@@ -291,27 +313,19 @@ class MouseTracker {
         return -1
     }
     
-    private func isAngleInSlice(_ angle: CGFloat, sliceConfig: PieSliceConfig) -> Bool {
-        if sliceConfig.isFullCircle {
-            return true  // Full circle always contains any angle
-        }
+    private func isAngleInSlice(_ angle: Double, sliceConfig: PieSliceConfig) -> Bool {
+        // Normalize all angles to 0-360 range
+        let normalizedAngle = angle.truncatingRemainder(dividingBy: 360)
+        let normalizedStart = sliceConfig.startAngle.truncatingRemainder(dividingBy: 360)
+        let normalizedEnd = sliceConfig.endAngle.truncatingRemainder(dividingBy: 360)
         
-        let sliceStart = CGFloat(sliceConfig.startAngle)
-        let sliceEnd = CGFloat(sliceConfig.endAngle)
-        let totalAngle = CGFloat(sliceConfig.totalAngle)
-        
-        // Normalize angle to 0-360
-        var normalizedAngle = angle
-        while normalizedAngle < 0 { normalizedAngle += 360 }
-        while normalizedAngle >= 360 { normalizedAngle -= 360 }
-        
-        // Handle wrap-around case (e.g., slice from 350° to 10°)
-        if sliceEnd < sliceStart {
-            // Slice wraps around 0°
-            return normalizedAngle >= sliceStart || normalizedAngle <= sliceEnd
+        // Handle wrapping (when slice crosses 0°)
+        if normalizedStart <= normalizedEnd {
+            // Normal case: start < end (e.g., 90° to 180°)
+            return normalizedAngle >= normalizedStart && normalizedAngle <= normalizedEnd
         } else {
-            // Normal case
-            return normalizedAngle >= sliceStart && normalizedAngle <= sliceEnd
+            // Wrapped case: crosses 0° (e.g., 350° to 10°)
+            return normalizedAngle >= normalizedStart || normalizedAngle <= normalizedEnd
         }
     }
 }

@@ -250,7 +250,8 @@ struct PieSliceConfig {
     }
     
     var isFullCircle: Bool {
-        return totalAngle >= 360.0
+        // Use tolerance to handle floating point precision
+        return totalAngle >= 359.9  // Changed from 360.0
     }
     
     // Factory method for full circle

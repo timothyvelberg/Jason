@@ -13,31 +13,37 @@ class OverlayWindow: NSWindow {
     // Callback for when window loses focus
     var onLostFocus: (() -> Void)?
     
+    // Add callback property for scroll events
+    var onScrollBack: (() -> Void)?
+    
+    // Store mouse location for positioning UI
+    var uiCenterLocation: NSPoint = .zero
+    
     init() {
+        // Get the main screen size for fullscreen overlay
+        let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 800, height: 800),
-            styleMask: [.borderless],
+            contentRect: screenFrame,  // Changed from fixed 800x800
+            styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         
-        // Make window behavior suitable for overlay
-        self.level = .floating
+        // Make window behavior suitable for fullscreen overlay
+        self.level = .screenSaver  // High level so it's always on top
         self.isOpaque = false
         self.backgroundColor = NSColor.clear
-        self.hasShadow = true
+        self.hasShadow = false  // No shadow for fullscreen
         self.isMovable = false
         self.canHide = false
-        self.collectionBehavior = [.canJoinAllSpaces, .stationary]
+        self.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         
         // CRITICAL: Accept mouse events (both movement and clicks)
         self.acceptsMouseMovedEvents = true
         self.ignoresMouseEvents = false
         
-        print("🪟 [OverlayWindow] ignoresMouseEvents set to: \(self.ignoresMouseEvents)")
-        
-        // Center the window on screen
-        self.center()
+        print("🪟 [OverlayWindow] Created fullscreen overlay: \(screenFrame.size)")
         
         // Initially hidden
         self.orderOut(nil)
@@ -46,12 +52,15 @@ class OverlayWindow: NSWindow {
     }
     
     func showOverlay(at mouseLocation: NSPoint) {
-        print("Showing overlay window at mouse location: \(mouseLocation)")
+        print("Showing fullscreen overlay with UI centered at: \(mouseLocation)")
         
-        // Position window centered at mouse location
-        let newX = mouseLocation.x - (self.frame.width / 2)
-        let newY = mouseLocation.y - (self.frame.height / 2)
-        self.setFrameOrigin(NSPoint(x: newX, y: newY))
+        // Store the location
+        self.uiCenterLocation = mouseLocation
+        
+        // Position window to cover entire screen
+        if let screenFrame = NSScreen.main?.frame {
+            self.setFrame(screenFrame, display: true)
+        }
         
         // Bring to front and show
         self.makeKeyAndOrderFront(nil)
@@ -60,7 +69,7 @@ class OverlayWindow: NSWindow {
         NSApp.activate(ignoringOtherApps: true)
         self.makeKey()
         
-        print("🪟 Window is now key: \(self.isKeyWindow), ignoresMouseEvents: \(self.ignoresMouseEvents)")
+        print("🪟 Window is now fullscreen, key: \(self.isKeyWindow), ignoresMouseEvents: \(self.ignoresMouseEvents)")
     }
     
     func hideOverlay() {
@@ -75,6 +84,27 @@ class OverlayWindow: NSWindow {
     
     override var canBecomeMain: Bool {
         return true
+    }
+    
+    // Handle scroll events
+    override func scrollWheel(with event: NSEvent) {
+        print("🎡 [OverlayWindow] Scroll detected: deltaY=\(event.deltaY), deltaX=\(event.deltaX)")
+        
+        // Threshold to avoid accidental triggers from tiny movements
+        let scrollThreshold: CGFloat = 0.1
+        
+        // Scroll down (positive deltaY) = go back/collapse
+        if event.deltaY > scrollThreshold {
+            print("🔙 Scroll DOWN - collapsing ring")
+            onScrollBack?()
+        }
+        // Scroll up (negative deltaY) = could be used for something else
+        else if event.deltaY < -scrollThreshold {
+            print("🔼 Scroll UP - (not implemented)")
+            // Could be used to re-expand collapsed rings or other features
+        }
+        
+        // Don't call super to prevent any default scroll behavior
     }
     
     // NEW: Detect when window loses focus

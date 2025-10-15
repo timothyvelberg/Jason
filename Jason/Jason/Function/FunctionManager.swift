@@ -33,6 +33,7 @@ class FunctionManager: ObservableObject {
         didSet {
             // Invalidate cache when rings change
             lastRingsHash = 0
+            cachedConfigurations = []
         }
     }
     @Published var activeRingLevel: Int = 0
@@ -80,19 +81,22 @@ class FunctionManager: ObservableObject {
         let centerHoleRadius: CGFloat = 50
         let defaultRingThickness: CGFloat = 80
         let defaultIconSize: CGFloat = 32
-        let collapsedRingThickness: CGFloat = 16
-        let collapsedIconSize: CGFloat = 8
+        let collapsedRingThickness: CGFloat = 32
+        let collapsedIconSize: CGFloat = 16
         let ringMargin: CGFloat = 2
         var currentRadius = centerHoleRadius
         
+        print("🔧 [calculateRingConfigurations] START - Processing \(rings.count) rings")
+        
         for (index, ringState) in rings.enumerated() {
+            print("🔧 [Ring \(index)] Processing ring with \(ringState.nodes.count) nodes, collapsed: \(ringState.isCollapsed)")
             let sliceConfig: PieSliceConfig
             
             // Determine thickness and icon size
             let ringThickness: CGFloat
             let iconSize: CGFloat
             
-            // NEW: Check if ring is collapsed
+            // Check if ring is collapsed
             if ringState.isCollapsed {
                 ringThickness = collapsedRingThickness
                 iconSize = collapsedIconSize
@@ -104,6 +108,7 @@ class FunctionManager: ObservableObject {
                     sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
                 } else {
                     guard let parentInfo = getParentInfo(for: index, configs: configs) else {
+                        print("❌ [Ring \(index)] No parent info - using defaults and CONTINUING")
                         sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
                         configs.append(RingConfiguration(
                             level: index,

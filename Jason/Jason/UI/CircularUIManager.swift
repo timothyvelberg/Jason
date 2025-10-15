@@ -28,6 +28,11 @@ class CircularUIManager: ObservableObject {
     
     init() {
         print("CircularUIManager initialized")
+        
+        // Connect scroll handler
+        overlayWindow?.onScrollBack = { [weak self] in
+            self?.handleScrollBack()
+        }
     }
     
     func setup(with appSwitcher: AppSwitcherManager) {
@@ -85,6 +90,19 @@ class CircularUIManager: ObservableObject {
         }
         
         print("✅ GestureManager ready")
+    }
+    
+    private func handleScrollBack() {
+        guard let functionManager = functionManager else { return }
+        
+        let currentLevel = functionManager.activeRingLevel
+        
+        if currentLevel > 0 {
+            print("🔙 [CircularUIManager] Scrolling back from ring \(currentLevel) to \(currentLevel - 1)")
+            functionManager.collapseToRing(level: currentLevel - 1)
+        } else {
+            print("⚠️ [CircularUIManager] Already at Ring 0 - cannot scroll back further")
+        }
     }
     
     // MARK: - Gesture Event Handler
@@ -449,6 +467,11 @@ class CircularUIManager: ObservableObject {
         guard let functionManager = functionManager else { return }
         
         overlayWindow = OverlayWindow()
+        
+        // Connect the callback for scroll events
+        overlayWindow?.onScrollBack = { [weak self] in
+            self?.handleScrollBack()
+        }
         
         // Set up focus loss callback
         overlayWindow?.onLostFocus = { [weak self] in
