@@ -41,47 +41,68 @@ class FinderLogic: FunctionProvider {
     private var folderContentsCache: [String: [FunctionNode]] = [:]
     private let cacheTimeout: TimeInterval = 30.0  // 30 seconds
     private var cacheTimestamps: [String: Date] = [:]
-    
-    // MARK: - Dynamic Loading
-    
-    // MARK: - Dynamic Loading
 
-    func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
-        print("📂 [FinderLogic] loadChildren called for: \(node.name)")
+
+    // MARK: - Serialization Helpers (ADD THESE TO FinderLogic CLASS)
+
+    /// Serialize nodes to JSON for database storage
+    private func serializeNodes(_ nodes: [FunctionNode]) -> String {
+        var items: [[String: Any]] = []
         
-        guard let metadata = node.metadata,
-              let urlString = metadata["folderURL"] as? String else {
-            print("❌ No folderURL in metadata")
-            return []
-        }
-        
-        let folderURL = URL(fileURLWithPath: urlString)
-        let cacheKey = folderURL.path
-        
-        if let cachedNodes = nodeCache[cacheKey] {
-            print("⚡ [FinderLogic] Using cached nodes for: \(node.name) (\(cachedNodes.count) items)")
-            return cachedNodes
-        }
-        
-        print("🔄 [START] Loading contents of: \(folderURL.path)")
-        let startTime = Date()
-        
-        let nodes: [FunctionNode] = await Task.detached(priority: .userInitiated) { [weak self] () -> [FunctionNode] in
-            guard let self = self else {
-                print("❌ [FinderLogic] Self deallocated during load")
-                return []
+        for node in nodes {
+            var item: [String: Any] = [
+                "name": node.name,
+                "id": node.id
+            ]
+            
+            // Extract file path from metadata
+            if let metadata = node.metadata,
+               let folderURL = metadata["folderURL"] as? String {
+                item["path"] = folderURL
+                item["isDirectory"] = true
+            } else if let previewURL = node.previewURL {
+                item["path"] = previewURL.path
+                item["isDirectory"] = false
             }
-            print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
-            let result = self.getFolderContents(at: folderURL)
-            print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items")
-            return result
-        }.value
+            
+            items.append(item)
+        }
         
-        let elapsed = Date().timeIntervalSince(startTime)
-        print("✅ [END] Loaded \(nodes.count) nodes in \(String(format: "%.2f", elapsed))s")
+        if let jsonData = try? JSONSerialization.data(withJSONObject: items),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            return jsonString
+        }
         
-        nodeCache[cacheKey] = nodes
-        print("💾 [FinderLogic] Cached \(nodes.count) nodes for: \(node.name)")
+        return "[]"
+    }
+
+    /// Deserialize nodes from JSON
+    private func deserializeNodes(from json: String, folderURL: URL) -> [FunctionNode]? {
+        guard let jsonData = json.data(using: .utf8),
+              let items = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] else {
+            print("❌ Failed to deserialize JSON")
+            return nil
+        }
+        
+        var nodes: [FunctionNode] = []
+        
+        for item in items {
+            guard let name = item["name"] as? String,
+                  let path = item["path"] as? String,
+                  let isDirectory = item["isDirectory"] as? Bool else {
+                continue
+            }
+            
+            let url = URL(fileURLWithPath: path)
+            
+            if isDirectory {
+                // Recreate folder node
+                nodes.append(createFolderNode(for: url))
+            } else {
+                // Recreate file node
+                nodes.append(createFileNode(for: url))
+            }
+        }
         
         return nodes
     }
@@ -110,9 +131,70 @@ class FinderLogic: FunctionProvider {
     
     func refresh() {
         print("🔄 [FinderLogic] refresh() called")
-        clearCache()  // Clear cache on explicit refresh
+        nodeCache.removeAll()
+        // NEW: Also clear database cache on explicit refresh
+        DatabaseManager.shared.clearAllFolderCache()
     }
     
+    // MARK: - Dynamic Loading (WITH DATABASE INTEGRATION)
+
+    func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
+        print("📂 [FinderLogic] loadChildren called for: \(node.name)")
+        
+        guard let metadata = node.metadata,
+              let urlString = metadata["folderURL"] as? String else {
+            print("❌ No folderURL in metadata")
+            return []
+        }
+        
+        let folderURL = URL(fileURLWithPath: urlString)
+        let cacheKey = folderURL.path
+        
+        // 1. CHECK DATABASE FIRST
+        if !DatabaseManager.shared.isCacheStale(for: cacheKey) {
+            if let cached = DatabaseManager.shared.getFolderCache(for: cacheKey) {
+                print("⚡ [FinderLogic] Using DATABASE cache for: \(node.name) (\(cached.itemCount) items)")
+                
+                // Deserialize from JSON
+                if let nodes = deserializeNodes(from: cached.itemsJSON, folderURL: folderURL) {
+                    return nodes
+                }
+            }
+        }
+        
+        // 2. CACHE MISS OR STALE - LOAD FROM DISK
+        print("🔄 [START] Loading from disk: \(folderURL.path)")
+        let startTime = Date()
+        
+        let nodes: [FunctionNode] = await Task.detached(priority: .userInitiated) { [weak self] () -> [FunctionNode] in
+            guard let self = self else {
+                print("❌ [FinderLogic] Self deallocated during load")
+                return []
+            }
+            print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
+            let result = self.getFolderContents(at: folderURL)
+            print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items")
+            return result
+        }.value
+        
+        let elapsed = Date().timeIntervalSince(startTime)
+        print("✅ [END] Loaded \(nodes.count) nodes in \(String(format: "%.2f", elapsed))s")
+        
+        // 3. SAVE TO DATABASE
+        let itemsJSON = serializeNodes(nodes)
+        let cacheEntry = FolderCacheEntry(
+            path: cacheKey,
+            lastScanned: Int(Date().timeIntervalSince1970),
+            itemsJSON: itemsJSON,
+            itemCount: nodes.count
+        )
+        DatabaseManager.shared.saveFolderCache(cacheEntry)
+        
+        // 4. RECORD USAGE
+        DatabaseManager.shared.recordAccess(path: cacheKey, type: "folder")
+        
+        return nodes
+    }
     
     private func createFavoriteFoldersNode() -> FunctionNode {
         // Create child nodes for each favorite folder
@@ -126,6 +208,11 @@ class FinderLogic: FunctionProvider {
                 name: "Git",
                 path: URL(fileURLWithPath: "/Users/timothy/Files/Git/"),
                 icon: NSImage(systemSymbolName: "chevron.left.forwardslash.chevron.right", accessibilityDescription: nil) ?? NSImage()
+            ),
+            createFavoriteFolderEntry(
+                name: "Screenshots",
+                path: URL(fileURLWithPath: "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots/"),
+                icon: NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: nil) ?? NSImage()
             )
             // Easy to add more favorites here:
             // createFavoriteFolderEntry(name: "Documents", path: ..., icon: ...),

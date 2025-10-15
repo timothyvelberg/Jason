@@ -3,11 +3,9 @@
 //  Jason
 //
 //  Created by Timothy Velberg on 15/10/2025.
-//  Database manager for persistent caching and user data
-//
 
 import Foundation
-import GRDB
+import SQLite3
 import AppKit
 
 class DatabaseManager {
@@ -18,8 +16,9 @@ class DatabaseManager {
     
     // MARK: - Properties
     
-    private var dbQueue: DatabaseQueue?
+    private var db: OpaquePointer?
     private let databaseFileName = "Jason.db"
+    private let queue = DispatchQueue(label: "com.jason.database", qos: .userInitiated)
     
     // MARK: - Initialization
     
@@ -28,12 +27,24 @@ class DatabaseManager {
             let dbPath = try getDatabasePath()
             print("📦 [DatabaseManager] Database path: \(dbPath)")
             
-            dbQueue = try DatabaseQueue(path: dbPath)
-            try setupDatabase()
-            
-            print("✅ [DatabaseManager] Database initialized successfully")
+            // Open database
+            if sqlite3_open(dbPath, &db) == SQLITE_OK {
+                print("✅ [DatabaseManager] Database opened successfully")
+                try setupDatabase()
+            } else {
+                print("❌ [DatabaseManager] Failed to open database")
+                if let error = sqlite3_errmsg(db) {
+                    print("   Error: \(String(cString: error))")
+                }
+            }
         } catch {
             print("❌ [DatabaseManager] Failed to initialize database: \(error)")
+        }
+    }
+    
+    deinit {
+        if db != nil {
+            sqlite3_close(db)
         }
     }
     
@@ -62,74 +73,133 @@ class DatabaseManager {
     // MARK: - Schema Setup
     
     private func setupDatabase() throws {
-        guard let dbQueue = dbQueue else {
+        guard let db = db else {
             throw DatabaseError.notInitialized
         }
         
-        try dbQueue.write { db in
-            // Create folder_cache table
-            try db.create(table: "folder_cache", ifNotExists: true) { table in
-                table.column("path", .text).primaryKey()
-                table.column("last_scanned", .integer).notNull()
-                table.column("items_json", .text).notNull()
-                table.column("item_count", .integer).notNull()
+        // Create folder_cache table
+        let folderCacheSQL = """
+        CREATE TABLE IF NOT EXISTS folder_cache (
+            path TEXT PRIMARY KEY,
+            last_scanned INTEGER NOT NULL,
+            items_json TEXT NOT NULL,
+            item_count INTEGER NOT NULL
+        );
+        """
+        
+        // Create usage_history table
+        let usageHistorySQL = """
+        CREATE TABLE IF NOT EXISTS usage_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_path TEXT NOT NULL,
+            item_type TEXT NOT NULL,
+            access_count INTEGER NOT NULL DEFAULT 1,
+            last_accessed INTEGER NOT NULL
+        );
+        """
+        
+        // Create favorites table
+        let favoritesSQL = """
+        CREATE TABLE IF NOT EXISTS favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            path TEXT NOT NULL UNIQUE,
+            icon_data BLOB,
+            sort_order INTEGER NOT NULL
+        );
+        """
+        
+        // Create preferences table
+        let preferencesSQL = """
+        CREATE TABLE IF NOT EXISTS preferences (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        """
+        
+        // Execute all schema creation
+        let tables = [folderCacheSQL, usageHistorySQL, favoritesSQL, preferencesSQL]
+        
+        for sql in tables {
+            if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to create table: \(String(cString: error))")
+                }
+                throw DatabaseError.schemaCreationFailed
             }
-            
-            // Create usage_history table (for MRU tracking)
-            try db.create(table: "usage_history", ifNotExists: true) { table in
-                table.autoIncrementedPrimaryKey("id")
-                table.column("item_path", .text).notNull()
-                table.column("item_type", .text).notNull() // "folder", "file", "app"
-                table.column("access_count", .integer).notNull().defaults(to: 1)
-                table.column("last_accessed", .integer).notNull()
-            }
-            
-            // Create favorites table
-            try db.create(table: "favorites", ifNotExists: true) { table in
-                table.autoIncrementedPrimaryKey("id")
-                table.column("name", .text).notNull()
-                table.column("path", .text).notNull().unique()
-                table.column("icon_data", .blob)
-                table.column("sort_order", .integer).notNull()
-            }
-            
-            // Create preferences table
-            try db.create(table: "preferences", ifNotExists: true) { table in
-                table.column("key", .text).primaryKey()
-                table.column("value", .text).notNull()
-            }
-            
-            print("✅ [DatabaseManager] Database schema created/verified")
         }
+        
+        print("✅ [DatabaseManager] Database schema created/verified")
     }
     
     // MARK: - Folder Cache Methods
     
     /// Get cached folder contents
     func getFolderCache(for path: String) -> FolderCacheEntry? {
-        guard let dbQueue = dbQueue else { return nil }
+        guard let db = db else { return nil }
         
-        do {
-            return try dbQueue.read { db in
-                try FolderCacheEntry.fetchOne(db, key: path)
+        var result: FolderCacheEntry?
+        
+        queue.sync {
+            let sql = "SELECT path, last_scanned, items_json, item_count FROM folder_cache WHERE path = ?;"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_ROW {
+                    let path = String(cString: sqlite3_column_text(statement, 0))
+                    let lastScanned = Int(sqlite3_column_int64(statement, 1))
+                    let itemsJSON = String(cString: sqlite3_column_text(statement, 2))
+                    let itemCount = Int(sqlite3_column_int(statement, 3))
+                    
+                    result = FolderCacheEntry(
+                        path: path,
+                        lastScanned: lastScanned,
+                        itemsJSON: itemsJSON,
+                        itemCount: itemCount
+                    )
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare statement: \(String(cString: error))")
+                }
             }
-        } catch {
-            print("❌ [DatabaseManager] Failed to get folder cache for '\(path)': \(error)")
-            return nil
+            
+            sqlite3_finalize(statement)
         }
+        
+        return result
     }
     
     /// Save folder contents to cache
     func saveFolderCache(_ entry: FolderCacheEntry) {
-        guard let dbQueue = dbQueue else { return }
+        guard let db = db else { return }
         
-        do {
-            try dbQueue.write { db in
-                try entry.save(db)
+        queue.async {
+            let sql = """
+            INSERT OR REPLACE INTO folder_cache (path, last_scanned, items_json, item_count)
+            VALUES (?, ?, ?, ?);
+            """
+            
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (entry.path as NSString).utf8String, -1, nil)
+                sqlite3_bind_int64(statement, 2, Int64(entry.lastScanned))
+                sqlite3_bind_text(statement, 3, (entry.itemsJSON as NSString).utf8String, -1, nil)
+                sqlite3_bind_int(statement, 4, Int32(entry.itemCount))
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("💾 [DatabaseManager] Saved folder cache for: \(entry.path) (\(entry.itemCount) items)")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to save: \(String(cString: error))")
+                    }
+                }
             }
-            print("💾 [DatabaseManager] Saved folder cache for: \(entry.path) (\(entry.itemCount) items)")
-        } catch {
-            print("❌ [DatabaseManager] Failed to save folder cache: \(error)")
+            
+            sqlite3_finalize(statement)
         }
     }
     
@@ -147,150 +217,255 @@ class DatabaseManager {
     
     /// Clear cache for specific folder
     func invalidateFolderCache(for path: String) {
-        guard let dbQueue = dbQueue else { return }
+        guard let db = db else { return }
         
-        do {
-            try dbQueue.write { db in
-                try db.execute(sql: "DELETE FROM folder_cache WHERE path = ?", arguments: [path])
+        queue.async {
+            let sql = "DELETE FROM folder_cache WHERE path = ?;"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("🗑️ [DatabaseManager] Invalidated cache for: \(path)")
+                }
             }
-            print("🗑️ [DatabaseManager] Invalidated cache for: \(path)")
-        } catch {
-            print("❌ [DatabaseManager] Failed to invalidate cache: \(error)")
+            
+            sqlite3_finalize(statement)
         }
     }
     
     /// Clear all folder cache
     func clearAllFolderCache() {
-        guard let dbQueue = dbQueue else { return }
+        guard let db = db else { return }
         
-        do {
-            try dbQueue.write { db in
-                try db.execute(sql: "DELETE FROM folder_cache")
+        queue.async {
+            let sql = "DELETE FROM folder_cache;"
+            
+            if sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK {
+                print("🗑️ [DatabaseManager] Cleared all folder cache")
             }
-            print("🗑️ [DatabaseManager] Cleared all folder cache")
-        } catch {
-            print("❌ [DatabaseManager] Failed to clear cache: \(error)")
         }
     }
     
     /// Get cache statistics
     func getCacheStats() -> (totalFolders: Int, totalItems: Int)? {
-        guard let dbQueue = dbQueue else { return nil }
+        guard let db = db else { return nil }
         
-        do {
-            return try dbQueue.read { db in
-                let folderCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM folder_cache") ?? 0
-                let itemCount = try Int.fetchOne(db, sql: "SELECT SUM(item_count) FROM folder_cache") ?? 0
-                return (folderCount, itemCount)
+        var stats: (Int, Int)?
+        
+        queue.sync {
+            var folderCount = 0
+            var itemCount = 0
+            
+            // Get folder count
+            var statement1: OpaquePointer?
+            if sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM folder_cache;", -1, &statement1, nil) == SQLITE_OK {
+                if sqlite3_step(statement1) == SQLITE_ROW {
+                    folderCount = Int(sqlite3_column_int(statement1, 0))
+                }
             }
-        } catch {
-            print("❌ [DatabaseManager] Failed to get cache stats: \(error)")
-            return nil
+            sqlite3_finalize(statement1)
+            
+            // Get total item count
+            var statement2: OpaquePointer?
+            if sqlite3_prepare_v2(db, "SELECT SUM(item_count) FROM folder_cache;", -1, &statement2, nil) == SQLITE_OK {
+                if sqlite3_step(statement2) == SQLITE_ROW {
+                    itemCount = Int(sqlite3_column_int(statement2, 0))
+                }
+            }
+            sqlite3_finalize(statement2)
+            
+            stats = (folderCount, itemCount)
         }
+        
+        return stats
     }
     
     // MARK: - Usage History Methods
     
     /// Record folder/file/app access
     func recordAccess(path: String, type: String) {
-        guard let dbQueue = dbQueue else { return }
+        guard let db = db else { return }
         
         let now = Int(Date().timeIntervalSince1970)
         
-        do {
-            try dbQueue.write { db in
-                // Check if entry exists
-                if let existing = try UsageHistoryEntry.filter(Column("item_path") == path).fetchOne(db) {
-                    // Update existing entry
-                    var updated = existing
-                    updated.accessCount += 1
-                    updated.lastAccessed = now
-                    try updated.update(db)
-                } else {
-                    // Create new entry
-                    var newEntry = UsageHistoryEntry(
-                        id: nil,
-                        itemPath: path,
-                        itemType: type,
-                        accessCount: 1,
-                        lastAccessed: now
-                    )
-                    try newEntry.insert(db)
+        queue.async {
+            // Check if entry exists
+            let checkSQL = "SELECT id, access_count FROM usage_history WHERE item_path = ?;"
+            var checkStatement: OpaquePointer?
+            var existingId: Int?
+            var existingCount = 0
+            
+            if sqlite3_prepare_v2(db, checkSQL, -1, &checkStatement, nil) == SQLITE_OK {
+                sqlite3_bind_text(checkStatement, 1, (path as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(checkStatement) == SQLITE_ROW {
+                    existingId = Int(sqlite3_column_int(checkStatement, 0))
+                    existingCount = Int(sqlite3_column_int(checkStatement, 1))
                 }
             }
-        } catch {
-            print("❌ [DatabaseManager] Failed to record access: \(error)")
+            sqlite3_finalize(checkStatement)
+            
+            if let id = existingId {
+                // Update existing
+                let updateSQL = "UPDATE usage_history SET access_count = ?, last_accessed = ? WHERE id = ?;"
+                var updateStatement: OpaquePointer?
+                
+                if sqlite3_prepare_v2(db, updateSQL, -1, &updateStatement, nil) == SQLITE_OK {
+                    sqlite3_bind_int(updateStatement, 1, Int32(existingCount + 1))
+                    sqlite3_bind_int64(updateStatement, 2, Int64(now))
+                    sqlite3_bind_int(updateStatement, 3, Int32(id))
+                    sqlite3_step(updateStatement)
+                }
+                sqlite3_finalize(updateStatement)
+            } else {
+                // Insert new
+                let insertSQL = "INSERT INTO usage_history (item_path, item_type, access_count, last_accessed) VALUES (?, ?, 1, ?);"
+                var insertStatement: OpaquePointer?
+                
+                if sqlite3_prepare_v2(db, insertSQL, -1, &insertStatement, nil) == SQLITE_OK {
+                    sqlite3_bind_text(insertStatement, 1, (path as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(insertStatement, 2, (type as NSString).utf8String, -1, nil)
+                    sqlite3_bind_int64(insertStatement, 3, Int64(now))
+                    sqlite3_step(insertStatement)
+                }
+                sqlite3_finalize(insertStatement)
+            }
         }
     }
     
     /// Get most recently used items
     func getMRU(type: String? = nil, limit: Int = 10) -> [UsageHistoryEntry] {
-        guard let dbQueue = dbQueue else { return [] }
+        guard let db = db else { return [] }
         
-        do {
-            return try dbQueue.read { db in
-                var query = UsageHistoryEntry.order(Column("last_accessed").desc)
-                
-                if let type = type {
-                    query = query.filter(Column("item_type") == type)
-                }
-                
-                return try query.limit(limit).fetchAll(db)
+        var results: [UsageHistoryEntry] = []
+        
+        queue.sync {
+            var sql = "SELECT id, item_path, item_type, access_count, last_accessed FROM usage_history"
+            
+            if let type = type {
+                sql += " WHERE item_type = '\(type)'"
             }
-        } catch {
-            print("❌ [DatabaseManager] Failed to get MRU: \(error)")
-            return []
+            
+            sql += " ORDER BY last_accessed DESC LIMIT \(limit);"
+            
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                while sqlite3_step(statement) == SQLITE_ROW {
+                    let id = Int(sqlite3_column_int(statement, 0))
+                    let itemPath = String(cString: sqlite3_column_text(statement, 1))
+                    let itemType = String(cString: sqlite3_column_text(statement, 2))
+                    let accessCount = Int(sqlite3_column_int(statement, 3))
+                    let lastAccessed = Int(sqlite3_column_int64(statement, 4))
+                    
+                    results.append(UsageHistoryEntry(
+                        id: id,
+                        itemPath: itemPath,
+                        itemType: itemType,
+                        accessCount: accessCount,
+                        lastAccessed: lastAccessed
+                    ))
+                }
+            }
+            
+            sqlite3_finalize(statement)
         }
+        
+        return results
     }
     
     // MARK: - Favorites Methods
     
     /// Get all favorites
     func getFavorites() -> [FavoriteEntry] {
-        guard let dbQueue = dbQueue else { return [] }
+        guard let db = db else { return [] }
         
-        do {
-            return try dbQueue.read { db in
-                try FavoriteEntry.order(Column("sort_order")).fetchAll(db)
+        var results: [FavoriteEntry] = []
+        
+        queue.sync {
+            let sql = "SELECT id, name, path, icon_data, sort_order FROM favorites ORDER BY sort_order;"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                while sqlite3_step(statement) == SQLITE_ROW {
+                    let id = Int(sqlite3_column_int(statement, 0))
+                    let name = String(cString: sqlite3_column_text(statement, 1))
+                    let path = String(cString: sqlite3_column_text(statement, 2))
+                    
+                    var iconData: Data?
+                    if let blob = sqlite3_column_blob(statement, 3) {
+                        let size = sqlite3_column_bytes(statement, 3)
+                        iconData = Data(bytes: blob, count: Int(size))
+                    }
+                    
+                    let sortOrder = Int(sqlite3_column_int(statement, 4))
+                    
+                    results.append(FavoriteEntry(
+                        id: id,
+                        name: name,
+                        path: path,
+                        iconData: iconData,
+                        sortOrder: sortOrder
+                    ))
+                }
             }
-        } catch {
-            print("❌ [DatabaseManager] Failed to get favorites: \(error)")
-            return []
+            
+            sqlite3_finalize(statement)
         }
+        
+        return results
     }
     
     /// Add favorite
     func addFavorite(name: String, path: String, iconData: Data?, sortOrder: Int) {
-        guard let dbQueue = dbQueue else { return }
+        guard let db = db else { return }
         
-        do {
-            try dbQueue.write { db in
-                var favorite = FavoriteEntry(
-                    id: nil,
-                    name: name,
-                    path: path,
-                    iconData: iconData,
-                    sortOrder: sortOrder
-                )
-                try favorite.insert(db)
+        queue.async {
+            let sql = "INSERT INTO favorites (name, path, icon_data, sort_order) VALUES (?, ?, ?, ?);"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (name as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, nil)
+                
+                if let iconData = iconData {
+                    iconData.withUnsafeBytes { bytes in
+                        sqlite3_bind_blob(statement, 3, bytes.baseAddress, Int32(iconData.count), nil)
+                    }
+                } else {
+                    sqlite3_bind_null(statement, 3)
+                }
+                
+                sqlite3_bind_int(statement, 4, Int32(sortOrder))
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("⭐ [DatabaseManager] Added favorite: \(name)")
+                }
             }
-            print("⭐ [DatabaseManager] Added favorite: \(name)")
-        } catch {
-            print("❌ [DatabaseManager] Failed to add favorite: \(error)")
+            
+            sqlite3_finalize(statement)
         }
     }
     
     /// Remove favorite
     func removeFavorite(path: String) {
-        guard let dbQueue = dbQueue else { return }
+        guard let db = db else { return }
         
-        do {
-            try dbQueue.write { db in
-                try db.execute(sql: "DELETE FROM favorites WHERE path = ?", arguments: [path])
+        queue.async {
+            let sql = "DELETE FROM favorites WHERE path = ?;"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("🗑️ [DatabaseManager] Removed favorite: \(path)")
+                }
             }
-            print("🗑️ [DatabaseManager] Removed favorite: \(path)")
-        } catch {
-            print("❌ [DatabaseManager] Failed to remove favorite: \(error)")
+            
+            sqlite3_finalize(statement)
         }
     }
     
@@ -298,78 +473,70 @@ class DatabaseManager {
     
     /// Get preference value
     func getPreference(key: String) -> String? {
-        guard let dbQueue = dbQueue else { return nil }
+        guard let db = db else { return nil }
         
-        do {
-            return try dbQueue.read { db in
-                try String.fetchOne(db, sql: "SELECT value FROM preferences WHERE key = ?", arguments: [key])
+        var result: String?
+        
+        queue.sync {
+            let sql = "SELECT value FROM preferences WHERE key = ?;"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (key as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_ROW {
+                    result = String(cString: sqlite3_column_text(statement, 0))
+                }
             }
-        } catch {
-            print("❌ [DatabaseManager] Failed to get preference '\(key)': \(error)")
-            return nil
+            
+            sqlite3_finalize(statement)
         }
+        
+        return result
     }
     
     /// Set preference value
     func setPreference(key: String, value: String) {
-        guard let dbQueue = dbQueue else { return }
+        guard let db = db else { return }
         
-        do {
-            try dbQueue.write { db in
-                try db.execute(
-                    sql: "INSERT OR REPLACE INTO preferences (key, value) VALUES (?, ?)",
-                    arguments: [key, value]
-                )
+        queue.async {
+            let sql = "INSERT OR REPLACE INTO preferences (key, value) VALUES (?, ?);"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (key as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 2, (value as NSString).utf8String, -1, nil)
+                sqlite3_step(statement)
             }
-        } catch {
-            print("❌ [DatabaseManager] Failed to set preference '\(key)': \(error)")
+            
+            sqlite3_finalize(statement)
         }
     }
 }
 
 // MARK: - Models
 
-struct FolderCacheEntry: Codable {
+struct FolderCacheEntry {
     let path: String
-    let lastScanned: Int  // Unix timestamp
-    let itemsJSON: String  // JSON-encoded array of file info
+    let lastScanned: Int
+    let itemsJSON: String
     let itemCount: Int
 }
 
-extension FolderCacheEntry: FetchableRecord, PersistableRecord {
-    static let databaseTableName = "folder_cache"
-}
-
-struct UsageHistoryEntry: Codable {
-    var id: Int?
+struct UsageHistoryEntry {
+    let id: Int?
     let itemPath: String
     let itemType: String
     var accessCount: Int
     var lastAccessed: Int
 }
 
-extension UsageHistoryEntry: FetchableRecord, MutablePersistableRecord {
-    static let databaseTableName = "usage_history"
-    
-    mutating func didInsert(_ inserted: InsertionSuccess) {
-        id = inserted.rowID
-    }
-}
-
-struct FavoriteEntry: Codable {
-    var id: Int?
+struct FavoriteEntry {
+    let id: Int?
     let name: String
     let path: String
     let iconData: Data?
     let sortOrder: Int
-}
-
-extension FavoriteEntry: FetchableRecord, MutablePersistableRecord {
-    static let databaseTableName = "favorites"
-    
-    mutating func didInsert(_ inserted: InsertionSuccess) {
-        id = inserted.rowID
-    }
 }
 
 // MARK: - Errors
@@ -377,6 +544,7 @@ extension FavoriteEntry: FetchableRecord, MutablePersistableRecord {
 enum DatabaseError: Error {
     case notInitialized
     case pathNotFound
+    case schemaCreationFailed
     case saveFailed
     case fetchFailed
 }
