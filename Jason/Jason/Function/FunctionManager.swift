@@ -423,6 +423,11 @@ class FunctionManager: ObservableObject {
     func navigateIntoFolder(ringLevel: Int, index: Int) {
         print("📂 navigateIntoFolder called: ringLevel=\(ringLevel), index=\(index)")
         
+        if isLoadingFolder {
+            print("⏸️ Already loading a folder - ignoring navigation request")
+            return
+        }
+        
         guard rings.indices.contains(ringLevel) else {
             print("❌ Invalid ring level: \(ringLevel)")
             return
@@ -467,6 +472,14 @@ class FunctionManager: ObservableObject {
             
             guard !childrenToDisplay.isEmpty else {
                 print("Cannot navigate into empty folder: \(node.name)")
+                isLoadingFolder = false
+                return
+            }
+            
+            // 👇 ADD BOUNDS CHECK HERE (inside Task, after async work)
+            guard rings.indices.contains(ringLevel),
+                  rings[ringLevel].nodes.indices.contains(index) else {
+                print("❌ Ring or index out of bounds after async load - rings may have changed")
                 isLoadingFolder = false
                 return
             }
