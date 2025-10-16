@@ -301,9 +301,6 @@ class FinderLogic: FunctionProvider {
             children: windowNodes,
             preferredLayout: .partialSlice,
             
-            
-            childRingThickness: 48,
-            childIconSize: 24,
             slicePositioning: .center,
             
             onLeftClick: .expand,
@@ -353,9 +350,6 @@ class FinderLogic: FunctionProvider {
             itemAngleSize: 15,
             previewURL: url,
             showLabel: true,
-            
-            childRingThickness: 48,
-            childIconSize: 24,
             slicePositioning: .center,
             
             metadata: ["folderURL": url.path],
@@ -485,9 +479,6 @@ class FinderLogic: FunctionProvider {
             itemAngleSize: 15,
             previewURL: url,
             showLabel: true,
-            
-            childRingThickness: 48,
-            childIconSize: 24,
             slicePositioning: .center,
             
             
