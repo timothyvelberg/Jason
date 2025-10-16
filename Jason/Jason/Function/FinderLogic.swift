@@ -300,6 +300,12 @@ class FinderLogic: FunctionProvider {
             icon: providerIcon,
             children: windowNodes,
             preferredLayout: .partialSlice,
+            
+            
+            childRingThickness: 48,
+            childIconSize: 24,
+            slicePositioning: .center,
+            
             onLeftClick: .expand,
             onRightClick: .execute { [weak self] in
                 self?.openNewFinderWindow()
@@ -347,11 +353,13 @@ class FinderLogic: FunctionProvider {
             itemAngleSize: 15,
             previewURL: url,
             showLabel: true,
+            
+            childRingThickness: 48,
+            childIconSize: 24,
+            slicePositioning: .center,
+            
             metadata: ["folderURL": url.path],
             providerId: self.providerId,
-            
-            
-            
             onLeftClick: .navigateInto,
             onRightClick: .expand,
             onMiddleClick: .executeKeepOpen {
@@ -472,13 +480,15 @@ class FinderLogic: FunctionProvider {
                 StandardContextActions.copyFile(url),
                 StandardContextActions.showInFinder(url)
             ],
-            
+
             preferredLayout: .partialSlice,
             itemAngleSize: 15,
             previewURL: url,
             showLabel: true,
-//            childRingThickness: 48,
-//            childIconSize: 24,
+            
+            childRingThickness: 48,
+            childIconSize: 24,
+            slicePositioning: .center,
             
             
             // 🎯 LEFT CLICK = OPEN FILE (or drag if you move the mouse!)

@@ -367,10 +367,15 @@ class MouseTracker {
         return -1
     }
     private func isAngleInSlice(_ angle: Double, sliceConfig: PieSliceConfig) -> Bool {
-        // Normalize all angles to 0-360 range
-        let normalizedAngle = angle.truncatingRemainder(dividingBy: 360)
-        let normalizedStart = sliceConfig.startAngle.truncatingRemainder(dividingBy: 360)
-        let normalizedEnd = sliceConfig.endAngle.truncatingRemainder(dividingBy: 360)
+        // Normalize all angles to 0-360 range (handle negatives properly!)
+        var normalizedAngle = angle.truncatingRemainder(dividingBy: 360)
+        if normalizedAngle < 0 { normalizedAngle += 360 }
+        
+        var normalizedStart = sliceConfig.startAngle.truncatingRemainder(dividingBy: 360)
+        if normalizedStart < 0 { normalizedStart += 360 }
+        
+        var normalizedEnd = sliceConfig.endAngle.truncatingRemainder(dividingBy: 360)
+        if normalizedEnd < 0 { normalizedEnd += 360 }
         
         // Handle wrapping (when slice crosses 0°)
         if normalizedStart <= normalizedEnd {
