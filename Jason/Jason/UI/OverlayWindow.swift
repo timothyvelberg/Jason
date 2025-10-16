@@ -154,6 +154,20 @@ class OverlayWindow: NSWindow {
         // All other keys are silently consumed
     }
     
+    // Override rightMouseDown to ensure it reaches event monitors
+    override func rightMouseDown(with event: NSEvent) {
+        print("🖱️ [OverlayWindow] rightMouseDown detected at: \(event.locationInWindow)")
+        
+        // CRITICAL: Call super to allow the event to propagate to local monitors
+        super.rightMouseDown(with: event)
+        
+        // Also manually notify global monitors since NSHostingView might block it
+        // Convert to screen coordinates for our gesture manager
+        let screenLocation = NSEvent.mouseLocation
+        print("🖱️ [OverlayWindow] Right-click at screen location: \(screenLocation)")
+    }
+    
+    
     // Log mouse events for debugging
     override func mouseDown(with event: NSEvent) {
         print("🖱️ [OverlayWindow] mouseDown detected at: \(event.locationInWindow)")

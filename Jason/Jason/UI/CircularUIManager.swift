@@ -25,6 +25,8 @@ class CircularUIManager: ObservableObject {
     private var gestureManager: GestureManager?
     private var isHandlingShortcut: Bool = false  // Prevent double-handling
     private var wasShiftPressed: Bool = false
+    private var centerPoint: CGPoint = .zero
+
     
     init() {
         print("CircularUIManager initialized")
@@ -145,25 +147,13 @@ class CircularUIManager: ObservableObject {
     private func handleLeftClick(event: GestureManager.GestureEvent) {
         guard let functionManager = functionManager else { return }
         
-        let activeRingLevel = functionManager.activeRingLevel
-        guard activeRingLevel < functionManager.rings.count else {
-            print("⚠️ No active ring for left-click")
+        // Use position-based detection instead of hoveredIndex
+        guard let (ringLevel, index, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) else {
+            print("⚠️ Left-click not on any item")
             return
         }
         
-        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
-            print("⚠️ No item currently hovered for left-click")
-            return
-        }
-        
-        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
-            print("⚠️ Invalid hovered index for left-click")
-            return
-        }
-        
-        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
-        
-        print("🖱️ [Left Click] On item: '\(node.name)'")
+        print("🖱️ [Left Click] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
         switch node.onLeftClick {
         case .execute(let action):
@@ -172,10 +162,10 @@ class CircularUIManager: ObservableObject {
         case .executeKeepOpen(let action):
             action()
         case .expand:
-            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
-        case .navigateInto:  // NEW: Handle folder navigation
+            functionManager.expandCategory(ringLevel: ringLevel, index: index)
+        case .navigateInto:
             print("📂 Navigating into folder: '\(node.name)'")
-            functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: hoveredIndex)
+            functionManager.navigateIntoFolder(ringLevel: ringLevel, index: index)
         case .drag(let provider):
             // Execute onClick if provided
             if let onClick = provider.onClick {
@@ -264,64 +254,51 @@ class CircularUIManager: ObservableObject {
     // MARK: - Click Handlers
     
     private func handleRightClick(event: GestureManager.GestureEvent) {
-        // Get the currently hovered node from FunctionManager
         guard let functionManager = functionManager else { return }
         
-        let activeRingLevel = functionManager.activeRingLevel
-        guard activeRingLevel < functionManager.rings.count else { return }
-        
-        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
-            print("⚠️ No item currently hovered for right-click")
+        // Use position-based detection instead of hoveredIndex
+        guard let (ringLevel, index, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) else {
+            print("⚠️ Right-click not on any item")
             return
         }
         
-        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
-            print("⚠️ Invalid hovered index for right-click")
-            return
-        }
-        
-        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
-        
-        print("🖱️ [Right Click] On item: '\(node.name)'")
+        print("🖱️ [Right Click] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
         switch node.onRightClick {
         case .expand:
-            functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
-        case .navigateInto:  // NEW: Support navigation on right-click
+            functionManager.expandCategory(ringLevel: ringLevel, index: index)
+            // Pause mouse tracking to prevent immediate collapse
+            mouseTracker?.pauseAfterScroll()
+            
+        case .navigateInto:
             print("📂 Navigating into folder: '\(node.name)'")
-            functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: hoveredIndex)
+            functionManager.navigateIntoFolder(ringLevel: ringLevel, index: index)
+            // Pause mouse tracking to prevent immediate collapse
+            mouseTracker?.pauseAfterScroll()
+            
         case .execute(let action):
             action()
             hide()
+            
         case .executeKeepOpen(let action):
             action()
+            
         default:
             break
         }
     }
-    
     private func handleMiddleClick(event: GestureManager.GestureEvent) {
-        // Get the currently hovered node from FunctionManager
         guard let functionManager = functionManager else { return }
         
-        let activeRingLevel = functionManager.activeRingLevel
-        guard activeRingLevel < functionManager.rings.count else { return }
-        
-        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
-            print("⚠️ No item currently hovered for middle-click")
+        // Use position-based detection instead of hoveredIndex
+        guard let (ringLevel, index, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) else {
+            print("⚠️ Middle-click not on any item")
             return
         }
         
-        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
-            print("⚠️ Invalid hovered index for middle-click")
-            return
-        }
+        print("🖱️ [Middle Click] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
-        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
-        
-        print("🖱️ [Middle Click] On item: '\(node.name)'")
-        
-        // NEW: Check if node is previewable - if so, show preview instead of executing action
+        // Check if node is previewable - if so, show preview instead of executing action
         if node.isPreviewable, let previewURL = node.previewURL {
             print("👁️ [Middle Click] Node is previewable - showing Quick Look")
             QuickLookManager.shared.togglePreview(for: previewURL)
@@ -591,6 +568,7 @@ class CircularUIManager: ObservableObject {
         }
         
         mousePosition = NSEvent.mouseLocation
+        centerPoint = mousePosition  // 👈 NEW: Store center point
         isVisible = true
         wasShiftPressed = false
         overlayWindow?.showOverlay(at: mousePosition)

@@ -357,6 +357,187 @@ class FunctionManager: ObservableObject {
         return ParentInfo(leftEdge: leftEdge, rightEdge: rightEdge, node: parentNode, parentItemAngle: parentItemAngle)
     }
     
+    func getItemAt(position: CGPoint, centerPoint: CGPoint) -> (ringLevel: Int, itemIndex: Int, node: FunctionNode)? {
+        // Calculate angle and distance from center
+        let angle = calculateAngle(from: centerPoint, to: position)
+        let distance = calculateDistance(from: centerPoint, to: position)
+        
+        // Determine which ring this position is in
+        guard let ringLevel = getRingLevel(at: distance) else {
+            print("📍 Position at distance \(distance) is not in any ring")
+            return nil
+        }
+        
+        // Check if this ring has items
+        guard ringLevel < rings.count else { return nil }
+        let nodes = rings[ringLevel].nodes
+        guard !nodes.isEmpty else { return nil }
+        
+        // Get the slice configuration for this ring
+        let configs = ringConfigurations
+        guard ringLevel < configs.count else { return nil }
+        let sliceConfig = configs[ringLevel].sliceConfig
+        
+        // Check if angle is within the slice (for partial slices)
+        if !sliceConfig.isFullCircle {
+            if !isAngleInSlice(angle, sliceConfig: sliceConfig) {
+                print("📍 Angle \(angle)° is outside the slice")
+                return nil
+            }
+        }
+        
+        // Calculate which item this angle corresponds to
+        let itemIndex = getItemIndex(for: angle, sliceConfig: sliceConfig, itemCount: nodes.count)
+        
+        guard itemIndex >= 0, itemIndex < nodes.count else {
+            print("📍 Invalid item index: \(itemIndex)")
+            return nil
+        }
+        
+        let node = nodes[itemIndex]
+        print("📍 Found item at position: ring=\(ringLevel), index=\(itemIndex), name='\(node.name)'")
+        
+        return (ringLevel, itemIndex, node)
+    }
+    
+    /// Calculate distance from center to position
+    private func calculateDistance(from center: CGPoint, to position: CGPoint) -> CGFloat {
+        let dx = position.x - center.x
+        let dy = position.y - center.y
+        return hypot(dx, dy)
+    }
+
+    /// Determine which ring level a given distance falls into
+    private func getRingLevel(at distance: CGFloat) -> Int? {
+        let configs = ringConfigurations
+        
+        // Check each ring's boundaries
+        for config in configs {
+            let ringInnerRadius = config.startRadius
+            let ringOuterRadius = config.startRadius + config.thickness
+            
+            if distance >= ringInnerRadius && distance <= ringOuterRadius {
+                return config.level
+            }
+        }
+        
+        // If beyond all rings, treat as being in the active (outermost) ring
+        // This matches MouseTracker's behavior for boundary crossing
+        if rings.count > 0 && distance > 0 {
+            print("📍 Distance \(distance) is beyond all rings, treating as active ring \(activeRingLevel)")
+            return activeRingLevel
+        }
+        
+        return nil
+    }
+    
+    private func getItemIndex(for angle: Double, sliceConfig: PieSliceConfig, itemCount: Int) -> Int {
+        guard itemCount > 0 else { return -1 }
+        
+        let itemAngle = sliceConfig.itemAngle
+        let sliceStart = sliceConfig.startAngle
+        let sliceEnd = sliceConfig.endAngle
+        
+        if sliceConfig.isFullCircle {
+            // Normalize angles to 0-360 range
+            var adjustedAngle = angle
+            while adjustedAngle < 0 { adjustedAngle += 360 }
+            while adjustedAngle >= 360 { adjustedAngle -= 360 }
+            
+            var normalizedStart = sliceStart
+            while normalizedStart >= 360 { normalizedStart -= 360 }
+            while normalizedStart < 0 { normalizedStart += 360 }
+            
+            // Calculate relative angle from start
+            var relativeAngle = adjustedAngle - normalizedStart
+            if relativeAngle < 0 { relativeAngle += 360 }
+            
+            let index = Int(relativeAngle / itemAngle) % itemCount
+            return index
+            
+        } else {
+            // Partial slice
+            var normalizedAngle = angle
+            while normalizedAngle < 0 { normalizedAngle += 360 }
+            while normalizedAngle >= 360 { normalizedAngle -= 360 }
+            
+            if sliceConfig.direction == .counterClockwise {
+                // Counter-clockwise: Items positioned from END going backwards
+                var normalizedEnd = sliceEnd
+                while normalizedEnd >= 360 { normalizedEnd -= 360 }
+                while normalizedEnd < 0 { normalizedEnd += 360 }
+                
+                var relativeAngle = normalizedEnd - normalizedAngle
+                if relativeAngle < 0 { relativeAngle += 360 }
+                
+                let index = Int(relativeAngle / itemAngle)
+                
+                if index >= 0 && index < itemCount {
+                    return index
+                }
+                
+            } else {
+                // Clockwise: Items positioned from START going forwards
+                var normalizedStart = sliceStart
+                while normalizedStart >= 360 { normalizedStart -= 360 }
+                while normalizedStart < 0 { normalizedStart += 360 }
+                
+                var relativeAngle = normalizedAngle - normalizedStart
+                if relativeAngle < 0 { relativeAngle += 360 }
+                
+                let index = Int(relativeAngle / itemAngle)
+                
+                if index >= 0 && index < itemCount {
+                    return index
+                }
+            }
+        }
+        
+        return -1
+    }
+    
+    /// Check if angle is within a slice configuration
+    private func isAngleInSlice(_ angle: Double, sliceConfig: PieSliceConfig) -> Bool {
+        // Normalize all angles to 0-360 range
+        var normalizedAngle = angle.truncatingRemainder(dividingBy: 360)
+        if normalizedAngle < 0 { normalizedAngle += 360 }
+        
+        var normalizedStart = sliceConfig.startAngle.truncatingRemainder(dividingBy: 360)
+        if normalizedStart < 0 { normalizedStart += 360 }
+        
+        var normalizedEnd = sliceConfig.endAngle.truncatingRemainder(dividingBy: 360)
+        if normalizedEnd < 0 { normalizedEnd += 360 }
+        
+        // Handle wrapping (when slice crosses 0°)
+        if normalizedStart <= normalizedEnd {
+            // Normal case: start < end
+            return normalizedAngle >= normalizedStart && normalizedAngle <= normalizedEnd
+        } else {
+            // Wrapped case: crosses 0°
+            return normalizedAngle >= normalizedStart || normalizedAngle <= normalizedEnd
+        }
+    }
+
+    /// Calculate angle from center to position (in degrees, 0° = top, clockwise)
+    private func calculateAngle(from center: CGPoint, to position: CGPoint) -> Double {
+        let dx = position.x - center.x
+        let dy = position.y - center.y
+        
+        let radians = atan2(dy, dx)
+        var degrees = radians * (180 / .pi)
+        
+        // Adjust so 0° is at top (not right)
+        degrees -= 90
+        
+        // Normalize to 0-360 range
+        if degrees < 0 { degrees += 360 }
+        
+        // Flip direction (screen coordinates are flipped)
+        degrees = (360 - degrees).truncatingRemainder(dividingBy: 360)
+        
+        return degrees
+    }
+    
     // MARK: - Initialization
     
     init(providers: [FunctionProvider] = []) {
@@ -485,11 +666,18 @@ class FunctionManager: ObservableObject {
         
         let node = rings[ringLevel].nodes[index]
         
+        print("⭐ Expanding node: '\(node.name)'")
+        print("   - isBranch: \(node.isBranch)")
+        print("   - children count: \(node.children?.count ?? 0)")
+        print("   - contextActions count: \(node.contextActions?.count ?? 0)")
+        
         // Use displayedChildren which respects maxDisplayedChildren limit
         let displayedChildren = node.displayedChildren
         
+        print("   - displayedChildren count: \(displayedChildren.count)")
+        
         guard node.isBranch, !displayedChildren.isEmpty else {
-            print("Cannot expand non-category or empty category: \(node.name)")
+            print("❌ Cannot expand non-category or empty category: \(node.name)")
             return
         }
         
@@ -506,7 +694,7 @@ class FunctionManager: ObservableObject {
         rings.append(RingState(nodes: displayedChildren))
         activeRingLevel = ringLevel + 1
         
-        print("Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes")
+        print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes")
     }
     
     func navigateIntoFolder(ringLevel: Int, index: Int) {
