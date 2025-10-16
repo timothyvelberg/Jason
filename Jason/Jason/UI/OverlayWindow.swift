@@ -88,19 +88,29 @@ class OverlayWindow: NSWindow {
     
     // Handle scroll events
     override func scrollWheel(with event: NSEvent) {
-        print("🎡 [OverlayWindow] Scroll detected: deltaY=\(event.deltaY), deltaX=\(event.deltaX)")
+        // Detect device type
+        let isTrackpad = event.hasPreciseScrollingDeltas
+        let deviceName = isTrackpad ? "Trackpad" : "Mouse Wheel"
         
-        // Threshold to avoid accidental triggers from tiny movements
-        let scrollThreshold: CGFloat = 0.1
+        // Different thresholds for different devices
+        let scrollThreshold: CGFloat = isTrackpad ? 0.9 : 0.1
+        
+        print("🎡 [OverlayWindow] \(deviceName) scroll: deltaY=\(event.deltaY), threshold=\(scrollThreshold)")
+        
+        // Ignore trackpad momentum scrolling (inertial scrolling after lifting fingers)
+        if isTrackpad && !event.momentumPhase.isEmpty {
+            print("⏩ Ignoring trackpad momentum scroll")
+            return
+        }
         
         // Scroll down (positive deltaY) = go back/collapse
         if event.deltaY > scrollThreshold {
-            print("🔙 Scroll DOWN - collapsing ring")
+            print("🔙 Scroll DOWN (\(deviceName)) - collapsing ring")
             onScrollBack?()
         }
         // Scroll up (negative deltaY) = could be used for something else
         else if event.deltaY < -scrollThreshold {
-            print("🔼 Scroll UP - (not implemented)")
+            print("🔼 Scroll UP (\(deviceName)) - (not implemented)")
             // Could be used to re-expand collapsed rings or other features
         }
         
