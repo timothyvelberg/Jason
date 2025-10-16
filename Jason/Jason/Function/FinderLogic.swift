@@ -347,8 +347,6 @@ class FinderLogic: FunctionProvider {
             itemAngleSize: 15,
             previewURL: url,
             showLabel: true,
-            
-            preferredAlignment: .center,
             metadata: ["folderURL": url.path],
             providerId: self.providerId,
             
@@ -481,7 +479,6 @@ class FinderLogic: FunctionProvider {
             showLabel: true,
 //            childRingThickness: 48,
 //            childIconSize: 24,
-            preferredAlignment: .center,
             
             
             // 🎯 LEFT CLICK = OPEN FILE (or drag if you move the mouse!)

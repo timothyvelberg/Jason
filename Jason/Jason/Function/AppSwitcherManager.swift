@@ -386,7 +386,6 @@ extension AppSwitcherManager: FunctionProvider {
                 itemAngleSize: 12,
                 childRingThickness: 48,
                 childIconSize: 24,
-                preferredDirection: .counterClockwise,
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .execute { [weak self] in
                     // Primary action: switch to app and close UI

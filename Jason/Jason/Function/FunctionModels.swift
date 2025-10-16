@@ -15,16 +15,12 @@ enum LayoutStyle {
     case partialSlice // Partial arc centered on parent
 }
 
-// MARK: - Slice Configuration Enums
+// MARK: - Slice Positioning
 
-enum SliceAlignment {
-    case start      // First item starts at parent angle, extends in specified direction
-    case center     // Slice centered symmetrically on parent angle
-}
-
-enum SliceDirection {
-    case clockwise        // Extend to the right
-    case counterClockwise // Extend to the left
+enum SlicePositioning {
+    case startClockwise       // Start at left edge of parent, extend right (default)
+    case startCounterClockwise // Start at right edge of parent, extend left
+    case center                // Center symmetrically on parent (direction doesn't matter)
 }
 
 // MARK: - Drag Provider
@@ -128,9 +124,8 @@ class FunctionNode: Identifiable, ObservableObject {
     let childRingThickness: CGFloat?
     let childIconSize: CGFloat?
     
-    // Slice alignment preferences
-    let preferredAlignment: SliceAlignment?
-    let preferredDirection: SliceDirection?
+    // Slice positioning preference
+    let slicePositioning: SlicePositioning?
     
     //Metadata for dynamic loading
     let metadata: [String: Any]?
@@ -161,9 +156,8 @@ class FunctionNode: Identifiable, ObservableObject {
         childRingThickness: CGFloat? = nil,
         childIconSize: CGFloat? = nil,
         
-        // Slice alignment parameters
-        preferredAlignment: SliceAlignment? = nil,
-        preferredDirection: SliceDirection? = nil,
+        // Slice positioning parameter
+        slicePositioning: SlicePositioning? = nil,
         
         //Metadata and provider ID
          metadata: [String: Any]? = nil,
@@ -192,8 +186,7 @@ class FunctionNode: Identifiable, ObservableObject {
         self.childRingThickness = childRingThickness
         self.childIconSize = childIconSize
         
-        self.preferredAlignment = preferredAlignment
-        self.preferredDirection = preferredDirection
+        self.slicePositioning = slicePositioning
         
         self.metadata = metadata
         self.providerId = providerId
@@ -266,8 +259,7 @@ struct PieSliceConfig {
     let startAngle: Double  // In degrees
     let endAngle: Double    // In degrees
     let itemAngle: Double   // Angle per item (default 30°)
-    let alignment: SliceAlignment
-    let direction: SliceDirection
+    let positioning: SlicePositioning
     
     var totalAngle: Double {
         return endAngle - startAngle
@@ -278,6 +270,16 @@ struct PieSliceConfig {
         return totalAngle >= 359.9
     }
     
+    // Helper computed properties for compatibility
+    var direction: SliceDirection {
+        switch positioning {
+        case .startClockwise, .center:
+            return .clockwise
+        case .startCounterClockwise:
+            return .counterClockwise
+        }
+    }
+    
     // Factory method for full circle
     static func fullCircle(itemCount: Int) -> PieSliceConfig {
         let itemAngle = 360.0 / Double(max(itemCount, 1))
@@ -285,8 +287,7 @@ struct PieSliceConfig {
             startAngle: 0,
             endAngle: 360,
             itemAngle: itemAngle,
-            alignment: .start,
-            direction: .clockwise
+            positioning: .startClockwise
         )
     }
     
@@ -297,8 +298,7 @@ struct PieSliceConfig {
             startAngle: angle,
             endAngle: angle + 360,
             itemAngle: itemAngle,
-            alignment: .start,
-            direction: .clockwise
+            positioning: .startClockwise
         )
     }
     
@@ -307,8 +307,7 @@ struct PieSliceConfig {
         itemCount: Int,
         centeredAt parentAngle: Double,
         defaultItemAngle: Double = 30.0,
-        alignment: SliceAlignment = .start,
-        direction: SliceDirection = .clockwise
+        positioning: SlicePositioning = .startClockwise
     ) -> PieSliceConfig {
         let totalAngle = min(Double(itemCount) * defaultItemAngle, 360.0)
         
@@ -322,19 +321,16 @@ struct PieSliceConfig {
         let startAngle: Double
         let endAngle: Double
         
-        switch alignment {
-        case .start:
-            // First item starts at parent angle
-            switch direction {
-            case .clockwise:
-                // Extend rightward (clockwise)
-                startAngle = parentAngle
-                endAngle = (parentAngle + totalAngle).truncatingRemainder(dividingBy: 360)
-            case .counterClockwise:
-                // Extend leftward (counter-clockwise)
-                startAngle = (parentAngle - totalAngle).truncatingRemainder(dividingBy: 360)
-                endAngle = parentAngle
-            }
+        switch positioning {
+        case .startClockwise:
+            // First item starts at parent angle, extends rightward
+            startAngle = parentAngle
+            endAngle = (parentAngle + totalAngle).truncatingRemainder(dividingBy: 360)
+            
+        case .startCounterClockwise:
+            // First item starts at parent angle, extends leftward
+            startAngle = (parentAngle - totalAngle).truncatingRemainder(dividingBy: 360)
+            endAngle = parentAngle
             
         case .center:
             // Center the slice symmetrically on parent angle
@@ -347,10 +343,15 @@ struct PieSliceConfig {
             startAngle: startAngle,
             endAngle: endAngle,
             itemAngle: itemAngle,
-            alignment: alignment,
-            direction: direction
+            positioning: positioning
         )
     }
+}
+
+// MARK: - Legacy Direction Enum (for compatibility)
+enum SliceDirection {
+    case clockwise
+    case counterClockwise
 }
 
 // MARK: - Drag behavior extension

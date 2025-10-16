@@ -127,28 +127,44 @@ class FunctionManager: ObservableObject {
                     let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
                     
                     if preferredLayout == .partialSlice && itemCount >= 12 {
-                        // Choose edge based on direction
-                        let direction = parentInfo.node.preferredDirection ?? .clockwise
-                        let startAngle = direction == .counterClockwise ? parentInfo.rightEdge : parentInfo.leftEdge
+                        // Choose angle based on positioning
+                        let positioning = parentInfo.node.slicePositioning ?? .startClockwise
+                        let startAngle: Double
+                        switch positioning {
+                        case .center:
+                            startAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
+                        case .startCounterClockwise:
+                            startAngle = parentInfo.rightEdge
+                        case .startClockwise:
+                            startAngle = parentInfo.leftEdge
+                        }
                         sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle)
                     } else if preferredLayout == .fullCircle {
-                        let direction = parentInfo.node.preferredDirection ?? .clockwise
-                        let startAngle = direction == .counterClockwise ? parentInfo.rightEdge : parentInfo.leftEdge
+                        let positioning = parentInfo.node.slicePositioning ?? .startClockwise
+                        let startAngle: Double
+                        switch positioning {
+                        case .center:
+                            startAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
+                        case .startCounterClockwise:
+                            startAngle = parentInfo.rightEdge
+                        case .startClockwise:
+                            startAngle = parentInfo.leftEdge
+                        }
                         sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle)
                     } else {
-                        // Partial slice with alignment and direction
+                        // Partial slice with positioning
                         let customAngle = parentInfo.node.itemAngleSize ?? 30.0
-                        let alignment = parentInfo.node.preferredAlignment ?? .start
-                        let direction = parentInfo.node.preferredDirection ?? .clockwise
+                        let positioning = parentInfo.node.slicePositioning ?? .startClockwise
                         
-                        // Choose the correct angle based on alignment
+                        // Choose the correct angle based on positioning
                         let startingAngle: Double
-                        if alignment == .center {
-                            // For center alignment, use the middle of the parent item
+                        switch positioning {
+                        case .center:
                             startingAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
-                        } else {
-                            // For start alignment, choose edge based on direction
-                            startingAngle = direction == .counterClockwise ? parentInfo.rightEdge : parentInfo.leftEdge
+                        case .startCounterClockwise:
+                            startingAngle = parentInfo.rightEdge
+                        case .startClockwise:
+                            startingAngle = parentInfo.leftEdge
                         }
                         
                         if itemCount == 1 {
@@ -156,16 +172,14 @@ class FunctionManager: ObservableObject {
                                 itemCount: 1,
                                 centeredAt: startingAngle,
                                 defaultItemAngle: parentInfo.node.itemAngleSize ?? parentInfo.parentItemAngle,
-                                alignment: alignment,
-                                direction: direction
+                                positioning: positioning
                             )
                         } else {
                             sliceConfig = .partialSlice(
                                 itemCount: itemCount,
                                 centeredAt: startingAngle,
                                 defaultItemAngle: customAngle,
-                                alignment: alignment,
-                                direction: direction
+                                positioning: positioning
                             )
                         }
                     }
@@ -204,57 +218,67 @@ class FunctionManager: ObservableObject {
                 // Decide slice type based on preference and item count
                 if preferredLayout == .partialSlice && itemCount >= 12 {
                     print("🔵 Ring \(index): Auto-converting to FULL CIRCLE (too many items: \(itemCount) >= 12)")
-                    let alignment = parentInfo.node.preferredAlignment ?? .start
-                    let direction = parentInfo.node.preferredDirection ?? .clockwise
-                    let startAngle = alignment == .center ?
-                        (parentInfo.leftEdge + parentInfo.rightEdge) / 2 :
-                        (direction == .counterClockwise ? parentInfo.rightEdge : parentInfo.leftEdge)
+                    let positioning = parentInfo.node.slicePositioning ?? .startClockwise
+                    let startAngle: Double
+                    switch positioning {
+                    case .center:
+                        startAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
+                    case .startCounterClockwise:
+                        startAngle = parentInfo.rightEdge
+                    case .startClockwise:
+                        startAngle = parentInfo.leftEdge
+                    }
                     sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle)
                     
                 } else if preferredLayout == .fullCircle {
                     print("🔵 Ring \(index): Using FULL CIRCLE layout (parent '\(parentInfo.node.name)' preference)")
-                    let alignment = parentInfo.node.preferredAlignment ?? .start
-                    let direction = parentInfo.node.preferredDirection ?? .clockwise
-                    let startAngle = alignment == .center ?
-                        (parentInfo.leftEdge + parentInfo.rightEdge) / 2 :
-                        (direction == .counterClockwise ? parentInfo.rightEdge : parentInfo.leftEdge)
+                    let positioning = parentInfo.node.slicePositioning ?? .startClockwise
+                    let startAngle: Double
+                    switch positioning {
+                    case .center:
+                        startAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
+                    case .startCounterClockwise:
+                        startAngle = parentInfo.rightEdge
+                    case .startClockwise:
+                        startAngle = parentInfo.leftEdge
+                    }
                     sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle)
                     
                 } else {
                     print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentInfo.node.name)' preference, \(itemCount) items)")
                     
                     let customAngle = parentInfo.node.itemAngleSize ?? 30.0
-                    let alignment = parentInfo.node.preferredAlignment ?? .start
-                    let direction = parentInfo.node.preferredDirection ?? .clockwise
+                    let positioning = parentInfo.node.slicePositioning ?? .startClockwise
                     
-                    // Choose the correct angle based on alignment
+                    // Choose the correct angle based on positioning
                     let startingAngle: Double
-                    if alignment == .center {
+                    switch positioning {
+                    case .center:
                         startingAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
-                    } else {
-                        startingAngle = direction == .counterClockwise ? parentInfo.rightEdge : parentInfo.leftEdge
+                    case .startCounterClockwise:
+                        startingAngle = parentInfo.rightEdge
+                    case .startClockwise:
+                        startingAngle = parentInfo.leftEdge
                     }
                     
                     print("🎯 Ring \(index) alignment:")
                     print("   Parent left edge: \(parentInfo.leftEdge)°, right edge: \(parentInfo.rightEdge)°")
-                    print("   Direction: \(direction), using \(alignment == .center ? "CENTER" : (direction == .counterClockwise ? "RIGHT" : "LEFT")) edge: \(startingAngle)°")
-                    print("   Alignment: \(alignment), itemAngleSize: \(customAngle)°")
+                    print("   Positioning: \(positioning), using angle: \(startingAngle)°")
+                    print("   itemAngleSize: \(customAngle)°")
                     
                     if itemCount == 1 {
                         sliceConfig = .partialSlice(
                             itemCount: 1,
                             centeredAt: startingAngle,
                             defaultItemAngle: parentInfo.node.itemAngleSize ?? parentInfo.parentItemAngle,
-                            alignment: alignment,
-                            direction: direction
+                            positioning: positioning
                         )
                     } else {
                         sliceConfig = .partialSlice(
                             itemCount: itemCount,
                             centeredAt: startingAngle,
                             defaultItemAngle: customAngle,
-                            alignment: alignment,
-                            direction: direction
+                            positioning: positioning
                         )
                     }
                     
