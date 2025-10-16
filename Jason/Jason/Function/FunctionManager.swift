@@ -186,11 +186,18 @@ class FunctionManager: ObservableObject {
                         }
                     }
                 }
-            } else if index == 0 {
-                // Ring 0 is always a full circle starting at 0° with default sizes
+            }else if index == 0 {
+                // Ring 0 is always a full circle, shifted so first item is at top (0°)
                 ringThickness = defaultRingThickness
                 iconSize = defaultIconSize
-                sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                
+                // Calculate offset to center first item at 0° (top) this sets the default angle on the first ring
+                let itemCount = ringState.nodes.count
+                let itemAngle = 360.0 / Double(itemCount)
+                let offset = -(itemAngle / 2)
+                
+                sliceConfig = .fullCircle(itemCount: itemCount, startingAt: offset)
+                print("🎯 Ring 0: Shifted by \(offset)° to center first item at 0° (itemAngle: \(itemAngle)°)")
             } else {
                 // Ring 1+ - get parent info
                 guard let parentInfo = getParentInfo(for: index, configs: configs) else {
