@@ -18,12 +18,14 @@ class FunctionManager: ObservableObject {
         var hoveredIndex: Int?
         var selectedIndex: Int?
         var isCollapsed: Bool = false
+        var openedByClick: Bool = false
         
-        init(nodes: [FunctionNode], isCollapsed: Bool = false) {
+        init(nodes: [FunctionNode], isCollapsed: Bool = false, openedByClick: Bool = false) {
             self.nodes = nodes
             self.hoveredIndex = nil
             self.selectedIndex = nil
             self.isCollapsed = isCollapsed
+            self.openedByClick = openedByClick
         }
     }
     
@@ -690,11 +692,11 @@ class FunctionManager: ObservableObject {
             rings.removeSubrange((ringLevel + 1)...)
         }
         
-        // Add new ring with displayed children (respects limit)
-        rings.append(RingState(nodes: displayedChildren))
+        // Add new ring with displayed children - MARK AS CLICK-OPENED
+        rings.append(RingState(nodes: displayedChildren, isCollapsed: false, openedByClick: true))
         activeRingLevel = ringLevel + 1
         
-        print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes")
+        print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes (openedByClick=true)")
     }
     
     func navigateIntoFolder(ringLevel: Int, index: Int) {
@@ -779,7 +781,7 @@ class FunctionManager: ObservableObject {
             }
             
             // Add new ring with children
-            rings.append(RingState(nodes: childrenToDisplay, isCollapsed: false))
+            rings.append(RingState(nodes: childrenToDisplay, isCollapsed: false, openedByClick: true))
             activeRingLevel = ringLevel + 1
             
             // Clear loading state

@@ -15,6 +15,8 @@ class MouseTracker {
     private var lastRingLevel: Int?  // Can be nil when outside all rings
     private var isPausedAfterScroll = false
     private var lastMouseLocation: NSPoint?
+    private var ringLevelAtPause: Int?
+
     
     var onPieHover: ((Int?) -> Void)?
     private var functionManager: FunctionManager
@@ -60,8 +62,9 @@ class MouseTracker {
     
     func pauseAfterScroll() {
         isPausedAfterScroll = true
-        lastMouseLocation = NSEvent.mouseLocation  // Remember current position
-        print("⏸️ [MouseTracker] Paused tracking after scroll - waiting for mouse movement")
+        lastMouseLocation = NSEvent.mouseLocation
+        ringLevelAtPause = lastRingLevel  // Remember which ring we clicked in
+        print("⏸️ [MouseTracker] Paused tracking - clicked in ring level: \(ringLevelAtPause ?? -1)")
     }
 
     private func trackMousePosition(distance: CGFloat) {
@@ -175,68 +178,113 @@ class MouseTracker {
         let activeRingConfig = configs[activeRingLevel]
         let activeRingOuterRadius = activeRingConfig.startRadius + activeRingConfig.thickness
         
+        // Check if active ring was opened by click
+        let activeRingOpenedByClick = functionManager.rings[activeRingLevel].openedByClick
+        
+        // NEW: Check if mouse moved FORWARD into the click-opened ring
+        // Once you move into it, apply regular boundary rules from then on
+        if activeRingOpenedByClick, let pauseLevel = ringLevelAtPause {
+            if let currentRingLevel = currentRingLevel, currentRingLevel == activeRingLevel, activeRingLevel > pauseLevel {
+                // Moved forward from ring 2 into ring 3 - clear click protection
+                print("➡️ Moved forward from ring \(pauseLevel) into ring \(currentRingLevel) - enabling regular boundary rules")
+                ringLevelAtPause = nil
+                // Note: Don't return, let the rest of the boundary logic handle it
+            }
+        }
+        
         // Check if we're beyond the active ring's boundary
         if let currentRingLevel = currentRingLevel,
            currentRingLevel == activeRingLevel,
            distance > activeRingOuterRadius {
             
-            // Get the slice configuration for the active ring
-            let configs = functionManager.ringConfigurations
-            guard activeRingLevel < configs.count else { return }
-            let sliceConfig = configs[activeRingLevel].sliceConfig
-            
-            // Check if the angle is within a valid slice
-            if sliceConfig.isFullCircle || isAngleInSlice(angle, sliceConfig: sliceConfig) {
-                // Calculate which item we're hovering over
-                let pieIndex = angleToIndex(angle, sliceConfig: sliceConfig)
+            // Only auto-expand if the ring was NOT opened by click OR we've moved into it
+            if !activeRingOpenedByClick || ringLevelAtPause == nil {
+                // Get the slice configuration for the active ring
+                let configs = functionManager.ringConfigurations
+                guard activeRingLevel < configs.count else { return }
+                let sliceConfig = configs[activeRingLevel].sliceConfig
                 
-                if pieIndex >= 0 {
-                    let nodes = functionManager.rings[activeRingLevel].nodes
+                // Check if the angle is within a valid slice
+                if sliceConfig.isFullCircle || isAngleInSlice(angle, sliceConfig: sliceConfig) {
+                    // Calculate which item we're hovering over
+                    let pieIndex = angleToIndex(angle, sliceConfig: sliceConfig)
                     
-                    if nodes.indices.contains(pieIndex) {
-                        let node = nodes[pieIndex]
+                    if pieIndex >= 0 {
+                        let nodes = functionManager.rings[activeRingLevel].nodes
                         
-                        // USE EXPLICIT INTERACTION MODEL
-                        switch node.onBoundaryCross {
-                        case .expand:
-//                            print("🔵 Beyond boundary (\(distance) > \(activeRingOuterRadius)) - expanding '\(node.name)'")
-                            functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)
+                        if nodes.indices.contains(pieIndex) {
+                            let node = nodes[pieIndex]
                             
-                            lastFunctionIndex = pieIndex
-                            lastRingLevel = activeRingLevel
-                            return
-                        
-                        case .navigateInto:  // NEW: Handle folder navigation on boundary cross
-                            print("📂 Beyond boundary (\(distance) > \(activeRingOuterRadius)) - navigating into '\(node.name)'")
-                            functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: pieIndex)
+                            // USE EXPLICIT INTERACTION MODEL
+                            switch node.onBoundaryCross {
+                            case .expand:
+                                functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)
+                                
+                                lastFunctionIndex = pieIndex
+                                lastRingLevel = activeRingLevel
+                                return
                             
-                            lastFunctionIndex = pieIndex
-                            lastRingLevel = activeRingLevel
-                            return
-                            
-                        case .doNothing:
-                            print("⚠️ Beyond boundary hovering '\(node.name)' - no auto-expand (use right-click)")
-                            
-                        case .execute:
-                            print("⚠️ Beyond boundary hovering '\(node.name)' - would execute action (unusual for boundary cross)")
-                            
-                        case .executeKeepOpen:
-                            print("⚠️ Beyond boundary hovering '\(node.name)' - would execute and keep open (unusual for boundary cross)")
-                            
-                        case .drag:
-                            // Drag doesn't make sense for boundary crossing
-                            print("⚠️ Beyond boundary hovering '\(node.name)' - draggable item (no auto-expand)")
+                            case .navigateInto:
+                                print("📂 Beyond boundary (\(distance) > \(activeRingOuterRadius)) - navigating into '\(node.name)'")
+                                functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: pieIndex)
+                                
+                                lastFunctionIndex = pieIndex
+                                lastRingLevel = activeRingLevel
+                                return
+                                
+                            case .doNothing:
+                                print("⚠️ Beyond boundary hovering '\(node.name)' - no auto-expand (use right-click)")
+                                
+                            case .execute:
+                                print("⚠️ Beyond boundary hovering '\(node.name)' - would execute action (unusual for boundary cross)")
+                                
+                            case .executeKeepOpen:
+                                print("⚠️ Beyond boundary hovering '\(node.name)' - would execute and keep open (unusual for boundary cross)")
+                                
+                            case .drag:
+                                // Drag doesn't make sense for boundary crossing
+                                print("⚠️ Beyond boundary hovering '\(node.name)' - draggable item (no auto-expand)")
+                            }
                         }
                     }
                 }
+            } else {
+                print("🔒 Active ring was opened by click - not auto-expanding beyond boundary")
             }
         }
         
-        // Check if mouse crossed inward
+        // Check if mouse crossed inward to a parent ring
         if let currentRingLevel = currentRingLevel, currentRingLevel < activeRingLevel {
-            print("🔴 Boundary crossed inward - collapsing to ring \(currentRingLevel)")
-            functionManager.collapseToRing(level: currentRingLevel)
-            return
+            // If active ring was opened by click
+            if activeRingOpenedByClick {
+                if let pauseLevel = ringLevelAtPause {
+                    if currentRingLevel < pauseLevel {
+                        // Moved backward past where we clicked - collapse
+                        print("🔴 Click-opened ring - moved backward from ring \(pauseLevel) to ring \(currentRingLevel) - collapsing")
+                        functionManager.collapseToRing(level: currentRingLevel)
+                        ringLevelAtPause = nil  // Reset
+                        return
+                    } else if currentRingLevel == pauseLevel {
+                        // Still in the ring where we clicked - keep open
+                        print("✅ Click-opened ring - staying in ring \(currentRingLevel) (clicked at \(pauseLevel)) - keeping open")
+                        return
+                    } else {
+                        // currentRingLevel > pauseLevel - shouldn't happen here but handle it
+                        print("⚠️ Unexpected: current ring \(currentRingLevel) > pause level \(pauseLevel) in inward check")
+                        return
+                    }
+                } else {
+                    // No pause level recorded - apply regular boundary rules
+                    print("🔴 Click-opened ring (no pause level) - collapsing to ring \(currentRingLevel)")
+                    functionManager.collapseToRing(level: currentRingLevel)
+                    return
+                }
+            } else {
+                // Not click-opened - normal boundary crossing behavior
+                print("🔴 Boundary crossed inward - collapsing to ring \(currentRingLevel)")
+                functionManager.collapseToRing(level: currentRingLevel)
+                return
+            }
         }
         
         // Mouse moved to different category in the same active ring level
@@ -256,7 +304,7 @@ class MouseTracker {
                         case .expand:
                             print("🔄 Switching to category '\(node.name)'")
                             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
-                        case .navigateInto:  // NEW: Handle switching folders
+                        case .navigateInto:
                             print("📂 Switching to folder '\(node.name)'")
                             functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: hoveredIndex)
                         case .doNothing, .execute, .executeKeepOpen, .drag:
