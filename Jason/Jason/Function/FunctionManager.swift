@@ -54,7 +54,8 @@ class FunctionManager: ObservableObject {
     // MARK: - Helper Types
     
     private struct ParentInfo {
-        let angle: Double
+        let leftEdge: Double   // Start angle of parent's slice
+        let rightEdge: Double  // End angle of parent's slice
         let node: FunctionNode
         let parentItemAngle: Double
     }
@@ -103,7 +104,6 @@ class FunctionManager: ObservableObject {
                 print("📦 Ring \(index) is COLLAPSED: thickness=\(ringThickness), iconSize=\(iconSize)")
                 
                 // Collapsed rings use their existing slice config
-                // We need to determine the slice config based on parent (if Ring 1+)
                 if index == 0 {
                     sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
                 } else {
@@ -127,22 +127,45 @@ class FunctionManager: ObservableObject {
                     let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
                     
                     if preferredLayout == .partialSlice && itemCount >= 12 {
-                        sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
+                        // Choose edge based on direction
+                        let direction = parentInfo.node.preferredDirection ?? .clockwise
+                        let startAngle = direction == .counterClockwise ? parentInfo.rightEdge : parentInfo.leftEdge
+                        sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle)
                     } else if preferredLayout == .fullCircle {
-                        sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
+                        let direction = parentInfo.node.preferredDirection ?? .clockwise
+                        let startAngle = direction == .counterClockwise ? parentInfo.rightEdge : parentInfo.leftEdge
+                        sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle)
                     } else {
+                        // Partial slice with alignment and direction
                         let customAngle = parentInfo.node.itemAngleSize ?? 30.0
+                        let alignment = parentInfo.node.preferredAlignment ?? .start
+                        let direction = parentInfo.node.preferredDirection ?? .clockwise
+                        
+                        // Choose the correct angle based on alignment
+                        let startingAngle: Double
+                        if alignment == .center {
+                            // For center alignment, use the middle of the parent item
+                            startingAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
+                        } else {
+                            // For start alignment, choose edge based on direction
+                            startingAngle = direction == .counterClockwise ? parentInfo.rightEdge : parentInfo.leftEdge
+                        }
+                        
                         if itemCount == 1 {
                             sliceConfig = .partialSlice(
                                 itemCount: 1,
-                                centeredAt: parentInfo.angle,
-                                defaultItemAngle: parentInfo.node.itemAngleSize ?? parentInfo.parentItemAngle
+                                centeredAt: startingAngle,
+                                defaultItemAngle: parentInfo.node.itemAngleSize ?? parentInfo.parentItemAngle,
+                                alignment: alignment,
+                                direction: direction
                             )
                         } else {
                             sliceConfig = .partialSlice(
                                 itemCount: itemCount,
-                                centeredAt: parentInfo.angle,
-                                defaultItemAngle: customAngle
+                                centeredAt: startingAngle,
+                                defaultItemAngle: customAngle,
+                                alignment: alignment,
+                                direction: direction
                             )
                         }
                     }
@@ -153,7 +176,7 @@ class FunctionManager: ObservableObject {
                 iconSize = defaultIconSize
                 sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
             } else {
-                // Ring 1+ - get parent info (existing logic)
+                // Ring 1+ - get parent info
                 guard let parentInfo = getParentInfo(for: index, configs: configs) else {
                     ringThickness = defaultRingThickness
                     iconSize = defaultIconSize
@@ -181,35 +204,61 @@ class FunctionManager: ObservableObject {
                 // Decide slice type based on preference and item count
                 if preferredLayout == .partialSlice && itemCount >= 12 {
                     print("🔵 Ring \(index): Auto-converting to FULL CIRCLE (too many items: \(itemCount) >= 12)")
-                    sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
+                    let alignment = parentInfo.node.preferredAlignment ?? .start
+                    let direction = parentInfo.node.preferredDirection ?? .clockwise
+                    let startAngle = alignment == .center ?
+                        (parentInfo.leftEdge + parentInfo.rightEdge) / 2 :
+                        (direction == .counterClockwise ? parentInfo.rightEdge : parentInfo.leftEdge)
+                    sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle)
                     
                 } else if preferredLayout == .fullCircle {
                     print("🔵 Ring \(index): Using FULL CIRCLE layout (parent '\(parentInfo.node.name)' preference)")
-                    sliceConfig = .fullCircle(itemCount: itemCount, startingAt: parentInfo.angle)
+                    let alignment = parentInfo.node.preferredAlignment ?? .start
+                    let direction = parentInfo.node.preferredDirection ?? .clockwise
+                    let startAngle = alignment == .center ?
+                        (parentInfo.leftEdge + parentInfo.rightEdge) / 2 :
+                        (direction == .counterClockwise ? parentInfo.rightEdge : parentInfo.leftEdge)
+                    sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle)
                     
                 } else {
                     print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentInfo.node.name)' preference, \(itemCount) items)")
                     
-                    print("🎯 Ring \(index) alignment:")
-                    print("   Parent angle: \(parentInfo.angle)°")
-                    print("   Child slice will start at: \(parentInfo.angle)°")
-                    
                     let customAngle = parentInfo.node.itemAngleSize ?? 30.0
-                    print("   Using custom angle size: \(customAngle)° (parent itemAngleSize: \(parentInfo.node.itemAngleSize?.description ?? "nil"))")
+                    let alignment = parentInfo.node.preferredAlignment ?? .start
+                    let direction = parentInfo.node.preferredDirection ?? .clockwise
+                    
+                    // Choose the correct angle based on alignment
+                    let startingAngle: Double
+                    if alignment == .center {
+                        startingAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
+                    } else {
+                        startingAngle = direction == .counterClockwise ? parentInfo.rightEdge : parentInfo.leftEdge
+                    }
+                    
+                    print("🎯 Ring \(index) alignment:")
+                    print("   Parent left edge: \(parentInfo.leftEdge)°, right edge: \(parentInfo.rightEdge)°")
+                    print("   Direction: \(direction), using \(alignment == .center ? "CENTER" : (direction == .counterClockwise ? "RIGHT" : "LEFT")) edge: \(startingAngle)°")
+                    print("   Alignment: \(alignment), itemAngleSize: \(customAngle)°")
                     
                     if itemCount == 1 {
                         sliceConfig = .partialSlice(
                             itemCount: 1,
-                            centeredAt: parentInfo.angle,
-                            defaultItemAngle: parentInfo.node.itemAngleSize ?? parentInfo.parentItemAngle
+                            centeredAt: startingAngle,
+                            defaultItemAngle: parentInfo.node.itemAngleSize ?? parentInfo.parentItemAngle,
+                            alignment: alignment,
+                            direction: direction
                         )
                     } else {
                         sliceConfig = .partialSlice(
                             itemCount: itemCount,
-                            centeredAt: parentInfo.angle,
-                            defaultItemAngle: customAngle
+                            centeredAt: startingAngle,
+                            defaultItemAngle: customAngle,
+                            alignment: alignment,
+                            direction: direction
                         )
                     }
+                    
+                    print("   Result: startAngle=\(sliceConfig.startAngle)°, endAngle=\(sliceConfig.endAngle)°")
                 }
             }
             
@@ -241,31 +290,47 @@ class FunctionManager: ObservableObject {
         
         let parentNode = parentRing.nodes[parentSelectedIndex]
         
-        // Calculate parent's angle
-        let parentAngle: Double
+        // Calculate parent's left and right edges
+        let leftEdge: Double
+        let rightEdge: Double
         let parentItemAngle: Double
         
         if ringIndex - 1 < configs.count {
             let parentSliceConfig = configs[ringIndex - 1].sliceConfig
             
             if parentSliceConfig.isFullCircle {
-                // Parent is full circle - account for its start angle
+                // Parent is full circle
                 parentItemAngle = 360.0 / Double(parentRing.nodes.count)
                 let parentStartAngle = parentSliceConfig.startAngle
-                parentAngle = parentStartAngle + (Double(parentSelectedIndex) * parentItemAngle)
+                
+                // Calculate the left edge (start) of parent's slice
+                leftEdge = parentStartAngle + (Double(parentSelectedIndex) * parentItemAngle)
+                rightEdge = leftEdge + parentItemAngle
+                
             } else {
-                // Parent is partial slice - align to START of parent item
-                let baseAngle = parentSliceConfig.startAngle
+                // Parent is partial slice - must account for parent's OWN direction
                 parentItemAngle = parentSliceConfig.itemAngle
-                parentAngle = baseAngle + (Double(parentSelectedIndex) * parentItemAngle)
+                
+                if parentSliceConfig.direction == .counterClockwise {
+                    // Parent slice is counter-clockwise: items positioned from endAngle going backwards
+                    rightEdge = parentSliceConfig.endAngle - (Double(parentSelectedIndex) * parentItemAngle)
+                    leftEdge = rightEdge - parentItemAngle
+                } else {
+                    // Parent slice is clockwise: items positioned from startAngle going forwards
+                    leftEdge = parentSliceConfig.startAngle + (Double(parentSelectedIndex) * parentItemAngle)
+                    rightEdge = leftEdge + parentItemAngle
+                }
             }
         } else {
             // Fallback (shouldn't happen normally)
             parentItemAngle = 360.0 / Double(max(parentRing.nodes.count, 1))
-            parentAngle = Double(parentSelectedIndex) * parentItemAngle
+            leftEdge = Double(parentSelectedIndex) * parentItemAngle
+            rightEdge = leftEdge + parentItemAngle
         }
         
-        return ParentInfo(angle: parentAngle, node: parentNode, parentItemAngle: parentItemAngle)
+        print("📐 Parent '\(parentNode.name)' edges: left=\(leftEdge)°, right=\(rightEdge)°")
+        
+        return ParentInfo(leftEdge: leftEdge, rightEdge: rightEdge, node: parentNode, parentItemAngle: parentItemAngle)
     }
     
     // MARK: - Initialization

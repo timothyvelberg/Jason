@@ -152,12 +152,16 @@ struct RingView: View {
                 let totalCount = nodes.count
                 guard totalCount > 0 else { return }
                 
-                // Use slice config for initial angles
                 let itemAngle = sliceConfig.itemAngle
-                let baseAngle = sliceConfig.startAngle
                 
-                // Center selection around item in middle of slice (all rings)
-                let angleOffset = baseAngle + (Double(index) * itemAngle) + (itemAngle / 2)
+                let angleOffset: Double
+                if sliceConfig.direction == .counterClockwise {
+                    let baseAngle = sliceConfig.endAngle
+                    angleOffset = baseAngle - (Double(index) * itemAngle) - (itemAngle / 2)
+                } else {
+                    let baseAngle = sliceConfig.startAngle
+                    angleOffset = baseAngle + (Double(index) * itemAngle) + (itemAngle / 2)
+                }
                 
                 startAngle = Angle(degrees: angleOffset - itemAngle / 2 - 90)
                 endAngle = Angle(degrees: angleOffset + itemAngle / 2 - 90)
@@ -184,9 +188,14 @@ struct RingView: View {
                 previousIndex = index
                 hasAppeared = true
                 
-                let baseAngle = sliceConfig.startAngle
-                // Center selection around item in middle of slice (all rings)
-                let angleOffset = baseAngle + (Double(index) * itemAngle) + (itemAngle / 2)
+                let angleOffset: Double
+                if sliceConfig.direction == .counterClockwise {
+                    let baseAngle = sliceConfig.endAngle
+                    angleOffset = baseAngle - (Double(index) * itemAngle) - (itemAngle / 2)
+                } else {
+                    let baseAngle = sliceConfig.startAngle
+                    angleOffset = baseAngle + (Double(index) * itemAngle) + (itemAngle / 2)
+                }
                 
                 startAngle = Angle(degrees: angleOffset - itemAngle / 2 - 90)
                 endAngle = Angle(degrees: angleOffset + itemAngle / 2 - 90)
@@ -199,7 +208,6 @@ struct RingView: View {
         var newRotationIndex: Int
         
         if sliceConfig.isFullCircle {
-            // Full circle: use wrap-around logic
             let forwardSteps = (index - prevIndex + totalCount) % totalCount
             let backwardSteps = (prevIndex - index + totalCount) % totalCount
             
@@ -209,13 +217,17 @@ struct RingView: View {
                 newRotationIndex = rotationIndex - backwardSteps
             }
         } else {
-            // Partial slice: no wrap-around, just use the actual index
             newRotationIndex = index
         }
         
-        let baseAngle = sliceConfig.startAngle
-        // Center selection around item in middle of slice (all rings)
-        let newAngleOffset = baseAngle + (Double(newRotationIndex) * itemAngle) + (itemAngle / 2)
+        let newAngleOffset: Double
+        if sliceConfig.direction == .counterClockwise {
+            let baseAngle = sliceConfig.endAngle
+            newAngleOffset = baseAngle - (Double(newRotationIndex) * itemAngle) - (itemAngle / 2)
+        } else {
+            let baseAngle = sliceConfig.startAngle
+            newAngleOffset = baseAngle + (Double(newRotationIndex) * itemAngle) + (itemAngle / 2)
+        }
         
         withAnimation(.easeOut(duration: 0.08)) {
             angleOffset = newAngleOffset
@@ -232,13 +244,22 @@ struct RingView: View {
             return CGPoint(x: totalDiameter / 2, y: totalDiameter / 2)
         }
         
-        // Calculate position within the slice
         let itemAngle = sliceConfig.itemAngle
-        let baseAngle = sliceConfig.startAngle
         
-        // Position items centered in their slices for all rings
-        let iconAngle = baseAngle + (itemAngle * Double(index)) + (itemAngle / 2)
-        let angleInRadians = (iconAngle - 90) * (.pi / 180)  // Adjust for 0° = top
+        let iconAngle: Double
+        
+        if sliceConfig.direction == .counterClockwise {
+            // Counter-clockwise: Position from END angle going backwards
+            // Item 0 starts at endAngle, item 1 is further counter-clockwise, etc.
+            let baseAngle = sliceConfig.endAngle
+            iconAngle = baseAngle - (itemAngle * Double(index)) - (itemAngle / 2)
+        } else {
+            // Clockwise: Position from START angle going forwards
+            let baseAngle = sliceConfig.startAngle
+            iconAngle = baseAngle + (itemAngle * Double(index)) + (itemAngle / 2)
+        }
+        
+        let angleInRadians = (iconAngle - 90) * (.pi / 180)
         
         let center = CGPoint(x: totalDiameter / 2, y: totalDiameter / 2)
         let x = center.x + middleRadius * cos(angleInRadians)
@@ -251,8 +272,15 @@ struct RingView: View {
         guard nodes.count > 0 else { return 0 }
         
         let itemAngle = sliceConfig.itemAngle
-        let baseAngle = sliceConfig.startAngle
         
-        return baseAngle + (itemAngle * Double(index)) + (itemAngle / 2)
+        if sliceConfig.direction == .counterClockwise {
+            // Counter-clockwise: Calculate from END angle going backwards
+            let baseAngle = sliceConfig.endAngle
+            return baseAngle - (itemAngle * Double(index)) - (itemAngle / 2)
+        } else {
+            // Clockwise: Calculate from START angle going forwards
+            let baseAngle = sliceConfig.startAngle
+            return baseAngle + (itemAngle * Double(index)) + (itemAngle / 2)
+        }
     }
 }

@@ -15,6 +15,18 @@ enum LayoutStyle {
     case partialSlice // Partial arc centered on parent
 }
 
+// MARK: - Slice Configuration Enums
+
+enum SliceAlignment {
+    case start      // First item starts at parent angle, extends in specified direction
+    case center     // Slice centered symmetrically on parent angle
+}
+
+enum SliceDirection {
+    case clockwise        // Extend to the right
+    case counterClockwise // Extend to the left
+}
+
 // MARK: - Drag Provider
 struct DragProvider {
     let fileURLs: [URL]
@@ -42,7 +54,6 @@ struct DragProvider {
     }
 }
 
-// MARK: - Extended InteractionBehavior
 // MARK: - Extended InteractionBehavior
 enum InteractionBehavior {
     case execute(() -> Void)           // Execute action, close UI
@@ -117,6 +128,10 @@ class FunctionNode: Identifiable, ObservableObject {
     let childRingThickness: CGFloat?
     let childIconSize: CGFloat?
     
+    // Slice alignment preferences
+    let preferredAlignment: SliceAlignment?
+    let preferredDirection: SliceDirection?
+    
     //Metadata for dynamic loading
     let metadata: [String: Any]?
     let providerId: String?
@@ -146,6 +161,10 @@ class FunctionNode: Identifiable, ObservableObject {
         childRingThickness: CGFloat? = nil,
         childIconSize: CGFloat? = nil,
         
+        // Slice alignment parameters
+        preferredAlignment: SliceAlignment? = nil,
+        preferredDirection: SliceDirection? = nil,
+        
         //Metadata and provider ID
          metadata: [String: Any]? = nil,
          providerId: String? = nil,
@@ -172,6 +191,9 @@ class FunctionNode: Identifiable, ObservableObject {
         
         self.childRingThickness = childRingThickness
         self.childIconSize = childIconSize
+        
+        self.preferredAlignment = preferredAlignment
+        self.preferredDirection = preferredDirection
         
         self.metadata = metadata
         self.providerId = providerId
@@ -244,6 +266,8 @@ struct PieSliceConfig {
     let startAngle: Double  // In degrees
     let endAngle: Double    // In degrees
     let itemAngle: Double   // Angle per item (default 30°)
+    let alignment: SliceAlignment
+    let direction: SliceDirection
     
     var totalAngle: Double {
         return endAngle - startAngle
@@ -251,25 +275,43 @@ struct PieSliceConfig {
     
     var isFullCircle: Bool {
         // Use tolerance to handle floating point precision
-        return totalAngle >= 359.9  // Changed from 360.0
+        return totalAngle >= 359.9
     }
     
     // Factory method for full circle
-    // Automatically calculates itemAngle based on item count
     static func fullCircle(itemCount: Int) -> PieSliceConfig {
         let itemAngle = 360.0 / Double(max(itemCount, 1))
         return PieSliceConfig(
             startAngle: 0,
             endAngle: 360,
-            itemAngle: itemAngle
+            itemAngle: itemAngle,
+            alignment: .start,
+            direction: .clockwise
         )
     }
     
-    // Factory method for partial slice (Ring 1+)
-    static func partialSlice(itemCount: Int, centeredAt parentAngle: Double, defaultItemAngle: Double = 30.0) -> PieSliceConfig {
-        let totalAngle = min(Double(itemCount) * defaultItemAngle, 360.0)  // Cap at 360°
+    // Factory method for full circle with custom start
+    static func fullCircle(itemCount: Int, startingAt angle: Double = 0) -> PieSliceConfig {
+        let itemAngle = 360.0 / Double(max(itemCount, 1))
+        return PieSliceConfig(
+            startAngle: angle,
+            endAngle: angle + 360,
+            itemAngle: itemAngle,
+            alignment: .start,
+            direction: .clockwise
+        )
+    }
+    
+    // Factory method for partial slice
+    static func partialSlice(
+        itemCount: Int,
+        centeredAt parentAngle: Double,
+        defaultItemAngle: Double = 30.0,
+        alignment: SliceAlignment = .start,
+        direction: SliceDirection = .clockwise
+    ) -> PieSliceConfig {
+        let totalAngle = min(Double(itemCount) * defaultItemAngle, 360.0)
         
-        // Handle single item case - inherit parent's angle
         let itemAngle: Double
         if itemCount == 1 {
             itemAngle = defaultItemAngle
@@ -277,26 +319,40 @@ struct PieSliceConfig {
             itemAngle = totalAngle / Double(itemCount)
         }
         
-        // Align first item with parent, extend clockwise
-        let startAngle = parentAngle
-        let endAngle = (parentAngle + totalAngle).truncatingRemainder(dividingBy: 360)
+        let startAngle: Double
+        let endAngle: Double
+        
+        switch alignment {
+        case .start:
+            // First item starts at parent angle
+            switch direction {
+            case .clockwise:
+                // Extend rightward (clockwise)
+                startAngle = parentAngle
+                endAngle = (parentAngle + totalAngle).truncatingRemainder(dividingBy: 360)
+            case .counterClockwise:
+                // Extend leftward (counter-clockwise)
+                startAngle = (parentAngle - totalAngle).truncatingRemainder(dividingBy: 360)
+                endAngle = parentAngle
+            }
+            
+        case .center:
+            // Center the slice symmetrically on parent angle
+            let halfAngle = totalAngle / 2
+            startAngle = (parentAngle - halfAngle).truncatingRemainder(dividingBy: 360)
+            endAngle = (parentAngle + halfAngle).truncatingRemainder(dividingBy: 360)
+        }
         
         return PieSliceConfig(
             startAngle: startAngle,
             endAngle: endAngle,
-            itemAngle: itemAngle
-        )
-    }
-    
-    static func fullCircle(itemCount: Int, startingAt angle: Double = 0) -> PieSliceConfig {
-        let itemAngle = 360.0 / Double(max(itemCount, 1))
-        return PieSliceConfig(
-            startAngle: angle,
-            endAngle: angle + 360,  // Don't use modulo - we need 360° span!
-            itemAngle: itemAngle
+            itemAngle: itemAngle,
+            alignment: alignment,
+            direction: direction
         )
     }
 }
+
 // MARK: - Drag behavior extension
 extension FunctionNode {
     // Add drag behavior property

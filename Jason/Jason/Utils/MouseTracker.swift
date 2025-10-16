@@ -300,6 +300,7 @@ class MouseTracker {
         
         let itemAngle = CGFloat(sliceConfig.itemAngle)
         let sliceStart = CGFloat(sliceConfig.startAngle)
+        let sliceEnd = CGFloat(sliceConfig.endAngle)
         
         if sliceConfig.isFullCircle {
             // Normalize angles to 0-360 range
@@ -317,33 +318,54 @@ class MouseTracker {
             
             let index = Int(relativeAngle / itemAngle) % totalCount
             return index
+            
         } else {
-            // Partial slice: items centered in their slices
+            // Partial slice
             
             // Normalize angle to 0-360
             var normalizedAngle = angle
             while normalizedAngle < 0 { normalizedAngle += 360 }
             while normalizedAngle >= 360 { normalizedAngle -= 360 }
             
-            // Normalize sliceStart to 0-360 (CRITICAL FIX!)
-            var normalizedStart = sliceStart
-            while normalizedStart >= 360 { normalizedStart -= 360 }
-            while normalizedStart < 0 { normalizedStart += 360 }
-            
-            // Calculate relative angle from normalized start
-            var relativeAngle = normalizedAngle - normalizedStart
-            if relativeAngle < 0 { relativeAngle += 360 }
-            
-            let index = Int(relativeAngle / itemAngle)
-            
-            if index >= 0 && index < totalCount {
-                return index
+            if sliceConfig.direction == .counterClockwise {
+                // Counter-clockwise: Items positioned from END going backwards
+                // Normalize end angle
+                var normalizedEnd = sliceEnd
+                while normalizedEnd >= 360 { normalizedEnd -= 360 }
+                while normalizedEnd < 0 { normalizedEnd += 360 }
+                
+                // Calculate how far back from the end we are
+                var relativeAngle = normalizedEnd - normalizedAngle
+                if relativeAngle < 0 { relativeAngle += 360 }
+                
+                // Convert to index (item 0 is closest to end, item N is furthest)
+                let index = Int(relativeAngle / itemAngle)
+                
+                if index >= 0 && index < totalCount {
+                    return index
+                }
+                
+            } else {
+                // Clockwise: Items positioned from START going forwards
+                // Normalize start angle
+                var normalizedStart = sliceStart
+                while normalizedStart >= 360 { normalizedStart -= 360 }
+                while normalizedStart < 0 { normalizedStart += 360 }
+                
+                // Calculate relative angle from start
+                var relativeAngle = normalizedAngle - normalizedStart
+                if relativeAngle < 0 { relativeAngle += 360 }
+                
+                let index = Int(relativeAngle / itemAngle)
+                
+                if index >= 0 && index < totalCount {
+                    return index
+                }
             }
         }
 
         return -1
     }
-    
     private func isAngleInSlice(_ angle: Double, sliceConfig: PieSliceConfig) -> Bool {
         // Normalize all angles to 0-360 range
         let normalizedAngle = angle.truncatingRemainder(dividingBy: 360)
