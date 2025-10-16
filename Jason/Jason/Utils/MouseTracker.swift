@@ -218,8 +218,8 @@ class MouseTracker {
                             // USE EXPLICIT INTERACTION MODEL
                             switch node.onBoundaryCross {
                             case .expand:
-                                functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)
-                                
+                                functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)  // Uses default false
+
                                 lastFunctionIndex = pieIndex
                                 lastRingLevel = activeRingLevel
                                 return

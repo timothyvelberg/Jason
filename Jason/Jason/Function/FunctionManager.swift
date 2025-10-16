@@ -654,8 +654,8 @@ class FunctionManager: ObservableObject {
         print("Selected ring \(ringLevel), index \(index): \(node.name)")
     }
     
-    func expandCategory(ringLevel: Int, index: Int) {
-        print("⭐ expandCategory called: ringLevel=\(ringLevel), index=\(index)")
+    func expandCategory(ringLevel: Int, index: Int, openedByClick: Bool = false) {
+        print("⭐ expandCategory called: ringLevel=\(ringLevel), index=\(index), openedByClick=\(openedByClick)")
         
         guard rings.indices.contains(ringLevel) else {
             print("❌ Invalid ring level: \(ringLevel)")
@@ -692,11 +692,11 @@ class FunctionManager: ObservableObject {
             rings.removeSubrange((ringLevel + 1)...)
         }
         
-        // Add new ring with displayed children - MARK AS CLICK-OPENED
-        rings.append(RingState(nodes: displayedChildren, isCollapsed: false, openedByClick: true))
+        // Add new ring with displayed children - use the openedByClick parameter
+        rings.append(RingState(nodes: displayedChildren, isCollapsed: false, openedByClick: openedByClick))
         activeRingLevel = ringLevel + 1
         
-        print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes (openedByClick=true)")
+        print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes (openedByClick=\(openedByClick))")
     }
     
     func navigateIntoFolder(ringLevel: Int, index: Int) {

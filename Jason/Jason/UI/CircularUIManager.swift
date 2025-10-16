@@ -162,7 +162,7 @@ class CircularUIManager: ObservableObject {
         case .executeKeepOpen(let action):
             action()
         case .expand:
-            functionManager.expandCategory(ringLevel: ringLevel, index: index)
+            functionManager.expandCategory(ringLevel: ringLevel, index: index, openedByClick: true)
         case .navigateInto:
             print("📂 Navigating into folder: '\(node.name)'")
             functionManager.navigateIntoFolder(ringLevel: ringLevel, index: index)
@@ -266,7 +266,7 @@ class CircularUIManager: ObservableObject {
         
         switch node.onRightClick {
         case .expand:
-            functionManager.expandCategory(ringLevel: ringLevel, index: index)
+            functionManager.expandCategory(ringLevel: ringLevel, index: index, openedByClick: true)
             // Pause mouse tracking to prevent immediate collapse
             mouseTracker?.pauseAfterScroll()
             
