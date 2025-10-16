@@ -562,44 +562,44 @@ class FinderLogic: FunctionProvider {
     
     // Helper: Create thumbnail for images
     private func createThumbnail(for url: URL) -> NSImage {
-        return NSWorkspace.shared.icon(forFile: url.path)
-//        let thumbnailSize = NSSize(width: 64, height: 64)
-//        let cornerRadius: CGFloat = 8  // Rounded corners!
-//        
-//        
-//        // Check if it's an image file
-//        let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
-//        let fileExtension = url.pathExtension.lowercased()
-//        
-//        if imageExtensions.contains(fileExtension) {
-//            if let image = NSImage(contentsOf: url) {
-//                let thumbnail = NSImage(size: thumbnailSize)
-//                
-//                thumbnail.lockFocus()
-//                
-//                // Create rounded rect path
-//                let rect = NSRect(origin: .zero, size: thumbnailSize)
-//                let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-//                
-//                // Clip to rounded rect
-//                path.addClip()
-//                
-//                // Draw image within rounded rect
-//                image.draw(
-//                    in: rect,
-//                    from: NSRect(origin: .zero, size: image.size),
-//                    operation: .sourceOver,
-//                    fraction: 1.0
-//                )
-//                
-//                thumbnail.unlockFocus()
-//                
-//                return thumbnail
-//            }
-//        }
-//        
-//        // For non-images, create rounded icon
-//        return createRoundedIcon(for: url, size: thumbnailSize, cornerRadius: cornerRadius)
+//        return NSWorkspace.shared.icon(forFile: url.path)
+        let thumbnailSize = NSSize(width: 64, height: 64)
+        let cornerRadius: CGFloat = 8  // Rounded corners!
+        
+        
+        // Check if it's an image file
+        let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
+        let fileExtension = url.pathExtension.lowercased()
+        
+        if imageExtensions.contains(fileExtension) {
+            if let image = NSImage(contentsOf: url) {
+                let thumbnail = NSImage(size: thumbnailSize)
+                
+                thumbnail.lockFocus()
+                
+                // Create rounded rect path
+                let rect = NSRect(origin: .zero, size: thumbnailSize)
+                let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
+                
+                // Clip to rounded rect
+                path.addClip()
+                
+                // Draw image within rounded rect
+                image.draw(
+                    in: rect,
+                    from: NSRect(origin: .zero, size: image.size),
+                    operation: .sourceOver,
+                    fraction: 1.0
+                )
+                
+                thumbnail.unlockFocus()
+                
+                return thumbnail
+            }
+        }
+        
+        // For non-images, create rounded icon
+        return createRoundedIcon(for: url, size: thumbnailSize, cornerRadius: cornerRadius)
     }
     
     // MARK: - Finder Window Discovery
