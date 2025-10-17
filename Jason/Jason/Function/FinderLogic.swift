@@ -232,7 +232,6 @@ class FinderLogic: FunctionProvider {
             children: favoriteChildren,
             preferredLayout: .partialSlice,
             slicePositioning: .center,
-            
             onLeftClick: .expand,
             onRightClick: .expand,
             onMiddleClick: .expand,
@@ -338,6 +337,7 @@ class FinderLogic: FunctionProvider {
             children: nil,
             preferredLayout: layout,
             itemAngleSize: itemAngle,
+            showLabel: true,
             
             childRingThickness: childThickness,
             childIconSize: childIcon,

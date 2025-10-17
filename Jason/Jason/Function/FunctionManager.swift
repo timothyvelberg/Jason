@@ -48,6 +48,8 @@ class FunctionManager: ObservableObject {
     private var navigationStack: [FunctionNode] = []
     private var providers: [FunctionProvider] = []
     
+    private(set) var favoriteAppsProvider: FavoriteAppsProvider?
+    
     // MARK: - Cache for Ring Configurations
     
     private var cachedConfigurations: [RingConfiguration] = []
@@ -551,6 +553,8 @@ class FunctionManager: ObservableObject {
     
     init(providers: [FunctionProvider] = []) {
         self.providers = providers
+        let appsProvider = FavoriteAppsProvider()
+        self.favoriteAppsProvider = appsProvider
         print("FunctionManager initialized with \(providers.count) provider(s)")
     }
     

@@ -109,7 +109,8 @@ struct PermissionRequestView: View {
 
 struct MinimalView: View {
     @ObservedObject var circularUI: CircularUIManager
-    @State private var showingFavoritesSettings = false  // 👈 NEW
+    @State private var showingFolderFavoritesSettings = false  // Renamed for clarity
+    @State private var showingAppFavoritesSettings = false     // NEW
     
     var body: some View {
         VStack(spacing: 20) {
@@ -144,10 +145,17 @@ struct MinimalView: View {
                 }
                 .buttonStyle(.bordered)
                 
-                Button("Manage Favorites") {
-                    showingFavoritesSettings = true
+                // Two separate buttons for each type of favorites
+                Button("Manage Favorite Folders") {
+                    showingFolderFavoritesSettings = true
                 }
                 .buttonStyle(.bordered)
+                
+                Button("Manage Favorite Apps") {
+                    showingAppFavoritesSettings = true
+                }
+                .buttonStyle(.bordered)
+                
                 Button("Show DB Path") {
                     if let path = try? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
                         .appendingPathComponent("Jason") {
@@ -159,8 +167,13 @@ struct MinimalView: View {
         }
         .padding(30)
         .frame(width: 300, height: 400)
-        .sheet(isPresented: $showingFavoritesSettings) {
+        .sheet(isPresented: $showingFolderFavoritesSettings) {
             FavoritesSettingsView(circularUI: circularUI)
+        }
+        .sheet(isPresented: $showingAppFavoritesSettings) {
+            if let appsProvider = circularUI.functionManager?.favoriteAppsProvider {
+                FavoriteAppsSettingsView(appsProvider: appsProvider)
+            }
         }
     }
 }

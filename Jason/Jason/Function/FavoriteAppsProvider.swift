@@ -26,27 +26,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         return NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil) ?? NSImage()
     }
     
-    // MARK: - Favorite Apps Configuration
-    
-    // Store favorite apps by bundle identifier
-    @Published var favoriteAppBundleIds: [String] = [
-        // Default favorites - customize these!
-        "com.vivaldi.Vivaldi",
-        "net.whatsapp.WhatsApp",
-        "com.anthropic.claudefordesktop",
-        "org.blenderfoundation.blender",
-        "com.bambulab.bambu-studio",
-        "com.openai.chat",
-        "com.spotify.client",
-        "com.seriflabs.affinitydesigner2",
-        "com.seriflabs.affinityphoto2",
-        "com.tinyspeck.slackmacgap",
-        "co.zeit.hyper",
-        "com.apple.dt.Xcode",
-        "com.figma.Desktop",
-
-        
-    ]
+    // MARK: - Properties
     
     // Cache resolved apps to avoid repeated lookups
     private var resolvedApps: [AppInfo] = []
@@ -58,6 +38,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         let name: String
         let icon: NSImage
         let url: URL
+        let customIconName: String?  // Optional custom icon override
     }
     
     // MARK: - Initialization
@@ -72,19 +53,28 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
     private func loadFavoriteApps() {
         resolvedApps.removeAll()
         
-        for bundleId in favoriteAppBundleIds {
-            if let appInfo = findApp(bundleIdentifier: bundleId) {
+        // Load favorite apps from database
+        let favorites = DatabaseManager.shared.getFavoriteApps()
+        
+        print("📋 [FavoriteAppsProvider] Loaded \(favorites.count) favorite apps from database")
+        
+        for favorite in favorites {
+            if let appInfo = findApp(
+                bundleIdentifier: favorite.bundleIdentifier,
+                customName: favorite.displayName,
+                iconOverride: favorite.iconOverride
+            ) {
                 resolvedApps.append(appInfo)
 //                print("✅ Found favorite app: \(appInfo.name)")
             } else {
-                print("⚠️ Could not find app with bundle ID: \(bundleId)")
+                print("⚠️ Could not find app with bundle ID: \(favorite.bundleIdentifier)")
             }
         }
         
-//        print("🌟 Loaded \(resolvedApps.count) favorite apps")
+        print("🌟 [FavoriteAppsProvider] Resolved \(resolvedApps.count) favorite apps")
     }
     
-    private func findApp(bundleIdentifier: String) -> AppInfo? {
+    private func findApp(bundleIdentifier: String, customName: String?, iconOverride: String?) -> AppInfo? {
         // Try to find app using NSWorkspace
         guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
             return nil
@@ -94,17 +84,33 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
             return nil
         }
         
-        let appName = bundle.infoDictionary?["CFBundleName"] as? String ??
-                      bundle.infoDictionary?["CFBundleDisplayName"] as? String ??
-                      appURL.deletingPathExtension().lastPathComponent
+        // Use custom name if provided, otherwise get from bundle
+        let appName = customName ?? (
+            bundle.infoDictionary?["CFBundleName"] as? String ??
+            bundle.infoDictionary?["CFBundleDisplayName"] as? String ??
+            appURL.deletingPathExtension().lastPathComponent
+        )
         
-        let appIcon = NSWorkspace.shared.icon(forFile: appURL.path)
+        // Get icon - use override if specified, otherwise system icon
+        let appIcon: NSImage
+        if let iconOverride = iconOverride {
+            // Try to load custom SF Symbol
+            if let customIcon = NSImage(systemSymbolName: iconOverride, accessibilityDescription: nil) {
+                appIcon = customIcon
+            } else {
+                // Fall back to app's icon
+                appIcon = NSWorkspace.shared.icon(forFile: appURL.path)
+            }
+        } else {
+            appIcon = NSWorkspace.shared.icon(forFile: appURL.path)
+        }
         
         return AppInfo(
             bundleIdentifier: bundleIdentifier,
             name: appName,
             icon: appIcon,
-            url: appURL
+            url: appURL,
+            customIconName: iconOverride
         )
     }
     
@@ -146,6 +152,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
                 children: appNodes,
                 
                 preferredLayout: .partialSlice,  // Use partial slice for compact display
+                slicePositioning: .center,
 
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .expand,           // Click to expand favorites
@@ -163,7 +170,8 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
     }
     
     func refresh() {
-        // Reload favorite apps (useful if app list changes)
+        // Reload favorite apps from database
+        print("🔄 [FavoriteAppsProvider] Refreshing favorite apps")
         loadFavoriteApps()
     }
     
@@ -171,6 +179,9 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
     
     private func launchApp(_ appInfo: AppInfo) {
         print("🚀 Launching favorite app: \(appInfo.name)")
+        
+        // Track app launch in database
+        DatabaseManager.shared.updateAppAccess(bundleIdentifier: appInfo.bundleIdentifier)
         
         // Launch the app
         let configuration = NSWorkspace.OpenConfiguration()
@@ -185,77 +196,129 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         }
     }
     
-    private func openFavoritesManager() {
-        // Future: Could open a UI to manage favorites
-        // For now, just log
-        print("💡 Favorites manager not yet implemented")
-        print("Current favorites: \(resolvedApps.map { $0.name }.joined(separator: ", "))")
-    }
+    // MARK: - Favorites Management (Database-backed)
     
-    // MARK: - Favorites Management
-    
-    func addFavorite(bundleIdentifier: String) {
-        guard !favoriteAppBundleIds.contains(bundleIdentifier) else {
-            print("⚠️ App already in favorites: \(bundleIdentifier)")
-            return
+    /// Add app to favorites (saves to database)
+    func addFavorite(bundleIdentifier: String, displayName: String? = nil, iconOverride: String? = nil) -> Bool {
+        // Try to find the app first to get its name
+        guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
+            print("⚠️ [FavoriteAppsProvider] Could not find app: \(bundleIdentifier)")
+            return false
         }
         
-        favoriteAppBundleIds.append(bundleIdentifier)
-        print("➕ Added to favorites: \(bundleIdentifier)")
-        
-        // Reload apps
-        loadFavoriteApps()
-        
-        // TODO: Persist to UserDefaults or a config file
-    }
-    
-    func removeFavorite(bundleIdentifier: String) {
-        favoriteAppBundleIds.removeAll { $0 == bundleIdentifier }
-        print("➖ Removed from favorites: \(bundleIdentifier)")
-        
-        // Reload apps
-        loadFavoriteApps()
-        
-        // TODO: Persist to UserDefaults or a config file
-    }
-    
-    func reorderFavorites(from: Int, to: Int) {
-        guard favoriteAppBundleIds.indices.contains(from),
-              favoriteAppBundleIds.indices.contains(to) else {
-            return
+        guard let bundle = Bundle(url: appURL) else {
+            print("⚠️ [FavoriteAppsProvider] Could not load bundle: \(bundleIdentifier)")
+            return false
         }
         
-        let item = favoriteAppBundleIds.remove(at: from)
-        favoriteAppBundleIds.insert(item, at: to)
+        // Get app name
+        let appName = displayName ?? (
+            bundle.infoDictionary?["CFBundleName"] as? String ??
+            bundle.infoDictionary?["CFBundleDisplayName"] as? String ??
+            appURL.deletingPathExtension().lastPathComponent
+        )
         
-        print("🔄 Reordered favorites")
+        // Add to database
+        let success = DatabaseManager.shared.addFavoriteApp(
+            bundleIdentifier: bundleIdentifier,
+            displayName: appName,
+            iconOverride: iconOverride
+        )
         
-        // Reload apps
-        loadFavoriteApps()
+        if success {
+            print("➕ [FavoriteAppsProvider] Added to favorites: \(appName)")
+            // Reload apps to reflect changes
+            loadFavoriteApps()
+        } else {
+            print("⚠️ [FavoriteAppsProvider] Failed to add favorite (may already exist)")
+        }
         
-        // TODO: Persist to UserDefaults or a config file
+        return success
     }
-}
-
-// MARK: - Persistence Extension (Future)
-
-extension FavoriteAppsProvider {
     
-    // Keys for UserDefaults
-    private static let favoritesKey = "com.jason.favoriteApps"
-    
-    // Load favorites from persistent storage
-    func loadFavoritesFromStorage() {
-        if let stored = UserDefaults.standard.array(forKey: Self.favoritesKey) as? [String] {
-            favoriteAppBundleIds = stored
-            print("📥 Loaded \(stored.count) favorites from storage")
+    /// Remove app from favorites (removes from database)
+    func removeFavorite(bundleIdentifier: String) -> Bool {
+        let success = DatabaseManager.shared.removeFavoriteApp(bundleIdentifier: bundleIdentifier)
+        
+        if success {
+            print("➖ [FavoriteAppsProvider] Removed from favorites: \(bundleIdentifier)")
+            // Reload apps to reflect changes
             loadFavoriteApps()
         }
+        
+        return success
     }
     
-    // Save favorites to persistent storage
-    func saveFavoritesToStorage() {
-        UserDefaults.standard.set(favoriteAppBundleIds, forKey: Self.favoritesKey)
-        print("💾 Saved \(favoriteAppBundleIds.count) favorites to storage")
+    /// Update favorite app settings (display name and icon)
+    func updateFavorite(bundleIdentifier: String, displayName: String, iconOverride: String?) -> Bool {
+        let success = DatabaseManager.shared.updateFavoriteApp(
+            bundleIdentifier: bundleIdentifier,
+            displayName: displayName,
+            iconOverride: iconOverride
+        )
+        
+        if success {
+            print("✏️ [FavoriteAppsProvider] Updated favorite: \(displayName)")
+            // Reload apps to reflect changes
+            loadFavoriteApps()
+        }
+        
+        return success
+    }
+    
+    /// Reorder favorites (updates sort_order in database)
+    func reorderFavorites(from: Int, to: Int) -> Bool {
+        let favorites = DatabaseManager.shared.getFavoriteApps()
+        
+        guard favorites.indices.contains(from),
+              favorites.indices.contains(to) else {
+            return false
+        }
+        
+        // Create mutable array of favorites
+        var reordered = favorites
+        let item = reordered.remove(at: from)
+        reordered.insert(item, at: to)
+        
+        // Update sort_order for all items
+        var success = true
+        for (index, favorite) in reordered.enumerated() {
+            if !DatabaseManager.shared.reorderFavoriteApps(
+                bundleIdentifier: favorite.bundleIdentifier,
+                newSortOrder: index
+            ) {
+                success = false
+            }
+        }
+        
+        if success {
+            print("🔄 [FavoriteAppsProvider] Reordered favorites")
+            // Reload apps to reflect changes
+            loadFavoriteApps()
+        }
+        
+        return success
+    }
+    
+    // MARK: - Migration Helper (One-time use)
+    
+    /// Migrate hardcoded favorites to database (call this once)
+    func migrateHardcodedFavorites() {
+        let hardcodedBundleIds = [
+            "com.vivaldi.Vivaldi",
+            "net.whatsapp.WhatsApp",
+            "com.anthropic.claudefordesktop"
+        ]
+        
+        print("🔄 [FavoriteAppsProvider] Migrating hardcoded favorites to database...")
+        
+        var migratedCount = 0
+        for bundleId in hardcodedBundleIds {
+            if addFavorite(bundleIdentifier: bundleId) {
+                migratedCount += 1
+            }
+        }
+        
+        print("✅ [FavoriteAppsProvider] Migrated \(migratedCount)/\(hardcodedBundleIds.count) apps")
     }
 }

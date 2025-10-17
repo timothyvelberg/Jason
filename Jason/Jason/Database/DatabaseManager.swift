@@ -77,25 +77,9 @@ class DatabaseManager {
             throw DatabaseError.notInitialized
         }
         
-        // Drop old tables if they exist (fresh start)
-        let dropTables = """
-        DROP TABLE IF EXISTS folder_cache;
-        DROP TABLE IF EXISTS usage_history;
-        DROP TABLE IF EXISTS favorites;
-        DROP TABLE IF EXISTS preferences;
-        DROP TABLE IF EXISTS folders;
-        DROP TABLE IF EXISTS favorite_folders;
-        """
-        
-        if sqlite3_exec(db, dropTables, nil, nil, nil) != SQLITE_OK {
-            if let error = sqlite3_errmsg(db) {
-                print("⚠️ [DatabaseManager] Warning dropping tables: \(String(cString: error))")
-            }
-        }
-        
         // Create folders table (all folders - registry + usage tracking)
         let foldersSQL = """
-        CREATE TABLE folders (
+        CREATE TABLE IF NOT EXISTS folders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             path TEXT UNIQUE NOT NULL,
             title TEXT NOT NULL,
@@ -107,7 +91,7 @@ class DatabaseManager {
         
         // Create favorite_folders table (which folders are favorites)
         let favoriteFoldersSQL = """
-        CREATE TABLE favorite_folders (
+        CREATE TABLE IF NOT EXISTS favorite_folders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             folder_id INTEGER NOT NULL,
             sort_order INTEGER NOT NULL,
@@ -121,9 +105,22 @@ class DatabaseManager {
         );
         """
         
+        // Create favorite_apps table (favorite applications)
+        let favoriteAppsSQL = """
+        CREATE TABLE IF NOT EXISTS favorite_apps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bundle_identifier TEXT UNIQUE NOT NULL,
+            display_name TEXT NOT NULL,
+            sort_order INTEGER NOT NULL,
+            icon_override TEXT,
+            last_accessed INTEGER,
+            access_count INTEGER DEFAULT 0
+        );
+        """
+        
         // Create folder_cache table (performance optimization)
         let folderCacheSQL = """
-        CREATE TABLE folder_cache (
+        CREATE TABLE IF NOT EXISTS folder_cache (
             path TEXT PRIMARY KEY,
             last_scanned INTEGER NOT NULL,
             items_json TEXT NOT NULL,
@@ -133,14 +130,14 @@ class DatabaseManager {
         
         // Create preferences table (general settings)
         let preferencesSQL = """
-        CREATE TABLE preferences (
+        CREATE TABLE IF NOT EXISTS preferences (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
         """
         
         // Execute all schema creation
-        let tables = [foldersSQL, favoriteFoldersSQL, folderCacheSQL, preferencesSQL]
+        let tables = [foldersSQL, favoriteFoldersSQL, favoriteAppsSQL, folderCacheSQL, preferencesSQL]
         
         for sql in tables {
             if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
@@ -536,6 +533,220 @@ class DatabaseManager {
         return success
     }
     
+    // MARK: - Favorite Apps Methods
+    
+    /// Get all favorite apps (sorted by sort_order)
+    func getFavoriteApps() -> [FavoriteAppEntry] {
+        guard let db = db else { return [] }
+        
+        var results: [FavoriteAppEntry] = []
+        
+        queue.sync {
+            let sql = """
+            SELECT id, bundle_identifier, display_name, sort_order, icon_override, last_accessed, access_count
+            FROM favorite_apps
+            ORDER BY sort_order;
+            """
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                while sqlite3_step(statement) == SQLITE_ROW {
+                    let id = Int(sqlite3_column_int(statement, 0))
+                    let bundleId = String(cString: sqlite3_column_text(statement, 1))
+                    let displayName = String(cString: sqlite3_column_text(statement, 2))
+                    let sortOrder = Int(sqlite3_column_int(statement, 3))
+                    let iconOverride = sqlite3_column_text(statement, 4) != nil ? String(cString: sqlite3_column_text(statement, 4)) : nil
+                    let lastAccessed: Int? = sqlite3_column_type(statement, 5) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(statement, 5))
+                    let accessCount = Int(sqlite3_column_int(statement, 6))
+                    
+                    results.append(FavoriteAppEntry(
+                        id: id,
+                        bundleIdentifier: bundleId,
+                        displayName: displayName,
+                        sortOrder: sortOrder,
+                        iconOverride: iconOverride,
+                        lastAccessed: lastAccessed,
+                        accessCount: accessCount
+                    ))
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+        
+        return results
+    }
+    
+    /// Add app to favorites
+    func addFavoriteApp(bundleIdentifier: String, displayName: String, iconOverride: String? = nil) -> Bool {
+        guard let db = db else { return false }
+        
+        var success = false
+        
+        queue.sync {
+            // Check if already exists
+            var checkStatement: OpaquePointer?
+            let checkSQL = "SELECT id FROM favorite_apps WHERE bundle_identifier = ?;"
+            
+            if sqlite3_prepare_v2(db, checkSQL, -1, &checkStatement, nil) == SQLITE_OK {
+                sqlite3_bind_text(checkStatement, 1, (bundleIdentifier as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(checkStatement) == SQLITE_ROW {
+                    print("⚠️ [DatabaseManager] App already in favorites: \(bundleIdentifier)")
+                    sqlite3_finalize(checkStatement)
+                    return
+                }
+            }
+            sqlite3_finalize(checkStatement)
+            
+            // Get next sort order
+            var nextSortOrder = 0
+            var countStatement: OpaquePointer?
+            if sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM favorite_apps;", -1, &countStatement, nil) == SQLITE_OK {
+                if sqlite3_step(countStatement) == SQLITE_ROW {
+                    nextSortOrder = Int(sqlite3_column_int(countStatement, 0))
+                }
+            }
+            sqlite3_finalize(countStatement)
+            
+            // Insert new favorite app
+            let sql = """
+            INSERT INTO favorite_apps (bundle_identifier, display_name, sort_order, icon_override, access_count)
+            VALUES (?, ?, ?, ?, 0);
+            """
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (bundleIdentifier as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 2, (displayName as NSString).utf8String, -1, nil)
+                sqlite3_bind_int(statement, 3, Int32(nextSortOrder))
+                
+                if let iconOverride = iconOverride {
+                    sqlite3_bind_text(statement, 4, (iconOverride as NSString).utf8String, -1, nil)
+                } else {
+                    sqlite3_bind_null(statement, 4)
+                }
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("⭐ [DatabaseManager] Added favorite app: \(displayName) (\(bundleIdentifier))")
+                    success = true
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+        
+        return success
+    }
+    
+    /// Remove app from favorites
+    func removeFavoriteApp(bundleIdentifier: String) -> Bool {
+        guard let db = db else { return false }
+        
+        var success = false
+        
+        queue.sync {
+            let sql = "DELETE FROM favorite_apps WHERE bundle_identifier = ?;"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (bundleIdentifier as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("🗑️ [DatabaseManager] Removed favorite app: \(bundleIdentifier)")
+                    success = true
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+        
+        return success
+    }
+    
+    /// Update favorite app display name and icon
+    func updateFavoriteApp(bundleIdentifier: String, displayName: String, iconOverride: String?) -> Bool {
+        guard let db = db else { return false }
+        
+        var success = false
+        
+        queue.sync {
+            let sql = """
+            UPDATE favorite_apps
+            SET display_name = ?, icon_override = ?
+            WHERE bundle_identifier = ?;
+            """
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (displayName as NSString).utf8String, -1, nil)
+                
+                if let iconOverride = iconOverride {
+                    sqlite3_bind_text(statement, 2, (iconOverride as NSString).utf8String, -1, nil)
+                } else {
+                    sqlite3_bind_null(statement, 2)
+                }
+                
+                sqlite3_bind_text(statement, 3, (bundleIdentifier as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("✏️ [DatabaseManager] Updated favorite app: \(displayName)")
+                    success = true
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+        
+        return success
+    }
+    
+    /// Update app access tracking
+    func updateAppAccess(bundleIdentifier: String) {
+        guard let db = db else { return }
+        
+        queue.async {
+            let now = Int(Date().timeIntervalSince1970)
+            
+            let sql = """
+            UPDATE favorite_apps
+            SET last_accessed = ?, access_count = access_count + 1
+            WHERE bundle_identifier = ?;
+            """
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_int64(statement, 1, Int64(now))
+                sqlite3_bind_text(statement, 2, (bundleIdentifier as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("📊 [DatabaseManager] Updated app access: \(bundleIdentifier)")
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+    }
+    
+    /// Reorder favorite apps
+    func reorderFavoriteApps(bundleIdentifier: String, newSortOrder: Int) -> Bool {
+        guard let db = db else { return false }
+        
+        var success = false
+        
+        queue.sync {
+            let sql = "UPDATE favorite_apps SET sort_order = ? WHERE bundle_identifier = ?;"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_int(statement, 1, Int32(newSortOrder))
+                sqlite3_bind_text(statement, 2, (bundleIdentifier as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("🔄 [DatabaseManager] Reordered app: \(bundleIdentifier) to position \(newSortOrder)")
+                    success = true
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+        
+        return success
+    }
     
     // MARK: - Folder Cache Methods
     
@@ -949,6 +1160,16 @@ struct FavoriteFolderEntry {
     let childIconSize: Int?
 }
 
+struct FavoriteAppEntry: Identifiable {
+    let id: Int
+    let bundleIdentifier: String
+    let displayName: String
+    let sortOrder: Int
+    let iconOverride: String?
+    let lastAccessed: Int?
+    let accessCount: Int
+}
+
 struct UsageHistoryEntry {
     let id: Int?
     let itemPath: String
@@ -957,7 +1178,7 @@ struct UsageHistoryEntry {
     var lastAccessed: Int
 }
 
-struct FavoriteEntry { 
+struct FavoriteEntry {
     let id: Int?
     let name: String
     let path: String
