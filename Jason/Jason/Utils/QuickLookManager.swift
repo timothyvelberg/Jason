@@ -1,10 +1,3 @@
-//
-//  QuickLookManager.swift
-//  Jason
-//
-//  Created by Timothy Velberg on 12/10/2025.
-//
-
 import Foundation
 import AppKit
 import Quartz
@@ -15,6 +8,9 @@ class QuickLookManager: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelega
     
     private var previewURLs: [URL] = []
     private(set) var isShowing: Bool = false
+    
+    // NEW: Callback when Quick Look visibility changes
+    var onVisibilityChanged: ((Bool) -> Void)?
     
     private override init() {
         super.init()
@@ -37,26 +33,32 @@ class QuickLookManager: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelega
         panel.dataSource = self
         panel.delegate = self
         
-        // Refresh and show
+        // Refresh data
         panel.reloadData()
 
-        if !panel.isVisible {
-            isShowing = true  // ← Set BEFORE showing the panel!
+        // Always check our own state, not panel.isVisible (which can be stale)
+        if !isShowing {
+            isShowing = true
+            onVisibilityChanged?(true)
             panel.makeKeyAndOrderFront(nil)
             print("✅ [QuickLook] Preview panel shown")
         } else {
-            panel.reloadData()
-            print("🔄 [QuickLook] Preview panel refreshed")
-        }    }
-    
-    /// Hide the Quick Look preview
+            // Already showing according to our state
+            print("🔄 [QuickLook] Preview panel refreshed (already visible)")
+        }
+    }
     func hidePreview() {
         guard let panel = QLPreviewPanel.shared() else { return }
         
+        // Force the state to false immediately
+        isShowing = false
+        onVisibilityChanged?(false)
+        
         if panel.isVisible {
             panel.orderOut(nil)
-            isShowing = false
             print("🙈 [QuickLook] Preview panel hidden")
+        } else {
+            print("🙈 [QuickLook] Preview panel already hidden")
         }
         
         previewURLs = []
@@ -101,5 +103,12 @@ class QuickLookManager: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelega
     func previewPanel(_ panel: QLPreviewPanel!, sourceFrameOnScreenFor item: QLPreviewItem!) -> NSRect {
         // Return a rect for the zoom animation (optional)
         return NSRect.zero
+    }
+    
+    // NEW: Delegate method called when panel is about to close
+    func previewPanelWillClose(_ panel: QLPreviewPanel!) {
+        isShowing = false
+        onVisibilityChanged?(false)  // 👈 Notify that QuickLook is closing
+        print("🙈 [QuickLook] Preview panel will close")
     }
 }

@@ -35,6 +35,16 @@ class CircularUIManager: ObservableObject {
         overlayWindow?.onScrollBack = { [weak self] in
             self?.handleScrollBack()
         }
+        
+        QuickLookManager.shared.onVisibilityChanged = { [weak self] isShowing in
+            if isShowing {
+                // QuickLook is showing - lower our window
+                self?.overlayWindow?.lowerWindowLevel()
+            } else {
+                // QuickLook is hidden - restore our window
+                self?.overlayWindow?.restoreWindowLevel()
+            }
+        }
     }
     
     func setup(with appSwitcher: AppSwitcherManager) {
@@ -467,8 +477,17 @@ class CircularUIManager: ObservableObject {
     
     // MARK: - Preview Handler
 
+    // MARK: - Preview Handler
+
     private func handlePreviewRequest() {
         guard let functionManager = functionManager else { return }
+        
+        // NEW: If QuickLook is already showing, just close it
+        if QuickLookManager.shared.isShowing {
+            print("👁️ [Preview] QuickLook is already open - closing it")
+            QuickLookManager.shared.hidePreview()
+            return
+        }
         
         let activeRingLevel = functionManager.activeRingLevel
         guard activeRingLevel < functionManager.rings.count else {
@@ -495,7 +514,7 @@ class CircularUIManager: ObservableObject {
         }
         
         print("👁️ [Preview] Showing Quick Look for: \(node.name)")
-        QuickLookManager.shared.togglePreview(for: previewURL)
+        QuickLookManager.shared.showPreview(for: previewURL)  // 👈 Changed from togglePreview to showPreview
     }
     
     // Handle global flag changes (modifier keys like SHIFT)

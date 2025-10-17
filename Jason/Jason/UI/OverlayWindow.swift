@@ -13,6 +13,8 @@ class OverlayWindow: NSWindow {
     // Callback for when window loses focus
     var onLostFocus: (() -> Void)?
     
+    private var normalLevel: NSWindow.Level = .statusBar
+    
     // Add callback property for scroll events
     var onScrollBack: (() -> Void)?
     
@@ -84,6 +86,18 @@ class OverlayWindow: NSWindow {
     
     override var canBecomeMain: Bool {
         return true
+    }
+    
+    // Lower window level (so QuickLook can appear on top)
+    func lowerWindowLevel() {
+        self.level = .normal
+        print("🔽 [OverlayWindow] Lowered window level to .normal")
+    }
+    
+    //Restore window level to normal overlay level
+    func restoreWindowLevel() {
+        self.level = normalLevel
+        print("🔼 [OverlayWindow] Restored window level to \(normalLevel)")
     }
     
     // Handle scroll events
