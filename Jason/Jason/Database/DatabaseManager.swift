@@ -112,6 +112,11 @@ class DatabaseManager {
             folder_id INTEGER NOT NULL,
             sort_order INTEGER NOT NULL,
             max_items INTEGER,
+            preferred_layout TEXT DEFAULT 'fullCircle',
+            item_angle_size INTEGER DEFAULT 30,
+            slice_positioning TEXT DEFAULT 'startClockwise',
+            child_ring_thickness INTEGER DEFAULT 80,
+            child_icon_size INTEGER DEFAULT 32,
             FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
         );
         """
@@ -276,14 +281,16 @@ class DatabaseManager {
     // MARK: - Favorite Folders Methods
 
     /// Get all favorite folders (sorted by sort_order)
-    func getFavoriteFolders() -> [(folder: FolderEntry, maxItems: Int?)] {
+    func getFavoriteFolders() -> [(folder: FolderEntry, settings: FavoriteFolderSettings)] {
         guard let db = db else { return [] }
         
-        var results: [(FolderEntry, Int?)] = []
+        var results: [(FolderEntry, FavoriteFolderSettings)] = []
         
         queue.sync {
             let sql = """
-            SELECT f.id, f.path, f.title, f.icon, f.last_accessed, f.access_count, ff.max_items
+            SELECT f.id, f.path, f.title, f.icon, f.last_accessed, f.access_count,
+                   ff.max_items, ff.preferred_layout, ff.item_angle_size, 
+                   ff.slice_positioning, ff.child_ring_thickness, ff.child_icon_size
             FROM favorite_folders ff
             JOIN folders f ON ff.folder_id = f.id
             ORDER BY ff.sort_order;
@@ -300,6 +307,11 @@ class DatabaseManager {
                     let accessCount = Int(sqlite3_column_int(statement, 5))
                     
                     let maxItems: Int? = sqlite3_column_type(statement, 6) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 6))
+                    let preferredLayout = sqlite3_column_text(statement, 7) != nil ? String(cString: sqlite3_column_text(statement, 7)) : nil
+                    let itemAngleSize: Int? = sqlite3_column_type(statement, 8) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 8))
+                    let slicePositioning = sqlite3_column_text(statement, 9) != nil ? String(cString: sqlite3_column_text(statement, 9)) : nil
+                    let childRingThickness: Int? = sqlite3_column_type(statement, 10) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 10))
+                    let childIconSize: Int? = sqlite3_column_type(statement, 11) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 11))
                     
                     let folder = FolderEntry(
                         id: id,
@@ -310,7 +322,16 @@ class DatabaseManager {
                         accessCount: accessCount
                     )
                     
-                    results.append((folder, maxItems))
+                    let settings = FavoriteFolderSettings(
+                        maxItems: maxItems,
+                        preferredLayout: preferredLayout,
+                        itemAngleSize: itemAngleSize,
+                        slicePositioning: slicePositioning,
+                        childRingThickness: childRingThickness,
+                        childIconSize: childIconSize
+                    )
+                    
+                    results.append((folder, settings))
                 }
             }
             sqlite3_finalize(statement)
@@ -320,7 +341,7 @@ class DatabaseManager {
     }
 
     /// Add folder to favorites
-    func addFavoriteFolder(path: String, title: String? = nil, maxItems: Int? = nil) -> Bool {
+    func addFavoriteFolder(path: String, title: String? = nil, settings: FavoriteFolderSettings? = nil) -> Bool {
         guard let db = db else { return false }
         
         var success = false
@@ -342,18 +363,54 @@ class DatabaseManager {
             }
             sqlite3_finalize(countStatement)
             
-            // Insert into favorite_folders
-            let sql = "INSERT INTO favorite_folders (folder_id, sort_order, max_items) VALUES (?, ?, ?);"
+            // Insert into favorite_folders with all settings
+            let sql = """
+            INSERT INTO favorite_folders 
+            (folder_id, sort_order, max_items, preferred_layout, item_angle_size, 
+             slice_positioning, child_ring_thickness, child_icon_size) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_int(statement, 1, Int32(folderId))
                 sqlite3_bind_int(statement, 2, Int32(nextSortOrder))
                 
-                if let maxItems = maxItems {
+                // Bind settings or use defaults
+                if let maxItems = settings?.maxItems {
                     sqlite3_bind_int(statement, 3, Int32(maxItems))
                 } else {
                     sqlite3_bind_null(statement, 3)
+                }
+                
+                if let layout = settings?.preferredLayout {
+                    sqlite3_bind_text(statement, 4, (layout as NSString).utf8String, -1, nil)
+                } else {
+                    sqlite3_bind_text(statement, 4, ("fullCircle" as NSString).utf8String, -1, nil)
+                }
+                
+                if let angleSize = settings?.itemAngleSize {
+                    sqlite3_bind_int(statement, 5, Int32(angleSize))
+                } else {
+                    sqlite3_bind_int(statement, 5, 30)
+                }
+                
+                if let positioning = settings?.slicePositioning {
+                    sqlite3_bind_text(statement, 6, (positioning as NSString).utf8String, -1, nil)
+                } else {
+                    sqlite3_bind_text(statement, 6, ("startClockwise" as NSString).utf8String, -1, nil)
+                }
+                
+                if let thickness = settings?.childRingThickness {
+                    sqlite3_bind_int(statement, 7, Int32(thickness))
+                } else {
+                    sqlite3_bind_int(statement, 7, 80)
+                }
+                
+                if let iconSize = settings?.childIconSize {
+                    sqlite3_bind_int(statement, 8, Int32(iconSize))
+                } else {
+                    sqlite3_bind_int(statement, 8, 32)
                 }
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
@@ -393,6 +450,93 @@ class DatabaseManager {
         
         return success
     }
+    
+    /// Update favorite folder settings
+    func updateFavoriteSettings(path: String, title: String, settings: FavoriteFolderSettings) -> Bool {
+        guard let db = db else { return false }
+        
+        var success = false
+        
+        queue.sync {
+            // First, update the folder title
+            let updateFolderSQL = "UPDATE folders SET title = ? WHERE path = ?;"
+            var folderStatement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, updateFolderSQL, -1, &folderStatement, nil) == SQLITE_OK {
+                sqlite3_bind_text(folderStatement, 1, (title as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(folderStatement, 2, (path as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(folderStatement) == SQLITE_DONE {
+                    print("✏️ [DatabaseManager] Updated folder title: \(title)")
+                }
+            }
+            sqlite3_finalize(folderStatement)
+            
+            // Then, update the favorite settings
+            let updateSettingsSQL = """
+            UPDATE favorite_folders
+            SET max_items = ?,
+                preferred_layout = ?,
+                item_angle_size = ?,
+                slice_positioning = ?,
+                child_ring_thickness = ?,
+                child_icon_size = ?
+            WHERE folder_id = (SELECT id FROM folders WHERE path = ?);
+            """
+            var settingsStatement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, updateSettingsSQL, -1, &settingsStatement, nil) == SQLITE_OK {
+                // Bind all settings
+                if let maxItems = settings.maxItems {
+                    sqlite3_bind_int(settingsStatement, 1, Int32(maxItems))
+                } else {
+                    sqlite3_bind_null(settingsStatement, 1)
+                }
+                
+                if let layout = settings.preferredLayout {
+                    sqlite3_bind_text(settingsStatement, 2, (layout as NSString).utf8String, -1, nil)
+                } else {
+                    sqlite3_bind_text(settingsStatement, 2, ("fullCircle" as NSString).utf8String, -1, nil)
+                }
+                
+                if let angleSize = settings.itemAngleSize {
+                    sqlite3_bind_int(settingsStatement, 3, Int32(angleSize))
+                } else {
+                    sqlite3_bind_int(settingsStatement, 3, 30)
+                }
+                
+                if let positioning = settings.slicePositioning {
+                    sqlite3_bind_text(settingsStatement, 4, (positioning as NSString).utf8String, -1, nil)
+                } else {
+                    sqlite3_bind_text(settingsStatement, 4, ("startClockwise" as NSString).utf8String, -1, nil)
+                }
+                
+                if let thickness = settings.childRingThickness {
+                    sqlite3_bind_int(settingsStatement, 5, Int32(thickness))
+                } else {
+                    sqlite3_bind_int(settingsStatement, 5, 80)
+                }
+                
+                if let iconSize = settings.childIconSize {
+                    sqlite3_bind_int(settingsStatement, 6, Int32(iconSize))
+                } else {
+                    sqlite3_bind_int(settingsStatement, 6, 32)
+                }
+                
+                sqlite3_bind_text(settingsStatement, 7, (path as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(settingsStatement) == SQLITE_DONE {
+                    print("✅ [DatabaseManager] Updated favorite settings for: \(path)")
+                    success = true
+                }
+            }
+            sqlite3_finalize(settingsStatement)
+        }
+        
+        return success
+    }
+    
+    
     // MARK: - Folder Cache Methods
     
     /// Get cached folder contents
@@ -798,6 +942,11 @@ struct FavoriteFolderEntry {
     let folderId: Int
     let sortOrder: Int
     let maxItems: Int?
+    let preferredLayout: String?
+    let itemAngleSize: Int?
+    let slicePositioning: String?
+    let childRingThickness: Int?
+    let childIconSize: Int?
 }
 
 struct UsageHistoryEntry {
@@ -808,12 +957,21 @@ struct UsageHistoryEntry {
     var lastAccessed: Int
 }
 
-struct FavoriteEntry {  // 👈 ADD THIS TOO (still used by old favorites methods)
+struct FavoriteEntry { 
     let id: Int?
     let name: String
     let path: String
     let iconData: Data?
     let sortOrder: Int
+}
+
+struct FavoriteFolderSettings {
+    let maxItems: Int?
+    let preferredLayout: String?
+    let itemAngleSize: Int?
+    let slicePositioning: String?
+    let childRingThickness: Int?
+    let childIconSize: Int?
 }
 
 // MARK: - Errors

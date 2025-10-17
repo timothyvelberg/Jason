@@ -216,13 +216,12 @@ class FinderLogic: FunctionProvider {
             return createFavoriteFoldersNode()
         }
         
-        // Create child nodes from database favorites
-        let favoriteChildren = favoritesFromDB.map { (folder, maxItems) in
+        let favoriteChildren = favoritesFromDB.map { (folder, settings) in
             createFavoriteFolderEntry(
                 name: folder.title,
                 path: URL(fileURLWithPath: folder.path),
                 icon: getIconForFolder(folder),
-                maxItems: maxItems
+                settings: settings
             )
         }
         
@@ -232,6 +231,7 @@ class FinderLogic: FunctionProvider {
             icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
             children: favoriteChildren,
             preferredLayout: .partialSlice,
+            slicePositioning: .center,
             
             onLeftClick: .expand,
             onRightClick: .expand,
@@ -241,13 +241,22 @@ class FinderLogic: FunctionProvider {
     }
 
     /// Add default favorites on first run
+    /// Add default favorites on first run
     private func addDefaultFavorites() {
         // Downloads
         if let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
+            let settings = FavoriteFolderSettings(
+                maxItems: 20,
+                preferredLayout: nil,
+                itemAngleSize: nil,
+                slicePositioning: nil,
+                childRingThickness: nil,
+                childIconSize: nil
+            )
             _ = DatabaseManager.shared.addFavoriteFolder(
                 path: downloadsURL.path,
                 title: "Downloads",
-                maxItems: 20
+                settings: settings
             )
         }
         
@@ -257,23 +266,30 @@ class FinderLogic: FunctionProvider {
             _ = DatabaseManager.shared.addFavoriteFolder(
                 path: gitPath,
                 title: "Git",
-                maxItems: nil
+                settings: nil  // Use all defaults
             )
         }
         
         // Screenshots (if it exists)
         let screenshotsPath = "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots/"
         if FileManager.default.fileExists(atPath: screenshotsPath) {
+            let settings = FavoriteFolderSettings(
+                maxItems: 10,
+                preferredLayout: nil,
+                itemAngleSize: nil,
+                slicePositioning: nil,
+                childRingThickness: nil,
+                childIconSize: nil
+            )
             _ = DatabaseManager.shared.addFavoriteFolder(
                 path: screenshotsPath,
                 title: "Screenshots",
-                maxItems: 10
+                settings: settings
             )
         }
         
         print("✅ [FinderLogic] Added default favorites")
     }
-    
     /// Get icon for folder (from database or system default)
     private func getIconForFolder(_ folder: FolderEntry) -> NSImage {
         // If custom icon stored in database, use it (future feature)
@@ -287,21 +303,46 @@ class FinderLogic: FunctionProvider {
         return NSWorkspace.shared.icon(forFile: folder.path)
     }
 
-    // Helper to create individual favorite folder entries
-    private func createFavoriteFolderEntry(name: String, path: URL, icon: NSImage, maxItems: Int? = nil) -> FunctionNode {
+    private func createFavoriteFolderEntry(name: String, path: URL, icon: NSImage, settings: FavoriteFolderSettings) -> FunctionNode {
         var metadata: [String: Any] = ["folderURL": path.path]
         
         // Add custom max items if specified
-        if let maxItems = maxItems {
+        if let maxItems = settings.maxItems {
             metadata["maxItems"] = maxItems
         }
+        
+        // Convert string settings to enums with defaults
+        let layout: LayoutStyle = {
+            guard let layoutString = settings.preferredLayout else { return .fullCircle }
+            return layoutString == "partialSlice" ? .partialSlice : .fullCircle
+        }()
+        
+        let positioning: SlicePositioning = {
+            guard let posString = settings.slicePositioning else { return .startClockwise }
+            switch posString {
+            case "startCounterClockwise": return .startCounterClockwise
+            case "center": return .center
+            default: return .startClockwise
+            }
+        }()
+        
+        // Get numeric settings with defaults
+        let itemAngle = settings.itemAngleSize.map { CGFloat($0) }
+        let childThickness = settings.childRingThickness.map { CGFloat($0) }
+        let childIcon = settings.childIconSize.map { CGFloat($0) }
         
         return FunctionNode(
             id: "favorite-\(path.path)",
             name: name,
             icon: icon,
             children: nil,
-            preferredLayout: .fullCircle,
+            preferredLayout: layout,
+            itemAngleSize: itemAngle,
+            
+            childRingThickness: childThickness,
+            childIconSize: childIcon,
+            
+            slicePositioning: positioning,
             
             metadata: metadata,
             providerId: self.providerId,
@@ -315,6 +356,24 @@ class FinderLogic: FunctionProvider {
             onBoundaryCross: .navigateInto
         )
     }
+    
+    /// Convert LayoutStyle enum to database string
+    private func layoutStyleToString(_ layout: LayoutStyle) -> String {
+        switch layout {
+        case .fullCircle: return "fullCircle"
+        case .partialSlice: return "partialSlice"
+        }
+    }
+
+    /// Convert SlicePositioning enum to database string
+    private func slicePositioningToString(_ positioning: SlicePositioning) -> String {
+        switch positioning {
+        case .startClockwise: return "startClockwise"
+        case .startCounterClockwise: return "startCounterClockwise"
+        case .center: return "center"
+        }
+    }
+    
     // MARK: - Finder Windows Section
     
     private func createFinderWindowsNode() -> FunctionNode {
