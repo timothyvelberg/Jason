@@ -199,35 +199,32 @@ class FinderLogic: FunctionProvider {
         DatabaseManager.shared.saveFolderCache(cacheEntry)
         
         // 4. RECORD USAGE
-        DatabaseManager.shared.recordAccess(path: cacheKey, type: "folder")
+        DatabaseManager.shared.updateFolderAccess(path: cacheKey)
         
         return nodes
     }
     
     private func createFavoriteFoldersNode() -> FunctionNode {
-        // Create child nodes for each favorite folder
-        let favoriteChildren = [
+        // Get favorites from database
+        let favoritesFromDB = DatabaseManager.shared.getFavoriteFolders()
+        
+        // If no favorites in database, add defaults
+        if favoritesFromDB.isEmpty {
+            print("📁 [FinderLogic] No favorites found - adding defaults")
+            addDefaultFavorites()
+            // Fetch again after adding defaults
+            return createFavoriteFoldersNode()
+        }
+        
+        // Create child nodes from database favorites
+        let favoriteChildren = favoritesFromDB.map { (folder, maxItems) in
             createFavoriteFolderEntry(
-                name: "Downloads",
-                path: FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!,
-                icon: NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil) ?? NSImage(),
-                maxItems: 20
-            ),
-            createFavoriteFolderEntry(
-                name: "Git",
-                path: URL(fileURLWithPath: "/Users/timothy/Files/Git/"),
-                icon: NSImage(systemSymbolName: "chevron.left.forwardslash.chevron.right", accessibilityDescription: nil) ?? NSImage()
-            ),
-            createFavoriteFolderEntry(
-                name: "Screenshots",
-                path: URL(fileURLWithPath: "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots/"),
-                icon: NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: nil) ?? NSImage(),
-                maxItems: 10
+                name: folder.title,
+                path: URL(fileURLWithPath: folder.path),
+                icon: getIconForFolder(folder),
+                maxItems: maxItems
             )
-            // Easy to add more favorites here:
-            // createFavoriteFolderEntry(name: "Documents", path: ..., icon: ...),
-            // createFavoriteFolderEntry(name: "Desktop", path: ..., icon: ...),
-        ]
+        }
         
         return FunctionNode(
             id: "favorite-folders-section",
@@ -241,6 +238,53 @@ class FinderLogic: FunctionProvider {
             onMiddleClick: .expand,
             onBoundaryCross: .expand
         )
+    }
+
+    /// Add default favorites on first run
+    private func addDefaultFavorites() {
+        // Downloads
+        if let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
+            _ = DatabaseManager.shared.addFavoriteFolder(
+                path: downloadsURL.path,
+                title: "Downloads",
+                maxItems: 20
+            )
+        }
+        
+        // Git folder (if it exists)
+        let gitPath = "/Users/timothy/Files/Git/"
+        if FileManager.default.fileExists(atPath: gitPath) {
+            _ = DatabaseManager.shared.addFavoriteFolder(
+                path: gitPath,
+                title: "Git",
+                maxItems: nil
+            )
+        }
+        
+        // Screenshots (if it exists)
+        let screenshotsPath = "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots/"
+        if FileManager.default.fileExists(atPath: screenshotsPath) {
+            _ = DatabaseManager.shared.addFavoriteFolder(
+                path: screenshotsPath,
+                title: "Screenshots",
+                maxItems: 10
+            )
+        }
+        
+        print("✅ [FinderLogic] Added default favorites")
+    }
+    
+    /// Get icon for folder (from database or system default)
+    private func getIconForFolder(_ folder: FolderEntry) -> NSImage {
+        // If custom icon stored in database, use it (future feature)
+        if let iconName = folder.icon {
+            if let icon = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) {
+                return icon
+            }
+        }
+        
+        // Otherwise use system folder icon
+        return NSWorkspace.shared.icon(forFile: folder.path)
     }
 
     // Helper to create individual favorite folder entries
@@ -265,6 +309,7 @@ class FinderLogic: FunctionProvider {
             onLeftClick: .navigateInto,
             onRightClick: .expand,
             onMiddleClick: .executeKeepOpen {
+                DatabaseManager.shared.updateFolderAccess(path: path.path)
                 NSWorkspace.shared.open(path)
             },
             onBoundaryCross: .navigateInto
@@ -346,7 +391,7 @@ class FinderLogic: FunctionProvider {
                 StandardContextActions.showInFinder(url),
                 StandardContextActions.deleteFile(url)
             ],
-            preferredLayout: .partialSlice,  // Changed from .fullCircle
+            preferredLayout: .partialSlice,
             itemAngleSize: 15,
             previewURL: url,
             showLabel: true,

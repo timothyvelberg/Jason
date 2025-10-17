@@ -77,9 +77,48 @@ class DatabaseManager {
             throw DatabaseError.notInitialized
         }
         
-        // Create folder_cache table
+        // Drop old tables if they exist (fresh start)
+        let dropTables = """
+        DROP TABLE IF EXISTS folder_cache;
+        DROP TABLE IF EXISTS usage_history;
+        DROP TABLE IF EXISTS favorites;
+        DROP TABLE IF EXISTS preferences;
+        DROP TABLE IF EXISTS folders;
+        DROP TABLE IF EXISTS favorite_folders;
+        """
+        
+        if sqlite3_exec(db, dropTables, nil, nil, nil) != SQLITE_OK {
+            if let error = sqlite3_errmsg(db) {
+                print("⚠️ [DatabaseManager] Warning dropping tables: \(String(cString: error))")
+            }
+        }
+        
+        // Create folders table (all folders - registry + usage tracking)
+        let foldersSQL = """
+        CREATE TABLE folders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            path TEXT UNIQUE NOT NULL,
+            title TEXT NOT NULL,
+            icon TEXT,
+            last_accessed INTEGER NOT NULL,
+            access_count INTEGER DEFAULT 0
+        );
+        """
+        
+        // Create favorite_folders table (which folders are favorites)
+        let favoriteFoldersSQL = """
+        CREATE TABLE favorite_folders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            folder_id INTEGER NOT NULL,
+            sort_order INTEGER NOT NULL,
+            max_items INTEGER,
+            FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
+        );
+        """
+        
+        // Create folder_cache table (performance optimization)
         let folderCacheSQL = """
-        CREATE TABLE IF NOT EXISTS folder_cache (
+        CREATE TABLE folder_cache (
             path TEXT PRIMARY KEY,
             last_scanned INTEGER NOT NULL,
             items_json TEXT NOT NULL,
@@ -87,38 +126,16 @@ class DatabaseManager {
         );
         """
         
-        // Create usage_history table
-        let usageHistorySQL = """
-        CREATE TABLE IF NOT EXISTS usage_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_path TEXT NOT NULL,
-            item_type TEXT NOT NULL,
-            access_count INTEGER NOT NULL DEFAULT 1,
-            last_accessed INTEGER NOT NULL
-        );
-        """
-        
-        // Create favorites table
-        let favoritesSQL = """
-        CREATE TABLE IF NOT EXISTS favorites (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            path TEXT NOT NULL UNIQUE,
-            icon_data BLOB,
-            sort_order INTEGER NOT NULL
-        );
-        """
-        
-        // Create preferences table
+        // Create preferences table (general settings)
         let preferencesSQL = """
-        CREATE TABLE IF NOT EXISTS preferences (
+        CREATE TABLE preferences (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
         """
         
         // Execute all schema creation
-        let tables = [folderCacheSQL, usageHistorySQL, favoritesSQL, preferencesSQL]
+        let tables = [foldersSQL, favoriteFoldersSQL, folderCacheSQL, preferencesSQL]
         
         for sql in tables {
             if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
@@ -129,9 +146,253 @@ class DatabaseManager {
             }
         }
         
-        print("✅ [DatabaseManager] Database schema created/verified")
+        print("✅ [DatabaseManager] Database schema created successfully")
     }
     
+    // MARK: - Folders Methods
+
+    /// Get or create folder entry by path (thread-safe)
+    func getOrCreateFolder(path: String, title: String? = nil) -> Int? {
+        guard let db = db else { return nil }
+        
+        var folderId: Int?
+        
+        queue.sync {
+            folderId = _getOrCreateFolderUnsafe(path: path, title: title)
+        }
+        
+        return folderId
+    }
+
+    /// Get or create folder entry by path (UNSAFE - must be called within queue.sync)
+    private func _getOrCreateFolderUnsafe(path: String, title: String? = nil) -> Int? {
+        guard let db = db else { return nil }
+        
+        var folderId: Int?
+        
+        // Try to get existing folder
+        let selectSQL = "SELECT id FROM folders WHERE path = ?;"
+        var selectStatement: OpaquePointer?
+        
+        if sqlite3_prepare_v2(db, selectSQL, -1, &selectStatement, nil) == SQLITE_OK {
+            sqlite3_bind_text(selectStatement, 1, (path as NSString).utf8String, -1, nil)
+            
+            if sqlite3_step(selectStatement) == SQLITE_ROW {
+                folderId = Int(sqlite3_column_int(selectStatement, 0))
+            }
+        }
+        sqlite3_finalize(selectStatement)
+        
+        // If doesn't exist, create it
+        if folderId == nil {
+            let folderName = title ?? URL(fileURLWithPath: path).lastPathComponent
+            let now = Int(Date().timeIntervalSince1970)
+            
+            let insertSQL = """
+            INSERT INTO folders (path, title, last_accessed, access_count)
+            VALUES (?, ?, ?, 0);
+            """
+            var insertStatement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, insertSQL, -1, &insertStatement, nil) == SQLITE_OK {
+                sqlite3_bind_text(insertStatement, 1, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(insertStatement, 2, (folderName as NSString).utf8String, -1, nil)
+                sqlite3_bind_int64(insertStatement, 3, Int64(now))
+                
+                if sqlite3_step(insertStatement) == SQLITE_DONE {
+                    folderId = Int(sqlite3_last_insert_rowid(db))
+                    print("📁 [DatabaseManager] Created folder entry: \(folderName) (id: \(folderId!))")
+                }
+            }
+            sqlite3_finalize(insertStatement)
+        }
+        
+        return folderId
+    }
+
+    /// Update folder access
+    func updateFolderAccess(path: String) {
+        guard let db = db else { return }
+        
+        queue.async {
+            let now = Int(Date().timeIntervalSince1970)
+            
+            let sql = """
+            UPDATE folders 
+            SET last_accessed = ?, access_count = access_count + 1
+            WHERE path = ?;
+            """
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_int64(statement, 1, Int64(now))
+                sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("📊 [DatabaseManager] Updated access for: \(path)")
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+    }
+
+    /// Get folder by path
+    func getFolder(path: String) -> FolderEntry? {
+        guard let db = db else { return nil }
+        
+        var result: FolderEntry?
+        
+        queue.sync {
+            let sql = "SELECT id, path, title, icon, last_accessed, access_count FROM folders WHERE path = ?;"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_ROW {
+                    let id = Int(sqlite3_column_int(statement, 0))
+                    let path = String(cString: sqlite3_column_text(statement, 1))
+                    let title = String(cString: sqlite3_column_text(statement, 2))
+                    let icon = sqlite3_column_text(statement, 3) != nil ? String(cString: sqlite3_column_text(statement, 3)) : nil
+                    let lastAccessed = Int(sqlite3_column_int64(statement, 4))
+                    let accessCount = Int(sqlite3_column_int(statement, 5))
+                    
+                    result = FolderEntry(
+                        id: id,
+                        path: path,
+                        title: title,
+                        icon: icon,
+                        lastAccessed: lastAccessed,
+                        accessCount: accessCount
+                    )
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+        
+        return result
+    }
+
+    // MARK: - Favorite Folders Methods
+
+    /// Get all favorite folders (sorted by sort_order)
+    func getFavoriteFolders() -> [(folder: FolderEntry, maxItems: Int?)] {
+        guard let db = db else { return [] }
+        
+        var results: [(FolderEntry, Int?)] = []
+        
+        queue.sync {
+            let sql = """
+            SELECT f.id, f.path, f.title, f.icon, f.last_accessed, f.access_count, ff.max_items
+            FROM favorite_folders ff
+            JOIN folders f ON ff.folder_id = f.id
+            ORDER BY ff.sort_order;
+            """
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                while sqlite3_step(statement) == SQLITE_ROW {
+                    let id = Int(sqlite3_column_int(statement, 0))
+                    let path = String(cString: sqlite3_column_text(statement, 1))
+                    let title = String(cString: sqlite3_column_text(statement, 2))
+                    let icon = sqlite3_column_text(statement, 3) != nil ? String(cString: sqlite3_column_text(statement, 3)) : nil
+                    let lastAccessed = Int(sqlite3_column_int64(statement, 4))
+                    let accessCount = Int(sqlite3_column_int(statement, 5))
+                    
+                    let maxItems: Int? = sqlite3_column_type(statement, 6) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 6))
+                    
+                    let folder = FolderEntry(
+                        id: id,
+                        path: path,
+                        title: title,
+                        icon: icon,
+                        lastAccessed: lastAccessed,
+                        accessCount: accessCount
+                    )
+                    
+                    results.append((folder, maxItems))
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+        
+        return results
+    }
+
+    /// Add folder to favorites
+    func addFavoriteFolder(path: String, title: String? = nil, maxItems: Int? = nil) -> Bool {
+        guard let db = db else { return false }
+        
+        var success = false
+        
+        queue.sync {
+            // Get or create folder entry (using unsafe version since we're already in sync)
+            guard let folderId = _getOrCreateFolderUnsafe(path: path, title: title) else {
+                print("❌ [DatabaseManager] Failed to get/create folder for: \(path)")
+                return
+            }
+            
+            // Get next sort order
+            var nextSortOrder = 0
+            var countStatement: OpaquePointer?
+            if sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM favorite_folders;", -1, &countStatement, nil) == SQLITE_OK {
+                if sqlite3_step(countStatement) == SQLITE_ROW {
+                    nextSortOrder = Int(sqlite3_column_int(countStatement, 0))
+                }
+            }
+            sqlite3_finalize(countStatement)
+            
+            // Insert into favorite_folders
+            let sql = "INSERT INTO favorite_folders (folder_id, sort_order, max_items) VALUES (?, ?, ?);"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_int(statement, 1, Int32(folderId))
+                sqlite3_bind_int(statement, 2, Int32(nextSortOrder))
+                
+                if let maxItems = maxItems {
+                    sqlite3_bind_int(statement, 3, Int32(maxItems))
+                } else {
+                    sqlite3_bind_null(statement, 3)
+                }
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("⭐ [DatabaseManager] Added favorite folder: \(path)")
+                    success = true
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+        
+        return success
+    }
+
+    /// Remove folder from favorites
+    func removeFavoriteFolder(path: String) -> Bool {
+        guard let db = db else { return false }
+        
+        var success = false
+        
+        queue.sync {
+            let sql = """
+            DELETE FROM favorite_folders 
+            WHERE folder_id = (SELECT id FROM folders WHERE path = ?);
+            """
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("🗑️ [DatabaseManager] Removed favorite folder: \(path)")
+                    success = true
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+        
+        return success
+    }
     // MARK: - Folder Cache Methods
     
     /// Get cached folder contents
@@ -523,6 +784,22 @@ struct FolderCacheEntry {
     let itemCount: Int
 }
 
+struct FolderEntry: Identifiable {
+    let id: Int
+    let path: String
+    let title: String
+    let icon: String?
+    let lastAccessed: Int
+    let accessCount: Int
+}
+
+struct FavoriteFolderEntry {
+    let id: Int?
+    let folderId: Int
+    let sortOrder: Int
+    let maxItems: Int?
+}
+
 struct UsageHistoryEntry {
     let id: Int?
     let itemPath: String
@@ -531,7 +808,7 @@ struct UsageHistoryEntry {
     var lastAccessed: Int
 }
 
-struct FavoriteEntry {
+struct FavoriteEntry {  // 👈 ADD THIS TOO (still used by old favorites methods)
     let id: Int?
     let name: String
     let path: String
