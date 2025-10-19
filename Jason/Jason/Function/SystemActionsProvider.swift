@@ -77,7 +77,9 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
                 icon: providerIcon,
                 children: systemNodes,
                 preferredLayout: .partialSlice,
+                itemAngleSize: 48,
                 slicePositioning: .center,
+                
                 
                 onLeftClick: .expand,
                 onRightClick: .expand,
