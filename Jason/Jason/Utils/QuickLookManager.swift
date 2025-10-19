@@ -58,6 +58,8 @@ class QuickLookManager: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelega
             panel.orderOut(nil)
             print("🙈 [QuickLook] Preview panel hidden")
         } else {
+            
+            
             print("🙈 [QuickLook] Preview panel already hidden")
         }
         

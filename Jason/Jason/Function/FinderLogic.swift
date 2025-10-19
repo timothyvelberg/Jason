@@ -353,7 +353,7 @@ class FinderLogic: FunctionProvider {
                 DatabaseManager.shared.updateFolderAccess(path: path.path)
                 NSWorkspace.shared.open(path)
             },
-            onBoundaryCross: .navigateInto
+            onBoundaryCross: .doNothing
         )
     }
     
