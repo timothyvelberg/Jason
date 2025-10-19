@@ -16,9 +16,11 @@ class MouseTracker {
     private var isPausedAfterScroll = false
     private var lastMouseLocation: NSPoint?
     private var ringLevelAtPause: Int?
+    private var lastExecutedNodeId: String?
 
     
     var onPieHover: ((Int?) -> Void)?
+    var onExecuteAction: (() -> Void)?
     private var functionManager: FunctionManager
 
     var mouseAngleOffset: CGFloat = 0
@@ -178,6 +180,12 @@ class MouseTracker {
         let activeRingConfig = configs[activeRingLevel]
         let activeRingOuterRadius = activeRingConfig.startRadius + activeRingConfig.thickness
         
+        if let currentRingLevel = currentRingLevel,
+           currentRingLevel == activeRingLevel,
+           distance <= activeRingOuterRadius {
+            lastExecutedNodeId = nil
+        }
+        
         // Check if active ring was opened by click
         let activeRingOpenedByClick = functionManager.rings[activeRingLevel].openedByClick
         
@@ -218,31 +226,44 @@ class MouseTracker {
                             // USE EXPLICIT INTERACTION MODEL
                             switch node.onBoundaryCross {
                             case .expand:
-                                functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)  // Uses default false
-
+                                functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)
                                 lastFunctionIndex = pieIndex
                                 lastRingLevel = activeRingLevel
                                 return
-                            
+
                             case .navigateInto:
                                 print("📂 Beyond boundary (\(distance) > \(activeRingOuterRadius)) - navigating into '\(node.name)'")
                                 functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: pieIndex)
-                                
                                 lastFunctionIndex = pieIndex
                                 lastRingLevel = activeRingLevel
                                 return
                                 
                             case .doNothing:
                                 print("⚠️ Beyond boundary hovering '\(node.name)' - no auto-expand (use right-click)")
+
+                            case .execute(let action):
+                                // Only execute once per node (debounce)
+                                if lastExecutedNodeId != node.id {
+                                    print("🎯 Beyond boundary - executing '\(node.name)'")
+                                    action()
+                                    lastExecutedNodeId = node.id
+                                    lastFunctionIndex = pieIndex
+                                    lastRingLevel = activeRingLevel
+                                    
+                                    onExecuteAction?()
+                                }
+                                return
                                 
-                            case .execute:
-                                print("⚠️ Beyond boundary hovering '\(node.name)' - would execute action (unusual for boundary cross)")
-                                
-                            case .executeKeepOpen:
-                                print("⚠️ Beyond boundary hovering '\(node.name)' - would execute and keep open (unusual for boundary cross)")
-                                
+                            case .executeKeepOpen(let action):
+                                // Only execute once per node (debounce)
+                                if lastExecutedNodeId != node.id {
+                                    print("🎯 Beyond boundary - executing '\(node.name)' (keeping UI open)")
+                                    action()
+                                    lastExecutedNodeId = node.id
+                                    lastFunctionIndex = pieIndex
+                                    lastRingLevel = activeRingLevel
+                                }
                             case .drag:
-                                // Drag doesn't make sense for boundary crossing
                                 print("⚠️ Beyond boundary hovering '\(node.name)' - draggable item (no auto-expand)")
                             }
                         }

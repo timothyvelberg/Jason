@@ -62,10 +62,18 @@ class CircularUIManager: ObservableObject {
         // Register mock provider for testing (shows alongside real apps)
 //        functionManager?.registerProvider(MockFunctionProvider())
         
+        functionManager?.registerProvider(SystemActionsProvider())
+        
         functionManager?.registerProvider(FinderLogic())
+        
+        
         
         if let functionManager = functionManager {
             self.mouseTracker = MouseTracker(functionManager: functionManager)
+            
+            mouseTracker?.onExecuteAction = { [weak self] in
+                self?.hide()
+            }
             
             mouseTracker?.onPieHover = { [weak functionManager] pieIndex in
                 guard let pieIndex = pieIndex, let fm = functionManager else { return }

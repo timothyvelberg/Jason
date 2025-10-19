@@ -43,7 +43,7 @@ class FinderLogic: FunctionProvider {
     private var cacheTimestamps: [String: Date] = [:]
 
 
-    // MARK: - Serialization Helpers (ADD THESE TO FinderLogic CLASS)
+    // MARK: - Serialization Helpers
 
     /// Serialize nodes to JSON for database storage
     private func serializeNodes(_ nodes: [FunctionNode]) -> String {
@@ -112,10 +112,10 @@ class FinderLogic: FunctionProvider {
     func provideFunctions() -> [FunctionNode] {
         print("🔍 [FinderLogic] provideFunctions() called")
         
-        let finderWindowsNode = createFinderWindowsNode()
-        let favoriteFoldersNode = createFavoriteFoldersNode()  // New!
+//        let finderWindowsNode = createFinderWindowsNode()
+        let favoriteFoldersNode = createFavoriteFoldersNode()
 
-        return [finderWindowsNode, favoriteFoldersNode]  // Clean Ring 0!
+        return [favoriteFoldersNode]  // Clean Ring 0!
     }
     
     func clearCache() {
@@ -239,7 +239,6 @@ class FinderLogic: FunctionProvider {
         )
     }
 
-    /// Add default favorites on first run
     /// Add default favorites on first run
     private func addDefaultFavorites() {
         // Downloads

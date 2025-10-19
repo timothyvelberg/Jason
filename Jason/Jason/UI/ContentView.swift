@@ -14,12 +14,12 @@ struct ContentView: View {
     
     var body: some View {
         Group {
-            MinimalView(circularUI: circularUI)
-//            if !appSwitcher.hasAccessibilityPermission {
-//                PermissionRequestView(appSwitcher: appSwitcher, circularUI: circularUI)
-//            } else {
-//                MinimalView(circularUI: circularUI)
-//            }
+//            MinimalView(circularUI: circularUI)
+            if !appSwitcher.hasAccessibilityPermission {
+                PermissionRequestView(appSwitcher: appSwitcher, circularUI: circularUI)
+            } else {
+                MinimalView(circularUI: circularUI)
+            }
         }
         .onAppear {
             print("🚀 ContentView appeared")
