@@ -15,6 +15,8 @@ class AppSwitcherManager: ObservableObject {
     @Published var selectedAppIndex: Int = 0
     @Published var hasAccessibilityPermission: Bool = false
     
+    weak var circularUIManager: CircularUIManager?
+    
     private var refreshTimer: Timer?
     internal var isCtrlPressed: Bool = false
     
@@ -294,27 +296,19 @@ class AppSwitcherManager: ObservableObject {
         // Record this app usage BEFORE hiding the switcher
         recordAppUsage(app)
         
-        // First hide our app switcher
+        // Update app switcher state
         hideAppSwitcher()
         
-        // Then activate the selected app and bring it to front
-        app.activate()
-        
-        // Give the system a moment to process the activation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            // Try to bring the app's windows to front
-            if let appWindows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] {
-                let targetPID = app.processIdentifier
-                for windowInfo in appWindows {
-                    if let ownerPID = windowInfo[kCGWindowOwnerPID as String] as? Int32,
-                       ownerPID == targetPID {
-                        // Found a window belonging to the target app
-                        print("🪟 Found window for \(app.localizedName ?? "Unknown")")
-                        break
-                    }
-                }
-            }
+        // 🆕 ADD THIS LOG:
+        if circularUIManager == nil {
+            print("❌ circularUIManager is NIL!")
+        } else {
+            print("✅ Calling hideAndSwitchTo...")
         }
+        
+        // Hide the circular UI and activate the selected app
+        // This uses the special hideAndSwitchTo which doesn't restore previous app
+        circularUIManager?.hideAndSwitchTo(app: app)
         
         print("✅ Successfully switched to \(app.localizedName ?? "Unknown")")
         

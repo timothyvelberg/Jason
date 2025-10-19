@@ -26,6 +26,8 @@ class CircularUIManager: ObservableObject {
     private var isHandlingShortcut: Bool = false  // Prevent double-handling
     private var wasShiftPressed: Bool = false
     private var centerPoint: CGPoint = .zero
+    private var previousApp: NSRunningApplication?
+    private var isIntentionallySwitching: Bool = false
 
     
     init() {
@@ -49,6 +51,7 @@ class CircularUIManager: ObservableObject {
     
     func setup(with appSwitcher: AppSwitcherManager) {
         self.appSwitcher = appSwitcher
+        appSwitcher.circularUIManager = self
         
         // Create FunctionManager with providers
         self.functionManager = FunctionManager()
@@ -563,6 +566,12 @@ class CircularUIManager: ObservableObject {
             return
         }
         
+        //Save the currently active app BEFORE we show our UI
+        previousApp = NSWorkspace.shared.frontmostApplication
+        if let prevApp = previousApp {
+            print("💾 Saved previous app: \(prevApp.localizedName ?? "Unknown")")
+        }
+        
         functionManager.loadFunctions()
         
         // Check if we have any actual content (leaf nodes or branches with children)
@@ -610,13 +619,45 @@ class CircularUIManager: ObservableObject {
         isVisible = false
         overlayWindow?.hideOverlay()
         
+        // 🆕 Only restore previous app if we're NOT intentionally switching
+        if !isIntentionallySwitching {
+            if let prevApp = previousApp, prevApp.isTerminated == false {
+                print("🔄 Restoring focus to: \(prevApp.localizedName ?? "Unknown")")
+                prevApp.activate()
+            }
+        } else {
+            print("⏭️ Skipping restore - intentionally switching apps")
+        }
+        
         // Reset all state for clean slate on next show
         functionManager?.reset()
         
-        // NEW: Close any open preview
+        // Close any open preview
         QuickLookManager.shared.hidePreview()
-        wasShiftPressed = false  // Reset SHIFT state
+        wasShiftPressed = false
+        previousApp = nil
+        isIntentionallySwitching = false  // 🆕 Reset flag
         
         print("Hiding circular UI")
+    }
+    
+    func hideAndSwitchTo(app: NSRunningApplication) {
+        // 🆕 Set flag to prevent hide() from restoring previous app
+        isIntentionallySwitching = true
+        
+        // Hide the UI (this will trigger onLostFocus -> hide())
+        mouseTracker?.stopTrackingMouse()
+        gestureManager?.stopMonitoring()
+        
+        isVisible = false
+        overlayWindow?.hideOverlay()
+        
+        print("🎯 Switching to selected app: \(app.localizedName ?? "Unknown")")
+        
+        // Activate the app AFTER setting the flag
+        app.activate()
+        
+        // Note: hide() will be called by onLostFocus, and it will see our flag
+        print("Switching to app (hide() will clean up)")
     }
 }
