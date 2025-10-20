@@ -15,7 +15,7 @@ class MouseTracker {
     private var lastRingLevel: Int?  // Can be nil when outside all rings
     private var isPausedAfterScroll = false
     private var lastMouseLocation: NSPoint?
-    private var ringLevelAtPause: Int?
+    internal var ringLevelAtPause: Int?
     private var lastExecutedNodeId: String?
 
     
@@ -189,7 +189,8 @@ class MouseTracker {
         // Check if active ring was opened by click
         let activeRingOpenedByClick = functionManager.rings[activeRingLevel].openedByClick
         
-        // NEW: Check if mouse moved FORWARD into the click-opened ring
+        
+        // Check if mouse moved FORWARD into the click-opened ring
         // Once you move into it, apply regular boundary rules from then on
         if activeRingOpenedByClick, let pauseLevel = ringLevelAtPause {
             if let currentRingLevel = currentRingLevel, currentRingLevel == activeRingLevel, activeRingLevel > pauseLevel {

@@ -28,6 +28,9 @@ class CircularUIManager: ObservableObject {
     private var centerPoint: CGPoint = .zero
     private var previousApp: NSRunningApplication?
     private var isIntentionallySwitching: Bool = false
+    
+    private var isInAppSwitcherMode: Bool = false
+    private var wasCtrlPressedInAppSwitcherMode: Bool = false
 
     
     init() {
@@ -118,9 +121,18 @@ class CircularUIManager: ObservableObject {
         let currentLevel = functionManager.activeRingLevel
         
         if currentLevel > 0 {
-            print("🔙 [CircularUIManager] Scrolling back from ring \(currentLevel) to \(currentLevel - 1)")
-            functionManager.collapseToRing(level: currentLevel - 1)
-            mouseTracker?.pauseAfterScroll()
+            let targetLevel = currentLevel - 1
+            print("🔙 [CircularUIManager] Scrolling back from ring \(currentLevel) to \(targetLevel)")
+            functionManager.collapseToRing(level: targetLevel)
+            
+            // Only hide UI if we just collapsed TO Ring 0
+            if targetLevel == 0 {
+                print("👋 [handleScrollBack] Collapsed to Ring 0 - hiding UI")
+                hide()
+            } else {
+                print("✅ [handleScrollBack] Collapsed to Ring \(targetLevel) - staying open")
+                mouseTracker?.pauseAfterScroll()
+            }
         } else {
             print("⚠️ [CircularUIManager] Already at Ring 0 - cannot scroll back further")
         }
@@ -335,17 +347,17 @@ class CircularUIManager: ObservableObject {
         }
     }
     
-    // MARK: - Global Hotkeys
-    
+    // MARK: - Modified setupGlobalHotkeys method
+
     private func setupGlobalHotkeys() {
-        print("⌨️ Setting up circular UI hotkeys (Ctrl+Shift+K)")
+        print("⌨️ Setting up circular UI hotkeys (Ctrl+Shift+K and Ctrl+`)")
         
         // Listen for global key events (keyDown only)
         NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             self?.handleGlobalKeyEvent(event)
         }
         
-        // Listen for global modifier key changes (for SHIFT detection)
+        // Listen for global modifier key changes (for SHIFT detection and Ctrl release)
         NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged]) { [weak self] event in
             self?.handleGlobalFlagsChanged(event)
         }
@@ -363,11 +375,33 @@ class CircularUIManager: ObservableObject {
         print("✅ Circular UI hotkey monitoring started")
     }
     
-    // Handle global keyboard events (when Jason is NOT in focus)
+    // MARK: - Modified handleGlobalKeyEvent
+
     private func handleGlobalKeyEvent(_ event: NSEvent) {
         let isCtrlPressed = event.modifierFlags.contains(.control)
         let isShiftPressed = event.modifierFlags.contains(.shift)
         let isKKey = event.keyCode == 40  // K key
+        let isTildeKey = event.keyCode == 50  // ` key (backtick/tilde)
+        
+        // CTRL+` - App Switcher Mode
+        if event.type == .keyDown && isCtrlPressed && isTildeKey {
+            print("⌨️ [GLOBAL] Ctrl+` detected - showing app switcher")
+            
+            if !isVisible {
+                // Show app switcher
+                isInAppSwitcherMode = true
+                wasCtrlPressedInAppSwitcherMode = true
+                show(expandingCategory: "app-switcher")
+                
+                // Automatically select next app (index 1) to mimic Cmd+Tab behavior
+                selectNextAppInSwitcher()
+            } else if isInAppSwitcherMode {
+                // Already visible in app switcher mode - cycle to next app
+                selectNextAppInSwitcher()
+            }
+            
+            return
+        }
         
         // Toggle UI when Ctrl + Shift + K is pressed
         if event.type == .keyDown && isCtrlPressed && isShiftPressed && isKKey {
@@ -397,8 +431,10 @@ class CircularUIManager: ObservableObject {
         // Hide UI on Escape (when visible)
         if event.type == .keyDown && event.keyCode == 53 && isVisible {
             print("⌨️ [GLOBAL] Escape pressed - hiding circular UI")
+            exitAppSwitcherMode()
             hide()
         }
+        
         if event.type == .keyDown && event.keyCode == 56 && isVisible {  // 56 = Left Shift
             print("⌨️ [GLOBAL] SHIFT pressed - checking for previewable node")
             handlePreviewRequest()
@@ -406,12 +442,120 @@ class CircularUIManager: ObservableObject {
         }
     }
     
-    // Handle local keyboard events (when Jason is in focus)
+    // MARK: - App Switcher Mode Helper Methods
+
+    private func selectNextAppInSwitcher() {
+        guard let functionManager = functionManager else { return }
+        
+        // Make sure we're at Ring 1 (app switcher)
+        guard functionManager.activeRingLevel == 1 else {
+            print("⚠️ Not in app switcher ring (level \(functionManager.activeRingLevel))")
+            return
+        }
+        
+        guard functionManager.rings.count > 1 else {
+            print("⚠️ App switcher ring not available")
+            return
+        }
+        
+        let ring = functionManager.rings[1]
+        let nodeCount = ring.nodes.count
+        
+        guard nodeCount > 0 else {
+            print("⚠️ No apps in switcher")
+            return
+        }
+        
+        // Get current hovered index, or start at -1
+        let currentIndex = ring.hoveredIndex ?? -1
+        
+        // Move to next app
+        let nextIndex = (currentIndex + 1) % nodeCount
+        
+        print("⌨️ Cycling to next app: index \(nextIndex) (\(ring.nodes[nextIndex].name))")
+        functionManager.hoverNode(ringLevel: 1, index: nextIndex)
+    }
+
+    private func handleCtrlReleaseInAppSwitcher() {
+        guard let functionManager = functionManager else { return }
+        
+        // Only act on Ctrl release if we're still in Ring 1 (app switcher)
+        guard functionManager.activeRingLevel == 1 else {
+            print("✅ Ctrl released but not in Ring 1 (level \(functionManager.activeRingLevel)) - exiting app switcher mode")
+            exitAppSwitcherMode()
+            return
+        }
+        
+        // Get the currently hovered app
+        guard functionManager.rings.count > 1 else {
+            print("⚠️ No app switcher ring available")
+            exitAppSwitcherMode()
+            hide()
+            return
+        }
+        
+        let ring = functionManager.rings[1]
+        
+        guard let hoveredIndex = ring.hoveredIndex,
+              hoveredIndex < ring.nodes.count else {
+            print("⚠️ No app selected in switcher")
+            exitAppSwitcherMode()
+            hide()
+            return
+        }
+        
+        let selectedNode = ring.nodes[hoveredIndex]
+        
+        print("✅ Ctrl released - switching to app: \(selectedNode.name)")
+        
+        // Execute the app's left click action (which switches to it)
+        switch selectedNode.onLeftClick {
+        case .execute(let action):
+            action()
+            exitAppSwitcherMode()
+            hide()
+        default:
+            print("⚠️ Selected node doesn't have execute action")
+            exitAppSwitcherMode()
+            hide()
+        }
+    }
+
+    private func exitAppSwitcherMode() {
+        if isInAppSwitcherMode {
+            print("🚪 Exiting app switcher mode")
+        }
+        isInAppSwitcherMode = false
+        wasCtrlPressedInAppSwitcherMode = false
+    }
+    
+    
+    
+    
+    // MARK: - Modified handleLocalKeyEvent
+
     private func handleLocalKeyEvent(_ event: NSEvent) -> NSEvent? {
         let isCtrlPressed = event.modifierFlags.contains(.control)
         let isShiftPressed = event.modifierFlags.contains(.shift)
         let isKKey = event.keyCode == 40  // K key
+        let isTildeKey = event.keyCode == 50  // ` key
         let isEscapeKey = event.keyCode == 53
+        
+        // CTRL+` - App Switcher Mode (LOCAL)
+        if event.type == .keyDown && isCtrlPressed && isTildeKey {
+            print("⌨️ [LOCAL] Ctrl+` detected - showing app switcher")
+            
+            if !isVisible {
+                isInAppSwitcherMode = true
+                wasCtrlPressedInAppSwitcherMode = true
+                show(expandingCategory: "app-switcher")
+                selectNextAppInSwitcher()
+            } else if isInAppSwitcherMode {
+                selectNextAppInSwitcher()
+            }
+            
+            return nil  // Consume event
+        }
         
         // Check if this is our shortcut (Ctrl+Shift+K)
         if event.type == .keyDown && isCtrlPressed && isShiftPressed && isKKey {
@@ -442,6 +586,7 @@ class CircularUIManager: ObservableObject {
         // Check if this is Escape and UI is visible
         if event.type == .keyDown && isEscapeKey && isVisible {
             print("⌨️ [LOCAL] Escape pressed - hiding circular UI")
+            exitAppSwitcherMode()
             hide()
             return nil  // Consume the event
         }
@@ -456,7 +601,37 @@ class CircularUIManager: ObservableObject {
         // Not our shortcut - let the system handle it
         return event
     }
-    
+
+    // MARK: - Modified handleLocalFlagsChanged
+
+    private func handleLocalFlagsChanged(_ event: NSEvent) -> NSEvent? {
+        guard isVisible else { return event }
+        
+        let isShiftPressed = event.modifierFlags.contains(.shift)
+        let isCtrlPressed = event.modifierFlags.contains(.control)
+        
+        // Handle Ctrl release in App Switcher Mode
+        if isInAppSwitcherMode && wasCtrlPressedInAppSwitcherMode && !isCtrlPressed {
+            print("⌨️ [LOCAL] Ctrl released in app switcher mode")
+            handleCtrlReleaseInAppSwitcher()
+            wasCtrlPressedInAppSwitcherMode = isCtrlPressed
+            return nil  // Consume event
+        }
+        
+        // Track Ctrl state
+        wasCtrlPressedInAppSwitcherMode = isCtrlPressed
+        
+        // Only trigger on SHIFT press (transition from not-pressed to pressed)
+        if isShiftPressed && !wasShiftPressed {
+            print("⌨️ [LOCAL] SHIFT pressed - toggling preview")
+            handlePreviewRequest()
+            wasShiftPressed = isShiftPressed
+            return nil  // Consume the event
+        }
+        
+        wasShiftPressed = isShiftPressed
+        return event
+    }
     // MARK: - Overlay Window
     
     private func setupOverlayWindow() {
@@ -525,11 +700,23 @@ class CircularUIManager: ObservableObject {
         QuickLookManager.shared.showPreview(for: previewURL)  // 👈 Changed from togglePreview to showPreview
     }
     
-    // Handle global flag changes (modifier keys like SHIFT)
+    // MARK: - Modified handleGlobalFlagsChanged
+
     private func handleGlobalFlagsChanged(_ event: NSEvent) {
         guard isVisible else { return }
         
         let isShiftPressed = event.modifierFlags.contains(.shift)
+        let isCtrlPressed = event.modifierFlags.contains(.control)
+        
+        // Handle Ctrl release in App Switcher Mode
+        if isInAppSwitcherMode && wasCtrlPressedInAppSwitcherMode && !isCtrlPressed {
+            print("⌨️ [GLOBAL] Ctrl released in app switcher mode")
+            handleCtrlReleaseInAppSwitcher()
+            return
+        }
+        
+        // Track Ctrl state
+        wasCtrlPressedInAppSwitcherMode = isCtrlPressed
         
         // Only trigger on SHIFT press (transition from not-pressed to pressed)
         if isShiftPressed && !wasShiftPressed {
@@ -539,26 +726,6 @@ class CircularUIManager: ObservableObject {
         
         wasShiftPressed = isShiftPressed
     }
-
-    // Handle local flag changes (modifier keys like SHIFT)
-    private func handleLocalFlagsChanged(_ event: NSEvent) -> NSEvent? {
-        guard isVisible else { return event }
-        
-        let isShiftPressed = event.modifierFlags.contains(.shift)
-        
-        // Only trigger on SHIFT press (transition from not-pressed to pressed)
-        if isShiftPressed && !wasShiftPressed {
-            print("⌨️ [LOCAL] SHIFT pressed - toggling preview")
-            handlePreviewRequest()
-            wasShiftPressed = isShiftPressed
-            return nil  // Consume the event
-        }
-        
-        wasShiftPressed = isShiftPressed
-        return event
-    }
-    
-    // MARK: - Show/Hide
     
     // MARK: - Show Methods
 
@@ -585,6 +752,10 @@ class CircularUIManager: ObservableObject {
         if let providerId = providerId {
             print("🎯 [CircularUIManager] Showing UI expanded to: \(providerId)")
             functionManager.loadAndExpandToCategory(providerId: providerId)
+            
+            // IMPORTANT: Tell MouseTracker we're starting at Ring 0 (even though Ring 1 is active)
+            // This way, when user moves back to Ring 0, it will collapse
+            mouseTracker?.ringLevelAtPause = 0
         } else {
             functionManager.loadFunctions()
         }
@@ -632,12 +803,17 @@ class CircularUIManager: ObservableObject {
         print("   Total rings: \(functionManager.rings.count)")
     }
     
+    // MARK: - Modified hide() method
+
     func hide() {
         mouseTracker?.stopTrackingMouse()
         gestureManager?.stopMonitoring()
         
         isVisible = false
         overlayWindow?.hideOverlay()
+        
+        // Exit app switcher mode when hiding
+        exitAppSwitcherMode()
         
         // 🆕 Only restore previous app if we're NOT intentionally switching
         if !isIntentionallySwitching {

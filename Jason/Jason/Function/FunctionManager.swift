@@ -709,7 +709,7 @@ class FunctionManager: ObservableObject {
         
         print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes (openedByClick=\(openedByClick))")
     }
-    
+
     // MARK: - Direct Category Expansion
 
     /// Load functions and immediately expand to a specific category by provider ID
@@ -743,8 +743,9 @@ class FunctionManager: ObservableObject {
         
         print("✅ Found provider '\(node.name)' at index \(index) with \(node.displayedChildren.count) children")
         
-        // Expand this category
-        expandCategory(ringLevel: 0, index: index, openedByClick: false)
+        // Expand this category with openedByClick: true
+        // This makes it behave like a right-click context menu - stable until boundary cross
+        expandCategory(ringLevel: 0, index: index, openedByClick: true)
         
         print("✅ Successfully expanded to '\(node.name)' - now at Ring \(activeRingLevel)")
     }
