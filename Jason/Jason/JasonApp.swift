@@ -59,7 +59,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if let button = statusItem?.button {
             // Set the icon - using SF Symbol
-            button.image = NSImage(systemSymbolName: "circle.grid.3x3.fill", accessibilityDescription: "Jason App Switcher")
+            button.image = NSImage(systemSymbolName: "circle.circle", accessibilityDescription: "Jason App Switcher")
             button.action = #selector(toggleContentWindow)
             button.target = self
         }

@@ -14,12 +14,12 @@ struct ContentView: View {
     
     var body: some View {
         Group {
-//            MinimalView(circularUI: circularUI)
-            if !appSwitcher.hasAccessibilityPermission {
-                PermissionRequestView(appSwitcher: appSwitcher, circularUI: circularUI)
-            } else {
-                MinimalView(circularUI: circularUI)
-            }
+            MinimalView(circularUI: circularUI)
+//            if !appSwitcher.hasAccessibilityPermission {
+//                PermissionRequestView(appSwitcher: appSwitcher, circularUI: circularUI)
+//            } else {
+//                MinimalView(circularUI: circularUI)
+//            }
         }
         .onAppear {
             print("🚀 ContentView appeared")
@@ -92,6 +92,11 @@ struct PermissionRequestView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 
+                Button("Test App Switcher Direct") {
+                    circularUI.show(expandingCategory: "app-switcher")
+                }
+                .buttonStyle(.bordered)
+                
                 Button("Hide") {
                     circularUI.hide()
                 }
@@ -139,6 +144,11 @@ struct MinimalView: View {
                     circularUI.show()
                 }
                 .buttonStyle(.borderedProminent)
+                
+                Button("Test App Switcher Direct") {
+                    circularUI.show(expandingCategory: "app-switcher")
+                }
+                .buttonStyle(.bordered)
                 
                 Button("Hide Circular UI") {
                     circularUI.hide()

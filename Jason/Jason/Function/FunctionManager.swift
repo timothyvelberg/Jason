@@ -710,6 +710,47 @@ class FunctionManager: ObservableObject {
         print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes (openedByClick=\(openedByClick))")
     }
     
+    // MARK: - Direct Category Expansion
+
+    /// Load functions and immediately expand to a specific category by provider ID
+    /// - Parameter providerId: The ID of the provider to expand (e.g., "app-switcher")
+    func loadAndExpandToCategory(providerId: String) {
+        print("🎯 [FunctionManager] Loading and expanding to category: \(providerId)")
+        
+        // First, load all functions normally
+        loadFunctions()
+        
+        // Verify we have a Ring 0
+        guard !rings.isEmpty, !rings[0].nodes.isEmpty else {
+            print("❌ No Ring 0 available after loading")
+            return
+        }
+        
+        // Find the node with matching ID in Ring 0
+        guard let index = rings[0].nodes.firstIndex(where: { $0.id == providerId }) else {
+            print("❌ Provider '\(providerId)' not found in Ring 0")
+            print("   Available providers: \(rings[0].nodes.map { $0.id }.joined(separator: ", "))")
+            return
+        }
+        
+        let node = rings[0].nodes[index]
+        
+        // Verify it's expandable
+        guard node.isBranch, !node.displayedChildren.isEmpty else {
+            print("❌ Provider '\(providerId)' is not expandable or has no children")
+            return
+        }
+        
+        print("✅ Found provider '\(node.name)' at index \(index) with \(node.displayedChildren.count) children")
+        
+        // Expand this category
+        expandCategory(ringLevel: 0, index: index, openedByClick: false)
+        
+        print("✅ Successfully expanded to '\(node.name)' - now at Ring \(activeRingLevel)")
+    }
+    
+    // MARK: - Direct Category Expansion
+    
     func navigateIntoFolder(ringLevel: Int, index: Int) {
         print("📂 navigateIntoFolder called: ringLevel=\(ringLevel), index=\(index)")
         

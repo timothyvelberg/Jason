@@ -560,19 +560,34 @@ class CircularUIManager: ObservableObject {
     
     // MARK: - Show/Hide
     
+    // MARK: - Show Methods
+
+    /// Show the UI at the root level (Ring 0)
     func show() {
+        show(expandingCategory: nil)
+    }
+
+    /// Show the UI already expanded to a specific category
+    /// - Parameter providerId: The ID of the provider to expand (e.g., "app-switcher"), or nil to show Ring 0
+    func show(expandingCategory providerId: String?) {
         guard let functionManager = functionManager else {
             print("FunctionManager not initialized")
             return
         }
         
-        //Save the currently active app BEFORE we show our UI
+        // Save the currently active app BEFORE we show our UI
         previousApp = NSWorkspace.shared.frontmostApplication
         if let prevApp = previousApp {
             print("💾 Saved previous app: \(prevApp.localizedName ?? "Unknown")")
         }
         
-        functionManager.loadFunctions()
+        // Load functions (and optionally expand to a category)
+        if let providerId = providerId {
+            print("🎯 [CircularUIManager] Showing UI expanded to: \(providerId)")
+            functionManager.loadAndExpandToCategory(providerId: providerId)
+        } else {
+            functionManager.loadFunctions()
+        }
         
         // Check if we have any actual content (leaf nodes or branches with children)
         let hasValidData: Bool = {
@@ -601,7 +616,7 @@ class CircularUIManager: ObservableObject {
         }
         
         mousePosition = NSEvent.mouseLocation
-        centerPoint = mousePosition  // 👈 NEW: Store center point
+        centerPoint = mousePosition
         isVisible = true
         wasShiftPressed = false
         overlayWindow?.showOverlay(at: mousePosition)
@@ -609,7 +624,12 @@ class CircularUIManager: ObservableObject {
         mouseTracker?.startTrackingMouse()
         gestureManager?.startMonitoring()
         
-        print("Showing circular UI at position: \(mousePosition)")
+        print("✅ Showing circular UI at position: \(mousePosition)")
+        if let providerId = providerId {
+            print("   Expanded to category: \(providerId)")
+        }
+        print("   Active ring level: \(functionManager.activeRingLevel)")
+        print("   Total rings: \(functionManager.rings.count)")
     }
     
     func hide() {
