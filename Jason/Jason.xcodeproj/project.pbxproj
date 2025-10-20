@@ -10,9 +10,22 @@
 		1C0298022E3B9914002661DB /* Jason.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jason.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		1CAD4C502EA636B0005C0EDF /* Exceptions for "Jason" folder in "Jason" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 1C0298012E3B9914002661DB /* Jason */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1C0298042E3B9914002661DB /* Jason */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				1CAD4C502EA636B0005C0EDF /* Exceptions for "Jason" folder in "Jason" target */,
+			);
 			path = Jason;
 			sourceTree = "<group>";
 		};
@@ -266,6 +279,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Jason/Info.plist;
+				"INFOPLIST_FILE[sdk=*]" = Jason/Info.plist;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "This app needs access to control other applications for app switching.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -298,6 +313,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Jason/Info.plist;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "This app needs access to control other applications for app switching.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
