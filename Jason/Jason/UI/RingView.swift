@@ -47,7 +47,7 @@ struct RingView: View {
     
     // Computed opacity based on shouldDimOpacity
     private var ringOpacity: Double {
-        return shouldDimOpacity ? 0.9 : 1.0
+        return shouldDimOpacity ? 1.0 : 1.0
     }
     
     private var ringScale: CGFloat {
@@ -70,7 +70,15 @@ struct RingView: View {
                     holePercentage: innerRadiusRatio,
                     outerPercentage: 1.0
                 )
-                .fill(backgroundColor, style: FillStyle(eoFill: true))
+//                .fill(backgroundColor, style: FillStyle(eoFill: true))
+                .foregroundStyle(.ultraThinMaterial)
+                .overlay(
+                    DonutShape(
+                        holePercentage: innerRadiusRatio,
+                        outerPercentage: 1.0
+                    )
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
                 .frame(width: totalDiameter, height: totalDiameter)
                 .allowsHitTesting(false)  // Don't block clicks
             } else {
@@ -81,7 +89,16 @@ struct RingView: View {
                     innerRadiusRatio: innerRadiusRatio,
                     outerRadiusRatio: 1.0
                 )
-                .fill(backgroundColor, style: FillStyle(eoFill: true))
+                .foregroundStyle(.ultraThinMaterial)
+                .overlay(
+                    PieSliceShape(
+                        startAngle: .degrees(sliceConfig.startAngle - 90),
+                        endAngle: .degrees(sliceConfig.endAngle - 90),
+                        innerRadiusRatio: innerRadiusRatio,
+                        outerRadiusRatio: 1.0
+                    )
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
                 .frame(width: totalDiameter, height: totalDiameter)
                 .allowsHitTesting(false)  // Don't block clicks
             }

@@ -15,18 +15,19 @@ struct DonutShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let center = CGPoint(x: rect.midX, y: rect.midY)
-        let maxRadius = rect.width / 2
+        let maxRadius = min(rect.width, rect.height) / 2
         let outerRadius = maxRadius * outerPercentage
         let innerRadius = maxRadius * holePercentage
         
-        // Outer circle
-        path.addArc(center: center, radius: outerRadius, startAngle: .degrees(0), endAngle: .degrees(360), clockwise: false)
+        // Outer circle - counterclockwise
+        path.addArc(center: center, radius: outerRadius,
+                    startAngle: .degrees(0), endAngle: .degrees(360),
+                    clockwise: false)
         
-        // Inner circle (creates the hole)
-        var innerPath = Path()
-        innerPath.addArc(center: center, radius: innerRadius, startAngle: .degrees(0), endAngle: .degrees(360), clockwise: false)
-        
-        path.addPath(innerPath)
+        // Inner circle - clockwise (opposite direction creates hole)
+        path.addArc(center: center, radius: innerRadius,
+                    startAngle: .degrees(0), endAngle: .degrees(360),
+                    clockwise: true)
         
         return path
     }
@@ -50,23 +51,22 @@ struct PieSliceShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let center = CGPoint(x: rect.midX, y: rect.midY)
-        let maxRadius = rect.width / 2
+        let maxRadius = min(rect.width, rect.height) / 2
         let outerRadius = maxRadius * outerRadiusRatio
         let innerRadius = maxRadius * innerRadiusRatio
         
-        // Outer pie slice
-        path.move(to: center)
-        path.addArc(center: center, radius: outerRadius, startAngle: startAngle, endAngle: endAngle, clockwise: false)
+        // Draw outer arc
+        path.addArc(center: center, radius: outerRadius,
+                    startAngle: startAngle, endAngle: endAngle,
+                    clockwise: false)
+        
+        // Connect to inner arc
+        path.addArc(center: center, radius: innerRadius,
+                    startAngle: endAngle, endAngle: startAngle,
+                    clockwise: true)
+        
+        // Close the path to complete the ring segment
         path.closeSubpath()
-        
-        // Inner cutout
-        var innerPath = Path()
-        innerPath.move(to: center)
-        innerPath.addArc(center: center, radius: innerRadius, startAngle: startAngle, endAngle: endAngle, clockwise: false)
-        innerPath.closeSubpath()
-        
-        // Combine paths to create cutout effect
-        path.addPath(innerPath)
         
         return path
     }
