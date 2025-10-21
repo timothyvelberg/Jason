@@ -52,7 +52,7 @@ struct RingView: View {
     }
     
     private var selectionColor: Color {
-        return shouldDimOpacity ? .black.opacity(0.8) : .black.opacity(0.8)
+        return shouldDimOpacity ? .black.opacity(0.6) : .black.opacity(0.6)
     }
     
     var body: some View {
@@ -65,11 +65,11 @@ struct RingView: View {
                 // Full circle background with blur material
                 ZStack {
                     // Dark tint layer
-                    DonutShape(
-                        holePercentage: innerRadiusRatio,
-                        outerPercentage: 1.0
-                    )
-                    .fill(Color.black.opacity(0.56), style: FillStyle(eoFill: true))
+                        DonutShape(
+                            holePercentage: innerRadiusRatio,
+                            outerPercentage: 1.0
+                        )
+                        .fill(Color.black.opacity(0.33), style: FillStyle(eoFill: true))
                     
                     // Blur material layer
                     DonutShape(
@@ -83,7 +83,7 @@ struct RingView: View {
                         holePercentage: innerRadiusRatio,
                         outerPercentage: 1.0
                     )
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
                 }
                 .frame(width: totalDiameter, height: totalDiameter)
                 .allowsHitTesting(false)  // Don't block clicks
@@ -97,7 +97,7 @@ struct RingView: View {
                         innerRadiusRatio: innerRadiusRatio,
                         outerRadiusRatio: 1.0
                     )
-                    .fill(Color.black.opacity(0.56))
+                    .fill(Color.black.opacity(0.33))
                     
                     // Blur material layer
                     PieSliceShape(
@@ -115,7 +115,7 @@ struct RingView: View {
                         innerRadiusRatio: innerRadiusRatio,
                         outerRadiusRatio: 1.0
                     )
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
                 }
                 .frame(width: totalDiameter, height: totalDiameter)
                 .allowsHitTesting(false)  // Don't block clicks
@@ -127,10 +127,10 @@ struct RingView: View {
                     startAngle: startAngle,
                     endAngle: endAngle,
                     innerRadiusRatio: innerRadiusRatio,
-                    outerRadiusRatio: 1.0
+                    outerRadiusRatio: 1.0,
+                    insetPercentage: 1
                 )
                 .fill(selectionColor, style: FillStyle(eoFill: true))
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 .frame(width: totalDiameter, height: totalDiameter)
                 .allowsHitTesting(false)  // Don't block clicks
             }

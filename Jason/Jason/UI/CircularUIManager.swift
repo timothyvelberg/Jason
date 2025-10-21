@@ -115,39 +115,26 @@ class CircularUIManager: ObservableObject {
         print("✅ GestureManager ready")
     }
     
-    // MARK: - Scroll Back Handler (Updated)
-
     private func handleScrollBack() {
         guard let functionManager = functionManager else { return }
         
         let currentLevel = functionManager.activeRingLevel
         
-        if currentLevel > 1 {
-            // Ring 2+ -> Ring 1+: Just collapse one ring, stay open
+        if currentLevel > 0 {
             let targetLevel = currentLevel - 1
             print("🔙 [CircularUIManager] Scrolling back from ring \(currentLevel) to \(targetLevel)")
             functionManager.collapseToRing(level: targetLevel)
-            mouseTracker?.pauseAfterScroll()
-        } else if currentLevel == 1 {
-            // Ring 1 -> Ring 0: Collapse to Ring 0, stay visible at Ring 0
-            print("🔙 [CircularUIManager] Scrolling back from ring 1 to ring 0 - staying at Ring 0")
-            functionManager.collapseToRing(level: 0)
-            mouseTracker?.pauseAfterScroll()
             
-            // Exit app switcher mode if active (since we're leaving Ring 1)
-            if isInAppSwitcherMode {
-                print("🚪 Exiting app switcher mode (scrolled to Ring 0)")
-                exitAppSwitcherMode()
+            // Only hide UI if we just collapsed TO Ring 0
+            if targetLevel == 0 {
+                print("👋 [handleScrollBack] Collapsed to Ring 0 - hiding UI")
+                hide()
+            } else {
+                print("✅ [handleScrollBack] Collapsed to Ring \(targetLevel) - staying open")
+                mouseTracker?.pauseAfterScroll()
             }
         } else {
-            // Already at Ring 0 - close entire UI
-            print("👋 [CircularUIManager] At Ring 0, scrolling back - closing UI")
-            
-            if isInAppSwitcherMode {
-                exitAppSwitcherMode()
-            }
-            
-            hide()
+            print("⚠️ [CircularUIManager] Already at Ring 0 - cannot scroll back further")
         }
     }
     

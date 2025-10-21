@@ -35,7 +35,7 @@ class GestureManager {
         case doubleClick(MouseButton)
         case mouseDown(MouseButton)
         case mouseUp(MouseButton)
-        // NEW: Drag support
+        // Drag support
         case dragStarted(MouseButton, startPoint: CGPoint)
         case dragMoved(currentPoint: CGPoint, delta: CGPoint)
         case dragEnded(endPoint: CGPoint, didComplete: Bool)

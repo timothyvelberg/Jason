@@ -49,7 +49,6 @@ class AppSwitcherManager: ObservableObject {
     
     func setupServices() {
         print("🎹 Setting up services")
-        setupGlobalHotkeys()
         startAutoRefresh()
         loadRunningApplications()
         
@@ -64,23 +63,6 @@ class AppSwitcherManager: ObservableObject {
             print("🎯 Initializing MRU with active app: \(activeApp.localizedName ?? "Unknown")")
             recordAppUsage(activeApp)
         }
-    }
-    
-    func setupGlobalHotkeys() {
-        print("🎹 Setting up global hotkeys")
-        
-        // Listen for global key events (requires Accessibility permission)
-        NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { event in
-            self.handleGlobalKeyEvent(event)
-        }
-        
-        // Also listen for local events (when our app has focus)
-        NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { event in
-            self.handleLocalKeyEvent(event)
-            return event
-        }
-        
-        print("✅ Global hotkey monitoring started")
     }
     
     // MARK: - App Management
