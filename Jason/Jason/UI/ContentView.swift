@@ -88,7 +88,9 @@ struct PermissionRequestView: View {
             
             HStack(spacing: 10) {
                 Button("Test Circular UI") {
-                    circularUI.show()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        circularUI.show()
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 
@@ -141,7 +143,9 @@ struct MinimalView: View {
             
             VStack(spacing: 10) {
                 Button("Test Circular UI") {
-                    circularUI.show()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        circularUI.show()
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 

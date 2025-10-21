@@ -17,9 +17,6 @@ struct RingView: View {
     let sliceConfig: PieSliceConfig
     let iconSize: CGFloat
     
-    // Visual properties
-    private let backgroundColor: Color = .black.opacity(0.9)
-    
     // Animation state
     @State private var startAngle: Angle = .degrees(0)
     @State private var endAngle: Angle = .degrees(90)
@@ -47,7 +44,7 @@ struct RingView: View {
     
     // Computed opacity based on shouldDimOpacity
     private var ringOpacity: Double {
-        return shouldDimOpacity ? 1.0 : 1.0
+        return shouldDimOpacity ? 0.9 : 1.0
     }
     
     private var ringScale: CGFloat {
@@ -55,7 +52,7 @@ struct RingView: View {
     }
     
     private var selectionColor: Color {
-        return shouldDimOpacity ? .blue.opacity(0.7) : .blue.opacity(0.8)
+        return shouldDimOpacity ? .black.opacity(0.8) : .black.opacity(0.8)
     }
     
     var body: some View {
@@ -65,32 +62,53 @@ struct RingView: View {
         return ZStack {
             // Ring background - either full circle or partial slice
             if sliceConfig.isFullCircle {
-                // Full circle background
-                DonutShape(
-                    holePercentage: innerRadiusRatio,
-                    outerPercentage: 1.0
-                )
-//                .fill(backgroundColor, style: FillStyle(eoFill: true))
-                .foregroundStyle(.ultraThinMaterial)
-                .overlay(
+                // Full circle background with blur material
+                ZStack {
+                    // Dark tint layer
+                    DonutShape(
+                        holePercentage: innerRadiusRatio,
+                        outerPercentage: 1.0
+                    )
+                    .fill(Color.black.opacity(0.56), style: FillStyle(eoFill: true))
+                    
+                    // Blur material layer
+                    DonutShape(
+                        holePercentage: innerRadiusRatio,
+                        outerPercentage: 1.0
+                    )
+                    .fill(.ultraThinMaterial, style: FillStyle(eoFill: true))
+                    
+                    // Border
                     DonutShape(
                         holePercentage: innerRadiusRatio,
                         outerPercentage: 1.0
                     )
                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                )
+                }
                 .frame(width: totalDiameter, height: totalDiameter)
                 .allowsHitTesting(false)  // Don't block clicks
             } else {
-                // Partial slice background
-                PieSliceShape(
-                    startAngle: .degrees(sliceConfig.startAngle - 90),  // Adjust for 0° = top
-                    endAngle: .degrees(sliceConfig.endAngle - 90),
-                    innerRadiusRatio: innerRadiusRatio,
-                    outerRadiusRatio: 1.0
-                )
-                .foregroundStyle(.ultraThinMaterial)
-                .overlay(
+                // Partial slice background with blur material
+                ZStack {
+                    // Dark tint layer
+                    PieSliceShape(
+                        startAngle: .degrees(sliceConfig.startAngle - 90),
+                        endAngle: .degrees(sliceConfig.endAngle - 90),
+                        innerRadiusRatio: innerRadiusRatio,
+                        outerRadiusRatio: 1.0
+                    )
+                    .fill(Color.black.opacity(0.56))
+                    
+                    // Blur material layer
+                    PieSliceShape(
+                        startAngle: .degrees(sliceConfig.startAngle - 90),
+                        endAngle: .degrees(sliceConfig.endAngle - 90),
+                        innerRadiusRatio: innerRadiusRatio,
+                        outerRadiusRatio: 1.0
+                    )
+                    .fill(.ultraThinMaterial)
+                    
+                    // Border
                     PieSliceShape(
                         startAngle: .degrees(sliceConfig.startAngle - 90),
                         endAngle: .degrees(sliceConfig.endAngle - 90),
@@ -98,7 +116,7 @@ struct RingView: View {
                         outerRadiusRatio: 1.0
                     )
                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                )
+                }
                 .frame(width: totalDiameter, height: totalDiameter)
                 .allowsHitTesting(false)  // Don't block clicks
             }
@@ -112,6 +130,7 @@ struct RingView: View {
                     outerRadiusRatio: 1.0
                 )
                 .fill(selectionColor, style: FillStyle(eoFill: true))
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 .frame(width: totalDiameter, height: totalDiameter)
                 .allowsHitTesting(false)  // Don't block clicks
             }
@@ -127,7 +146,6 @@ struct RingView: View {
             }
         }
         .frame(width: totalDiameter, height: totalDiameter)
-        .opacity(ringOpacity)
         .scaleEffect(ringScale)
         .overlay(
             Group {
