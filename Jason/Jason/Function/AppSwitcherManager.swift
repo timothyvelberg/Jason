@@ -390,8 +390,7 @@ extension AppSwitcherManager: FunctionProvider {
                 icon: providerIcon,
                 children: appNodes,
                 maxDisplayedChildren: 12,  // Limit to 12 apps in the pie slice
-                preferredLayout: .partialSlic
-                ,  // Use full circle for many apps
+                preferredLayout: .partialSlice,  // Use full circle for many apps
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .expand,           // Click to expand applications
                 onRightClick: .execute { [weak self] in
