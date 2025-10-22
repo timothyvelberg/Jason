@@ -39,7 +39,8 @@ struct PieSliceShape: Shape {
     var endAngle: Angle
     var innerRadiusRatio: CGFloat
     var outerRadiusRatio: CGFloat
-    var insetPercentage: CGFloat = 0.0  // Add this parameter with default value
+    var insetPercentage: CGFloat = 0.0
+    var cornerRadius: CGFloat = 0.0  // New parameter for rounded corners
     
     var animatableData: AnimatablePair<Double, Double> {
         get { AnimatablePair(startAngle.degrees, endAngle.degrees) }
@@ -53,20 +54,15 @@ struct PieSliceShape: Shape {
         var path = Path()
         let center = CGPoint(x: rect.midX, y: rect.midY)
         let maxRadius = min(rect.width, rect.height) / 2
-        let outerRadius = (maxRadius * outerRadiusRatio) - insetPercentage  // Apply inset
-        let innerRadius = (maxRadius * innerRadiusRatio) + insetPercentage  // Apply inset
+        let outerRadius = (maxRadius * outerRadiusRatio) - insetPercentage
+        let innerRadius = (maxRadius * innerRadiusRatio) + insetPercentage
         
-        // Draw outer arc
         path.addArc(center: center, radius: outerRadius,
                     startAngle: startAngle, endAngle: endAngle,
                     clockwise: false)
-        
-        // Connect to inner arc
         path.addArc(center: center, radius: innerRadius,
                     startAngle: endAngle, endAngle: startAngle,
                     clockwise: true)
-        
-        // Close the path to complete the ring segment
         path.closeSubpath()
         
         return path

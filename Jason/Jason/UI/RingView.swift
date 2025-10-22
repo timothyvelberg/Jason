@@ -128,7 +128,8 @@ struct RingView: View {
                     endAngle: endAngle,
                     innerRadiusRatio: innerRadiusRatio,
                     outerRadiusRatio: 1.0,
-                    insetPercentage: 1
+                    insetPercentage: 1,
+                    cornerRadius: 8
                 )
                 .fill(selectionColor, style: FillStyle(eoFill: true))
                 .frame(width: totalDiameter, height: totalDiameter)
