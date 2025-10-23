@@ -220,7 +220,7 @@ class FinderLogic: FunctionProvider {
             createFavoriteFolderEntry(
                 name: folder.title,
                 path: URL(fileURLWithPath: folder.path),
-                icon: getIconForFolder(folder),
+                icon: NSImage(named: "folder") ?? NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
                 settings: settings
             )
         }
@@ -288,6 +288,7 @@ class FinderLogic: FunctionProvider {
         
         print("✅ [FinderLogic] Added default favorites")
     }
+    
     /// Get icon for folder (from database or system default)
     private func getIconForFolder(_ folder: FolderEntry) -> NSImage {
         // If custom icon stored in database, use it (future feature)
@@ -436,7 +437,7 @@ class FinderLogic: FunctionProvider {
     // Create folder node with navigation capability
     private func createFolderNode(for url: URL) -> FunctionNode {
         let folderName = url.lastPathComponent
-        let folderIcon = NSWorkspace.shared.icon(forFile: url.path)
+        let folderIcon = FolderIconProvider.shared.getIcon(for: url, size: 64, cornerRadius: 8)
         
         print("📁 [FinderLogic] Creating folder node with metadata for: \(folderName)")
         

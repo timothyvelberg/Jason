@@ -2,7 +2,7 @@
 //  FileIconProvider.swift
 //  Jason
 //
-//  Created by Timothy Velberg on 23/10/2025.
+//  Custom icon provider for file types with fallback to system icons
 //
 
 import Foundation
@@ -49,7 +49,7 @@ class FileIconProvider {
         "ts": IconConfig(symbolName: "chevron.left.forwardslash.chevron.right", backgroundColor: NSColor(red: 0.2, green: 0.5, blue: 0.8, alpha: 1.0), foregroundColor: .white),
         "html": IconConfig(symbolName: "chevron.left.forwardslash.chevron.right", backgroundColor: NSColor(red: 0.9, green: 0.3, blue: 0.2, alpha: 1.0), foregroundColor: .white),
         "css": IconConfig(symbolName: "paintbrush.fill", backgroundColor: NSColor(red: 0.2, green: 0.5, blue: 0.9, alpha: 1.0), foregroundColor: .white),
-        "json": IconConfig(symbolName: "curlybraces", backgroundColor: NSColor(red: 0.4, green: 0.4, blue: 0.4, alpha: 1.0), foregroundColor: .white),
+        "json": IconConfig(symbolName: "car.fill", backgroundColor: NSColor(red: 0.4, green: 0.4, blue: 0.4, alpha: 1.0), foregroundColor: .white),
         "xml": IconConfig(symbolName: "chevron.left.forwardslash.chevron.right", backgroundColor: NSColor(red: 0.6, green: 0.4, blue: 0.2, alpha: 1.0), foregroundColor: .white),
         
         // Archives

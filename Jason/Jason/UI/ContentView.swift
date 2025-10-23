@@ -9,17 +9,16 @@ import SwiftUI
 import AppKit
 
 struct ContentView: View {
-    @StateObject private var appSwitcher = AppSwitcherManager()
     @StateObject private var circularUI = CircularUIManager()
-
+    
     var body: some View {
         Group {
             MinimalView(circularUI: circularUI)
-    //            if !circularUI.appSwitcher?.hasAccessibilityPermission ?? false {
-    //                PermissionRequestView(circularUI: circularUI)
-    //            } else {
-    //                MinimalView(circularUI: circularUI)
-    //            }
+//            if !(circularUI.appSwitcher?.hasAccessibilityPermission ?? true) {
+//                PermissionRequestView(circularUI: circularUI)
+//            } else {
+//                MinimalView(circularUI: circularUI)
+//            }
         }
         .onAppear {
             print("🚀 ContentView appeared")
@@ -35,7 +34,6 @@ struct ContentView: View {
 // MARK: - Permission Request View
 
 struct PermissionRequestView: View {
-    let appSwitcher: AppSwitcherManager
     @ObservedObject var circularUI: CircularUIManager
     
     var body: some View {
@@ -68,12 +66,12 @@ struct PermissionRequestView: View {
             
             HStack(spacing: 15) {
                 Button("Open System Preferences") {
-                    appSwitcher.openAccessibilityPreferences()
+                    circularUI.appSwitcher?.openAccessibilityPreferences()
                 }
                 .buttonStyle(.borderedProminent)
                 
                 Button("Check Again") {
-                    appSwitcher.checkAccessibilityPermission()
+                    circularUI.appSwitcher?.checkAccessibilityPermission()
                 }
                 .buttonStyle(.bordered)
             }
@@ -230,44 +228,46 @@ struct FavoritesSettingsView: View {
                         .foregroundColor(.secondary)
                     
                     Text("No favorites yet")
-                        .font(.title3)
+                        .font(.headline)
                         .foregroundColor(.secondary)
                     
-                    Text("Click 'Add Folder' to add your first favorite")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    Button("Add Folder") {
+                        addFolder()
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List {
-                    ForEach(Array(favorites.enumerated()), id: \.element.folder.id) { index, item in
-                        FavoriteRow(
-                            folder: item.folder,
-                            maxItems: item.settings.maxItems,  // Changed from item.maxItems
-                            onEdit: {
-                                editingFavorite = item.folder
-                                editingName = item.folder.title
-                                editingMaxItems = item.settings.maxItems.map { String($0) } ?? ""
-                            },
-                            onRemove: {
-                                removeFavorite(item.folder)
-                            }
-                        )
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(favorites, id: \.folder.id) { item in
+                            FavoriteRow(
+                                folder: item.folder,
+                                maxItems: item.settings.maxItems,
+                                onEdit: {
+                                    editingFavorite = item.folder
+                                    editingName = item.folder.title
+                                    editingMaxItems = item.settings.maxItems.map { String($0) } ?? ""
+                                },
+                                onRemove: {
+                                    removeFavorite(item.folder)
+                                }
+                            )
+                            Divider()
+                        }
                     }
-                    .onMove { from, to in
-                        // TODO: Handle reordering
-                    }
+                    .padding()
                 }
             }
             
             Divider()
             
-            // Add Button
+            // Footer
             HStack {
                 Button(action: addFolder) {
-                    Label("Add Folder", systemImage: "plus.circle.fill")
+                    Label("Add Folder", systemImage: "plus")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 
                 Spacer()
                 
