@@ -84,6 +84,11 @@ class DatabaseManager {
             path TEXT UNIQUE NOT NULL,
             title TEXT NOT NULL,
             icon TEXT,
+            icon_name TEXT,
+            icon_color_hex TEXT,
+            base_asset TEXT DEFAULT '_folder-blue_',
+            symbol_size REAL DEFAULT 24.0,
+            symbol_offset REAL DEFAULT -8.0,
             last_accessed INTEGER NOT NULL,
             access_count INTEGER DEFAULT 0
         );
@@ -238,6 +243,128 @@ class DatabaseManager {
         }
     }
 
+    /// Set custom icon for a folder
+    func setFolderIcon(path: String, iconName: String?, iconColorHex: String?, baseAsset: String = "_folder-blue_", symbolSize: CGFloat = 24.0, symbolOffset: CGFloat = -8.0) {
+        guard let db = db else { return }
+        
+        queue.async {
+            // First ensure the folder exists
+            let folderId = self._getOrCreateFolderUnsafe(path: path, title: nil)
+            guard folderId != nil else {
+                print("❌ [DatabaseManager] Failed to get/create folder for icon update: \(path)")
+                return
+            }
+            
+            let sql = """
+            UPDATE folders 
+            SET icon_name = ?, icon_color_hex = ?, base_asset = ?, symbol_size = ?, symbol_offset = ?
+            WHERE path = ?;
+            """
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                if let iconName = iconName {
+                    sqlite3_bind_text(statement, 1, (iconName as NSString).utf8String, -1, nil)
+                } else {
+                    sqlite3_bind_null(statement, 1)
+                }
+                
+                if let iconColorHex = iconColorHex {
+                    sqlite3_bind_text(statement, 2, (iconColorHex as NSString).utf8String, -1, nil)
+                } else {
+                    sqlite3_bind_null(statement, 2)
+                }
+                
+                sqlite3_bind_text(statement, 3, (baseAsset as NSString).utf8String, -1, nil)
+                sqlite3_bind_double(statement, 4, Double(symbolSize))
+                sqlite3_bind_double(statement, 5, Double(symbolOffset))
+                sqlite3_bind_text(statement, 6, (path as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("🎨 [DatabaseManager] Set custom icon for folder: \(path)")
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+    }
+
+    /// Remove custom icon from a folder (reset to defaults)
+    func removeFolderIcon(path: String) {
+        guard let db = db else { return }
+        
+        queue.async {
+            let sql = """
+            UPDATE folders 
+            SET icon_name = NULL, icon_color_hex = NULL, base_asset = '_folder-blue_', symbol_size = 24.0, symbol_offset = -8.0
+            WHERE path = ?;
+            """
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("🗑️ [DatabaseManager] Removed custom icon for folder: \(path)")
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+    }
+
+    /// Get all folders with custom icons
+    func getFoldersWithCustomIcons() -> [FolderEntry] {
+        guard let db = db else { return [] }
+        
+        var results: [FolderEntry] = []
+        
+        queue.sync {
+            let sql = """
+            SELECT id, path, title, icon, icon_name, icon_color_hex, 
+                   COALESCE(base_asset, '_folder-blue_'), 
+                   COALESCE(symbol_size, 24.0), 
+                   COALESCE(symbol_offset, -8.0),
+                   last_accessed, access_count 
+            FROM folders 
+            WHERE icon_name IS NOT NULL
+            ORDER BY title;
+            """
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                while sqlite3_step(statement) == SQLITE_ROW {
+                    let id = Int(sqlite3_column_int(statement, 0))
+                    let path = String(cString: sqlite3_column_text(statement, 1))
+                    let title = String(cString: sqlite3_column_text(statement, 2))
+                    let icon = sqlite3_column_text(statement, 3) != nil ? String(cString: sqlite3_column_text(statement, 3)) : nil
+                    let iconName = sqlite3_column_text(statement, 4) != nil ? String(cString: sqlite3_column_text(statement, 4)) : nil
+                    let iconColorHex = sqlite3_column_text(statement, 5) != nil ? String(cString: sqlite3_column_text(statement, 5)) : nil
+                    let baseAsset = String(cString: sqlite3_column_text(statement, 6))
+                    let symbolSize = CGFloat(sqlite3_column_double(statement, 7))
+                    let symbolOffset = CGFloat(sqlite3_column_double(statement, 8))
+                    let lastAccessed = Int(sqlite3_column_int64(statement, 9))
+                    let accessCount = Int(sqlite3_column_int(statement, 10))
+                    
+                    results.append(FolderEntry(
+                        id: id,
+                        path: path,
+                        title: title,
+                        icon: icon,
+                        iconName: iconName,
+                        iconColorHex: iconColorHex,
+                        baseAsset: baseAsset,
+                        symbolSize: symbolSize,
+                        symbolOffset: symbolOffset,
+                        lastAccessed: lastAccessed,
+                        accessCount: accessCount
+                    ))
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+        
+        return results
+    }
+
     /// Get folder by path
     func getFolder(path: String) -> FolderEntry? {
         guard let db = db else { return nil }
@@ -245,7 +372,14 @@ class DatabaseManager {
         var result: FolderEntry?
         
         queue.sync {
-            let sql = "SELECT id, path, title, icon, last_accessed, access_count FROM folders WHERE path = ?;"
+            let sql = """
+            SELECT id, path, title, icon, icon_name, icon_color_hex, 
+                   COALESCE(base_asset, '_folder-blue_'), 
+                   COALESCE(symbol_size, 24.0), 
+                   COALESCE(symbol_offset, -8.0),
+                   last_accessed, access_count 
+            FROM folders WHERE path = ?;
+            """
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
@@ -256,14 +390,24 @@ class DatabaseManager {
                     let path = String(cString: sqlite3_column_text(statement, 1))
                     let title = String(cString: sqlite3_column_text(statement, 2))
                     let icon = sqlite3_column_text(statement, 3) != nil ? String(cString: sqlite3_column_text(statement, 3)) : nil
-                    let lastAccessed = Int(sqlite3_column_int64(statement, 4))
-                    let accessCount = Int(sqlite3_column_int(statement, 5))
+                    let iconName = sqlite3_column_text(statement, 4) != nil ? String(cString: sqlite3_column_text(statement, 4)) : nil
+                    let iconColorHex = sqlite3_column_text(statement, 5) != nil ? String(cString: sqlite3_column_text(statement, 5)) : nil
+                    let baseAsset = String(cString: sqlite3_column_text(statement, 6))
+                    let symbolSize = CGFloat(sqlite3_column_double(statement, 7))
+                    let symbolOffset = CGFloat(sqlite3_column_double(statement, 8))
+                    let lastAccessed = Int(sqlite3_column_int64(statement, 9))
+                    let accessCount = Int(sqlite3_column_int(statement, 10))
                     
                     result = FolderEntry(
                         id: id,
                         path: path,
                         title: title,
                         icon: icon,
+                        iconName: iconName,
+                        iconColorHex: iconColorHex,
+                        baseAsset: baseAsset,
+                        symbolSize: symbolSize,
+                        symbolOffset: symbolOffset,
                         lastAccessed: lastAccessed,
                         accessCount: accessCount
                     )
@@ -285,7 +429,12 @@ class DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT f.id, f.path, f.title, f.icon, f.last_accessed, f.access_count,
+            SELECT f.id, f.path, f.title, f.icon, 
+                   f.icon_name, f.icon_color_hex, 
+                   COALESCE(f.base_asset, '_folder-blue_'), 
+                   COALESCE(f.symbol_size, 24.0), 
+                   COALESCE(f.symbol_offset, -8.0),
+                   f.last_accessed, f.access_count,
                    ff.max_items, ff.preferred_layout, ff.item_angle_size, 
                    ff.slice_positioning, ff.child_ring_thickness, ff.child_icon_size
             FROM favorite_folders ff
@@ -300,21 +449,31 @@ class DatabaseManager {
                     let path = String(cString: sqlite3_column_text(statement, 1))
                     let title = String(cString: sqlite3_column_text(statement, 2))
                     let icon = sqlite3_column_text(statement, 3) != nil ? String(cString: sqlite3_column_text(statement, 3)) : nil
-                    let lastAccessed = Int(sqlite3_column_int64(statement, 4))
-                    let accessCount = Int(sqlite3_column_int(statement, 5))
+                    let iconName = sqlite3_column_text(statement, 4) != nil ? String(cString: sqlite3_column_text(statement, 4)) : nil
+                    let iconColorHex = sqlite3_column_text(statement, 5) != nil ? String(cString: sqlite3_column_text(statement, 5)) : nil
+                    let baseAsset = String(cString: sqlite3_column_text(statement, 6))
+                    let symbolSize = CGFloat(sqlite3_column_double(statement, 7))
+                    let symbolOffset = CGFloat(sqlite3_column_double(statement, 8))
+                    let lastAccessed = Int(sqlite3_column_int64(statement, 9))
+                    let accessCount = Int(sqlite3_column_int(statement, 10))
                     
-                    let maxItems: Int? = sqlite3_column_type(statement, 6) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 6))
-                    let preferredLayout = sqlite3_column_text(statement, 7) != nil ? String(cString: sqlite3_column_text(statement, 7)) : nil
-                    let itemAngleSize: Int? = sqlite3_column_type(statement, 8) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 8))
-                    let slicePositioning = sqlite3_column_text(statement, 9) != nil ? String(cString: sqlite3_column_text(statement, 9)) : nil
-                    let childRingThickness: Int? = sqlite3_column_type(statement, 10) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 10))
-                    let childIconSize: Int? = sqlite3_column_type(statement, 11) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 11))
+                    let maxItems: Int? = sqlite3_column_type(statement, 11) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 11))
+                    let preferredLayout = sqlite3_column_text(statement, 12) != nil ? String(cString: sqlite3_column_text(statement, 12)) : nil
+                    let itemAngleSize: Int? = sqlite3_column_type(statement, 13) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 13))
+                    let slicePositioning = sqlite3_column_text(statement, 14) != nil ? String(cString: sqlite3_column_text(statement, 14)) : nil
+                    let childRingThickness: Int? = sqlite3_column_type(statement, 15) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 15))
+                    let childIconSize: Int? = sqlite3_column_type(statement, 16) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 16))
                     
                     let folder = FolderEntry(
                         id: id,
                         path: path,
                         title: title,
                         icon: icon,
+                        iconName: iconName,
+                        iconColorHex: iconColorHex,
+                        baseAsset: baseAsset,
+                        symbolSize: symbolSize,
+                        symbolOffset: symbolOffset,
                         lastAccessed: lastAccessed,
                         accessCount: accessCount
                     )
@@ -1144,8 +1303,18 @@ struct FolderEntry: Identifiable {
     let path: String
     let title: String
     let icon: String?
+    let iconName: String?
+    let iconColorHex: String?
+    let baseAsset: String
+    let symbolSize: CGFloat
+    let symbolOffset: CGFloat
     let lastAccessed: Int
     let accessCount: Int
+    
+    var iconColor: NSColor? {
+        guard let hex = iconColorHex else { return nil }
+        return NSColor(hex: hex)
+    }
 }
 
 struct FavoriteFolderEntry {

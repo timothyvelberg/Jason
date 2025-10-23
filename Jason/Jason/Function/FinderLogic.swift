@@ -204,6 +204,10 @@ class FinderLogic: FunctionProvider {
         return nodes
     }
     
+    // Updated methods for FinderLogic.swift
+
+    // MARK: - Replace the createFavoriteFoldersNode method with this:
+
     private func createFavoriteFoldersNode() -> FunctionNode {
         // Get favorites from database
         let favoritesFromDB = DatabaseManager.shared.getFavoriteFolders()
@@ -218,9 +222,7 @@ class FinderLogic: FunctionProvider {
         
         let favoriteChildren = favoritesFromDB.map { (folder, settings) in
             createFavoriteFolderEntry(
-                name: folder.title,
-                path: URL(fileURLWithPath: folder.path),
-                icon: NSImage(named: "folder") ?? NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
+                folderEntry: folder,  // Pass the entire FolderEntry
                 settings: settings
             )
         }
@@ -231,11 +233,89 @@ class FinderLogic: FunctionProvider {
             icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
             children: favoriteChildren,
             preferredLayout: .partialSlice,
-            slicePositioning: .center,
             onLeftClick: .expand,
             onRightClick: .expand,
-            onMiddleClick: .expand,
             onBoundaryCross: .expand
+        )
+    }
+
+    // MARK: - Replace the createFavoriteFolderEntry method with this:
+
+    private func createFavoriteFolderEntry(folderEntry: FolderEntry, settings: FavoriteFolderSettings) -> FunctionNode {
+        let path = URL(fileURLWithPath: folderEntry.path)
+        var metadata: [String: Any] = ["folderURL": folderEntry.path]
+        
+        // Add custom max items if specified
+        if let maxItems = settings.maxItems {
+            metadata["maxItems"] = maxItems
+        }
+        
+        // Convert string settings to enums with defaults
+        let layout: LayoutStyle = {
+            guard let layoutString = settings.preferredLayout else { return .fullCircle }
+            return layoutString == "partialSlice" ? .partialSlice : .fullCircle
+        }()
+        
+        let positioning: SlicePositioning = {
+            guard let posString = settings.slicePositioning else { return .startClockwise }
+            switch posString {
+            case "startCounterClockwise": return .startCounterClockwise
+            case "center": return .center
+            default: return .startClockwise
+            }
+        }()
+        
+        // Get numeric settings with defaults
+        let itemAngle = settings.itemAngleSize.map { CGFloat($0) }
+        let childThickness = settings.childRingThickness.map { CGFloat($0) }
+        let childIcon = settings.childIconSize.map { CGFloat($0) }
+        
+        // Generate folder icon based on database settings
+        let folderIcon: NSImage = {
+            // Check if folder has custom icon settings
+            if let iconName = folderEntry.iconName,
+               let iconColor = folderEntry.iconColor {
+                print("🎨 [FinderLogic] Using custom icon for '\(folderEntry.title)': \(iconName)")
+                return IconProvider.shared.createCompositeIcon(
+                    baseAssetName: folderEntry.baseAsset,
+                    symbolName: iconName,
+                    symbolColor: iconColor,
+                    size: 64,
+                    symbolSize: folderEntry.symbolSize,
+                    cornerRadius: 8,
+                    symbolOffset: folderEntry.symbolOffset
+                )
+            }
+            
+            // Default folder icon
+            print("📁 [FinderLogic] Using default icon for '\(folderEntry.title)'")
+            return IconProvider.shared.getFolderIcon(for: path, size: 64, cornerRadius: 8)
+        }()
+        
+        return FunctionNode(
+            id: "favorite-\(path.path)",
+            name: folderEntry.title,
+            icon: folderIcon,
+            children: nil,
+            preferredLayout: layout,
+            itemAngleSize: itemAngle,
+            showLabel: true,
+            
+            childRingThickness: childThickness,
+            childIconSize: childIcon,
+            
+            slicePositioning: positioning,
+            
+            metadata: metadata,
+            providerId: self.providerId,
+            
+            onLeftClick: .navigateInto,
+            onRightClick: .expand,
+            onMiddleClick: .executeKeepOpen {
+                DatabaseManager.shared.updateFolderAccess(path: path.path)
+                NSWorkspace.shared.open(path)
+            },
+            onBoundaryCross: .doNothing
         )
     }
 
@@ -330,10 +410,16 @@ class FinderLogic: FunctionProvider {
         let childThickness = settings.childRingThickness.map { CGFloat($0) }
         let childIcon = settings.childIconSize.map { CGFloat($0) }
         
+        // Get folder icon from database (will use custom icon if set, otherwise default)
+        let folderIcon = IconProvider.shared.getFolderIconFromDatabase(
+            for: path,
+            size: 64
+        )
+        
         return FunctionNode(
             id: "favorite-\(path.path)",
             name: name,
-            icon: icon,
+            icon: folderIcon,  // Use database icon instead of hardcoded
             children: nil,
             preferredLayout: layout,
             itemAngleSize: itemAngle,
@@ -355,6 +441,73 @@ class FinderLogic: FunctionProvider {
             },
             onBoundaryCross: .doNothing
         )
+    }
+    
+    private func createCompositeIcon(baseAssetName: String, symbolName: String, symbolColor: NSColor, size: CGFloat, cornerRadius: CGFloat) -> NSImage {
+        let compositeImage = NSImage(size: NSSize(width: size, height: size))
+        
+        compositeImage.lockFocus()
+        
+        // Draw base icon (your custom folder)
+        if let baseImage = NSImage(named: baseAssetName) {
+            let imageSize = baseImage.size
+            let scale = min(size / imageSize.width, size / imageSize.height)
+            let scaledWidth = imageSize.width * scale
+            let scaledHeight = imageSize.height * scale
+            
+            let drawRect = NSRect(
+                x: (size - scaledWidth) / 2,
+                y: (size - scaledHeight) / 2,
+                width: scaledWidth,
+                height: scaledHeight
+            )
+            
+            baseImage.draw(
+                in: drawRect,
+                from: NSRect(origin: .zero, size: baseImage.size),
+                operation: .sourceOver,
+                fraction: 1.0
+            )
+        }
+        
+        // Create colored SF Symbol with preserved aspect ratio
+        if let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
+            let symbolConfig = NSImage.SymbolConfiguration(pointSize: size * 0.4, weight: .medium)
+            if let configuredSymbol = symbol.withSymbolConfiguration(symbolConfig) {
+                
+                let symbolSize = configuredSymbol.size
+                
+                // Create colored version in its own context
+                let coloredSymbol = NSImage(size: symbolSize)
+                coloredSymbol.lockFocus()
+                
+                configuredSymbol.draw(
+                    in: NSRect(origin: .zero, size: symbolSize),
+                    from: NSRect(origin: .zero, size: symbolSize),
+                    operation: .sourceOver,
+                    fraction: 1.0
+                )
+                
+                symbolColor.setFill()
+                NSRect(origin: .zero, size: symbolSize).fill(using: .sourceAtop)
+                
+                coloredSymbol.unlockFocus()
+                
+                // Draw colored symbol centered on composite
+                let symbolRect = NSRect(
+                    x: (size - symbolSize.width) / 2,
+                    y: (size - symbolSize.height) / 2 - 4,
+                    width: symbolSize.width,
+                    height: symbolSize.height
+                )
+                
+                coloredSymbol.draw(in: symbolRect)
+            }
+        }
+        
+        compositeImage.unlockFocus()
+        
+        return compositeImage
     }
     
     /// Convert LayoutStyle enum to database string
@@ -437,14 +590,21 @@ class FinderLogic: FunctionProvider {
     // Create folder node with navigation capability
     private func createFolderNode(for url: URL) -> FunctionNode {
         let folderName = url.lastPathComponent
-        let folderIcon = FolderIconProvider.shared.getIcon(for: url, size: 64, cornerRadius: 8)
+//        let folderIcon = FolderIconProvider.shared.getIcon(for: url, size: 64, cornerRadius: 8)
         
         print("📁 [FinderLogic] Creating folder node with metadata for: \(folderName)")
         
         return FunctionNode(
             id: "folder-\(url.path)",
             name: folderName,
-            icon: folderIcon,
+            icon: IconProvider.shared.createCompositeIcon(
+                baseAssetName: "folder-blue",  // Your custom folder asset
+                symbolName: "star.fill",
+                symbolColor: .white,
+                size: 64,
+                symbolSize: 24,
+                symbolOffset: -4
+            ),
             children: nil,
             contextActions: [
                 StandardContextActions.showInFinder(url),
@@ -704,7 +864,7 @@ class FinderLogic: FunctionProvider {
         }
         
         // For non-images, use FileIconProvider
-        return FileIconProvider.shared.getIcon(for: url, size: thumbnailSize.width, cornerRadius: cornerRadius)
+        return IconProvider.shared.getFileIcon(for: url, size: thumbnailSize.width, cornerRadius: cornerRadius)
     }
     
     // MARK: - Finder Window Discovery

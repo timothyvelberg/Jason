@@ -390,10 +390,6 @@ struct FavoriteRow: View {
 
 // MARK: - Edit Favorite View
 
-// MARK: - Edit Favorite View
-
-// MARK: - Edit Favorite View
-
 struct EditFavoriteView: View {
     @Environment(\.dismiss) var dismiss
     let folder: FolderEntry
@@ -408,6 +404,41 @@ struct EditFavoriteView: View {
     @State private var childRingThickness: String = "80"
     @State private var childIconSize: String = "32"
     
+    // NEW: Icon customization
+    @State private var iconName: String = ""
+    @State private var selectedColor: IconColor = .blue
+    
+    // Color options
+    enum IconColor: String, CaseIterable, Identifiable {
+        case blue = "Blue"
+        case orange = "Orange"
+        case red = "Red"
+        case purple = "Purple"
+        case green = "Green"
+        
+        var id: String { rawValue }
+        
+        var nsColor: NSColor {
+            switch self {
+            case .blue: return NSColor(red: 0.2, green: 0.6, blue: 0.9, alpha: 1.0)
+            case .orange: return NSColor(red: 1.0, green: 0.6, blue: 0.2, alpha: 1.0)
+            case .red: return NSColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 1.0)
+            case .purple: return NSColor(red: 0.6, green: 0.3, blue: 0.8, alpha: 1.0)
+            case .green: return NSColor(red: 0.2, green: 0.7, blue: 0.3, alpha: 1.0)
+            }
+        }
+        
+        var swiftUIColor: Color {
+            switch self {
+            case .blue: return Color(red: 0.2, green: 0.6, blue: 0.9)
+            case .orange: return Color(red: 1.0, green: 0.6, blue: 0.2)
+            case .red: return Color(red: 0.9, green: 0.2, blue: 0.2)
+            case .purple: return Color(red: 0.6, green: 0.3, blue: 0.8)
+            case .green: return Color(red: 0.2, green: 0.7, blue: 0.3)
+            }
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 20) {
             Text("Edit Favorite: \(folder.title)")
@@ -420,6 +451,44 @@ struct EditFavoriteView: View {
                         TextField("Name", text: $name)
                         TextField("Max Items (optional)", text: $maxItems)
                             .help("Leave empty for no limit")
+                    }
+                    
+                    // NEW: Icon Customization Section
+                    Section("Icon Customization") {
+                        TextField("SF Symbol Name", text: $iconName)
+                            .help("e.g., star.fill, camera.fill, folder.badge.plus")
+                        
+                        Picker("Icon Color", selection: $selectedColor) {
+                            ForEach(IconColor.allCases) { color in
+                                HStack {
+                                    Circle()
+                                        .fill(color.swiftUIColor)
+                                        .frame(width: 12, height: 12)
+                                    Text(color.rawValue)
+                                }
+                                .tag(color)
+                            }
+                        }
+                        
+                        // Preview
+                        if !iconName.isEmpty {
+                            HStack {
+                                Text("Preview:")
+                                    .foregroundColor(.secondary)
+                                
+                                if let nsImage = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) {
+                                    Image(nsImage: nsImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(width: 24, height: 24)
+                                        .foregroundColor(selectedColor.swiftUIColor)
+                                } else {
+                                    Text("Invalid symbol name")
+                                        .foregroundColor(.red)
+                                        .font(.caption)
+                                }
+                            }
+                        }
                     }
                     
                     Section("Layout") {
@@ -447,7 +516,7 @@ struct EditFavoriteView: View {
                     }
                 }
             }
-            .frame(height: 400)
+            .frame(height: 450)
             
             HStack(spacing: 12) {
                 Button("Cancel") {
@@ -462,17 +531,54 @@ struct EditFavoriteView: View {
             }
         }
         .onAppear {
-            // Load current settings
-            if let settings = currentSettings {
-                selectedLayout = settings.preferredLayout ?? "fullCircle"
-                itemAngleSize = settings.itemAngleSize.map { String($0) } ?? "30"
-                slicePositioning = settings.slicePositioning ?? "startClockwise"
-                childRingThickness = settings.childRingThickness.map { String($0) } ?? "80"
-                childIconSize = settings.childIconSize.map { String($0) } ?? "32"
-            }
+            loadCurrentSettings()
         }
         .padding()
-        .frame(width: 500, height: 550)
+        .frame(width: 500, height: 600)
+    }
+    
+    private func loadCurrentSettings() {
+        // Load layout settings
+        if let settings = currentSettings {
+            selectedLayout = settings.preferredLayout ?? "fullCircle"
+            itemAngleSize = settings.itemAngleSize.map { String($0) } ?? "30"
+            slicePositioning = settings.slicePositioning ?? "startClockwise"
+            childRingThickness = settings.childRingThickness.map { String($0) } ?? "80"
+            childIconSize = settings.childIconSize.map { String($0) } ?? "32"
+        }
+        
+        // Load icon settings from folder entry
+        if let existingIconName = folder.iconName {
+            iconName = existingIconName
+        }
+        
+        if let existingColorHex = folder.iconColorHex,
+           let existingColor = NSColor(hex: existingColorHex) {
+            // Try to match to one of our predefined colors
+            selectedColor = matchClosestColor(existingColor)
+        }
+    }
+    
+    private func matchClosestColor(_ color: NSColor) -> IconColor {
+        // Simple color matching - you could make this more sophisticated
+        guard let rgb = color.usingColorSpace(.deviceRGB) else { return .blue }
+        
+        let r = rgb.redComponent
+        let g = rgb.greenComponent
+        let b = rgb.blueComponent
+        
+        // Match based on dominant component
+        if r > g && r > b {
+            return .red
+        } else if g > r && g > b {
+            return .green
+        } else if b > r && b > g {
+            return .blue
+        } else if r > 0.5 && g > 0.5 {
+            return .orange
+        } else {
+            return .purple
+        }
     }
     
     private func saveChanges() {
@@ -491,9 +597,27 @@ struct EditFavoriteView: View {
             childIconSize: iconSizeValue
         )
         
-        // Update in database
+        // Update layout settings in database
         if DatabaseManager.shared.updateFavoriteSettings(path: folder.path, title: name, settings: settings) {
             print("✅ Updated favorite settings for: \(folder.title)")
+            
+            // Update icon customization
+            if !iconName.trimmingCharacters(in: .whitespaces).isEmpty {
+                DatabaseManager.shared.setFolderIcon(
+                    path: folder.path,
+                    iconName: iconName.trimmingCharacters(in: .whitespaces),
+                    iconColorHex: selectedColor.nsColor.hexString,
+                    baseAsset: "_folder-blue_",
+                    symbolSize: 24,
+                    symbolOffset: -8
+                )
+                print("✅ Updated folder icon: \(iconName) with color \(selectedColor.rawValue)")
+            } else {
+                // Remove custom icon if icon name is empty
+                DatabaseManager.shared.removeFolderIcon(path: folder.path)
+                print("🗑️ Removed custom icon")
+            }
+            
             onSave()
         } else {
             print("❌ Failed to update favorite settings")
