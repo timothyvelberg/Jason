@@ -406,10 +406,10 @@ struct EditFavoriteView: View {
     
     // NEW: Icon customization
     @State private var iconName: String = ""
-    @State private var selectedColor: IconColor = .blue
+    @State private var selectedFolderColor: FolderColor = .blue
     
-    // Color options
-    enum IconColor: String, CaseIterable, Identifiable {
+    // Folder color options (matches asset names)
+    enum FolderColor: String, CaseIterable, Identifiable {
         case blue = "Blue"
         case orange = "Orange"
         case red = "Red"
@@ -418,16 +418,18 @@ struct EditFavoriteView: View {
         
         var id: String { rawValue }
         
-        var nsColor: NSColor {
+        // Asset name in your Assets folder
+        var assetName: String {
             switch self {
-            case .blue: return NSColor(red: 0.2, green: 0.6, blue: 0.9, alpha: 1.0)
-            case .orange: return NSColor(red: 1.0, green: 0.6, blue: 0.2, alpha: 1.0)
-            case .red: return NSColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 1.0)
-            case .purple: return NSColor(red: 0.6, green: 0.3, blue: 0.8, alpha: 1.0)
-            case .green: return NSColor(red: 0.2, green: 0.7, blue: 0.3, alpha: 1.0)
+            case .blue: return "folder-blue"
+            case .orange: return "folder-orange"
+            case .red: return "folder-red"
+            case .purple: return "folder-purple"
+            case .green: return "folder-green"
             }
         }
         
+        // Color for the preview circle
         var swiftUIColor: Color {
             switch self {
             case .blue: return Color(red: 0.2, green: 0.6, blue: 0.9)
@@ -455,11 +457,8 @@ struct EditFavoriteView: View {
                     
                     // NEW: Icon Customization Section
                     Section("Icon Customization") {
-                        TextField("SF Symbol Name", text: $iconName)
-                            .help("e.g., star.fill, camera.fill, folder.badge.plus")
-                        
-                        Picker("Icon Color", selection: $selectedColor) {
-                            ForEach(IconColor.allCases) { color in
+                        Picker("Folder Color", selection: $selectedFolderColor) {
+                            ForEach(FolderColor.allCases) { color in
                                 HStack {
                                     Circle()
                                         .fill(color.swiftUIColor)
@@ -469,23 +468,42 @@ struct EditFavoriteView: View {
                                 .tag(color)
                             }
                         }
+                        .help("Choose the base folder color")
+                        
+                        TextField("SF Symbol Name (optional)", text: $iconName)
+                            .help("e.g., star.fill, camera.fill, music.note - will appear in white on the folder")
                         
                         // Preview
-                        if !iconName.isEmpty {
+                        if !iconName.isEmpty || selectedFolderColor != .blue {
                             HStack {
                                 Text("Preview:")
                                     .foregroundColor(.secondary)
                                 
-                                if let nsImage = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) {
-                                    Image(nsImage: nsImage)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .frame(width: 24, height: 24)
-                                        .foregroundColor(selectedColor.swiftUIColor)
-                                } else {
-                                    Text("Invalid symbol name")
-                                        .foregroundColor(.red)
-                                        .font(.caption)
+                                // Show preview of folder with symbol
+                                ZStack {
+                                    // Base folder
+                                    if let folderImage = NSImage(named: selectedFolderColor.assetName) {
+                                        Image(nsImage: folderImage)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .frame(width: 32, height: 32)
+                                    }
+                                    
+                                    // SF Symbol on top (if provided)
+                                    if !iconName.isEmpty,
+                                       let symbolImage = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) {
+                                        Image(nsImage: symbolImage)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .frame(width: 16, height: 16)
+                                            .foregroundColor(.white)
+                                            .offset(y: -2)
+                                    } else if !iconName.isEmpty {
+                                        Text("Invalid symbol")
+                                            .foregroundColor(.red)
+                                            .font(.caption)
+                                            .offset(x: 40)
+                                    }
                                 }
                             }
                         }
@@ -552,32 +570,25 @@ struct EditFavoriteView: View {
             iconName = existingIconName
         }
         
-        if let existingColorHex = folder.iconColorHex,
-           let existingColor = NSColor(hex: existingColorHex) {
-            // Try to match to one of our predefined colors
-            selectedColor = matchClosestColor(existingColor)
-        }
+        // Load folder color based on baseAsset
+        selectedFolderColor = matchFolderColor(folder.baseAsset)
     }
     
-    private func matchClosestColor(_ color: NSColor) -> IconColor {
-        // Simple color matching - you could make this more sophisticated
-        guard let rgb = color.usingColorSpace(.deviceRGB) else { return .blue }
-        
-        let r = rgb.redComponent
-        let g = rgb.greenComponent
-        let b = rgb.blueComponent
-        
-        // Match based on dominant component
-        if r > g && r > b {
-            return .red
-        } else if g > r && g > b {
-            return .green
-        } else if b > r && b > g {
+    private func matchFolderColor(_ baseAsset: String) -> FolderColor {
+        // Match the base asset to our enum
+        switch baseAsset {
+        case "folder-blue", "_folder-blue_":
             return .blue
-        } else if r > 0.5 && g > 0.5 {
+        case "folder-orange":
             return .orange
-        } else {
+        case "folder-red":
+            return .red
+        case "folder-purple":
             return .purple
+        case "folder-green":
+            return .green
+        default:
+            return .blue
         }
     }
     
@@ -602,20 +613,22 @@ struct EditFavoriteView: View {
             print("✅ Updated favorite settings for: \(folder.title)")
             
             // Update icon customization
-            if !iconName.trimmingCharacters(in: .whitespaces).isEmpty {
-                DatabaseManager.shared.setFolderIcon(
-                    path: folder.path,
-                    iconName: iconName.trimmingCharacters(in: .whitespaces),
-                    iconColorHex: selectedColor.nsColor.hexString,
-                    baseAsset: "_folder-blue_",
-                    symbolSize: 24,
-                    symbolOffset: -8
-                )
-                print("✅ Updated folder icon: \(iconName) with color \(selectedColor.rawValue)")
+            let trimmedIconName = iconName.trimmingCharacters(in: .whitespaces)
+            
+            // Always save folder color and optional symbol
+            DatabaseManager.shared.setFolderIcon(
+                path: folder.path,
+                iconName: trimmedIconName.isEmpty ? nil : trimmedIconName,
+                iconColorHex: "#FFFFFF",  // Always white for symbols
+                baseAsset: selectedFolderColor.assetName,  // The colored folder asset
+                symbolSize: 24,
+                symbolOffset: -4  // Hardcoded - change this value to adjust vertical position
+            )
+            
+            if !trimmedIconName.isEmpty {
+                print("✅ Updated folder: \(selectedFolderColor.assetName) with symbol: \(trimmedIconName)")
             } else {
-                // Remove custom icon if icon name is empty
-                DatabaseManager.shared.removeFolderIcon(path: folder.path)
-                print("🗑️ Removed custom icon")
+                print("✅ Updated folder color: \(selectedFolderColor.assetName)")
             }
             
             onSave()

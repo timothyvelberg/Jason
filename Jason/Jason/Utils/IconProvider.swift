@@ -170,7 +170,7 @@ class IconProvider {
         symbol: String,
         symbolColor: NSColor,
         symbolSize: CGFloat,
-        symbolOffset: CGFloat = -8,
+        symbolOffset: CGFloat = -4,
         forPath path: String
     ) {
         pathBasedFolderIcons[path] = FolderConfig(

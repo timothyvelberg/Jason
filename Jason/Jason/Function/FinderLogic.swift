@@ -233,6 +233,7 @@ class FinderLogic: FunctionProvider {
             icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
             children: favoriteChildren,
             preferredLayout: .partialSlice,
+            slicePositioning: .center,
             onLeftClick: .expand,
             onRightClick: .expand,
             onBoundaryCross: .expand
@@ -240,7 +241,7 @@ class FinderLogic: FunctionProvider {
     }
 
     // MARK: - Replace the createFavoriteFolderEntry method with this:
-
+    
     private func createFavoriteFolderEntry(folderEntry: FolderEntry, settings: FavoriteFolderSettings) -> FunctionNode {
         let path = URL(fileURLWithPath: folderEntry.path)
         var metadata: [String: Any] = ["folderURL": folderEntry.path]
@@ -272,23 +273,29 @@ class FinderLogic: FunctionProvider {
         
         // Generate folder icon based on database settings
         let folderIcon: NSImage = {
-            // Check if folder has custom icon settings
-            if let iconName = folderEntry.iconName,
-               let iconColor = folderEntry.iconColor {
-                print("🎨 [FinderLogic] Using custom icon for '\(folderEntry.title)': \(iconName)")
+            // Use custom folder if baseAsset is not default OR if symbol is provided
+            if folderEntry.baseAsset != "folder-blue" || folderEntry.iconName != nil {
+                let symbolName = folderEntry.iconName ?? ""
+                
+                if !symbolName.isEmpty {
+                    print("🎨 [FinderLogic] Custom folder '\(folderEntry.title)': \(folderEntry.baseAsset) + symbol '\(symbolName)'")
+                } else {
+                    print("🎨 [FinderLogic] Custom folder '\(folderEntry.title)': \(folderEntry.baseAsset)")
+                }
+                
                 return IconProvider.shared.createCompositeIcon(
                     baseAssetName: folderEntry.baseAsset,
-                    symbolName: iconName,
-                    symbolColor: iconColor,
+                    symbolName: symbolName,  // Empty string if no symbol (will be ignored)
+                    symbolColor: .white,     // Always white for symbols
                     size: 64,
                     symbolSize: folderEntry.symbolSize,
                     cornerRadius: 8,
-                    symbolOffset: folderEntry.symbolOffset
+                    symbolOffset: -4  // Hardcoded offset
                 )
             }
             
-            // Default folder icon
-            print("📁 [FinderLogic] Using default icon for '\(folderEntry.title)'")
+            // Default system folder icon
+            print("📁 [FinderLogic] Using default system icon for '\(folderEntry.title)'")
             return IconProvider.shared.getFolderIcon(for: path, size: 64, cornerRadius: 8)
         }()
         
