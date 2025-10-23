@@ -53,7 +53,9 @@ class CircularUIManager: ObservableObject {
     }
     
     func setup(with appSwitcher: AppSwitcherManager) {
+        
         self.appSwitcher = appSwitcher
+        
         appSwitcher.circularUIManager = self
         
         // Create FunctionManager with providers
@@ -68,9 +70,7 @@ class CircularUIManager: ObservableObject {
         functionManager?.registerProvider(FavoriteAppsProvider())
 
         functionManager?.registerProvider(FinderLogic())
-        
-        
-        
+
         if let functionManager = functionManager {
             self.mouseTracker = MouseTracker(functionManager: functionManager)
             
