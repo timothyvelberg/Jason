@@ -19,7 +19,7 @@ class CircularUIManager: ObservableObject {
     private var draggedNode: FunctionNode?
     
     private var overlayWindow: OverlayWindow?
-    private var appSwitcher: AppSwitcherManager?
+    private(set) var appSwitcher: AppSwitcherManager?
     var functionManager: FunctionManager?
     private var mouseTracker: MouseTracker?
     private var gestureManager: GestureManager?
@@ -52,8 +52,9 @@ class CircularUIManager: ObservableObject {
         }
     }
     
-    func setup(with appSwitcher: AppSwitcherManager) {
-        
+    func setup() {
+        // Create AppSwitcherManager internally
+        let appSwitcher = AppSwitcherManager()
         self.appSwitcher = appSwitcher
         
         appSwitcher.circularUIManager = self
@@ -775,11 +776,6 @@ class CircularUIManager: ObservableObject {
             }
             return false
         }()
-        
-        if !hasValidData {
-            print("No valid function data, loading mock data for testing")
-            functionManager.loadMockFunctions()
-        }
         
         guard !functionManager.rings.isEmpty && !functionManager.rings[0].nodes.isEmpty else {
             print("No functions to display")

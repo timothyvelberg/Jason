@@ -882,14 +882,4 @@ class FunctionManager: ObservableObject {
         rebuildRings()
         print("Loaded \(rootNodes.count) total root nodes from \(providers.count) provider(s)")
     }
-    
-    // DEPRECATED: Use providers instead
-    func loadMockFunctions() {
-        print("⚠️ loadMockFunctions() is deprecated. Register MockFunctionProvider instead.")
-        
-        // For backward compatibility, create a mock provider
-        let mockProvider = MockFunctionProvider()
-        providers = [mockProvider]
-        loadFunctions()
-    }
 }

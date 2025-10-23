@@ -11,23 +11,23 @@ import AppKit
 struct ContentView: View {
     @StateObject private var appSwitcher = AppSwitcherManager()
     @StateObject private var circularUI = CircularUIManager()
-    
+
     var body: some View {
         Group {
             MinimalView(circularUI: circularUI)
-//            if !appSwitcher.hasAccessibilityPermission {
-//                PermissionRequestView(appSwitcher: appSwitcher, circularUI: circularUI)
-//            } else {
-//                MinimalView(circularUI: circularUI)
-//            }
+    //            if !circularUI.appSwitcher?.hasAccessibilityPermission ?? false {
+    //                PermissionRequestView(circularUI: circularUI)
+    //            } else {
+    //                MinimalView(circularUI: circularUI)
+    //            }
         }
         .onAppear {
             print("🚀 ContentView appeared")
-            circularUI.setup(with: appSwitcher)
+            circularUI.setup()
         }
         .onDisappear {
             print("👋 ContentView disappeared - stopping services")
-            appSwitcher.stopAutoRefresh()
+            circularUI.appSwitcher?.stopAutoRefresh()
         }
     }
 }
