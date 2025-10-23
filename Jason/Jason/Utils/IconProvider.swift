@@ -21,6 +21,13 @@ class IconProvider {
         let symbolName: String
         let backgroundColor: NSColor
         let foregroundColor: NSColor
+        
+        // Convenience initializer with color names
+        init(symbolName: String, symbolColor: FileIconColor) {
+            self.symbolName = symbolName
+            self.backgroundColor = .white
+            self.foregroundColor = symbolColor.nsColor
+        }
     }
     
     private enum FolderIconType {
@@ -33,66 +40,93 @@ class IconProvider {
         let type: FolderIconType
     }
     
-    // MARK: - File Type Mappings
+    // Simple color enum
+    private enum FileIconColor {
+        case red
+        case blue
+        case green
+        case orange
+        case purple
+        case yellow
+        case pink
+        case teal
+        case gray
+        case brown
+        
+        var nsColor: NSColor {
+            switch self {
+            case .red: return NSColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 1.0)
+            case .blue: return NSColor(red: 0.2, green: 0.4, blue: 0.8, alpha: 1.0)
+            case .green: return NSColor(red: 0.2, green: 0.7, blue: 0.3, alpha: 1.0)
+            case .orange: return NSColor(red: 1.0, green: 0.6, blue: 0.2, alpha: 1.0)
+            case .purple: return NSColor(red: 0.6, green: 0.3, blue: 0.8, alpha: 1.0)
+            case .yellow: return NSColor(red: 0.9, green: 0.8, blue: 0.2, alpha: 1.0)
+            case .pink: return NSColor(red: 0.9, green: 0.4, blue: 0.6, alpha: 1.0)
+            case .teal: return NSColor(red: 0.2, green: 0.7, blue: 0.7, alpha: 1.0)
+            case .gray: return NSColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1.0)
+            case .brown: return NSColor(red: 0.6, green: 0.4, blue: 0.2, alpha: 1.0)
+            }
+        }
+    }
     
     // Custom icon mappings by file extension
     private let fileIcons: [String: FileIconConfig] = [
         // Documents
-        "pdf": FileIconConfig(symbolName: "doc.fill", backgroundColor: NSColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 1.0), foregroundColor: .white),
-        "doc": FileIconConfig(symbolName: "doc.text.fill", backgroundColor: NSColor(red: 0.2, green: 0.4, blue: 0.8, alpha: 1.0), foregroundColor: .white),
-        "docx": FileIconConfig(symbolName: "doc.text.fill", backgroundColor: NSColor(red: 0.2, green: 0.4, blue: 0.8, alpha: 1.0), foregroundColor: .white),
-        "txt": FileIconConfig(symbolName: "doc.plaintext.fill", backgroundColor: NSColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1.0), foregroundColor: .white),
-        "rtf": FileIconConfig(symbolName: "doc.richtext.fill", backgroundColor: NSColor(red: 0.6, green: 0.6, blue: 0.6, alpha: 1.0), foregroundColor: .white),
+        "pdf": FileIconConfig(symbolName: "doc.fill", symbolColor: .red),
+        "doc": FileIconConfig(symbolName: "doc.text.fill", symbolColor: .blue),
+        "docx": FileIconConfig(symbolName: "doc.text.fill", symbolColor: .blue),
+        "txt": FileIconConfig(symbolName: "doc.plaintext.fill", symbolColor: .gray),
+        "rtf": FileIconConfig(symbolName: "doc.richtext.fill", symbolColor: .gray),
         
         // Spreadsheets
-        "xls": FileIconConfig(symbolName: "tablecells.fill", backgroundColor: NSColor(red: 0.1, green: 0.6, blue: 0.3, alpha: 1.0), foregroundColor: .white),
-        "xlsx": FileIconConfig(symbolName: "tablecells.fill", backgroundColor: NSColor(red: 0.1, green: 0.6, blue: 0.3, alpha: 1.0), foregroundColor: .white),
-        "csv": FileIconConfig(symbolName: "tablecells.fill", backgroundColor: NSColor(red: 0.2, green: 0.5, blue: 0.4, alpha: 1.0), foregroundColor: .white),
+        "xls": FileIconConfig(symbolName: "tablecells.fill", symbolColor: .green),
+        "xlsx": FileIconConfig(symbolName: "tablecells.fill", symbolColor: .green),
+        "csv": FileIconConfig(symbolName: "tablecells.fill", symbolColor: .teal),
         
         // Presentations
-        "ppt": FileIconConfig(symbolName: "rectangle.on.rectangle.fill", backgroundColor: NSColor(red: 0.9, green: 0.4, blue: 0.1, alpha: 1.0), foregroundColor: .white),
-        "pptx": FileIconConfig(symbolName: "rectangle.on.rectangle.fill", backgroundColor: NSColor(red: 0.9, green: 0.4, blue: 0.1, alpha: 1.0), foregroundColor: .white),
+        "ppt": FileIconConfig(symbolName: "rectangle.on.rectangle.fill", symbolColor: .orange),
+        "pptx": FileIconConfig(symbolName: "rectangle.on.rectangle.fill", symbolColor: .orange),
         
         // Code
-        "swift": FileIconConfig(symbolName: "swift", backgroundColor: NSColor(red: 0.9, green: 0.4, blue: 0.2, alpha: 1.0), foregroundColor: .white),
-        "py": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", backgroundColor: NSColor(red: 0.2, green: 0.4, blue: 0.6, alpha: 1.0), foregroundColor: .white),
-        "js": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", backgroundColor: NSColor(red: 0.9, green: 0.8, blue: 0.2, alpha: 1.0), foregroundColor: .black),
-        "ts": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", backgroundColor: NSColor(red: 0.2, green: 0.5, blue: 0.8, alpha: 1.0), foregroundColor: .white),
-        "html": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", backgroundColor: NSColor(red: 0.9, green: 0.3, blue: 0.2, alpha: 1.0), foregroundColor: .white),
-        "css": FileIconConfig(symbolName: "paintbrush.fill", backgroundColor: NSColor(red: 0.2, green: 0.5, blue: 0.9, alpha: 1.0), foregroundColor: .white),
-        "json": FileIconConfig(symbolName: "car.fill", backgroundColor: NSColor(red: 0.4, green: 0.4, blue: 0.4, alpha: 1.0), foregroundColor: .white),
-        "xml": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", backgroundColor: NSColor(red: 0.6, green: 0.4, blue: 0.2, alpha: 1.0), foregroundColor: .white),
+        "swift": FileIconConfig(symbolName: "swift", symbolColor: .orange),
+        "py": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", symbolColor: .blue),
+        "js": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", symbolColor: .yellow),
+        "ts": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", symbolColor: .blue),
+        "html": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", symbolColor: .red),
+        "css": FileIconConfig(symbolName: "paintbrush.fill", symbolColor: .blue),
+        "json": FileIconConfig(symbolName: "curlybraces", symbolColor: .gray),
+        "xml": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", symbolColor: .brown),
         
         // Archives
-        "zip": FileIconConfig(symbolName: "doc.zipper", backgroundColor: NSColor(red: 0.5, green: 0.3, blue: 0.6, alpha: 1.0), foregroundColor: .white),
-        "rar": FileIconConfig(symbolName: "doc.zipper", backgroundColor: NSColor(red: 0.6, green: 0.3, blue: 0.5, alpha: 1.0), foregroundColor: .white),
-        "7z": FileIconConfig(symbolName: "doc.zipper", backgroundColor: NSColor(red: 0.4, green: 0.3, blue: 0.6, alpha: 1.0), foregroundColor: .white),
-        "tar": FileIconConfig(symbolName: "doc.zipper", backgroundColor: NSColor(red: 0.5, green: 0.4, blue: 0.3, alpha: 1.0), foregroundColor: .white),
-        "gz": FileIconConfig(symbolName: "doc.zipper", backgroundColor: NSColor(red: 0.5, green: 0.4, blue: 0.3, alpha: 1.0), foregroundColor: .white),
+        "zip": FileIconConfig(symbolName: "doc.zipper", symbolColor: .purple),
+        "rar": FileIconConfig(symbolName: "doc.zipper", symbolColor: .purple),
+        "7z": FileIconConfig(symbolName: "doc.zipper", symbolColor: .purple),
+        "tar": FileIconConfig(symbolName: "doc.zipper", symbolColor: .brown),
+        "gz": FileIconConfig(symbolName: "doc.zipper", symbolColor: .brown),
         
         // Audio
-        "mp3": FileIconConfig(symbolName: "music.note", backgroundColor: NSColor(red: 0.8, green: 0.2, blue: 0.4, alpha: 1.0), foregroundColor: .white),
-        "wav": FileIconConfig(symbolName: "waveform", backgroundColor: NSColor(red: 0.7, green: 0.3, blue: 0.5, alpha: 1.0), foregroundColor: .white),
-        "m4a": FileIconConfig(symbolName: "music.note", backgroundColor: NSColor(red: 0.8, green: 0.3, blue: 0.4, alpha: 1.0), foregroundColor: .white),
-        "flac": FileIconConfig(symbolName: "waveform", backgroundColor: NSColor(red: 0.6, green: 0.3, blue: 0.6, alpha: 1.0), foregroundColor: .white),
+        "mp3": FileIconConfig(symbolName: "music.note", symbolColor: .pink),
+        "wav": FileIconConfig(symbolName: "waveform", symbolColor: .pink),
+        "m4a": FileIconConfig(symbolName: "music.note", symbolColor: .pink),
+        "flac": FileIconConfig(symbolName: "waveform", symbolColor: .purple),
         
         // Video
-        "mp4": FileIconConfig(symbolName: "video.fill", backgroundColor: NSColor(red: 0.2, green: 0.3, blue: 0.8, alpha: 1.0), foregroundColor: .white),
-        "mov": FileIconConfig(symbolName: "video.fill", backgroundColor: NSColor(red: 0.3, green: 0.3, blue: 0.7, alpha: 1.0), foregroundColor: .white),
-        "avi": FileIconConfig(symbolName: "video.fill", backgroundColor: NSColor(red: 0.4, green: 0.3, blue: 0.6, alpha: 1.0), foregroundColor: .white),
-        "mkv": FileIconConfig(symbolName: "video.fill", backgroundColor: NSColor(red: 0.3, green: 0.4, blue: 0.7, alpha: 1.0), foregroundColor: .white),
+        "mp4": FileIconConfig(symbolName: "video.fill", symbolColor: .blue),
+        "mov": FileIconConfig(symbolName: "video.fill", symbolColor: .blue),
+        "avi": FileIconConfig(symbolName: "video.fill", symbolColor: .purple),
+        "mkv": FileIconConfig(symbolName: "video.fill", symbolColor: .teal),
         
         // Images (for non-thumbnail cases)
-        "svg": FileIconConfig(symbolName: "photo.fill", backgroundColor: NSColor(red: 0.9, green: 0.6, blue: 0.2, alpha: 1.0), foregroundColor: .white),
-        "psd": FileIconConfig(symbolName: "photo.fill", backgroundColor: NSColor(red: 0.2, green: 0.4, blue: 0.8, alpha: 1.0), foregroundColor: .white),
+        "svg": FileIconConfig(symbolName: "photo.fill", symbolColor: .orange),
+        "psd": FileIconConfig(symbolName: "photo.fill", symbolColor: .blue),
         
         // Fonts
-        "ttf": FileIconConfig(symbolName: "textformat", backgroundColor: NSColor(red: 0.3, green: 0.3, blue: 0.3, alpha: 1.0), foregroundColor: .white),
-        "otf": FileIconConfig(symbolName: "textformat", backgroundColor: NSColor(red: 0.4, green: 0.4, blue: 0.4, alpha: 1.0), foregroundColor: .white),
+        "ttf": FileIconConfig(symbolName: "textformat", symbolColor: .gray),
+        "otf": FileIconConfig(symbolName: "textformat", symbolColor: .gray),
         
         // Misc
-        "dmg": FileIconConfig(symbolName: "internaldrive.fill", backgroundColor: NSColor(red: 0.6, green: 0.6, blue: 0.6, alpha: 1.0), foregroundColor: .white),
-        "pkg": FileIconConfig(symbolName: "shippingbox.fill", backgroundColor: NSColor(red: 0.7, green: 0.5, blue: 0.3, alpha: 1.0), foregroundColor: .white),
+        "dmg": FileIconConfig(symbolName: "internaldrive.fill", symbolColor: .gray),
+        "pkg": FileIconConfig(symbolName: "shippingbox.fill", symbolColor: .brown),
     ]
     
     // MARK: - Folder Mappings
