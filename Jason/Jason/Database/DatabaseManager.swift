@@ -187,6 +187,10 @@ class DatabaseManager {
             if sqlite3_step(selectStatement) == SQLITE_ROW {
                 folderId = Int(sqlite3_column_int(selectStatement, 0))
             }
+        } else {
+            if let error = sqlite3_errmsg(db) {
+                print("❌ [DatabaseManager] Failed to prepare SELECT for folder '\(path)': \(String(cString: error))")
+            }
         }
         sqlite3_finalize(selectStatement)
         
@@ -209,6 +213,14 @@ class DatabaseManager {
                 if sqlite3_step(insertStatement) == SQLITE_DONE {
                     folderId = Int(sqlite3_last_insert_rowid(db))
                     print("📁 [DatabaseManager] Created folder entry: \(folderName) (id: \(folderId!))")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to insert folder '\(folderName)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare INSERT for folder '\(folderName)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(insertStatement)
@@ -237,6 +249,14 @@ class DatabaseManager {
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("📊 [DatabaseManager] Updated access for: \(path)")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to update access for '\(path)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare UPDATE for folder access '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -282,6 +302,14 @@ class DatabaseManager {
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("🎨 [DatabaseManager] Set custom icon for folder: \(path)")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to set icon for folder '\(path)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare UPDATE for folder icon '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -305,6 +333,14 @@ class DatabaseManager {
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("🗑️ [DatabaseManager] Removed custom icon for folder: \(path)")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to remove icon for folder '\(path)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare UPDATE for removing icon '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -357,6 +393,10 @@ class DatabaseManager {
                         lastAccessed: lastAccessed,
                         accessCount: accessCount
                     ))
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare SELECT for custom icons: \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -412,6 +452,10 @@ class DatabaseManager {
                         accessCount: accessCount
                     )
                 }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare SELECT for folder '\(path)': \(String(cString: error))")
+                }
             }
             sqlite3_finalize(statement)
         }
@@ -419,18 +463,15 @@ class DatabaseManager {
         return result
     }
 
-    // MARK: - Favorite Folders Methods
-
-    /// Get all favorite folders (sorted by sort_order)
+    /// Get all favorite folders with their settings
     func getFavoriteFolders() -> [(folder: FolderEntry, settings: FavoriteFolderSettings)] {
         guard let db = db else { return [] }
         
-        var results: [(FolderEntry, FavoriteFolderSettings)] = []
+        var results: [(folder: FolderEntry, settings: FavoriteFolderSettings)] = []
         
         queue.sync {
             let sql = """
-            SELECT f.id, f.path, f.title, f.icon, 
-                   f.icon_name, f.icon_color_hex, 
+            SELECT f.id, f.path, f.title, f.icon, f.icon_name, f.icon_color_hex,
                    COALESCE(f.base_asset, '_folder-blue_'), 
                    COALESCE(f.symbol_size, 24.0), 
                    COALESCE(f.symbol_offset, -8.0),
@@ -489,6 +530,10 @@ class DatabaseManager {
                     
                     results.append((folder, settings))
                 }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare SELECT for favorite folders: \(String(cString: error))")
+                }
             }
             sqlite3_finalize(statement)
         }
@@ -515,6 +560,10 @@ class DatabaseManager {
             if sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM favorite_folders;", -1, &countStatement, nil) == SQLITE_OK {
                 if sqlite3_step(countStatement) == SQLITE_ROW {
                     nextSortOrder = Int(sqlite3_column_int(countStatement, 0))
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare COUNT for favorite folders: \(String(cString: error))")
                 }
             }
             sqlite3_finalize(countStatement)
@@ -572,6 +621,14 @@ class DatabaseManager {
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("⭐ [DatabaseManager] Added favorite folder: \(path)")
                     success = true
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to insert favorite folder '\(path)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare INSERT for favorite folder '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -599,6 +656,14 @@ class DatabaseManager {
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("🗑️ [DatabaseManager] Removed favorite folder: \(path)")
                     success = true
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to delete favorite folder '\(path)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare DELETE for favorite folder '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -606,8 +671,8 @@ class DatabaseManager {
         
         return success
     }
-    
-    /// Update favorite folder settings
+
+    /// Update settings for a favorite folder (including title and all settings)
     func updateFavoriteSettings(path: String, title: String, settings: FavoriteFolderSettings) -> Bool {
         guard let db = db else { return false }
         
@@ -624,6 +689,14 @@ class DatabaseManager {
                 
                 if sqlite3_step(folderStatement) == SQLITE_DONE {
                     print("✏️ [DatabaseManager] Updated folder title: \(title)")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to update folder title '\(title)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare UPDATE for folder title '\(title)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(folderStatement)
@@ -684,6 +757,14 @@ class DatabaseManager {
                 if sqlite3_step(settingsStatement) == SQLITE_DONE {
                     print("✅ [DatabaseManager] Updated favorite settings for: \(path)")
                     success = true
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to update favorite settings for '\(path)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare UPDATE for favorite settings '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(settingsStatement)
@@ -694,24 +775,20 @@ class DatabaseManager {
     
     // MARK: - Favorite Apps Methods
     
-    /// Get all favorite apps (sorted by sort_order)
+    /// Get all favorite apps
     func getFavoriteApps() -> [FavoriteAppEntry] {
         guard let db = db else { return [] }
         
         var results: [FavoriteAppEntry] = []
         
         queue.sync {
-            let sql = """
-            SELECT id, bundle_identifier, display_name, sort_order, icon_override, last_accessed, access_count
-            FROM favorite_apps
-            ORDER BY sort_order;
-            """
+            let sql = "SELECT id, bundle_identifier, display_name, sort_order, icon_override, last_accessed, access_count FROM favorite_apps ORDER BY sort_order;"
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 while sqlite3_step(statement) == SQLITE_ROW {
                     let id = Int(sqlite3_column_int(statement, 0))
-                    let bundleId = String(cString: sqlite3_column_text(statement, 1))
+                    let bundleIdentifier = String(cString: sqlite3_column_text(statement, 1))
                     let displayName = String(cString: sqlite3_column_text(statement, 2))
                     let sortOrder = Int(sqlite3_column_int(statement, 3))
                     let iconOverride = sqlite3_column_text(statement, 4) != nil ? String(cString: sqlite3_column_text(statement, 4)) : nil
@@ -720,13 +797,17 @@ class DatabaseManager {
                     
                     results.append(FavoriteAppEntry(
                         id: id,
-                        bundleIdentifier: bundleId,
+                        bundleIdentifier: bundleIdentifier,
                         displayName: displayName,
                         sortOrder: sortOrder,
                         iconOverride: iconOverride,
                         lastAccessed: lastAccessed,
                         accessCount: accessCount
                     ))
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare SELECT for favorite apps: \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -743,19 +824,26 @@ class DatabaseManager {
         
         queue.sync {
             // Check if already exists
-            var checkStatement: OpaquePointer?
             let checkSQL = "SELECT id FROM favorite_apps WHERE bundle_identifier = ?;"
+            var checkStatement: OpaquePointer?
+            var alreadyExists = false
             
             if sqlite3_prepare_v2(db, checkSQL, -1, &checkStatement, nil) == SQLITE_OK {
                 sqlite3_bind_text(checkStatement, 1, (bundleIdentifier as NSString).utf8String, -1, nil)
-                
                 if sqlite3_step(checkStatement) == SQLITE_ROW {
-                    print("⚠️ [DatabaseManager] App already in favorites: \(bundleIdentifier)")
-                    sqlite3_finalize(checkStatement)
-                    return
+                    alreadyExists = true
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare CHECK for app '\(bundleIdentifier)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(checkStatement)
+            
+            if alreadyExists {
+                print("⚠️ [DatabaseManager] App '\(displayName)' already in favorites")
+                return
+            }
             
             // Get next sort order
             var nextSortOrder = 0
@@ -764,14 +852,15 @@ class DatabaseManager {
                 if sqlite3_step(countStatement) == SQLITE_ROW {
                     nextSortOrder = Int(sqlite3_column_int(countStatement, 0))
                 }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare COUNT for favorite apps: \(String(cString: error))")
+                }
             }
             sqlite3_finalize(countStatement)
             
             // Insert new favorite app
-            let sql = """
-            INSERT INTO favorite_apps (bundle_identifier, display_name, sort_order, icon_override, access_count)
-            VALUES (?, ?, ?, ?, 0);
-            """
+            let sql = "INSERT INTO favorite_apps (bundle_identifier, display_name, sort_order, icon_override) VALUES (?, ?, ?, ?);"
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
@@ -786,8 +875,16 @@ class DatabaseManager {
                 }
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("⭐ [DatabaseManager] Added favorite app: \(displayName) (\(bundleIdentifier))")
+                    print("⭐ [DatabaseManager] Added favorite app: \(displayName)")
                     success = true
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to insert favorite app '\(displayName)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare INSERT for favorite app '\(displayName)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -812,6 +909,14 @@ class DatabaseManager {
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("🗑️ [DatabaseManager] Removed favorite app: \(bundleIdentifier)")
                     success = true
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to delete favorite app '\(bundleIdentifier)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare DELETE for favorite app '\(bundleIdentifier)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -820,7 +925,112 @@ class DatabaseManager {
         return success
     }
     
-    /// Update favorite app display name and icon
+    /// Update app access tracking
+    func updateAppAccess(bundleIdentifier: String) {
+        guard let db = db else { return }
+        
+        queue.async {
+            let now = Int(Date().timeIntervalSince1970)
+            
+            let sql = """
+            UPDATE favorite_apps 
+            SET last_accessed = ?, access_count = access_count + 1
+            WHERE bundle_identifier = ?;
+            """
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_int64(statement, 1, Int64(now))
+                sqlite3_bind_text(statement, 2, (bundleIdentifier as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("📊 [DatabaseManager] Updated access for app: \(bundleIdentifier)")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to update access for app '\(bundleIdentifier)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare UPDATE for app access '\(bundleIdentifier)': \(String(cString: error))")
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+    }
+    
+    /// Get app by bundle identifier
+    func getFavoriteApp(bundleIdentifier: String) -> FavoriteAppEntry? {
+        guard let db = db else { return nil }
+        
+        var result: FavoriteAppEntry?
+        
+        queue.sync {
+            let sql = "SELECT id, bundle_identifier, display_name, sort_order, icon_override, last_accessed, access_count FROM favorite_apps WHERE bundle_identifier = ?;"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (bundleIdentifier as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_ROW {
+                    let id = Int(sqlite3_column_int(statement, 0))
+                    let bundleIdentifier = String(cString: sqlite3_column_text(statement, 1))
+                    let displayName = String(cString: sqlite3_column_text(statement, 2))
+                    let sortOrder = Int(sqlite3_column_int(statement, 3))
+                    let iconOverride = sqlite3_column_text(statement, 4) != nil ? String(cString: sqlite3_column_text(statement, 4)) : nil
+                    let lastAccessed: Int? = sqlite3_column_type(statement, 5) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(statement, 5))
+                    let accessCount = Int(sqlite3_column_int(statement, 6))
+                    
+                    result = FavoriteAppEntry(
+                        id: id,
+                        bundleIdentifier: bundleIdentifier,
+                        displayName: displayName,
+                        sortOrder: sortOrder,
+                        iconOverride: iconOverride,
+                        lastAccessed: lastAccessed,
+                        accessCount: accessCount
+                    )
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare SELECT for app '\(bundleIdentifier)': \(String(cString: error))")
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+        
+        return result
+    }
+    
+    /// Update app sort order
+    func updateAppSortOrder(bundleIdentifier: String, sortOrder: Int) {
+        guard let db = db else { return }
+        
+        queue.async {
+            let sql = "UPDATE favorite_apps SET sort_order = ? WHERE bundle_identifier = ?;"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_int(statement, 1, Int32(sortOrder))
+                sqlite3_bind_text(statement, 2, (bundleIdentifier as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("📊 [DatabaseManager] Updated sort order for app: \(bundleIdentifier)")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to update sort order for app '\(bundleIdentifier)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare UPDATE for app sort order '\(bundleIdentifier)': \(String(cString: error))")
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+    }
+    
+    /// Update favorite app details (display name and icon override)
     func updateFavoriteApp(bundleIdentifier: String, displayName: String, iconOverride: String?) -> Bool {
         guard let db = db else { return false }
         
@@ -848,6 +1058,14 @@ class DatabaseManager {
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("✏️ [DatabaseManager] Updated favorite app: \(displayName)")
                     success = true
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to update favorite app '\(displayName)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare UPDATE for favorite app '\(displayName)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -856,33 +1074,7 @@ class DatabaseManager {
         return success
     }
     
-    /// Update app access tracking
-    func updateAppAccess(bundleIdentifier: String) {
-        guard let db = db else { return }
-        
-        queue.async {
-            let now = Int(Date().timeIntervalSince1970)
-            
-            let sql = """
-            UPDATE favorite_apps
-            SET last_accessed = ?, access_count = access_count + 1
-            WHERE bundle_identifier = ?;
-            """
-            var statement: OpaquePointer?
-            
-            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_int64(statement, 1, Int64(now))
-                sqlite3_bind_text(statement, 2, (bundleIdentifier as NSString).utf8String, -1, nil)
-                
-                if sqlite3_step(statement) == SQLITE_DONE {
-                    print("📊 [DatabaseManager] Updated app access: \(bundleIdentifier)")
-                }
-            }
-            sqlite3_finalize(statement)
-        }
-    }
-    
-    /// Reorder favorite apps
+    /// Reorder favorite app
     func reorderFavoriteApps(bundleIdentifier: String, newSortOrder: Int) -> Bool {
         guard let db = db else { return false }
         
@@ -899,6 +1091,14 @@ class DatabaseManager {
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("🔄 [DatabaseManager] Reordered app: \(bundleIdentifier) to position \(newSortOrder)")
                     success = true
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to reorder app '\(bundleIdentifier)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare UPDATE for reordering app '\(bundleIdentifier)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -937,10 +1137,9 @@ class DatabaseManager {
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare statement: \(String(cString: error))")
+                    print("❌ [DatabaseManager] Failed to prepare SELECT for folder cache '\(path)': \(String(cString: error))")
                 }
             }
-            
             sqlite3_finalize(statement)
         }
         
@@ -952,11 +1151,7 @@ class DatabaseManager {
         guard let db = db else { return }
         
         queue.async {
-            let sql = """
-            INSERT OR REPLACE INTO folder_cache (path, last_scanned, items_json, item_count)
-            VALUES (?, ?, ?, ?);
-            """
-            
+            let sql = "INSERT OR REPLACE INTO folder_cache (path, last_scanned, items_json, item_count) VALUES (?, ?, ?, ?);"
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
@@ -966,32 +1161,35 @@ class DatabaseManager {
                 sqlite3_bind_int(statement, 4, Int32(entry.itemCount))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("💾 [DatabaseManager] Saved folder cache for: \(entry.path) (\(entry.itemCount) items)")
+                    print("💾 [DatabaseManager] Cached folder contents: \(entry.path) (\(entry.itemCount) items)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to save: \(String(cString: error))")
+                        print("❌ [DatabaseManager] Failed to save folder cache for '\(entry.path)': \(String(cString: error))")
                     }
                 }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare INSERT for folder cache '\(entry.path)': \(String(cString: error))")
+                }
             }
-            
             sqlite3_finalize(statement)
         }
     }
     
-    /// Check if cache is stale (older than timeout)
-    func isCacheStale(for path: String, timeout: TimeInterval = 1800) -> Bool {
-        guard let entry = getFolderCache(for: path) else {
+    /// Check if cache is stale (older than 1 hour)
+    func isCacheStale(for path: String, maxAge: TimeInterval = 3600) -> Bool {
+        guard let cache = getFolderCache(for: path) else {
             return true // No cache = stale
         }
         
-        let now = Date().timeIntervalSince1970
-        let age = now - Double(entry.lastScanned)
+        let now = Int(Date().timeIntervalSince1970)
+        let age = now - cache.lastScanned
         
-        return age > timeout
+        return age > Int(maxAge)
     }
     
     /// Clear cache for specific folder
-    func invalidateFolderCache(for path: String) {
+    func clearFolderCache(for path: String) {
         guard let db = db else { return }
         
         queue.async {
@@ -1002,10 +1200,17 @@ class DatabaseManager {
                 sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("🗑️ [DatabaseManager] Invalidated cache for: \(path)")
+                    print("🗑️ [DatabaseManager] Cleared cache for: \(path)")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to clear cache for '\(path)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare DELETE for folder cache '\(path)': \(String(cString: error))")
                 }
             }
-            
             sqlite3_finalize(statement)
         }
     }
@@ -1016,114 +1221,116 @@ class DatabaseManager {
         
         queue.async {
             let sql = "DELETE FROM folder_cache;"
+            var statement: OpaquePointer?
             
-            if sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK {
-                print("🗑️ [DatabaseManager] Cleared all folder cache")
-            }
-        }
-    }
-    
-    /// Get cache statistics
-    func getCacheStats() -> (totalFolders: Int, totalItems: Int)? {
-        guard let db = db else { return nil }
-        
-        var stats: (Int, Int)?
-        
-        queue.sync {
-            var folderCount = 0
-            var itemCount = 0
-            
-            // Get folder count
-            var statement1: OpaquePointer?
-            if sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM folder_cache;", -1, &statement1, nil) == SQLITE_OK {
-                if sqlite3_step(statement1) == SQLITE_ROW {
-                    folderCount = Int(sqlite3_column_int(statement1, 0))
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("🗑️ [DatabaseManager] Cleared all folder cache")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to clear all folder cache: \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare DELETE for all folder cache: \(String(cString: error))")
                 }
             }
-            sqlite3_finalize(statement1)
-            
-            // Get total item count
-            var statement2: OpaquePointer?
-            if sqlite3_prepare_v2(db, "SELECT SUM(item_count) FROM folder_cache;", -1, &statement2, nil) == SQLITE_OK {
-                if sqlite3_step(statement2) == SQLITE_ROW {
-                    itemCount = Int(sqlite3_column_int(statement2, 0))
-                }
-            }
-            sqlite3_finalize(statement2)
-            
-            stats = (folderCount, itemCount)
+            sqlite3_finalize(statement)
         }
-        
-        return stats
     }
     
     // MARK: - Usage History Methods
     
-    /// Record folder/file/app access
-    func recordAccess(path: String, type: String) {
+    /// Record or update usage history for a file/folder
+    func recordUsageHistory(itemPath: String, itemType: String) {
         guard let db = db else { return }
         
-        let now = Int(Date().timeIntervalSince1970)
-        
         queue.async {
+            let now = Int(Date().timeIntervalSince1970)
+            
             // Check if entry exists
             let checkSQL = "SELECT id, access_count FROM usage_history WHERE item_path = ?;"
             var checkStatement: OpaquePointer?
             var existingId: Int?
-            var existingCount = 0
+            var currentCount = 0
             
             if sqlite3_prepare_v2(db, checkSQL, -1, &checkStatement, nil) == SQLITE_OK {
-                sqlite3_bind_text(checkStatement, 1, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(checkStatement, 1, (itemPath as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(checkStatement) == SQLITE_ROW {
                     existingId = Int(sqlite3_column_int(checkStatement, 0))
-                    existingCount = Int(sqlite3_column_int(checkStatement, 1))
+                    currentCount = Int(sqlite3_column_int(checkStatement, 1))
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare CHECK for usage history '\(itemPath)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(checkStatement)
             
             if let id = existingId {
-                // Update existing
+                // Update existing entry
                 let updateSQL = "UPDATE usage_history SET access_count = ?, last_accessed = ? WHERE id = ?;"
                 var updateStatement: OpaquePointer?
                 
                 if sqlite3_prepare_v2(db, updateSQL, -1, &updateStatement, nil) == SQLITE_OK {
-                    sqlite3_bind_int(updateStatement, 1, Int32(existingCount + 1))
+                    sqlite3_bind_int(updateStatement, 1, Int32(currentCount + 1))
                     sqlite3_bind_int64(updateStatement, 2, Int64(now))
                     sqlite3_bind_int(updateStatement, 3, Int32(id))
-                    sqlite3_step(updateStatement)
+                    
+                    if sqlite3_step(updateStatement) == SQLITE_DONE {
+                        print("📊 [DatabaseManager] Updated usage history: \(itemPath)")
+                    } else {
+                        if let error = sqlite3_errmsg(db) {
+                            print("❌ [DatabaseManager] Failed to update usage history for '\(itemPath)': \(String(cString: error))")
+                        }
+                    }
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to prepare UPDATE for usage history '\(itemPath)': \(String(cString: error))")
+                    }
                 }
                 sqlite3_finalize(updateStatement)
             } else {
-                // Insert new
+                // Insert new entry
                 let insertSQL = "INSERT INTO usage_history (item_path, item_type, access_count, last_accessed) VALUES (?, ?, 1, ?);"
                 var insertStatement: OpaquePointer?
                 
                 if sqlite3_prepare_v2(db, insertSQL, -1, &insertStatement, nil) == SQLITE_OK {
-                    sqlite3_bind_text(insertStatement, 1, (path as NSString).utf8String, -1, nil)
-                    sqlite3_bind_text(insertStatement, 2, (type as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(insertStatement, 1, (itemPath as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(insertStatement, 2, (itemType as NSString).utf8String, -1, nil)
                     sqlite3_bind_int64(insertStatement, 3, Int64(now))
-                    sqlite3_step(insertStatement)
+                    
+                    if sqlite3_step(insertStatement) == SQLITE_DONE {
+                        print("📊 [DatabaseManager] Created usage history: \(itemPath)")
+                    } else {
+                        if let error = sqlite3_errmsg(db) {
+                            print("❌ [DatabaseManager] Failed to insert usage history for '\(itemPath)': \(String(cString: error))")
+                        }
+                    }
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to prepare INSERT for usage history '\(itemPath)': \(String(cString: error))")
+                    }
                 }
                 sqlite3_finalize(insertStatement)
             }
         }
     }
     
-    /// Get most recently used items
-    func getMRU(type: String? = nil, limit: Int = 10) -> [UsageHistoryEntry] {
+    /// Get usage history, optionally filtered by type
+    func getUsageHistory(type: String? = nil, limit: Int = 50) -> [UsageHistoryEntry] {
         guard let db = db else { return [] }
         
         var results: [UsageHistoryEntry] = []
         
         queue.sync {
             var sql = "SELECT id, item_path, item_type, access_count, last_accessed FROM usage_history"
-            
             if let type = type {
                 sql += " WHERE item_type = '\(type)'"
             }
-            
-            sql += " ORDER BY last_accessed DESC LIMIT \(limit);"
+            sql += " ORDER BY access_count DESC, last_accessed DESC LIMIT \(limit);"
             
             var statement: OpaquePointer?
             
@@ -1142,6 +1349,10 @@ class DatabaseManager {
                         accessCount: accessCount,
                         lastAccessed: lastAccessed
                     ))
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare SELECT for usage history: \(String(cString: error))")
                 }
             }
             
@@ -1185,6 +1396,10 @@ class DatabaseManager {
                         sortOrder: sortOrder
                     ))
                 }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare SELECT for favorites: \(String(cString: error))")
+                }
             }
             
             sqlite3_finalize(statement)
@@ -1217,6 +1432,14 @@ class DatabaseManager {
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("⭐ [DatabaseManager] Added favorite: \(name)")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to add favorite '\(name)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare INSERT for favorite '\(name)': \(String(cString: error))")
                 }
             }
             
@@ -1237,6 +1460,14 @@ class DatabaseManager {
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("🗑️ [DatabaseManager] Removed favorite: \(path)")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to remove favorite '\(path)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare DELETE for favorite '\(path)': \(String(cString: error))")
                 }
             }
             
@@ -1262,6 +1493,10 @@ class DatabaseManager {
                 if sqlite3_step(statement) == SQLITE_ROW {
                     result = String(cString: sqlite3_column_text(statement, 0))
                 }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare SELECT for preference '\(key)': \(String(cString: error))")
+                }
             }
             
             sqlite3_finalize(statement)
@@ -1281,7 +1516,18 @@ class DatabaseManager {
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_text(statement, 1, (key as NSString).utf8String, -1, nil)
                 sqlite3_bind_text(statement, 2, (value as NSString).utf8String, -1, nil)
-                sqlite3_step(statement)
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("⚙️ [DatabaseManager] Set preference: \(key) = \(value)")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to set preference '\(key)': \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare INSERT for preference '\(key)': \(String(cString: error))")
+                }
             }
             
             sqlite3_finalize(statement)
