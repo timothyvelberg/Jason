@@ -77,7 +77,7 @@ class FinderLogic: FunctionProvider {
     }
 
     /// Deserialize nodes from JSON
-    private func deserializeNodes(from json: String, folderURL: URL, parentBaseAsset: String = "folder-blue") -> [FunctionNode]? {
+    private func deserializeNodes(from json: String, folderURL: URL) -> [FunctionNode]? {
         guard let jsonData = json.data(using: .utf8),
               let items = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] else {
             print("❌ Failed to deserialize JSON")
@@ -96,8 +96,8 @@ class FinderLogic: FunctionProvider {
             let url = URL(fileURLWithPath: path)
             
             if isDirectory {
-                // Recreate folder node WITH INHERITED COLOR
-                nodes.append(createFolderNode(for: url, parentBaseAsset: parentBaseAsset))
+                // Recreate folder node
+                nodes.append(createFolderNode(for: url))
             } else {
                 // Recreate file node
                 nodes.append(createFileNode(for: url))
@@ -153,17 +153,13 @@ class FinderLogic: FunctionProvider {
         // Get custom max items from metadata
         let customMaxItems = metadata["maxItems"] as? Int
         
-        // GET PARENT BASE ASSET (folder color) - defaults to blue if not set
-        let parentBaseAsset = metadata["parentBaseAsset"] as? String ?? "folder-blue"
-        print("🎨 [FinderLogic] Using parent folder color: \(parentBaseAsset)")
-        
         // 1. CHECK DATABASE FIRST
         if !DatabaseManager.shared.isCacheStale(for: cacheKey) {
             if let cached = DatabaseManager.shared.getFolderCache(for: cacheKey) {
                 print("⚡ [FinderLogic] Using DATABASE cache for: \(node.name) (\(cached.itemCount) items)")
                 
-                // Deserialize from JSON - PASS parentBaseAsset
-                if let nodes = deserializeNodes(from: cached.itemsJSON, folderURL: folderURL, parentBaseAsset: parentBaseAsset) {
+                // Deserialize from JSON
+                if let nodes = deserializeNodes(from: cached.itemsJSON, folderURL: folderURL) {
                     // Apply custom limit if specified
                     if let limit = customMaxItems {
                         print("✂️ [FinderLogic] Applying custom limit: \(limit) items")
@@ -185,7 +181,7 @@ class FinderLogic: FunctionProvider {
             }
             print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
             // PASS parentBaseAsset to getFolderContents
-            let result = self.getFolderContents(at: folderURL, maxItems: customMaxItems, parentBaseAsset: parentBaseAsset)
+            let result = self.getFolderContents(at: folderURL, maxItems: customMaxItems)
             print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items")
             return result
         }.value
@@ -251,8 +247,7 @@ class FinderLogic: FunctionProvider {
     private func createFavoriteFolderEntry(folderEntry: FolderEntry, settings: FavoriteFolderSettings) -> FunctionNode {
         let path = URL(fileURLWithPath: folderEntry.path)
         var metadata: [String: Any] = [
-            "folderURL": folderEntry.path,
-            "parentBaseAsset": folderEntry.baseAsset  // ADD THIS - pass folder color to children
+            "folderURL": folderEntry.path
         ]
         
         // Add custom max items if specified
@@ -585,40 +580,32 @@ class FinderLogic: FunctionProvider {
         )
     }
     
-    // MARK: - Downloads Files Section (DRAGGABLE!)
+    // MARK: - Downloads Files Section
     
-    private func createDraggableFileNode(for url: URL, parentBaseAsset: String = "folder-blue") -> FunctionNode {
-        let fileName = url.lastPathComponent
+    private func createDraggableFileNode(for url: URL) -> FunctionNode {
         
         // Check if this is a directory
         var isDirectory: ObjCBool = false
         FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
         
         if isDirectory.boolValue {
-            // This is a FOLDER - create navigable folder node WITH INHERITED COLOR
-            return createFolderNode(for: url, parentBaseAsset: parentBaseAsset)
+            // This is a FOLDER - create navigable folder node
+            return createFolderNode(for: url)
         } else {
             // This is a FILE - create draggable file node
             return createFileNode(for: url)
         }
     }
 
-    private func createFolderNode(for url: URL, parentBaseAsset: String = "folder-blue") -> FunctionNode {
+    private func createFolderNode(for url: URL) -> FunctionNode {
         let folderName = url.lastPathComponent
         
-        print("📁 [FinderLogic] Creating folder node for: \(folderName) with color: \(parentBaseAsset)")
+        print("📁 [FinderLogic] Creating folder node for: \(folderName)")
         
         return FunctionNode(
             id: "folder-\(url.path)",
             name: folderName,
-            icon: IconProvider.shared.createCompositeIcon(
-                baseAssetName: parentBaseAsset,  // USE INHERITED COLOR
-                symbolName: "",  // No symbol for child folders
-                symbolColor: .white,
-                size: 64,
-                symbolSize: 24,
-                symbolOffset: -4
-            ),
+            icon: IconProvider.shared.getFolderIcon(for: url, size: 64, cornerRadius: 8),
             children: nil,
             contextActions: [
                 StandardContextActions.showInFinder(url),
@@ -632,7 +619,6 @@ class FinderLogic: FunctionProvider {
             
             metadata: [
                 "folderURL": url.path,
-                "parentBaseAsset": parentBaseAsset  // PASS COLOR TO NEXT LEVEL
             ],
             providerId: self.providerId,
             onLeftClick: .navigateInto,
@@ -646,8 +632,8 @@ class FinderLogic: FunctionProvider {
     }
     
     // Get folder contents (files and subfolders)
-    private func getFolderContents(at url: URL, maxItems: Int? = nil, parentBaseAsset: String = "folder-blue") -> [FunctionNode] {
-        print("📂 [getFolderContents] START: \(url.path) with color: \(parentBaseAsset)")
+    private func getFolderContents(at url: URL, maxItems: Int? = nil) -> [FunctionNode] {
+        print("📂 [getFolderContents] START: \(url.path)")
         
         do {
             let contents = try FileManager.default.contentsOfDirectory(
@@ -670,7 +656,7 @@ class FinderLogic: FunctionProvider {
             for (index, contentURL) in limitedContents.enumerated() {
                 print("   [\(index+1)/\(limitedContents.count)] Processing: \(contentURL.lastPathComponent)")
                 // PASS parentBaseAsset to createDraggableFileNode
-                let node = createDraggableFileNode(for: contentURL, parentBaseAsset: parentBaseAsset)
+                let node = createDraggableFileNode(for: contentURL)
                 nodes.append(node)
             }
             
