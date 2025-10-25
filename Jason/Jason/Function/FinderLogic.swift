@@ -148,31 +148,51 @@ class FinderLogic: FunctionProvider {
         }
         
         let folderURL = URL(fileURLWithPath: urlString)
-        let cacheKey = folderURL.path
+        let folderPath = folderURL.path
+        let db = DatabaseManager.shared
         
         // Get custom max items from metadata
         let customMaxItems = metadata["maxItems"] as? Int
         
-        // 1. CHECK DATABASE FIRST
-        if !DatabaseManager.shared.isCacheStale(for: cacheKey) {
-            if let cached = DatabaseManager.shared.getFolderCache(for: cacheKey) {
-                print("⚡ [FinderLogic] Using DATABASE cache for: \(node.name) (\(cached.itemCount) items)")
+        // ⚡ STEP 1: Record that we're accessing this folder
+        db.recordFolderAccess(folderPath: folderPath)
+        
+        // ⚡ STEP 2: Check if this is a HEAVY folder and try SmartCache
+        if db.isHeavyFolder(path: folderPath) {
+            print("📦 [FinderLogic] Heavy folder detected: \(node.name)")
+            
+            if let cachedItems = db.getCachedFolderContents(folderPath: folderPath) {
+                print("⚡ [SmartCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
                 
-                // Deserialize from JSON
-                if let nodes = deserializeNodes(from: cached.itemsJSON, folderURL: folderURL) {
-                    // Apply custom limit if specified
-                    if let limit = customMaxItems {
-                        print("✂️ [FinderLogic] Applying custom limit: \(limit) items")
-                        return Array(nodes.prefix(limit))
+                // Convert FolderItem to FunctionNode
+                let nodes = cachedItems.map { item in
+                    let url = URL(fileURLWithPath: item.path)
+                    if item.isDirectory {
+                        return createFolderNode(for: url)
+                    } else {
+                        return createFileNode(for: url)
                     }
-                    return nodes
                 }
+                
+                // Apply custom limit if specified
+                if let limit = customMaxItems {
+                    print("✂️ [FinderLogic] Applying custom limit: \(limit) items")
+                    return Array(nodes.prefix(limit))
+                }
+                
+                return nodes
+            } else {
+                print("⚠️ [SmartCache] Cache miss for heavy folder - will reload")
             }
         }
         
-        // 2. CACHE MISS OR STALE - LOAD FROM DISK
-        print("🔄 [START] Loading from disk: \(folderURL.path)")
+        // 💿 STEP 3: CACHE MISS OR NOT A HEAVY FOLDER - Load from disk
+        print("💿 [START] Loading from disk: \(folderURL.path)")
         let startTime = Date()
+        
+        // 🔍 NEW: Check ACTUAL folder size BEFORE limiting display
+        let actualItemCount = countFolderItems(at: folderURL)
+        print("📊 [FinderLogic] Actual folder contains: \(actualItemCount) items")
         
         let nodes: [FunctionNode] = await Task.detached(priority: .userInitiated) { [weak self] () -> [FunctionNode] in
             guard let self = self else {
@@ -180,29 +200,85 @@ class FinderLogic: FunctionProvider {
                 return []
             }
             print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
-            // PASS parentBaseAsset to getFolderContents
             let result = self.getFolderContents(at: folderURL, maxItems: customMaxItems)
-            print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items")
+            print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items (displayed)")
             return result
         }.value
         
         let elapsed = Date().timeIntervalSince(startTime)
-        print("✅ [END] Loaded \(nodes.count) nodes in \(String(format: "%.2f", elapsed))s")
+        print("✅ [END] Loaded \(nodes.count) nodes (displayed) in \(String(format: "%.2f", elapsed))s")
         
-        // 3. SAVE TO DATABASE
-        let itemsJSON = serializeNodes(nodes)
-        let cacheEntry = FolderCacheEntry(
-            path: cacheKey,
-            lastScanned: Int(Date().timeIntervalSince1970),
-            itemsJSON: itemsJSON,
-            itemCount: nodes.count
-        )
-        DatabaseManager.shared.saveFolderCache(cacheEntry)
+        // 📊 STEP 4: If folder has >100 items (ACTUAL COUNT), mark as HEAVY and cache it
+        if actualItemCount > 100 {
+            print("📊 [SmartCache] Folder has \(actualItemCount) items - marking as HEAVY")
+            
+            // Mark as heavy folder with ACTUAL count
+            db.markAsHeavyFolder(path: folderPath, itemCount: actualItemCount)
+            
+            // Convert nodes to FolderItem format for caching
+            let folderItems: [FolderItem] = nodes.compactMap { node in
+                // Extract path from node
+                var path: String?
+                var isDirectory = false
+                var modDate = Date()
+                
+                // Check if it's a folder node
+                if let metadata = node.metadata,
+                   let folderURLString = metadata["folderURL"] as? String {
+                    path = folderURLString
+                    isDirectory = true
+                }
+                // Check if it's a file node
+                else if let previewURL = node.previewURL {
+                    path = previewURL.path
+                    isDirectory = false
+                    // Try to get modification date
+                    if let attrs = try? FileManager.default.attributesOfItem(atPath: previewURL.path),
+                       let date = attrs[.modificationDate] as? Date {
+                        modDate = date
+                    }
+                }
+                
+                guard let itemPath = path else { return nil }
+                
+                return FolderItem(
+                    name: node.name,
+                    path: itemPath,
+                    isDirectory: isDirectory,
+                    modificationDate: modDate
+                )
+            }
+            
+            // ⚠️ IMPORTANT: We're only caching the DISPLAYED items (limited by maxItems)
+            // But we marked the folder as "heavy" based on ACTUAL size
+            // This means future loads will be instant (for the displayed items)
+            db.saveFolderContents(folderPath: folderPath, items: folderItems)
+            print("💾 [SmartCache] Cached \(nodes.count) items for future instant loads!")
+            print("   (Folder actually has \(actualItemCount) items, but caching \(nodes.count) displayed items)")
+        } else {
+            print("ℹ️ [SmartCache] Folder has only \(actualItemCount) items - not caching (threshold: 100)")
+        }
         
-        // 4. RECORD USAGE
-        DatabaseManager.shared.updateFolderAccess(path: cacheKey)
+        // 📝 STEP 5: Update folder access tracking (for usage stats)
+        db.updateFolderAccess(path: folderPath)
         
         return nodes
+    }
+
+    // 🆕 HELPER: Count actual items in folder WITHOUT loading them all
+    private func countFolderItems(at url: URL) -> Int {
+        do {
+            // Use shallow enumeration - just count, don't load details
+            let items = try FileManager.default.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            )
+            return items.count
+        } catch {
+            print("⚠️ [FinderLogic] Failed to count folder items: \(error)")
+            return 0
+        }
     }
     // Updated methods for FinderLogic.swift
 

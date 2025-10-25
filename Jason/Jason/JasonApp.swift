@@ -25,8 +25,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var contentWindow: NSWindow?
     
+    
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("🚀 AppDelegate: Setting up menu bar app")
+        
+        // ✅ NEW: Initialize SmartCache system
+        DatabaseManager.shared.setupSmartCacheTables()
+        print("⚡ SmartCache: System initialized!")
+        
+        // ✅ NEW: Clean up old cached data (folders not accessed in 30 days)
+        DatabaseManager.shared.cleanupInactiveHeavyFolders(inactiveDays: 30)
+        DatabaseManager.shared.cleanupOldAccessRecords(keepDays: 90)
+        print("🧹 SmartCache: Cleanup completed")
         
         // Create the status bar item (menu bar icon)
         setupMenuBar()
