@@ -30,19 +30,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("🚀 AppDelegate: Setting up menu bar app")
         
-        // ✅ Initialize SmartCache system (basic)
+        // Initialize databases
         DatabaseManager.shared.setupSmartCacheTables()
         print("⚡ SmartCache: System initialized!")
         
-        // ✅ NEW: Initialize EnhancedCache system (with thumbnails)
         DatabaseManager.shared.createEnhancedCacheTables()
         print("⚡ EnhancedCache: System initialized!")
         
-//        // ✅ Clean up old cached data
-//        DatabaseManager.shared.cleanupInactiveHeavyFolders(inactiveDays: 30)
-//        DatabaseManager.shared.cleanupOldAccessRecords(keepDays: 90)
-//        DatabaseManager.shared.cleanupOldEnhancedCache() 
-        print("🧹 SmartCache: Cleanup completed")
+        // Start watching (after a small delay to let everything initialize)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            FolderWatcherManager.shared.startWatchingFavorites()
+            print("👀 FSEvents: Folder watching started!")
+            
+            let stats = DatabaseManager.shared.getEnhancedCacheStats()
+            print("📊 Cache stats: \(stats.folders) folders, \(stats.items) items, \(stats.thumbnails) thumbnails")
+            
+            let watchedFolders = FolderWatcherManager.shared.getWatchedFolders()
+            if !watchedFolders.isEmpty {
+                print("👀 Currently watching \(watchedFolders.count) folders:")
+                for folder in watchedFolders {
+                    print("   📁 \(folder)")
+                }
+            }
+        }
+        
+        // Run cleanup later (30 minutes after launch)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1800) {
+            DatabaseManager.shared.cleanupInactiveHeavyFolders(inactiveDays: 30)
+            DatabaseManager.shared.cleanupOldAccessRecords(keepDays: 90)
+            DatabaseManager.shared.cleanupOldEnhancedCache()
+            print("🧹 SmartCache: Cleanup completed")
+        }
+    
         
         // ✅ Optional: Print cache stats
         let stats = DatabaseManager.shared.getEnhancedCacheStats()

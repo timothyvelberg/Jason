@@ -194,26 +194,6 @@ extension DatabaseManager {
         return folders
     }
     
-    /// Remove a folder from heavy folders list
-    func removeHeavyFolder(path: String) {
-        guard let db = db else { return }
-        
-        queue.async {
-            let sql = "DELETE FROM heavy_folders WHERE path = ?"
-            var statement: OpaquePointer?
-            
-            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
-                
-                if sqlite3_step(statement) == SQLITE_DONE {
-                    print("[SmartCache] 🗑️ Removed heavy folder: \(path)")
-                }
-            }
-            
-            sqlite3_finalize(statement)
-        }
-    }
-    
     // MARK: - Folder Contents Caching
     
     /// Save folder contents to cache
