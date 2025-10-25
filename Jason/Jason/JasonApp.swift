@@ -30,14 +30,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("🚀 AppDelegate: Setting up menu bar app")
         
-        // ✅ NEW: Initialize SmartCache system
+        // ✅ Initialize SmartCache system (basic)
         DatabaseManager.shared.setupSmartCacheTables()
         print("⚡ SmartCache: System initialized!")
         
-        // ✅ NEW: Clean up old cached data (folders not accessed in 30 days)
-        DatabaseManager.shared.cleanupInactiveHeavyFolders(inactiveDays: 30)
-        DatabaseManager.shared.cleanupOldAccessRecords(keepDays: 90)
+        // ✅ NEW: Initialize EnhancedCache system (with thumbnails)
+        DatabaseManager.shared.createEnhancedCacheTables()
+        print("⚡ EnhancedCache: System initialized!")
+        
+//        // ✅ Clean up old cached data
+//        DatabaseManager.shared.cleanupInactiveHeavyFolders(inactiveDays: 30)
+//        DatabaseManager.shared.cleanupOldAccessRecords(keepDays: 90)
+//        DatabaseManager.shared.cleanupOldEnhancedCache() 
         print("🧹 SmartCache: Cleanup completed")
+        
+        // ✅ Optional: Print cache stats
+        let stats = DatabaseManager.shared.getEnhancedCacheStats()
+        print("📊 Cache stats: \(stats.folders) folders, \(stats.items) items, \(stats.thumbnails) thumbnails")
         
         // Create the status bar item (menu bar icon)
         setupMenuBar()

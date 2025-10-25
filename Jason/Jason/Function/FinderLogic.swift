@@ -157,20 +157,19 @@ class FinderLogic: FunctionProvider {
         // ⚡ STEP 1: Record that we're accessing this folder
         db.recordFolderAccess(folderPath: folderPath)
         
-        // ⚡ STEP 2: Check if this is a HEAVY folder and try SmartCache
+        // ⚡ STEP 2: Check if this is a HEAVY folder and try ENHANCED CACHE
         if db.isHeavyFolder(path: folderPath) {
             print("📦 [FinderLogic] Heavy folder detected: \(node.name)")
             
-            if let cachedItems = db.getCachedFolderContents(folderPath: folderPath) {
-                print("⚡ [SmartCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
+            if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
+                print("⚡ [EnhancedCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
                 
-                // Convert FolderItem to FunctionNode
+                // Convert EnhancedFolderItem to FunctionNode WITHOUT DISK I/O!
                 let nodes = cachedItems.map { item in
-                    let url = URL(fileURLWithPath: item.path)
                     if item.isDirectory {
-                        return createFolderNode(for: url)
+                        return createFolderNodeFromCache(item: item)
                     } else {
-                        return createFileNode(for: url)
+                        return createFileNodeFromCache(item: item)
                     }
                 }
                 
@@ -182,7 +181,7 @@ class FinderLogic: FunctionProvider {
                 
                 return nodes
             } else {
-                print("⚠️ [SmartCache] Cache miss for heavy folder - will reload")
+                print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
             }
         }
         
@@ -190,7 +189,7 @@ class FinderLogic: FunctionProvider {
         print("💿 [START] Loading from disk: \(folderURL.path)")
         let startTime = Date()
         
-        // 🔍 NEW: Check ACTUAL folder size BEFORE limiting display
+        // 🔍 Check ACTUAL folder size BEFORE limiting display
         let actualItemCount = countFolderItems(at: folderURL)
         print("📊 [FinderLogic] Actual folder contains: \(actualItemCount) items")
         
@@ -210,53 +209,20 @@ class FinderLogic: FunctionProvider {
         
         // 📊 STEP 4: If folder has >100 items (ACTUAL COUNT), mark as HEAVY and cache it
         if actualItemCount > 100 {
-            print("📊 [SmartCache] Folder has \(actualItemCount) items - marking as HEAVY")
+            print("📊 [EnhancedCache] Folder has \(actualItemCount) items - marking as HEAVY and caching with thumbnails")
             
             // Mark as heavy folder with ACTUAL count
             db.markAsHeavyFolder(path: folderPath, itemCount: actualItemCount)
             
-            // Convert nodes to FolderItem format for caching
-            let folderItems: [FolderItem] = nodes.compactMap { node in
-                // Extract path from node
-                var path: String?
-                var isDirectory = false
-                var modDate = Date()
-                
-                // Check if it's a folder node
-                if let metadata = node.metadata,
-                   let folderURLString = metadata["folderURL"] as? String {
-                    path = folderURLString
-                    isDirectory = true
-                }
-                // Check if it's a file node
-                else if let previewURL = node.previewURL {
-                    path = previewURL.path
-                    isDirectory = false
-                    // Try to get modification date
-                    if let attrs = try? FileManager.default.attributesOfItem(atPath: previewURL.path),
-                       let date = attrs[.modificationDate] as? Date {
-                        modDate = date
-                    }
-                }
-                
-                guard let itemPath = path else { return nil }
-                
-                return FolderItem(
-                    name: node.name,
-                    path: itemPath,
-                    isDirectory: isDirectory,
-                    modificationDate: modDate
-                )
-            }
+            // Convert nodes to EnhancedFolderItem format WITH THUMBNAILS
+            let enhancedItems = convertToEnhancedFolderItems(nodes: nodes, folderURL: folderURL)
             
-            // ⚠️ IMPORTANT: We're only caching the DISPLAYED items (limited by maxItems)
-            // But we marked the folder as "heavy" based on ACTUAL size
-            // This means future loads will be instant (for the displayed items)
-            db.saveFolderContents(folderPath: folderPath, items: folderItems)
-            print("💾 [SmartCache] Cached \(nodes.count) items for future instant loads!")
+            // Save to Enhanced Cache
+            db.saveEnhancedFolderContents(folderPath: folderPath, items: enhancedItems)
+            print("💾 [EnhancedCache] Cached \(nodes.count) items (with thumbnails) for future instant loads!")
             print("   (Folder actually has \(actualItemCount) items, but caching \(nodes.count) displayed items)")
         } else {
-            print("ℹ️ [SmartCache] Folder has only \(actualItemCount) items - not caching (threshold: 100)")
+            print("ℹ️ [EnhancedCache] Folder has only \(actualItemCount) items - not caching (threshold: 100)")
         }
         
         // 📝 STEP 5: Update folder access tracking (for usage stats)
@@ -265,10 +231,184 @@ class FinderLogic: FunctionProvider {
         return nodes
     }
 
-    // 🆕 HELPER: Count actual items in folder WITHOUT loading them all
+    // MARK: - Enhanced Cache Helper Methods
+
+    /// Create a file node from cached data WITHOUT disk I/O
+    private func createFileNodeFromCache(item: EnhancedFolderItem) -> FunctionNode {
+        let url = URL(fileURLWithPath: item.path)
+        let fileName = item.name
+        
+        // 🎨 Use cached thumbnail if available, otherwise create icon from metadata
+        let icon: NSImage
+        if let thumbnailData = item.thumbnailData, let cachedThumbnail = NSImage(data: thumbnailData) {
+            // ⚡ INSTANT! No disk access!
+            icon = cachedThumbnail
+            print("🖼️ [FinderLogic] Using cached thumbnail for: \(fileName)")
+        } else if item.hasCustomIcon {
+            // Use IconProvider with cached extension (fast, no disk read)
+            icon = IconProvider.shared.getFileIcon(for: url, size: 64, cornerRadius: 8)
+            print("🎨 [FinderLogic] Using custom icon for: \(fileName)")
+        } else {
+            // Fallback to system icon
+            icon = IconProvider.shared.getFileIcon(for: url, size: 64, cornerRadius: 8)
+            print("📄 [FinderLogic] Using system icon for: \(fileName)")
+        }
+        
+        return FunctionNode(
+            id: "file-\(item.path)",
+            name: fileName,
+            icon: icon,
+            
+            contextActions: [
+                StandardContextActions.deleteFile(url),
+                StandardContextActions.copyFile(url),
+                StandardContextActions.showInFinder(url)
+            ],
+            
+            preferredLayout: .partialSlice,
+            itemAngleSize: 15,
+            previewURL: url,
+            showLabel: true,
+            slicePositioning: .center,
+            
+            onLeftClick: .drag(DragProvider(
+                fileURLs: [url],
+                dragImage: icon,
+                allowedOperations: .move,
+                onClick: {
+                    print("📂 Opening file: \(fileName)")
+                    NSWorkspace.shared.open(url)
+                },
+                onDragStarted: {
+                    print("📦 Started dragging: \(fileName)")
+                },
+                onDragCompleted: { success in
+                    if success {
+                        print("✅ Successfully dragged: \(fileName)")
+                    } else {
+                        print("❌ Drag cancelled: \(fileName)")
+                    }
+                }
+            )),
+            
+            onRightClick: .expand,
+            
+            onMiddleClick: .executeKeepOpen {
+                print("🖱️ Middle-click opening: \(fileName)")
+                NSWorkspace.shared.open(url)
+            },
+            
+            onBoundaryCross: .doNothing
+        )
+    }
+
+    /// Create a folder node from cached data WITHOUT disk I/O
+    private func createFolderNodeFromCache(item: EnhancedFolderItem) -> FunctionNode {
+        let url = URL(fileURLWithPath: item.path)
+        let folderName = item.name
+        
+        // Get folder icon (uses cached config if available)
+        let icon = IconProvider.shared.getFolderIcon(for: url, size: 64, cornerRadius: 8)
+        
+        print("📁 [FinderLogic] Creating folder node from cache for: \(folderName)")
+        
+        return FunctionNode(
+            id: "folder-\(item.path)",
+            name: folderName,
+            icon: icon,
+            children: nil,
+            contextActions: [
+                StandardContextActions.showInFinder(url),
+                StandardContextActions.deleteFile(url)
+            ],
+            preferredLayout: .partialSlice,
+            itemAngleSize: 15,
+            previewURL: url,
+            showLabel: true,
+            slicePositioning: .center,
+            
+            metadata: [
+                "folderURL": item.path,
+            ],
+            providerId: self.providerId,
+            onLeftClick: .navigateInto,
+            onRightClick: .expand,
+            onMiddleClick: .executeKeepOpen {
+                print("📂 Middle-click opening folder: \(folderName)")
+                NSWorkspace.shared.open(url)
+            },
+            onBoundaryCross: .doNothing
+        )
+    }
+
+    /// Convert FunctionNodes to EnhancedFolderItems WITH THUMBNAILS
+    private func convertToEnhancedFolderItems(nodes: [FunctionNode], folderURL: URL) -> [EnhancedFolderItem] {
+        return nodes.compactMap { node -> EnhancedFolderItem? in
+            var path: String?
+            var isDirectory = false
+            var modDate = Date()
+            var fileExtension = ""
+            var fileSize: Int64 = 0
+            var thumbnailData: Data?
+            
+            // Check if it's a folder node
+            if let metadata = node.metadata,
+               let folderURLString = metadata["folderURL"] as? String {
+                path = folderURLString
+                isDirectory = true
+            }
+            // Check if it's a file node
+            else if let previewURL = node.previewURL {
+                path = previewURL.path
+                isDirectory = false
+                fileExtension = previewURL.pathExtension.lowercased()
+                
+                // Get file attributes
+                if let attrs = try? FileManager.default.attributesOfItem(atPath: previewURL.path) {
+                    if let date = attrs[.modificationDate] as? Date {
+                        modDate = date
+                    }
+                    if let size = attrs[.size] as? Int64 {
+                        fileSize = size
+                    }
+                }
+                
+                // 🎨 EXTRACT THUMBNAIL from the already-generated icon!
+                let iconImage = node.icon
+                if let tiffData = iconImage.tiffRepresentation,
+                   let bitmap = NSBitmapImageRep(data: tiffData),
+                   let pngData = bitmap.representation(using: .png, properties: [:]) {
+                    thumbnailData = pngData
+                }
+            }
+            
+            guard let itemPath = path else { return nil }
+            
+            // Check if file extension has custom icon
+            let hasCustomIcon = !fileExtension.isEmpty && IconProvider.shared.hasCustomFileIcon(for: fileExtension)
+            
+            // Check if it's an image file
+            let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
+            let isImageFile = imageExtensions.contains(fileExtension)
+            
+            return EnhancedFolderItem(
+                name: node.name,
+                path: itemPath,
+                isDirectory: isDirectory,
+                modificationDate: modDate,
+                fileExtension: fileExtension,
+                fileSize: fileSize,
+                hasCustomIcon: hasCustomIcon,
+                isImageFile: isImageFile,
+                thumbnailData: thumbnailData,  // 🎨 THE THUMBNAIL!
+                folderConfigJSON: nil  // TODO: Add folder config if needed
+            )
+        }
+    }
+
+    /// Count actual items in folder WITHOUT loading them all
     private func countFolderItems(at url: URL) -> Int {
         do {
-            // Use shallow enumeration - just count, don't load details
             let items = try FileManager.default.contentsOfDirectory(
                 at: url,
                 includingPropertiesForKeys: nil,
@@ -280,7 +420,6 @@ class FinderLogic: FunctionProvider {
             return 0
         }
     }
-    // Updated methods for FinderLogic.swift
 
     // MARK: - Replace the createFavoriteFoldersNode method with this:
 
