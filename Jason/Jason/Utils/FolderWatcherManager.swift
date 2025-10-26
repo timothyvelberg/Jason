@@ -28,19 +28,25 @@ class FolderWatcherManager {
     
     /// Start watching all favorite heavy folders
     func startWatchingFavorites() {
+        // Get all database data on MAIN thread FIRST (avoid threading issues)
+        let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
+        
+        // Build list of folders to watch (also check heavy status on main thread)
+        var foldersToWatch: [(path: String, name: String)] = []
+        for (folder, _) in favoriteFolders {
+            if DatabaseManager.shared.isHeavyFolder(path: folder.path) {
+                foldersToWatch.append((path: folder.path, name: folder.title))
+            }
+        }
+        
+        // Now dispatch to background thread with the data we already fetched
         watcherQueue.async { [weak self] in
             guard let self = self else { return }
             
-            // Get all favorite folders from database
-            let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
-            
             var watchedCount = 0
-            for (folder, _) in favoriteFolders {
-                // Only watch if it's a heavy folder
-                if DatabaseManager.shared.isHeavyFolder(path: folder.path) {
-                    self.startWatching(path: folder.path, itemName: folder.title)
-                    watchedCount += 1
-                }
+            for folder in foldersToWatch {
+                self.startWatching(path: folder.path, itemName: folder.name)
+                watchedCount += 1
             }
             
             print("[FolderWatcher] 👀 Started watching \(watchedCount) favorite heavy folders")

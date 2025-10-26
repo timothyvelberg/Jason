@@ -240,7 +240,8 @@ class MouseTracker {
                                 return
                                 
                             case .doNothing:
-                                print("⚠️ Beyond boundary hovering '\(node.name)' - no auto-expand (use right-click)")
+                                return
+//                                print("⚠️ Beyond boundary hovering '\(node.name)' - no auto-expand (use right-click)")
 
                             case .execute(let action):
                                 // Only execute once per node (debounce)
