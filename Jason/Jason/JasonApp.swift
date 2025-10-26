@@ -30,42 +30,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("🚀 AppDelegate: Setting up menu bar app")
         
-        // Initialize databases
+        // ✅ Run ALL database operations sequentially on main thread
         DatabaseManager.shared.setupSmartCacheTables()
         print("⚡ SmartCache: System initialized!")
         
-        DatabaseManager.shared.createEnhancedCacheTables()
-        print("⚡ EnhancedCache: System initialized!")
-        
-        // Start watching (after a small delay to let everything initialize)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            FolderWatcherManager.shared.startWatchingFavorites()
-            print("👀 FSEvents: Folder watching started!")
+        // Small delay between operations to prevent conflicts
+        DispatchQueue.main.async {
+            DatabaseManager.shared.createEnhancedCacheTables()
+            print("⚡ EnhancedCache: System initialized!")
             
-            let stats = DatabaseManager.shared.getEnhancedCacheStats()
-            print("📊 Cache stats: \(stats.folders) folders, \(stats.items) items, \(stats.thumbnails) thumbnails")
-            
-            let watchedFolders = FolderWatcherManager.shared.getWatchedFolders()
-            if !watchedFolders.isEmpty {
-                print("👀 Currently watching \(watchedFolders.count) folders:")
-                for folder in watchedFolders {
-                    print("   📁 \(folder)")
+            // Start folder watching after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                FolderWatcherManager.shared.startWatchingFavorites()
+                print("👀 FSEvents: Folder watching started!")
+                
+                let stats = DatabaseManager.shared.getEnhancedCacheStats()
+                print("📊 Cache stats: \(stats.folders) folders, \(stats.items) items, \(stats.thumbnails) thumbnails")
+                
+                let watchedFolders = FolderWatcherManager.shared.getWatchedFolders()
+                if !watchedFolders.isEmpty {
+                    print("👀 Currently watching \(watchedFolders.count) folders:")
+                    for folder in watchedFolders {
+                        print("   📁 \(folder)")
+                    }
                 }
             }
+            
+//            // Run cleanup even later (30 minutes after launch)
+//            DispatchQueue.main.asyncAfter(deadline: .now() + 1800) {
+//                DatabaseManager.shared.cleanupInactiveHeavyFolders(inactiveDays: 30)
+//                DatabaseManager.shared.cleanupOldAccessRecords(keepDays: 90)
+//                DatabaseManager.shared.cleanupOldEnhancedCache()
+//                print("🧹 SmartCache: Cleanup completed")
+//            }
         }
         
-        // Run cleanup later (30 minutes after launch)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1800) {
-            DatabaseManager.shared.cleanupInactiveHeavyFolders(inactiveDays: 30)
-            DatabaseManager.shared.cleanupOldAccessRecords(keepDays: 90)
-            DatabaseManager.shared.cleanupOldEnhancedCache()
-            print("🧹 SmartCache: Cleanup completed")
-        }
-    
-        
-        // ✅ Optional: Print cache stats
-        let stats = DatabaseManager.shared.getEnhancedCacheStats()
-        print("📊 Cache stats: \(stats.folders) folders, \(stats.items) items, \(stats.thumbnails) thumbnails")
         
         // Create the status bar item (menu bar icon)
         setupMenuBar()

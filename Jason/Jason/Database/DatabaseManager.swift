@@ -106,6 +106,7 @@ class DatabaseManager {
             slice_positioning TEXT DEFAULT 'startClockwise',
             child_ring_thickness INTEGER DEFAULT 80,
             child_icon_size INTEGER DEFAULT 32,
+            content_sort_order TEXT DEFAULT 'modified_newest',
             FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
         );
         """

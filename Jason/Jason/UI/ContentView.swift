@@ -10,6 +10,7 @@ import AppKit
 
 struct ContentView: View {
     @StateObject private var circularUI = CircularUIManager()
+    @State private var selectedSortOrder: FolderSortOrder = .modifiedNewest
     
     var body: some View {
         Group {
@@ -404,9 +405,11 @@ struct EditFavoriteView: View {
     @State private var childRingThickness: String = "80"
     @State private var childIconSize: String = "32"
     
+    
     // NEW: Icon customization
     @State private var iconName: String = ""
     @State private var selectedFolderColor: FolderColor = .blue
+    @State private var selectedSortOrder: FolderSortOrder = .modifiedNewest
     
     // Folder color options (matches asset names)
     enum FolderColor: String, CaseIterable, Identifiable {
@@ -455,7 +458,15 @@ struct EditFavoriteView: View {
                             .help("Leave empty for no limit")
                     }
                     
-                    // NEW: Icon Customization Section
+                    Picker("Sort By", selection: $selectedSortOrder) {
+                        ForEach(FolderSortOrder.allCases, id: \.self) { sortOrder in
+                            Label(sortOrder.displayName, systemImage: sortOrder.icon)
+                                .tag(sortOrder)
+                        }
+                    }
+                    .help("How items are sorted when you open this folder")
+                    
+                    // Icon Customization Section
                     Section("Icon Customization") {
                         Picker("Folder Color", selection: $selectedFolderColor) {
                             ForEach(FolderColor.allCases) { color in
@@ -563,6 +574,7 @@ struct EditFavoriteView: View {
             slicePositioning = settings.slicePositioning ?? "startClockwise"
             childRingThickness = settings.childRingThickness.map { String($0) } ?? "80"
             childIconSize = settings.childIconSize.map { String($0) } ?? "32"
+            selectedSortOrder = settings.contentSortOrder ?? .modifiedNewest
         }
         
         // Load icon settings from folder entry
@@ -605,12 +617,13 @@ struct EditFavoriteView: View {
             itemAngleSize: itemAngleValue,
             slicePositioning: slicePositioning,
             childRingThickness: thicknessValue,
-            childIconSize: iconSizeValue
+            childIconSize: iconSizeValue,
+            contentSortOrder: selectedSortOrder,
         )
         
         // Update layout settings in database
         if DatabaseManager.shared.updateFavoriteSettings(path: folder.path, title: name, settings: settings) {
-            print("✅ Updated favorite settings for: \(folder.title)")
+            print("✅ Updated favorite settings for: \(folder.title) (sort: \(selectedSortOrder.displayName))")
             
             // Update icon customization
             let trimmedIconName = iconName.trimmingCharacters(in: .whitespaces)
@@ -619,10 +632,10 @@ struct EditFavoriteView: View {
             DatabaseManager.shared.setFolderIcon(
                 path: folder.path,
                 iconName: trimmedIconName.isEmpty ? nil : trimmedIconName,
-                iconColorHex: "#FFFFFF",  // Always white for symbols
-                baseAsset: selectedFolderColor.assetName,  // The colored folder asset
+                iconColorHex: "#FFFFFF",
+                baseAsset: selectedFolderColor.assetName,
                 symbolSize: 24,
-                symbolOffset: -4  // Hardcoded - change this value to adjust vertical position
+                symbolOffset: -4
             )
             
             if !trimmedIconName.isEmpty {

@@ -162,24 +162,31 @@ class FinderLogic: FunctionProvider {
             print("📦 [FinderLogic] Heavy folder detected: \(node.name)")
             
             if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
-                print("⚡ [EnhancedCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
-                
-                // Convert EnhancedFolderItem to FunctionNode WITHOUT DISK I/O!
-                let nodes = cachedItems.map { item in
-                    if item.isDirectory {
-                        return createFolderNodeFromCache(item: item)
-                    } else {
-                        return createFileNodeFromCache(item: item)
+                if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
+                    print("⚡ [EnhancedCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
+                    
+                    // Convert to nodes
+                    var nodes = cachedItems.map { item in
+                        if item.isDirectory {
+                            return createFolderNodeFromCache(item: item)
+                        } else {
+                            return createFileNodeFromCache(item: item)
+                        }
                     }
+                    
+                    // 🎯 NEW: Apply current sort order preference
+                    let sortOrder = getSortOrderForFolder(path: folderPath)
+                    nodes = sortNodes(nodes, by: sortOrder)
+                    print("🔄 [FinderLogic] Applied sort order: \(sortOrder) to cached items")
+                    
+                    // Apply custom limit if specified
+                    if let limit = customMaxItems {
+                        print("✂️ [FinderLogic] Applying custom limit: \(limit) items")
+                        return Array(nodes.prefix(limit))
+                    }
+                    
+                    return nodes
                 }
-                
-                // Apply custom limit if specified
-                if let limit = customMaxItems {
-                    print("✂️ [FinderLogic] Applying custom limit: \(limit) items")
-                    return Array(nodes.prefix(limit))
-                }
-                
-                return nodes
             } else {
                 print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
             }
@@ -229,6 +236,50 @@ class FinderLogic: FunctionProvider {
         db.updateFolderAccess(path: folderPath)
         
         return nodes
+    }
+    
+    // MARK: - Sorting Helper Methods
+
+    /// Get the sort order preference for a folder
+    private func getSortOrderForFolder(path: String) -> FolderSortOrder {
+        let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
+        
+        if let favoriteFolder = favoriteFolders.first(where: { $0.folder.path == path }),
+           let sortOrder = favoriteFolder.settings.contentSortOrder {
+            return sortOrder
+        }
+        
+        // Default to modified newest
+        return .modifiedNewest
+    }
+
+    /// Sort nodes according to the sort order
+    private func sortNodes(_ nodes: [FunctionNode], by sortOrder: FolderSortOrder) -> [FunctionNode] {
+        // Extract URLs from nodes for sorting
+        var urlNodePairs: [(URL, FunctionNode)] = []
+        
+        for node in nodes {
+            if let previewURL = node.previewURL {
+                urlNodePairs.append((previewURL, node))
+            } else if let metadata = node.metadata,
+                      let urlString = metadata["folderURL"] as? String {
+                urlNodePairs.append((URL(fileURLWithPath: urlString), node))
+            }
+        }
+        
+        // Sort the URLs using existing sort logic
+        let urls = urlNodePairs.map { $0.0 }
+        let sortedURLs = sortURLs(urls, sortOrder: sortOrder)
+        
+        // Reorder nodes to match sorted URLs
+        var sortedNodes: [FunctionNode] = []
+        for sortedURL in sortedURLs {
+            if let pair = urlNodePairs.first(where: { $0.0 == sortedURL }) {
+                sortedNodes.append(pair.1)
+            }
+        }
+        
+        return sortedNodes
     }
 
     // MARK: - Enhanced Cache Helper Methods
@@ -547,7 +598,7 @@ class FinderLogic: FunctionProvider {
 
     /// Add default favorites on first run
     private func addDefaultFavorites() {
-        // Downloads
+        // Downloads - Newest First (see latest downloads!)
         if let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
             let settings = FavoriteFolderSettings(
                 maxItems: 20,
@@ -555,7 +606,8 @@ class FinderLogic: FunctionProvider {
                 itemAngleSize: nil,
                 slicePositioning: nil,
                 childRingThickness: nil,
-                childIconSize: nil
+                childIconSize: nil,
+                contentSortOrder: .modifiedNewest
             )
             _ = DatabaseManager.shared.addFavoriteFolder(
                 path: downloadsURL.path,
@@ -564,17 +616,26 @@ class FinderLogic: FunctionProvider {
             )
         }
         
-        // Git folder (if it exists)
+        // Git folder - Alphabetical (organized code!)
         let gitPath = "/Users/timothy/Files/Git/"
         if FileManager.default.fileExists(atPath: gitPath) {
+            let settings = FavoriteFolderSettings(
+                maxItems: nil,
+                preferredLayout: nil,
+                itemAngleSize: nil,
+                slicePositioning: nil,
+                childRingThickness: nil,
+                childIconSize: nil,
+                contentSortOrder: .alphabeticalAsc  // ← ADD THIS!
+            )
             _ = DatabaseManager.shared.addFavoriteFolder(
                 path: gitPath,
                 title: "Git",
-                settings: nil  // Use all defaults
+                settings: settings
             )
         }
         
-        // Screenshots (if it exists)
+        // Screenshots - Newest First (see latest captures!)
         let screenshotsPath = "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots/"
         if FileManager.default.fileExists(atPath: screenshotsPath) {
             let settings = FavoriteFolderSettings(
@@ -583,7 +644,8 @@ class FinderLogic: FunctionProvider {
                 itemAngleSize: nil,
                 slicePositioning: nil,
                 childRingThickness: nil,
-                childIconSize: nil
+                childIconSize: nil,
+                contentSortOrder: .modifiedNewest
             )
             _ = DatabaseManager.shared.addFavoriteFolder(
                 path: screenshotsPath,
@@ -592,7 +654,7 @@ class FinderLogic: FunctionProvider {
             )
         }
         
-        print("✅ [FinderLogic] Added default favorites")
+        print("✅ [FinderLogic] Added default favorites with smart sorting")
     }
     
     /// Get icon for folder (from database or system default)

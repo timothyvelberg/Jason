@@ -23,7 +23,8 @@ extension DatabaseManager {
                    COALESCE(f.symbol_offset, -8.0),
                    f.last_accessed, f.access_count,
                    ff.max_items, ff.preferred_layout, ff.item_angle_size, 
-                   ff.slice_positioning, ff.child_ring_thickness, ff.child_icon_size
+                   ff.slice_positioning, ff.child_ring_thickness, ff.child_icon_size,
+                   COALESCE(ff.content_sort_order, 'modified_newest')
             FROM favorite_folders ff
             JOIN folders f ON ff.folder_id = f.id
             ORDER BY ff.sort_order;
@@ -51,6 +52,12 @@ extension DatabaseManager {
                     let childRingThickness: Int? = sqlite3_column_type(statement, 15) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 15))
                     let childIconSize: Int? = sqlite3_column_type(statement, 16) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 16))
                     
+                    // Read sort order
+                    let contentSortOrderString = sqlite3_column_text(statement, 17) != nil
+                        ? String(cString: sqlite3_column_text(statement, 17))
+                        : "modified_newest"
+                    let contentSortOrder = FolderSortOrder(rawValue: contentSortOrderString) ?? .modifiedNewest
+                    
                     let folder = FolderEntry(
                         id: id,
                         path: path,
@@ -71,7 +78,8 @@ extension DatabaseManager {
                         itemAngleSize: itemAngleSize,
                         slicePositioning: slicePositioning,
                         childRingThickness: childRingThickness,
-                        childIconSize: childIconSize
+                        childIconSize: childIconSize,
+                        contentSortOrder: contentSortOrder
                     )
                     
                     results.append((folder, settings))
@@ -118,8 +126,8 @@ extension DatabaseManager {
             let sql = """
             INSERT INTO favorite_folders 
             (folder_id, sort_order, max_items, preferred_layout, item_angle_size, 
-             slice_positioning, child_ring_thickness, child_icon_size) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+             slice_positioning, child_ring_thickness, child_icon_size, content_sort_order) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
             """
             var statement: OpaquePointer?
             
@@ -162,6 +170,13 @@ extension DatabaseManager {
                     sqlite3_bind_int(statement, 8, Int32(iconSize))
                 } else {
                     sqlite3_bind_int(statement, 8, 32)
+                }
+                
+                // Bind content_sort_order
+                if let sortOrder = settings?.contentSortOrder {
+                    sqlite3_bind_text(statement, 9, (sortOrder.rawValue as NSString).utf8String, -1, nil)
+                } else {
+                    sqlite3_bind_text(statement, 9, ("modified_newest" as NSString).utf8String, -1, nil)
                 }
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
@@ -255,11 +270,12 @@ extension DatabaseManager {
                 item_angle_size = ?,
                 slice_positioning = ?,
                 child_ring_thickness = ?,
-                child_icon_size = ?
+                child_icon_size = ?,
+                content_sort_order = ?
             WHERE folder_id = (SELECT id FROM folders WHERE path = ?);
             """
             var settingsStatement: OpaquePointer?
-            
+
             if sqlite3_prepare_v2(db, updateSettingsSQL, -1, &settingsStatement, nil) == SQLITE_OK {
                 // Bind all settings
                 if let maxItems = settings.maxItems {
@@ -298,7 +314,14 @@ extension DatabaseManager {
                     sqlite3_bind_int(settingsStatement, 6, 32)
                 }
                 
-                sqlite3_bind_text(settingsStatement, 7, (path as NSString).utf8String, -1, nil)
+                // Bind content_sort_order
+                if let sortOrder = settings.contentSortOrder {
+                    sqlite3_bind_text(settingsStatement, 7, (sortOrder.rawValue as NSString).utf8String, -1, nil)
+                } else {
+                    sqlite3_bind_text(settingsStatement, 7, ("modified_newest" as NSString).utf8String, -1, nil)
+                }
+                
+                sqlite3_bind_text(settingsStatement, 8, (path as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(settingsStatement) == SQLITE_DONE {
                     print("✅ [DatabaseManager] Updated favorite settings for: \(path)")

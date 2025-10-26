@@ -80,6 +80,7 @@ struct FavoriteFolderSettings {
     let slicePositioning: String?
     let childRingThickness: Int?
     let childIconSize: Int?
+    let contentSortOrder: FolderSortOrder?
 }
 
 // MARK: - Errors
