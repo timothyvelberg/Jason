@@ -162,34 +162,32 @@ class FinderLogic: FunctionProvider {
             print("📦 [FinderLogic] Heavy folder detected: \(node.name)")
             
             if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
-                if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
-                    print("⚡ [EnhancedCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
-                    
-                    // Convert to nodes
-                    var nodes = cachedItems.map { item in
-                        if item.isDirectory {
-                            return createFolderNodeFromCache(item: item)
-                        } else {
-                            return createFileNodeFromCache(item: item)
-                        }
+                print("⚡ [EnhancedCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
+                
+                // Convert to nodes
+                var nodes = cachedItems.map { item in
+                    if item.isDirectory {
+                        return createFolderNodeFromCache(item: item)
+                    } else {
+                        return createFileNodeFromCache(item: item)
                     }
-                    
-                    // 🎯 NEW: Apply current sort order preference
-                    let sortOrder = getSortOrderForFolder(path: folderPath)
-                    nodes = sortNodes(nodes, by: sortOrder)
-                    print("🔄 [FinderLogic] Applied sort order: \(sortOrder) to cached items")
-                    
-                    // Apply custom limit if specified
-                    if let limit = customMaxItems {
-                        print("✂️ [FinderLogic] Applying custom limit: \(limit) items")
-                        return Array(nodes.prefix(limit))
-                    }
-                    
-                    return nodes
                 }
-            } else {
-                print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
-            }
+                
+                // 🎯 NEW: Apply current sort order preference
+                let sortOrder = getSortOrderForFolder(path: folderPath)
+                nodes = sortNodes(nodes, by: sortOrder)
+                print("🔄 [FinderLogic] Applied sort order: \(sortOrder) to cached items")
+                
+                // Apply custom limit if specified
+                if let limit = customMaxItems {
+                    print("✂️ [FinderLogic] Applying custom limit: \(limit) items")
+                    return Array(nodes.prefix(limit))
+                }
+                
+                return nodes
+        } else {
+            print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
+        }
         }
         
         // 💿 STEP 3: CACHE MISS OR NOT A HEAVY FOLDER - Load from disk
