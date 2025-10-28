@@ -199,7 +199,7 @@ class FunctionManager: ObservableObject {
                 let offset = -(itemAngle / 2)
                 
                 sliceConfig = .fullCircle(itemCount: itemCount, startingAt: offset)
-                print("🎯 Ring 0: Shifted by \(offset)° to center first item at 0° (itemAngle: \(itemAngle)°)")
+//                print("🎯 Ring 0: Shifted by \(offset)° to center first item at 0° (itemAngle: \(itemAngle)°)")
             } else {
                 // Ring 1+ - get parent info
                 guard let parentInfo = getParentInfo(for: index, configs: configs) else {
@@ -272,10 +272,10 @@ class FunctionManager: ObservableObject {
                         startingAngle = parentInfo.leftEdge
                     }
                     
-                    print("🎯 Ring \(index) alignment:")
-                    print("   Parent left edge: \(parentInfo.leftEdge)°, right edge: \(parentInfo.rightEdge)°")
-                    print("   Positioning: \(positioning), using angle: \(startingAngle)°")
-                    print("   itemAngleSize: \(customAngle)°")
+//                    print("🎯 Ring \(index) alignment:")
+//                    print("   Parent left edge: \(parentInfo.leftEdge)°, right edge: \(parentInfo.rightEdge)°")
+//                    print("   Positioning: \(positioning), using angle: \(startingAngle)°")
+//                    print("   itemAngleSize: \(customAngle)°")
                     
                     if itemCount == 1 {
                         sliceConfig = .partialSlice(
@@ -711,9 +711,7 @@ class FunctionManager: ObservableObject {
     }
 
     // MARK: - Direct Category Expansion
-
-    /// Load functions and immediately expand to a specific category by provider ID
-    /// - Parameter providerId: The ID of the provider to expand (e.g., "app-switcher")
+    
     func loadAndExpandToCategory(providerId: String) {
         print("🎯 [FunctionManager] Loading and expanding to category: \(providerId)")
         

@@ -2,7 +2,8 @@
 //  FolderWatcherManager.swift
 //  Jason
 //
-//  Created by Timothy Velberg on 25/10/2025.
+//  Manages file system watching for favorite heavy folders
+//  NOW WITH PROACTIVE CACHE REFRESH - cache updates in background when files change
 //
 
 import Foundation
@@ -17,7 +18,7 @@ class FolderWatcherManager {
     private let watcherQueue = DispatchQueue(label: "com.jason.folderwatcher", qos: .utility)
     
     // Debouncing configuration
-    private var pendingInvalidations: [String: DispatchWorkItem] = [:]
+    private var pendingRefreshes: [String: DispatchWorkItem] = [:]
     private let debounceInterval: TimeInterval = 1.0 // Wait 1s after last change
     
     private init() {
@@ -67,6 +68,7 @@ class FolderWatcherManager {
             print("[FolderWatcher] 👀 Started watching \(watchedCount) favorite heavy folders")
         }
     }
+    
     /// Start watching a specific folder
     func startWatching(path: String, itemName: String) {
         watcherQueue.async { [weak self] in
@@ -134,31 +136,112 @@ class FolderWatcherManager {
     // MARK: - Private Methods
     
     private func handleFolderChange(path: String, name: String) {
-        // Cancel any pending invalidation for this folder
-        pendingInvalidations[path]?.cancel()
+        // Cancel any pending refresh for this folder
+        pendingRefreshes[path]?.cancel()
         
-        // Create new debounced invalidation
+        // Create new debounced refresh
         let workItem = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
             
             print("[FolderWatcher] 📂 Change detected in: \(name)")
-            print("[FolderWatcher] 🗑️ Invalidating cache for: \(path)")
+            print("[FolderWatcher] 🔄 Refreshing cache in background...")
             
-            // Invalidate the enhanced cache
-            DatabaseManager.shared.invalidateEnhancedCache(for: path)
+            // 🆕 PROACTIVE REFRESH: Update cache with new contents
+            self.refreshCacheInBackground(path: path, name: name)
             
             // Remove from pending
-            self.pendingInvalidations.removeValue(forKey: path)
-            
-            print("[FolderWatcher] ✅ Cache invalidated - next visit will reload from disk")
+            self.pendingRefreshes.removeValue(forKey: path)
         }
         
-        pendingInvalidations[path] = workItem
+        pendingRefreshes[path] = workItem
         
         // Execute after debounce interval
         watcherQueue.asyncAfter(deadline: .now() + debounceInterval, execute: workItem)
     }
     
+    // MARK: - Proactive Cache Refresh
+    
+    /// Refresh cache in background when file changes are detected
+    private func refreshCacheInBackground(path: String, name: String) {
+        let folderURL = URL(fileURLWithPath: path)
+        
+        // Get folder settings from database
+        let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
+        guard let favoriteFolder = favoriteFolders.first(where: { $0.folder.path == path }) else {
+            print("[FolderWatcher] ⚠️ Folder '\(name)' not in favorites, just invalidating")
+            DatabaseManager.shared.invalidateEnhancedCache(for: path)
+            return
+        }
+        
+        let maxItems = favoriteFolder.settings.maxItems ?? 20
+        let sortOrder = favoriteFolder.settings.contentSortOrder ?? .modifiedNewest
+        
+        print("[FolderWatcher] 📊 Reloading contents: max=\(maxItems), sort=\(sortOrder.displayName)")
+        
+        // Load folder contents
+        do {
+            let contents = try FileManager.default.contentsOfDirectory(
+                at: folderURL,
+                includingPropertiesForKeys: [
+                    .isDirectoryKey,
+                    .contentModificationDateKey,
+                    .fileSizeKey,
+                    .nameKey
+                ],
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            )
+            
+            print("[FolderWatcher] 📂 Found \(contents.count) items")
+            
+            // 🎯 Sort using the shared utility
+            let sortedContents = FolderSortingUtility.sortURLs(contents, by: sortOrder)
+            
+            // Limit to configured max items
+            let limitedContents = Array(sortedContents.prefix(maxItems))
+            
+            print("[FolderWatcher] 📊 Processing \(limitedContents.count) items (after limit)")
+            
+            // Create enhanced items
+            var enhancedItems: [EnhancedFolderItem] = []
+            for url in limitedContents {
+                let values = try? url.resourceValues(forKeys: [
+                    .isDirectoryKey,
+                    .contentModificationDateKey,
+                    .fileSizeKey
+                ])
+                
+                let isDir = values?.isDirectory ?? false
+                let modDate = values?.contentModificationDate ?? Date()
+                let fileSize = Int64(values?.fileSize ?? 0)
+                let fileExtension = url.pathExtension.lowercased()
+                
+                enhancedItems.append(EnhancedFolderItem(
+                    name: url.lastPathComponent,
+                    path: url.path,
+                    isDirectory: isDir,
+                    modificationDate: modDate,
+                    fileExtension: fileExtension,
+                    fileSize: fileSize,
+                    hasCustomIcon: false,
+                    isImageFile: ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"].contains(fileExtension),
+                    thumbnailData: nil,  // Skip thumbnails in background refresh for speed
+                    folderConfigJSON: nil
+                ))
+            }
+            
+            // Clear old cache and save new
+            DatabaseManager.shared.invalidateEnhancedCache(for: path)
+            DatabaseManager.shared.saveEnhancedFolderContents(folderPath: path, items: enhancedItems)
+            
+            print("[FolderWatcher] ✅ Cache refreshed - \(enhancedItems.count) items ready!")
+            print("[FolderWatcher] 🎯 Next time '\(name)' is opened, it will load instantly with fresh data")
+            
+        } catch {
+            print("[FolderWatcher] ❌ Failed to refresh cache: \(error)")
+            // Fallback: just invalidate so next visit will reload
+            DatabaseManager.shared.invalidateEnhancedCache(for: path)
+        }
+    }
 }
 
 // MARK: - Individual Folder Watcher
@@ -217,7 +300,7 @@ private class FolderWatcher {
                 
                 if flags & relevantFlags != 0 {
                     watcher.onChange(watcher.path)
-                    break // One change is enough to trigger invalidation
+                    break // One change is enough to trigger refresh
                 }
             }
         }
