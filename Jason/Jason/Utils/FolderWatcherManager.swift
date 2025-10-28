@@ -28,16 +28,31 @@ class FolderWatcherManager {
     
     /// Start watching all favorite heavy folders
     func startWatchingFavorites() {
+        print("🔍 [FolderWatcher] ========== Starting Favorite Watchers ==========")
+        
         // Get all database data on MAIN thread FIRST (avoid threading issues)
         let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
+        print("🔍 [FolderWatcher] Found \(favoriteFolders.count) favorite folders total")
         
         // Build list of folders to watch (also check heavy status on main thread)
         var foldersToWatch: [(path: String, name: String)] = []
         for (folder, _) in favoriteFolders {
-            if DatabaseManager.shared.isHeavyFolder(path: folder.path) {
+            print("🔍 [FolderWatcher] Checking: '\(folder.title)'")
+            print("   📂 Path: \(folder.path)")
+            
+            let isHeavy = DatabaseManager.shared.isHeavyFolder(path: folder.path)
+            print("   ⚖️ Is heavy: \(isHeavy)")
+            
+            if isHeavy {
                 foldersToWatch.append((path: folder.path, name: folder.title))
+                print("   ✅ Will watch this folder")
+            } else {
+                print("   ⏭️ Skipping (not marked as heavy)")
             }
         }
+        
+        print("🔍 [FolderWatcher] Total folders to watch: \(foldersToWatch.count)")
+        print("🔍 [FolderWatcher] ===============================================")
         
         // Now dispatch to background thread with the data we already fetched
         watcherQueue.async { [weak self] in
@@ -52,7 +67,6 @@ class FolderWatcherManager {
             print("[FolderWatcher] 👀 Started watching \(watchedCount) favorite heavy folders")
         }
     }
-    
     /// Start watching a specific folder
     func startWatching(path: String, itemName: String) {
         watcherQueue.async { [weak self] in

@@ -218,12 +218,16 @@ class FinderLogic: FunctionProvider {
            let elapsed = Date().timeIntervalSince(startTime)
            print("✅ [END] Loaded \(nodes.count) nodes (displayed) in \(String(format: "%.2f", elapsed))s")
            
-           // 📊 STEP 4: If folder has >100 items (ACTUAL COUNT), mark as HEAVY and cache it
+           // If folder has >100 items (ACTUAL COUNT), mark as HEAVY and cache it
            if actualItemCount > 100 {
                print("📊 [EnhancedCache] Folder has \(actualItemCount) items - marking as HEAVY and caching with thumbnails")
                
                // Mark as heavy folder with ACTUAL count
                db.markAsHeavyFolder(path: folderPath, itemCount: actualItemCount)
+               
+               // 🆕 START WATCHING THIS FOLDER IMMEDIATELY
+               print("👁️ [FinderLogic] Starting FSEvents watcher for newly-heavy folder")
+               FolderWatcherManager.shared.startWatching(path: folderPath, itemName: node.name)
                
                // Convert nodes to EnhancedFolderItem format WITH THUMBNAILS
                let enhancedItems = convertToEnhancedFolderItems(nodes: nodes, folderURL: folderURL)
@@ -644,7 +648,7 @@ class FinderLogic: FunctionProvider {
                 slicePositioning: nil,
                 childRingThickness: nil,
                 childIconSize: nil,
-                contentSortOrder: .alphabeticalAsc  // ← ADD THIS!
+                contentSortOrder: .alphabeticalAsc
             )
             _ = DatabaseManager.shared.addFavoriteFolder(
                 path: gitPath,
