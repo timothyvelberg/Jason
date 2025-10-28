@@ -29,7 +29,7 @@ extension DatabaseManager {
             """
             
             if sqlite3_exec(db, heavyFoldersSQL, nil, nil, nil) == SQLITE_OK {
-                print("[SmartCache] ✅ Created heavy_folders table")
+//                print("[SmartCache] ✅ Created heavy_folders table")
             } else {
                 if let error = sqlite3_errmsg(db) {
                     print("[SmartCache] ❌ Error creating heavy_folders: \(String(cString: error))")
@@ -51,7 +51,7 @@ extension DatabaseManager {
             """
             
             if sqlite3_exec(db, folderContentsSQL, nil, nil, nil) == SQLITE_OK {
-                print("[SmartCache] ✅ Created folder_contents table")
+//                print("[SmartCache] ✅ Created folder_contents table")
             } else {
                 if let error = sqlite3_errmsg(db) {
                     print("[SmartCache] ❌ Error creating folder_contents: \(String(cString: error))")
@@ -68,7 +68,7 @@ extension DatabaseManager {
             """
             
             if sqlite3_exec(db, folderAccessSQL, nil, nil, nil) == SQLITE_OK {
-                print("[SmartCache] ✅ Created folder_access table")
+//                print("[SmartCache] ✅ Created folder_access table")
             } else {
                 if let error = sqlite3_errmsg(db) {
                     print("[SmartCache] ❌ Error creating folder_access: \(String(cString: error))")
@@ -86,8 +86,8 @@ extension DatabaseManager {
                 sqlite3_exec(db, indexSQL, nil, nil, nil)
             }
             
-            print("[SmartCache] ✅ Created all indexes")
-            print("[SmartCache] 🎉 Smart cache tables ready!")
+//            print("[SmartCache] ✅ Created all indexes")
+//            print("[SmartCache] 🎉 Smart cache tables ready!")
         }
     }
     

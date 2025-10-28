@@ -91,10 +91,10 @@ class FunctionManager: ObservableObject {
         let ringMargin: CGFloat = 2
         var currentRadius = centerHoleRadius
         
-        print("🔧 [calculateRingConfigurations] START - Processing \(rings.count) rings")
+//        print("🔧 [calculateRingConfigurations] START - Processing \(rings.count) rings")
         
         for (index, ringState) in rings.enumerated() {
-            print("🔧 [Ring \(index)] Processing ring with \(ringState.nodes.count) nodes, collapsed: \(ringState.isCollapsed)")
+//            print("🔧 [Ring \(index)] Processing ring with \(ringState.nodes.count) nodes, collapsed: \(ringState.isCollapsed)")
             let sliceConfig: PieSliceConfig
             
             // Determine thickness and icon size
@@ -228,7 +228,7 @@ class FunctionManager: ObservableObject {
                 
                 // Decide slice type based on preference and item count
                 if preferredLayout == .partialSlice && itemCount >= 12 {
-                    print("🔵 Ring \(index): Auto-converting to FULL CIRCLE (too many items: \(itemCount) >= 12)")
+//                    print("Ring \(index): Auto-converting to FULL CIRCLE (too many items: \(itemCount) >= 12)")
                     let positioning = parentInfo.node.slicePositioning ?? .startClockwise
                     let startAngle: Double
                     switch positioning {
@@ -242,7 +242,7 @@ class FunctionManager: ObservableObject {
                     sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle)
                     
                 } else if preferredLayout == .fullCircle {
-                    print("🔵 Ring \(index): Using FULL CIRCLE layout (parent '\(parentInfo.node.name)' preference)")
+//                    print("Ring \(index): Using FULL CIRCLE layout (parent '\(parentInfo.node.name)' preference)")
                     let positioning = parentInfo.node.slicePositioning ?? .startClockwise
                     let startAngle: Double
                     switch positioning {
@@ -256,7 +256,7 @@ class FunctionManager: ObservableObject {
                     sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle)
                     
                 } else {
-                    print("🔵 Ring \(index): Using PARTIAL SLICE layout (parent '\(parentInfo.node.name)' preference, \(itemCount) items)")
+//                    print("Ring \(index): Using PARTIAL SLICE layout (parent '\(parentInfo.node.name)' preference, \(itemCount) items)")
                     
                     let customAngle = parentInfo.node.itemAngleSize ?? 30.0
                     let positioning = parentInfo.node.slicePositioning ?? .startClockwise

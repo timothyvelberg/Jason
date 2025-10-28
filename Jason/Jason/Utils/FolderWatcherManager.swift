@@ -158,6 +158,7 @@ class FolderWatcherManager {
         // Execute after debounce interval
         watcherQueue.asyncAfter(deadline: .now() + debounceInterval, execute: workItem)
     }
+    
 }
 
 // MARK: - Individual Folder Watcher

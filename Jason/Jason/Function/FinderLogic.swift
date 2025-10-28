@@ -658,7 +658,7 @@ class FinderLogic: FunctionProvider {
         }
         
         // Screenshots - Newest First (see latest captures!)
-        let screenshotsPath = "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots/"
+        let screenshotsPath = "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots"
         if FileManager.default.fileExists(atPath: screenshotsPath) {
             let settings = FavoriteFolderSettings(
                 maxItems: 10,
