@@ -20,20 +20,7 @@ class FinderLogic: FunctionProvider {
         return NSWorkspace.shared.icon(forFile: "/System/Library/CoreServices/Finder.app")
     }
     
-    // MARK: - Configuration
-    enum SortOrder {
-        case nameAscending
-        case nameDescending
-        case dateModifiedNewest
-        case dateModifiedOldest
-        case dateCreatedNewest
-        case dateCreatedOldest
-        case size
-    }
-    
     private let maxItemsPerFolder: Int = 20
-    private let sortOrder: SortOrder = .dateModifiedNewest
-    
     private var nodeCache: [String: [FunctionNode]] = [:]
     
     // MARK: - Cache
@@ -139,146 +126,179 @@ class FinderLogic: FunctionProvider {
     // MARK: - Dynamic Loading (WITH DATABASE INTEGRATION)
 
     func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
-        print("📂 [FinderLogic] loadChildren called for: \(node.name)")
-        
-        guard let metadata = node.metadata,
-              let urlString = metadata["folderURL"] as? String else {
-            print("❌ No folderURL in metadata")
-            return []
-        }
-        
-        let folderURL = URL(fileURLWithPath: urlString)
-        let folderPath = folderURL.path
-        let db = DatabaseManager.shared
-        
-        // Get custom max items from metadata
-        let customMaxItems = metadata["maxItems"] as? Int
-        
-        // ⚡ STEP 1: Record that we're accessing this folder
-        db.recordFolderAccess(folderPath: folderPath)
-        
-        // ⚡ STEP 2: Check if this is a HEAVY folder and try ENHANCED CACHE
-        if db.isHeavyFolder(path: folderPath) {
-            print("📦 [FinderLogic] Heavy folder detected: \(node.name)")
-            
-            if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
-                print("⚡ [EnhancedCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
-                
-                // Convert to nodes
-                var nodes = cachedItems.map { item in
-                    if item.isDirectory {
-                        return createFolderNodeFromCache(item: item)
-                    } else {
-                        return createFileNodeFromCache(item: item)
-                    }
-                }
-                
-                // 🎯 NEW: Apply current sort order preference
-                let sortOrder = getSortOrderForFolder(path: folderPath)
-                nodes = sortNodes(nodes, by: sortOrder)
-                print("🔄 [FinderLogic] Applied sort order: \(sortOrder) to cached items")
-                
-                // Apply custom limit if specified
-                if let limit = customMaxItems {
-                    print("✂️ [FinderLogic] Applying custom limit: \(limit) items")
-                    return Array(nodes.prefix(limit))
-                }
-                
-                return nodes
-        } else {
-            print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
-        }
-        }
-        
-        // 💿 STEP 3: CACHE MISS OR NOT A HEAVY FOLDER - Load from disk
-        print("💿 [START] Loading from disk: \(folderURL.path)")
-        let startTime = Date()
-        
-        // 🔍 Check ACTUAL folder size BEFORE limiting display
-        let actualItemCount = countFolderItems(at: folderURL)
-        print("📊 [FinderLogic] Actual folder contains: \(actualItemCount) items")
-        
-        let nodes: [FunctionNode] = await Task.detached(priority: .userInitiated) { [weak self] () -> [FunctionNode] in
-            guard let self = self else {
-                print("❌ [FinderLogic] Self deallocated during load")
-                return []
-            }
-            print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
-            let result = self.getFolderContents(at: folderURL, maxItems: customMaxItems)
-            print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items (displayed)")
-            return result
-        }.value
-        
-        let elapsed = Date().timeIntervalSince(startTime)
-        print("✅ [END] Loaded \(nodes.count) nodes (displayed) in \(String(format: "%.2f", elapsed))s")
-        
-        // 📊 STEP 4: If folder has >100 items (ACTUAL COUNT), mark as HEAVY and cache it
-        if actualItemCount > 100 {
-            print("📊 [EnhancedCache] Folder has \(actualItemCount) items - marking as HEAVY and caching with thumbnails")
-            
-            // Mark as heavy folder with ACTUAL count
-            db.markAsHeavyFolder(path: folderPath, itemCount: actualItemCount)
-            
-            // Convert nodes to EnhancedFolderItem format WITH THUMBNAILS
-            let enhancedItems = convertToEnhancedFolderItems(nodes: nodes, folderURL: folderURL)
-            
-            // Save to Enhanced Cache
-            db.saveEnhancedFolderContents(folderPath: folderPath, items: enhancedItems)
-            print("💾 [EnhancedCache] Cached \(nodes.count) items (with thumbnails) for future instant loads!")
-            print("   (Folder actually has \(actualItemCount) items, but caching \(nodes.count) displayed items)")
-        } else {
-            print("ℹ️ [EnhancedCache] Folder has only \(actualItemCount) items - not caching (threshold: 100)")
-        }
-        
-        // 📝 STEP 5: Update folder access tracking (for usage stats)
-        db.updateFolderAccess(path: folderPath)
-        
-        return nodes
-    }
+           print("📂 [FinderLogic] loadChildren called for: \(node.name)")
+           
+           guard let metadata = node.metadata,
+                 let urlString = metadata["folderURL"] as? String else {
+               print("❌ No folderURL in metadata")
+               return []
+           }
+           
+           let folderURL = URL(fileURLWithPath: urlString)
+           let folderPath = folderURL.path
+           let db = DatabaseManager.shared
+           
+           // Get custom max items from metadata
+           let customMaxItems = metadata["maxItems"] as? Int
+           
+           // 🔍 DIAGNOSTIC: Get sort order EARLY
+           let requestedSortOrder = getSortOrderForFolder(path: folderPath)
+           print("🎯 [SORT DIAGNOSTIC] Folder: \(node.name)")
+           print("   Requested sort order: \(requestedSortOrder.displayName) (\(requestedSortOrder.rawValue))")
+           
+           // ⚡ STEP 1: Record that we're accessing this folder
+           db.recordFolderAccess(folderPath: folderPath)
+           
+           // ⚡ STEP 2: Check if this is a HEAVY folder and try ENHANCED CACHE
+           if db.isHeavyFolder(path: folderPath) {
+               print("📦 [FinderLogic] Heavy folder detected: \(node.name)")
+               
+               if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
+                   print("⚡ [EnhancedCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
+                   
+                   // Convert to nodes
+                   var nodes = cachedItems.map { item in
+                       if item.isDirectory {
+                           return createFolderNodeFromCache(item: item)
+                       } else {
+                           return createFileNodeFromCache(item: item)
+                       }
+                   }
+                   
+                   // 🔍 DIAGNOSTIC: Log BEFORE sorting
+                   print("🔍 [BEFORE SORT] First 5 items:")
+                   for (i, node) in nodes.prefix(5).enumerated() {
+                       print("   [\(i+1)] \(node.name)")
+                   }
+                   
+                   // 🎯 Apply current sort order preference
+                   nodes = sortNodes(nodes, by: requestedSortOrder)
+                   
+                   // 🔍 DIAGNOSTIC: Log AFTER sorting
+                   print("✅ [AFTER SORT] First 5 items:")
+                   for (i, node) in nodes.prefix(5).enumerated() {
+                       print("   [\(i+1)] \(node.name)")
+                   }
+                   
+                   // Apply custom limit if specified
+                   if let limit = customMaxItems {
+                       print("✂️ [FinderLogic] Applying custom limit: \(limit) items")
+                       return Array(nodes.prefix(limit))
+                   }
+                   
+                   return nodes
+               } else {
+                   print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
+               }
+           }
+           
+           // 💿 STEP 3: CACHE MISS OR NOT A HEAVY FOLDER - Load from disk
+           print("💿 [START] Loading from disk: \(folderURL.path)")
+           let startTime = Date()
+           
+           // 🔍 Check ACTUAL folder size BEFORE limiting display
+           let actualItemCount = countFolderItems(at: folderURL)
+           print("📊 [FinderLogic] Actual folder contains: \(actualItemCount) items")
+           
+           // 🔧 FIXED: Pass the sort order to getFolderContents
+           let nodes: [FunctionNode] = await Task.detached(priority: .userInitiated) { [weak self] () -> [FunctionNode] in
+               guard let self = self else {
+                   print("❌ [FinderLogic] Self deallocated during load")
+                   return []
+               }
+               print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
+               
+               // 🔧 NEW: Pass sort order parameter
+               let result = self.getFolderContents(at: folderURL, sortOrder: requestedSortOrder, maxItems: customMaxItems)
+               
+               print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items (displayed)")
+               return result
+           }.value
+           
+           let elapsed = Date().timeIntervalSince(startTime)
+           print("✅ [END] Loaded \(nodes.count) nodes (displayed) in \(String(format: "%.2f", elapsed))s")
+           
+           // 📊 STEP 4: If folder has >100 items (ACTUAL COUNT), mark as HEAVY and cache it
+           if actualItemCount > 100 {
+               print("📊 [EnhancedCache] Folder has \(actualItemCount) items - marking as HEAVY and caching with thumbnails")
+               
+               // Mark as heavy folder with ACTUAL count
+               db.markAsHeavyFolder(path: folderPath, itemCount: actualItemCount)
+               
+               // Convert nodes to EnhancedFolderItem format WITH THUMBNAILS
+               let enhancedItems = convertToEnhancedFolderItems(nodes: nodes, folderURL: folderURL)
+               
+               // Save to Enhanced Cache
+               db.saveEnhancedFolderContents(folderPath: folderPath, items: enhancedItems)
+               print("💾 [EnhancedCache] Cached \(nodes.count) items (with thumbnails) for future instant loads!")
+               print("   (Folder actually has \(actualItemCount) items, but caching \(nodes.count) displayed items)")
+           } else {
+               print("ℹ️ [EnhancedCache] Folder has only \(actualItemCount) items - not caching (threshold: 100)")
+           }
+           
+           // 📝 STEP 5: Update folder access tracking (for usage stats)
+           db.updateFolderAccess(path: folderPath)
+           
+           return nodes
+       }
     
     // MARK: - Sorting Helper Methods
 
     /// Get the sort order preference for a folder
-    private func getSortOrderForFolder(path: String) -> FolderSortOrder {
-        let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
-        
-        if let favoriteFolder = favoriteFolders.first(where: { $0.folder.path == path }),
-           let sortOrder = favoriteFolder.settings.contentSortOrder {
-            return sortOrder
-        }
-        
-        // Default to modified newest
-        return .modifiedNewest
-    }
+      private func getSortOrderForFolder(path: String) -> FolderSortOrder {
+          let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
+          
+          if let favoriteFolder = favoriteFolders.first(where: { $0.folder.path == path }),
+             let sortOrder = favoriteFolder.settings.contentSortOrder {
+              return sortOrder
+          }
+          
+          // Default to modified newest
+          return .modifiedNewest
+      }
 
-    /// Sort nodes according to the sort order
-    private func sortNodes(_ nodes: [FunctionNode], by sortOrder: FolderSortOrder) -> [FunctionNode] {
-        // Extract URLs from nodes for sorting
-        var urlNodePairs: [(URL, FunctionNode)] = []
-        
-        for node in nodes {
-            if let previewURL = node.previewURL {
-                urlNodePairs.append((previewURL, node))
-            } else if let metadata = node.metadata,
-                      let urlString = metadata["folderURL"] as? String {
-                urlNodePairs.append((URL(fileURLWithPath: urlString), node))
-            }
-        }
-        
-        // Sort the URLs using existing sort logic
-        let urls = urlNodePairs.map { $0.0 }
-        let sortedURLs = sortURLs(urls, sortOrder: sortOrder)
-        
-        // Reorder nodes to match sorted URLs
-        var sortedNodes: [FunctionNode] = []
-        for sortedURL in sortedURLs {
-            if let pair = urlNodePairs.first(where: { $0.0 == sortedURL }) {
-                sortedNodes.append(pair.1)
-            }
-        }
-        
-        return sortedNodes
-    }
+      /// Sort nodes according to the sort order
+      private func sortNodes(_ nodes: [FunctionNode], by sortOrder: FolderSortOrder) -> [FunctionNode] {
+          print("🔄 [sortNodes] Sorting \(nodes.count) nodes by: \(sortOrder.displayName)")
+          
+          // Extract URLs from nodes for sorting
+          var urlNodePairs: [(URL, FunctionNode)] = []
+          
+          for node in nodes {
+              if let previewURL = node.previewURL {
+                  urlNodePairs.append((previewURL, node))
+              } else if let metadata = node.metadata,
+                        let urlString = metadata["folderURL"] as? String {
+                  urlNodePairs.append((URL(fileURLWithPath: urlString), node))
+              }
+          }
+          
+          // 🔍 DIAGNOSTIC: Log URLs being sorted
+          print("🔍 [sortNodes] URLs to sort:")
+          for (i, pair) in urlNodePairs.prefix(5).enumerated() {
+              print("   [\(i+1)] \(pair.0.lastPathComponent)")
+          }
+          
+          // Sort the URLs using existing sort logic
+          let urls = urlNodePairs.map { $0.0 }
+          let sortedURLs = sortURLs(urls, sortOrder: sortOrder)
+          
+          // 🔍 DIAGNOSTIC: Log sorted URLs
+          print("🔍 [sortNodes] Sorted URLs:")
+          for (i, url) in sortedURLs.prefix(5).enumerated() {
+              print("   [\(i+1)] \(url.lastPathComponent)")
+          }
+          
+          // Reorder nodes to match sorted URLs
+          var sortedNodes: [FunctionNode] = []
+          for sortedURL in sortedURLs {
+              if let pair = urlNodePairs.first(where: { $0.0 == sortedURL }) {
+                  sortedNodes.append(pair.1)
+              }
+          }
+          
+          return sortedNodes
+      }
 
     // MARK: - Enhanced Cache Helper Methods
 
@@ -907,8 +927,9 @@ class FinderLogic: FunctionProvider {
     }
     
     // Get folder contents (files and subfolders)
-    private func getFolderContents(at url: URL, maxItems: Int? = nil) -> [FunctionNode] {
+    private func getFolderContents(at url: URL, sortOrder: FolderSortOrder, maxItems: Int? = nil) -> [FunctionNode] {
         print("📂 [getFolderContents] START: \(url.path)")
+        print("🎯 [getFolderContents] Using sort order: \(sortOrder.displayName) (\(sortOrder.rawValue))")
         
         do {
             let contents = try FileManager.default.contentsOfDirectory(
@@ -919,7 +940,20 @@ class FinderLogic: FunctionProvider {
             
             print("📂 [getFolderContents] Found \(contents.count) items")
             
-            let sortedContents = sortContents(contents, by: sortOrder)
+            // 🔍 DIAGNOSTIC: Log BEFORE sorting
+            print("🔍 [BEFORE SORT] First 5 items:")
+            for (i, url) in contents.prefix(5).enumerated() {
+                print("   [\(i+1)] \(url.lastPathComponent)")
+            }
+            
+            // 🔧 FIXED: Use the NEW sortURLs method with FolderSortOrder
+            let sortedContents = sortURLs(contents, sortOrder: sortOrder)
+            
+            // 🔍 DIAGNOSTIC: Log AFTER sorting
+            print("✅ [AFTER SORT] First 5 items:")
+            for (i, url) in sortedContents.prefix(5).enumerated() {
+                print("   [\(i+1)] \(url.lastPathComponent)")
+            }
             
             // Use custom limit if provided, otherwise use default
             let itemLimit = maxItems ?? maxItemsPerFolder
@@ -930,7 +964,6 @@ class FinderLogic: FunctionProvider {
             var nodes: [FunctionNode] = []
             for (index, contentURL) in limitedContents.enumerated() {
                 print("   [\(index+1)/\(limitedContents.count)] Processing: \(contentURL.lastPathComponent)")
-                // PASS parentBaseAsset to createDraggableFileNode
                 let node = createDraggableFileNode(for: contentURL)
                 nodes.append(node)
             }
@@ -941,62 +974,6 @@ class FinderLogic: FunctionProvider {
         } catch {
             print("❌ [getFolderContents] Failed: \(error)")
             return []
-        }
-    }
-
-    // NEW: Sort contents based on sort order
-    private func sortContents(_ contents: [URL], by sortOrder: SortOrder) -> [URL] {
-        switch sortOrder {
-        case .nameAscending:
-            return contents.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
-            
-        case .nameDescending:
-            return contents.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedDescending }
-            
-        case .dateModifiedNewest:
-            return contents.sorted { url1, url2 in
-                guard let date1 = try? url1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-                      let date2 = try? url2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
-                    return false
-                }
-                return date1 > date2
-            }
-            
-        case .dateModifiedOldest:
-            return contents.sorted { url1, url2 in
-                guard let date1 = try? url1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-                      let date2 = try? url2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
-                    return false
-                }
-                return date1 < date2
-            }
-            
-        case .dateCreatedNewest:
-            return contents.sorted { url1, url2 in
-                guard let date1 = try? url1.resourceValues(forKeys: [.creationDateKey]).creationDate,
-                      let date2 = try? url2.resourceValues(forKeys: [.creationDateKey]).creationDate else {
-                    return false
-                }
-                return date1 > date2
-            }
-            
-        case .dateCreatedOldest:
-            return contents.sorted { url1, url2 in
-                guard let date1 = try? url1.resourceValues(forKeys: [.creationDateKey]).creationDate,
-                      let date2 = try? url2.resourceValues(forKeys: [.creationDateKey]).creationDate else {
-                    return false
-                }
-                return date1 < date2
-            }
-            
-        case .size:
-            return contents.sorted { url1, url2 in
-                guard let size1 = try? url1.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-                      let size2 = try? url2.resourceValues(forKeys: [.fileSizeKey]).fileSize else {
-                    return false
-                }
-                return size1 > size2
-            }
         }
     }
 
