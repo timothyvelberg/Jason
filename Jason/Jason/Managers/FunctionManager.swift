@@ -976,12 +976,18 @@ class FunctionManager: ObservableObject {
         
         // Find the ring(s) that match this context
         for (level, ring) in rings.enumerated() {
-            // Check if this ring matches
             let providerMatches = ring.providerId == providerId
             let contentMatches = contentIdentifier == nil || ring.contentIdentifier == contentIdentifier
             
             if providerMatches && contentMatches {
                 print("✅ Found matching ring at level \(level)")
+                
+                // 🆕 CRITICAL: Close any child rings BEFORE updating
+                // This prevents orphaned context menus with invalid parent references
+                if level + 1 < rings.count {
+                    print("🗑️ Closing \(rings.count - level - 1) child ring(s) before update")
+                    collapseToRing(level: level)
+                }
                 
                 // Refresh the provider
                 provider.refresh()
