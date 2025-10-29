@@ -17,6 +17,13 @@ struct RingView: View {
     let sliceConfig: PieSliceConfig
     let iconSize: CGFloat
     
+    // Animation configuration
+    private let animationInitialDelay: Double = 0.1// Initial delay before animation starts (seconds)
+    private let animationStaggerDelay: Double = 0.025   // Delay between each icon (seconds)
+    private let animationDuration: Double = 0.25       // Duration of fade/scale animation
+    private let animationStartScale: CGFloat = 0.9     // Starting scale (0.9 = 90% size)
+    private let animationRotationOffset: Double = -10  // Starting rotation offset in degrees (negative = counter-clockwise)
+    
     // Animation state
     @State private var startAngle: Angle = .degrees(0)
     @State private var endAngle: Angle = .degrees(90)
@@ -24,8 +31,9 @@ struct RingView: View {
     @State private var previousIndex: Int? = nil
     @State private var rotationIndex: Int = 0
     @State private var hasAppeared: Bool = false
-    @State private var iconOpacities: [String: Double] = [:]  // Track opacity per icon ID
-    @State private var iconScales: [String: CGFloat] = [:]    // Track scale per icon ID
+    @State private var iconOpacities: [String: Double] = [:]       // Track opacity per icon ID
+    @State private var iconScales: [String: CGFloat] = [:]         // Track scale per icon ID
+    @State private var iconRotationOffsets: [String: Double] = [:] // Track rotation offset per icon ID
     
     // Calculated properties
     private var endRadius: CGFloat {
@@ -144,8 +152,8 @@ struct RingView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: iconSize, height: iconSize)
-                    .scaleEffect(iconScales[node.id] ?? 0.9)  // Start at 0.9, animate to 1.0
-                    .opacity(iconOpacities[node.id] ?? 0)     // Start at 0, animate to 1
+                    .scaleEffect(iconScales[node.id] ?? animationStartScale)  // Start at configured scale
+                    .opacity(iconOpacities[node.id] ?? 0)                     // Start at 0, animate to 1
                     .position(iconPosition(for: index))
                     .allowsHitTesting(false)  // Icons don't intercept clicks
             }
@@ -305,7 +313,12 @@ struct RingView: View {
             iconAngle = baseAngle + (itemAngle * Double(index)) + (itemAngle / 2)
         }
         
-        let angleInRadians = (iconAngle - 90) * (.pi / 180)
+        // Apply rotation offset for animation
+        let node = nodes[index]
+        let rotationOffset = iconRotationOffsets[node.id] ?? 0
+        let finalAngle = iconAngle + rotationOffset
+        
+        let angleInRadians = (finalAngle - 90) * (.pi / 180)
         
         let center = CGPoint(x: totalDiameter / 2, y: totalDiameter / 2)
         let x = center.x + middleRadius * cos(angleInRadians)
@@ -333,20 +346,22 @@ struct RingView: View {
     // MARK: - Staggered Animation
     
     private func animateIconsIn() {
-        // Reset all opacities to 0 and scales to 0.9
+        // Reset all opacities to 0, scales to starting value, and rotation offsets
         for node in nodes {
-            iconOpacities[node.id] = 0.1
-            iconScales[node.id] = 0.75
+            iconOpacities[node.id] = 0
+            iconScales[node.id] = animationStartScale
+            iconRotationOffsets[node.id] = animationRotationOffset
         }
         
-        // Animate each icon in with a staggered delay
+        // Animate each icon in with initial delay + staggered delay
         for (index, node) in nodes.enumerated() {
-            let delay = Double(index) * 0.02  // 50ms delay between each icon
+            let delay = animationInitialDelay + (Double(index) * animationStaggerDelay)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(.easeOut(duration: self.animationDuration)) {
                     iconOpacities[node.id] = 1.0
                     iconScales[node.id] = 1.0
+                    iconRotationOffsets[node.id] = 0  // Rotate to final position
                 }
             }
         }
