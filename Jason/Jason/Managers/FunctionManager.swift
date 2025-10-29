@@ -966,100 +966,106 @@ class FunctionManager: ObservableObject {
     /// Update a specific ring with fresh data from its provider
     /// Preserves navigation state and only updates the affected ring
     func updateRing(providerId: String, contentIdentifier: String? = nil) {
-        print("🔄 [updateRing] Looking for ring with providerId: \(providerId), contentId: \(contentIdentifier ?? "nil")")
-        
-        // Find the provider
-        guard let provider = providers.first(where: { $0.providerId == providerId }) else {
-            print("❌ Provider '\(providerId)' not found")
-            return
-        }
-        
-        // Find the ring(s) that match this context
-        for (level, ring) in rings.enumerated() {
-            let providerMatches = ring.providerId == providerId
-            let contentMatches = contentIdentifier == nil || ring.contentIdentifier == contentIdentifier
+            print("🔄 [updateRing] Looking for ring with providerId: \(providerId), contentId: \(contentIdentifier ?? "nil")")
             
-            if providerMatches && contentMatches {
-                print("✅ Found matching ring at level \(level)")
-                
-                // 🆕 CRITICAL: Close any child rings BEFORE updating
-                // This prevents orphaned context menus with invalid parent references
-                if level + 1 < rings.count {
-                    print("🗑️ Closing \(rings.count - level - 1) child ring(s) before update")
-                    collapseToRing(level: level)
-                }
-                
-                // Refresh the provider
-                provider.refresh()
-                
-                // Get fresh nodes
-                let freshNodes: [FunctionNode]
-                
-                if level == 0 {
-                    // Ring 0: This ring is a mix of providers, so we need to update just this provider's node
-                    // Find the node in Ring 0 that belongs to this provider
-                    let updatedRootNodes = provider.provideFunctions()
-                    
-                    // Replace the old node(s) from this provider with new ones
-                    var newRing0Nodes = rings[0].nodes.filter { $0.providerId != providerId }
-                    newRing0Nodes.append(contentsOf: updatedRootNodes)
-                    
-                    rings[0].nodes = newRing0Nodes
-                    print("✅ Updated Ring 0: replaced nodes from provider '\(providerId)'")
-                    
-                } else {
-                    // Ring 1+: Get children from FRESH parent node
-                    guard level > 0, level - 1 < rings.count else {
-                        print("❌ Cannot find parent ring for level \(level)")
-                        continue
-                    }
-                    
-                    let parentRing = rings[level - 1]
-                    guard let selectedIndex = parentRing.selectedIndex,
-                          selectedIndex < parentRing.nodes.count else {
-                        print("❌ No selected node in parent ring")
-                        continue
-                    }
-                    
-                    // 🆕 Get FRESH parent node after provider refresh
-                    let freshRootNodes = provider.provideFunctions()
-                    
-                    // If parent is Ring 0, find the fresh root node
-                    if level == 1 && !freshRootNodes.isEmpty {
-                        let freshParentNode = freshRootNodes[0]  // Provider returns one root node
-                        
-                        // For dynamic loading (folders)
-                        if freshParentNode.needsDynamicLoading {
-                            Task { @MainActor in
-                                let loadedNodes = await provider.loadChildren(for: freshParentNode)
-                                
-                                // Check if ring still exists and matches
-                                guard level < self.rings.count,
-                                      self.rings[level].providerId == providerId,
-                                      self.rings[level].contentIdentifier == contentIdentifier else {
-                                    print("⚠️ Ring changed during async load - ignoring update")
-                                    return
-                                }
-                                
-                                self.rings[level].nodes = loadedNodes
-                                print("✅ Updated Ring \(level) with \(loadedNodes.count) dynamically loaded nodes")
-                            }
-                        } else {
-                            // For static children (apps) - use FRESH displayedChildren
-                            freshNodes = freshParentNode.displayedChildren
-                            rings[level].nodes = freshNodes
-                            print("✅ Updated Ring \(level) with \(freshNodes.count) nodes")
-                        }
-                    } else {
-                        print("⚠️ Cannot get fresh parent node for Ring \(level)")
-                    }
-                }
-                
-                // Only update the first matching ring
+            // Find the provider
+            guard let provider = providers.first(where: { $0.providerId == providerId }) else {
+                print("❌ Provider '\(providerId)' not found")
                 return
             }
+            
+            // Find the ring(s) that match this context
+            for (level, ring) in rings.enumerated() {
+                let providerMatches = ring.providerId == providerId
+                let contentMatches = contentIdentifier == nil || ring.contentIdentifier == contentIdentifier
+                
+                if providerMatches && contentMatches {
+                    print("✅ Found matching ring at level \(level)")
+                    
+                    // 🆕 CRITICAL: Close any child rings BEFORE updating
+                    // This prevents orphaned context menus with invalid parent references
+                    if level + 1 < rings.count {
+                        print("🗑️ Closing \(rings.count - level - 1) child ring(s) before update")
+                        collapseToRing(level: level)
+                    }
+                    
+                    // Refresh the provider
+                    provider.refresh()
+                    
+                    // Get fresh nodes
+                    let freshNodes: [FunctionNode]
+                    
+                    if level == 0 {
+                        // Ring 0: This ring is a mix of providers, so we need to update just this provider's node
+                        // Find the node in Ring 0 that belongs to this provider
+                        let updatedRootNodes = provider.provideFunctions()
+                        
+                        // Replace the old node(s) from this provider with new ones
+                        var newRing0Nodes = rings[0].nodes.filter { $0.providerId != providerId }
+                        newRing0Nodes.append(contentsOf: updatedRootNodes)
+                        
+                        rings[0].nodes = newRing0Nodes
+                        print("✅ Updated Ring 0: replaced nodes from provider '\(providerId)'")
+                        
+                    } else {
+                        // Ring 1+: Get children from FRESH parent node
+                        guard level > 0, level - 1 < rings.count else {
+                            print("❌ Cannot find parent ring for level \(level)")
+                            continue
+                        }
+                        
+                        let parentRing = rings[level - 1]
+                        guard let selectedIndex = parentRing.selectedIndex,
+                              selectedIndex < parentRing.nodes.count else {
+                            print("❌ No selected node in parent ring")
+                            continue
+                        }
+                        
+                        // 🆕 Get FRESH parent node after provider refresh
+                        let freshRootNodes = provider.provideFunctions()
+                        
+                        // If parent is Ring 0, find the fresh root node
+                        if level == 1 && !freshRootNodes.isEmpty {
+                            let freshParentNode = freshRootNodes[0]  // Provider returns one root node
+                            
+                            // 🆕 UPDATE Ring 0's node with fresh data to prevent stale cache
+                            if let parentIndex = rings[0].nodes.firstIndex(where: { $0.providerId == providerId }) {
+                                print("🔄 Updating Ring 0's '\(freshParentNode.name)' node with fresh children")
+                                rings[0].nodes[parentIndex] = freshParentNode
+                            }
+                            
+                            // For dynamic loading (folders)
+                            if freshParentNode.needsDynamicLoading {
+                                Task { @MainActor in
+                                    let loadedNodes = await provider.loadChildren(for: freshParentNode)
+                                    
+                                    // Check if ring still exists and matches
+                                    guard level < self.rings.count,
+                                          self.rings[level].providerId == providerId,
+                                          self.rings[level].contentIdentifier == contentIdentifier else {
+                                        print("⚠️ Ring changed during async load - ignoring update")
+                                        return
+                                    }
+                                    
+                                    self.rings[level].nodes = loadedNodes
+                                    print("✅ Updated Ring \(level) with \(loadedNodes.count) dynamically loaded nodes")
+                                }
+                            } else {
+                                // For static children (apps) - use FRESH displayedChildren
+                                freshNodes = freshParentNode.displayedChildren
+                                rings[level].nodes = freshNodes
+                                print("✅ Updated Ring \(level) with \(freshNodes.count) nodes")
+                            }
+                        } else {
+                            print("⚠️ Cannot get fresh parent node for Ring \(level)")
+                        }
+                    }
+                    
+                    // Only update the first matching ring
+                    return
+                }
+            }
+            
+            print("⚠️ No matching ring found for providerId: \(providerId), contentId: \(contentIdentifier ?? "nil")")
         }
-        
-        print("⚠️ No matching ring found for providerId: \(providerId), contentId: \(contentIdentifier ?? "nil")")
-    }
 }
