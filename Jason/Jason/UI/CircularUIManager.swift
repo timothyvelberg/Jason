@@ -928,6 +928,8 @@ class CircularUIManager: ObservableObject {
         }
         print("   Active ring level: \(functionManager.activeRingLevel)")
         print("   Total rings: \(functionManager.rings.count)")
+        
+        appSwitcher?.startAutoRefresh()
     }
     
     // MARK: - Modified hide() method
@@ -962,6 +964,8 @@ class CircularUIManager: ObservableObject {
         isIntentionallySwitching = false  // 🆕 Reset flag
         
         print("Hiding circular UI")
+        
+        appSwitcher?.stopAutoRefresh()
     }
     
     func hideAndSwitchTo(app: NSRunningApplication) {

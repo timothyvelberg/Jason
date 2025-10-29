@@ -80,7 +80,7 @@ class AppSwitcherManager: ObservableObject {
     
     // MARK: - App Management
     
-    func startAutoRefresh() {
+    public func startAutoRefresh() {
         // Stop any existing timer
         stopAutoRefresh()
         
@@ -93,7 +93,7 @@ class AppSwitcherManager: ObservableObject {
         print("✅ Auto-refresh timer started (1 second interval)")
     }
     
-    func stopAutoRefresh() {
+    public func stopAutoRefresh() {
         refreshTimer?.invalidate()
         refreshTimer = nil
         print("🛑 Auto-refresh timer stopped")
@@ -184,10 +184,6 @@ class AppSwitcherManager: ObservableObject {
                 let name2 = app2.localizedName ?? ""
                 return name1.localizedCaseInsensitiveCompare(name2) == .orderedAscending
             }
-        
-        for app in newApps {
-//            print("  🆕 Added new app: \(app.localizedName ?? "Unknown") (PID: \(app.processIdentifier))")
-        }
         
         sortedApps.append(contentsOf: newApps)
         
