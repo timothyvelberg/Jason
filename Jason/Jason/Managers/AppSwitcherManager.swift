@@ -412,7 +412,7 @@ extension AppSwitcherManager: FunctionProvider {
                 name: providerName,
                 icon: providerIcon,
                 children: appNodes,
-                maxDisplayedChildren: 12,  // Limit to 12 apps in the pie slice
+                maxDisplayedChildren: 25,  // Limit to 12 apps in the pie slice
                 preferredLayout: .partialSlice,  // Use full circle for many apps
                 providerId: self.providerId,
                 // EXPLICIT INTERACTION MODEL:

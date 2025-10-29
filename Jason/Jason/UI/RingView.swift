@@ -24,6 +24,8 @@ struct RingView: View {
     @State private var previousIndex: Int? = nil
     @State private var rotationIndex: Int = 0
     @State private var hasAppeared: Bool = false
+    @State private var iconOpacities: [String: Double] = [:]  // Track opacity per icon ID
+    @State private var iconScales: [String: CGFloat] = [:]    // Track scale per icon ID
     
     // Calculated properties
     private var endRadius: CGFloat {
@@ -142,6 +144,8 @@ struct RingView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: iconSize, height: iconSize)
+                    .scaleEffect(iconScales[node.id] ?? 0.9)  // Start at 0.9, animate to 1.0
+                    .opacity(iconOpacities[node.id] ?? 0)     // Start at 0, animate to 1
                     .position(iconPosition(for: index))
                     .allowsHitTesting(false)  // Icons don't intercept clicks
             }
@@ -174,6 +178,9 @@ struct RingView: View {
             } else {
                 previousIndex = nil
             }
+            
+            // Trigger staggered fade-in animation for icons
+            animateIconsIn()
         }
         .onChange(of: selectedIndex) {
             if let index = selectedIndex {
@@ -181,6 +188,9 @@ struct RingView: View {
             }
         }
         .onAppear {
+            // Trigger staggered fade-in animation
+            animateIconsIn()
+            
             if let index = selectedIndex {
                 rotationIndex = index
                 previousIndex = index
@@ -317,6 +327,28 @@ struct RingView: View {
             // Clockwise: Calculate from START angle going forwards
             let baseAngle = sliceConfig.startAngle
             return baseAngle + (itemAngle * Double(index)) + (itemAngle / 2)
+        }
+    }
+    
+    // MARK: - Staggered Animation
+    
+    private func animateIconsIn() {
+        // Reset all opacities to 0 and scales to 0.9
+        for node in nodes {
+            iconOpacities[node.id] = 0.1
+            iconScales[node.id] = 0.75
+        }
+        
+        // Animate each icon in with a staggered delay
+        for (index, node) in nodes.enumerated() {
+            let delay = Double(index) * 0.02  // 50ms delay between each icon
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    iconOpacities[node.id] = 1.0
+                    iconScales[node.id] = 1.0
+                }
+            }
         }
     }
 }
