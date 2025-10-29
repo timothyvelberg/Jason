@@ -31,7 +31,6 @@ class CircularUIManager: ObservableObject {
     
     private var isInAppSwitcherMode: Bool = false
     private var wasCtrlPressedInAppSwitcherMode: Bool = false
-
     
     init() {
         print("CircularUIManager initialized")
@@ -50,6 +49,108 @@ class CircularUIManager: ObservableObject {
                 self?.overlayWindow?.restoreWindowLevel()
             }
         }
+        
+        // Register for provider update notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleProviderUpdate(_:)),
+            name: .providerContentUpdated,
+            object: nil
+        )
+        
+        print("✅ Registered for provider update notifications")
+    }
+    
+    deinit {
+        // Clean up notification observer
+        NotificationCenter.default.removeObserver(self)
+        print("🧹 CircularUIManager deallocated - removed observers")
+    }
+    
+    @objc private func handleProviderUpdate(_ notification: Notification) {
+        guard let updateInfo = ProviderUpdateInfo.from(notification) else {
+            print("❌ Invalid provider update notification")
+            return
+        }
+        
+        print("📢 [CircularUIManager] Received update for provider: \(updateInfo.providerId)")
+        if let folderPath = updateInfo.folderPath {
+            print("   Folder: \(folderPath)")
+        }
+        
+        // Only update if UI is visible
+        guard isVisible else {
+            print("   ⏭️ UI not visible - ignoring update")
+            return
+        }
+        
+        // Check if this provider is currently displayed in any ring
+        guard let functionManager = functionManager else {
+            print("   ❌ No FunctionManager")
+            return
+        }
+        
+        // For now, simple approach: reload ALL visible rings if the provider matches
+        // TODO: Optimize to only reload affected rings
+        let needsUpdate = checkIfProviderIsVisible(providerId: updateInfo.providerId, folderPath: updateInfo.folderPath)
+        
+        if needsUpdate {
+            print("   ✅ Provider is visible - reloading rings")
+            reloadVisibleRings()
+        } else {
+            print("   ⏭️ Provider not currently visible - ignoring")
+        }
+    }
+    
+    /// Check if a provider is currently visible in any ring
+    private func checkIfProviderIsVisible(providerId: String, folderPath: String?) -> Bool {
+        guard let functionManager = functionManager else { return false }
+        
+        // Check all active rings
+        for (index, ring) in functionManager.rings.enumerated() {
+            for node in ring.nodes {
+                // Check if this node belongs to the updated provider
+                
+                // For FinderLogic: check folderPath in metadata
+                if providerId == "finder-windows", let folderPath = folderPath {
+                    if let metadata = node.metadata,
+                       let nodeFolderPath = metadata["folderURL"] as? String,
+                       nodeFolderPath == folderPath {
+                        print("   🎯 Found matching folder in Ring \(index): \(folderPath)")
+                        return true
+                    }
+                }
+                
+                // For AppSwitcher: check node ID prefix
+                if providerId == "app-switcher" && node.id.hasPrefix("app-") {
+                    print("   🎯 Found app switcher content in Ring \(index)")
+                    return true
+                }
+                
+                // Add more provider-specific checks here as needed
+            }
+        }
+        
+        return false
+    }
+    
+    /// Reload all visible rings
+    private func reloadVisibleRings() {
+        guard let functionManager = functionManager else { return }
+        
+        let currentLevel = functionManager.activeRingLevel
+        
+        print("🔄 Reloading rings (current level: \(currentLevel))")
+        
+        // Simple approach: Reload from root
+        // This recreates the entire ring hierarchy
+        functionManager.loadFunctions()
+        
+        // If we were deeper than Ring 0, we might need to re-expand
+        // For now, this is acceptable - user can navigate again if needed
+        // TODO: Preserve navigation state during reload
+        
+        print("✅ Rings reloaded")
     }
     
     func setup() {

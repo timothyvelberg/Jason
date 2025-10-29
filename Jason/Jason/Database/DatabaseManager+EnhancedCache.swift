@@ -203,9 +203,23 @@ extension DatabaseManager {
                 }
             }
             
+            DispatchQueue.main.async {
+                NotificationCenter.default.postProviderUpdate(
+                    providerId: "finder-windows",
+                    folderPath: folderPath
+                )
+            }
+            
             sqlite3_finalize(insertStmt)
             
             print("[EnhancedCache] 💾 Cached \(savedCount) items (\(thumbnailCount) with thumbnails) for: \(folderPath)")
+            DispatchQueue.main.async {
+                NotificationCenter.default.postProviderUpdate(
+                    providerId: "finder-windows",
+                    folderPath: folderPath
+                )
+                print("📢 Posted update notification for folder: \(folderPath)")
+            }
         }
     }
     // MARK: - Load Enhanced Cache

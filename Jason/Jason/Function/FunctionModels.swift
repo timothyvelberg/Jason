@@ -127,6 +127,9 @@ class FunctionNode: Identifiable, ObservableObject {
     // Slice positioning preference
     let slicePositioning: SlicePositioning?
     
+    //Threshold for switching from partial to fullCircle
+    let partialSliceThreshold: Int?
+    
     //Metadata for dynamic loading
     let metadata: [String: Any]?
     let providerId: String?
@@ -159,6 +162,9 @@ class FunctionNode: Identifiable, ObservableObject {
         // Slice positioning parameter
         slicePositioning: SlicePositioning? = nil,
         
+        //Custom threshold for partial→fullCircle switch
+        partialSliceThreshold: Int? = nil,
+      
         //Metadata and provider ID
          metadata: [String: Any]? = nil,
          providerId: String? = nil,
@@ -187,6 +193,7 @@ class FunctionNode: Identifiable, ObservableObject {
         self.childIconSize = childIconSize
         
         self.slicePositioning = slicePositioning
+        self.partialSliceThreshold = partialSliceThreshold
         
         self.metadata = metadata
         self.providerId = providerId

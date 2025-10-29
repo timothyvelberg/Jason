@@ -83,7 +83,7 @@ class FunctionManager: ObservableObject {
     
     private func calculateRingConfigurations() -> [RingConfiguration] {
         var configs: [RingConfiguration] = []
-        let centerHoleRadius: CGFloat = 50
+        let centerHoleRadius: CGFloat = 56
         let defaultRingThickness: CGFloat = 80
         let defaultIconSize: CGFloat = 32
         let collapsedRingThickness: CGFloat = 32
@@ -130,7 +130,12 @@ class FunctionManager: ObservableObject {
                     let itemCount = ringState.nodes.count
                     let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
                     
-                    if preferredLayout == .partialSlice && itemCount >= 12 {
+                    let threshold = parentInfo.node.partialSliceThreshold ?? calculateThreshold(
+                        for: index,
+                        startRadius: currentRadius,
+                        thickness: ringThickness
+                    )
+                    if preferredLayout == .partialSlice && itemCount >= threshold {
                         // Choose angle based on positioning
                         let positioning = parentInfo.node.slicePositioning ?? .startClockwise
                         let startAngle: Double
@@ -226,9 +231,16 @@ class FunctionManager: ObservableObject {
                 let itemCount = ringState.nodes.count
                 let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
                 
+                
                 // Decide slice type based on preference and item count
-                if preferredLayout == .partialSlice && itemCount >= 12 {
-//                    print("Ring \(index): Auto-converting to FULL CIRCLE (too many items: \(itemCount) >= 12)")
+                // Get threshold: use node's custom value OR calculate from ring size
+                let threshold = parentInfo.node.partialSliceThreshold ?? calculateThreshold(
+                    for: index,
+                    startRadius: currentRadius,
+                    thickness: ringThickness
+                )
+                if preferredLayout == .partialSlice && itemCount >= threshold {
+                        print("Ring \(index): Auto-converting to FULL CIRCLE (\(itemCount) items >= threshold \(threshold))")
                     let positioning = parentInfo.node.slicePositioning ?? .startClockwise
                     let startAngle: Double
                     switch positioning {
@@ -310,6 +322,33 @@ class FunctionManager: ObservableObject {
         }
         
         return configs
+    }
+    
+    /// Calculate the threshold for when to switch from partial to fullCircle based on ring depth
+    /// Deeper rings (larger radius) can hold more items before needing to switch
+    private func calculateThreshold(for ringIndex: Int, startRadius: CGFloat, thickness: CGFloat) -> Int {
+        // Calculate the radius at the center of the ring (where icons sit)
+        let iconCenterRadius = startRadius + (thickness / 2)
+        
+        // Calculate circumference at icon center
+        let circumference = 2 * .pi * iconCenterRadius
+        
+        // Assume each item needs ~42 points of space (32pt icon + 10pt spacing)
+        let spacePerItem: CGFloat = 42
+        
+        // For partial slice (~180° = half circle), we can fit:
+        let halfCircleCapacity = Int((circumference / 2) / spacePerItem)
+        
+        // Use 80% of theoretical capacity for comfortable spacing
+        let threshold = Int(Double(halfCircleCapacity) * 0.8)
+        
+        // Clamp to reasonable bounds: minimum 6, maximum 25
+        let finalThreshold = max(6, min(threshold, 25))
+        
+        // 🆕 Debug logging
+        print("📐 Ring \(ringIndex): radius=\(Int(iconCenterRadius)), circumference=\(Int(circumference)), halfCapacity=\(halfCircleCapacity), threshold=\(finalThreshold)")
+        
+        return finalThreshold
     }
     
     private func getParentInfo(for ringIndex: Int, configs: [RingConfiguration]) -> ParentInfo? {

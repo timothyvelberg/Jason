@@ -49,7 +49,7 @@ struct StandardContextActions {
             id: "quit-\(app.processIdentifier)",
             name: "Quit",
             icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: .execute { [weak manager] in
+            onLeftClick: .executeKeepOpen { [weak manager] in
                 manager?.quitApp(app)
             },
             onMiddleClick: .executeKeepOpen { [weak manager] in

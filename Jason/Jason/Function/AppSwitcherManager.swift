@@ -24,7 +24,16 @@ class AppSwitcherManager: ObservableObject {
     private var appUsageHistory: [pid_t] = [] // Track PIDs in MRU order
     
     init() {
+        
         checkAccessibilityPermission()
+        setupServices()
+        
+        //Force timer start for debugging
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            print("🔍 [DEBUG] Checking timer status...")
+            print("   Timer exists: \(self.refreshTimer != nil)")
+            print("   Timer is valid: \(self.refreshTimer?.isValid ?? false)")
+        }
     }
     
     // MARK: - Permission Management
@@ -48,12 +57,16 @@ class AppSwitcherManager: ObservableObject {
     // MARK: - Service Setup
     
     func setupServices() {
-        print("🎹 Setting up services")
+        print("🎹 Setting up services (timer always runs)")
         startAutoRefresh()
         loadRunningApplications()
         
-        // Initialize MRU history with currently active app
-        initializeMRUHistory()
+        // Only initialize MRU if we have permission
+        if hasAccessibilityPermission {
+            initializeMRUHistory()
+        } else {
+            print("⚠️ MRU tracking disabled (no accessibility permission)")
+        }
     }
     
     private func initializeMRUHistory() {
@@ -72,8 +85,9 @@ class AppSwitcherManager: ObservableObject {
         stopAutoRefresh()
         
         // Start a timer that checks for changes every 1 second
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            self.loadRunningApplications()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            print("⏰ [AppSwitcher] Timer fired - checking for app changes...")  // 🆕 ADD THIS
+            self?.loadRunningApplications()
         }
         
         print("✅ Auto-refresh timer started (1 second interval)")
@@ -94,11 +108,15 @@ class AppSwitcherManager: ObservableObject {
             app.bundleIdentifier != Bundle.main.bundleIdentifier  // Exclude our own app (Jason)
         }
         
+        //Log current state
+        print("🔍 [AppSwitcher] Checking apps: current=\(runningApps.count), new=\(newApps.count)")
+        
         // Only update if there's actually a change (to reduce unnecessary UI updates)
         let oldAppIDs = Set(runningApps.map { $0.processIdentifier })
         let newAppIDs = Set(newApps.map { $0.processIdentifier })
         
         if oldAppIDs != newAppIDs {
+            print("✅ [AppSwitcher] CHANGE DETECTED!")
             // Only do expensive sorting when the app list actually changes
             let sortedApps = sortAppsByMRU(newApps)
             
@@ -132,10 +150,13 @@ class AppSwitcherManager: ObservableObject {
             // Update the state AFTER logging
             runningApps = sortedApps
             
+            DispatchQueue.main.async {
+                NotificationCenter.default.postProviderUpdate(providerId: "app-switcher")
+                print("📢 Posted update notification for app-switcher")
+            }
             print("📊 Applications changed: \(oldCount) → \(newCount)")
             print("🏆 MRU Order: \(runningApps.prefix(5).map { $0.localizedName ?? "Unknown" }.joined(separator: " → "))")
         }
-        // If no apps changed, don't do anything - this prevents spam
     }
     
     // MARK: - MRU Management
