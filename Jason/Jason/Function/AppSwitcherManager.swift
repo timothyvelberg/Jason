@@ -232,6 +232,12 @@ class AppSwitcherManager: ObservableObject {
         
         let sortedApps = sortAppsByMRU(newApps)
         runningApps = sortedApps
+        
+        // 🆕 OPTIONAL: Trigger surgical UI update immediately
+        DispatchQueue.main.async {
+            NotificationCenter.default.postProviderUpdate(providerId: "app-switcher")
+            print("📢 Posted update notification after force resort")
+        }
     }
     
     // MARK: - App Switcher Control

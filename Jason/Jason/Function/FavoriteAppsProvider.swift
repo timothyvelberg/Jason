@@ -30,6 +30,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
     
     // Cache resolved apps to avoid repeated lookups
     private var resolvedApps: [AppInfo] = []
+    weak var appSwitcherManager: AppSwitcherManager?
     
     // MARK: - App Info Structure
     
@@ -192,6 +193,10 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
                 print("❌ Failed to launch \(appInfo.name): \(error.localizedDescription)")
             } else if let app = app {
                 print("✅ Successfully launched \(appInfo.name)")
+                
+                // 🆕 Update MRU tracking so the app appears at the top of the list
+                self.appSwitcherManager?.recordAppUsage(app)
+                print("📊 Updated MRU tracking for \(appInfo.name)")
             }
         }
     }

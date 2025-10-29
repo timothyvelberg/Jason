@@ -199,7 +199,9 @@ class CircularUIManager: ObservableObject {
         functionManager?.registerProvider(SystemActionsProvider())
         
         // Register Favorites Provider
-        functionManager?.registerProvider(FavoriteAppsProvider())
+        let favoriteAppsProvider = FavoriteAppsProvider()
+        favoriteAppsProvider.appSwitcherManager = appSwitcher
+        functionManager?.registerProvider(favoriteAppsProvider)
 
         functionManager?.registerProvider(FinderLogic())
 
