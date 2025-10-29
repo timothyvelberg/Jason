@@ -67,6 +67,8 @@ class CircularUIManager: ObservableObject {
         print("🧹 CircularUIManager deallocated - removed observers")
     }
     
+    // MARK: - Provider Update Handler
+
     @objc private func handleProviderUpdate(_ notification: Notification) {
         guard let updateInfo = ProviderUpdateInfo.from(notification) else {
             print("❌ Invalid provider update notification")
@@ -90,16 +92,44 @@ class CircularUIManager: ObservableObject {
             return
         }
         
-        // For now, simple approach: reload ALL visible rings if the provider matches
-        // TODO: Optimize to only reload affected rings
-        let needsUpdate = checkIfProviderIsVisible(providerId: updateInfo.providerId, folderPath: updateInfo.folderPath)
+        let needsUpdate = checkIfProviderIsVisible(
+            providerId: updateInfo.providerId,
+            contentIdentifier: updateInfo.folderPath
+        )
         
         if needsUpdate {
-            print("   ✅ Provider is visible - reloading rings")
-            reloadVisibleRings()
+            print("   ✅ Provider is visible - performing surgical update")
+            functionManager.updateRing(
+                providerId: updateInfo.providerId,
+                contentIdentifier: updateInfo.folderPath
+            )
         } else {
             print("   ⏭️ Provider not currently visible - ignoring")
         }
+    }
+
+    /// Check if a provider is currently visible in any ring
+    private func checkIfProviderIsVisible(providerId: String, contentIdentifier: String?) -> Bool {
+        guard let functionManager = functionManager else { return false }
+        
+        // Check all active rings
+        for (index, ring) in functionManager.rings.enumerated() {
+            // Check if ring matches this provider
+            if ring.providerId == providerId {
+                // If no content identifier specified, provider match is enough
+                if contentIdentifier == nil {
+                    print("   🎯 Found matching provider in Ring \(index)")
+                    return true
+                }
+                // If content identifier specified, check it too
+                if ring.contentIdentifier == contentIdentifier {
+                    print("   🎯 Found matching provider + content in Ring \(index): \(contentIdentifier ?? "")")
+                    return true
+                }
+            }
+        }
+        
+        return false
     }
     
     /// Check if a provider is currently visible in any ring
@@ -135,23 +165,23 @@ class CircularUIManager: ObservableObject {
     }
     
     /// Reload all visible rings
-    private func reloadVisibleRings() {
-        guard let functionManager = functionManager else { return }
-        
-        let currentLevel = functionManager.activeRingLevel
-        
-        print("🔄 Reloading rings (current level: \(currentLevel))")
-        
-        // Simple approach: Reload from root
-        // This recreates the entire ring hierarchy
-        functionManager.loadFunctions()
-        
-        // If we were deeper than Ring 0, we might need to re-expand
-        // For now, this is acceptable - user can navigate again if needed
-        // TODO: Preserve navigation state during reload
-        
-        print("✅ Rings reloaded")
-    }
+//    private func reloadVisibleRings() {
+//        guard let functionManager = functionManager else { return }
+//        
+//        let currentLevel = functionManager.activeRingLevel
+//        
+//        print("🔄 Reloading rings (current level: \(currentLevel))")
+//        
+//        // Simple approach: Reload from root
+//        // This recreates the entire ring hierarchy
+//        functionManager.loadFunctions()
+//        
+//        // If we were deeper than Ring 0, we might need to re-expand
+//        // For now, this is acceptable - user can navigate again if needed
+//        // TODO: Preserve navigation state during reload
+//        
+//        print("✅ Rings reloaded")
+//    }
     
     func setup() {
         // Create AppSwitcherManager internally

@@ -20,13 +20,23 @@ class FunctionManager: ObservableObject {
         var isCollapsed: Bool = false
         var openedByClick: Bool = false
         
-        init(nodes: [FunctionNode], isCollapsed: Bool = false, openedByClick: Bool = false) {
-            self.nodes = nodes
-            self.hoveredIndex = nil
-            self.selectedIndex = nil
-            self.isCollapsed = isCollapsed
-            self.openedByClick = openedByClick
-        }
+        // Track what this ring represents
+        var providerId: String?           // Which provider owns this content
+        var contentIdentifier: String?    // For folders: folderPath, for apps: nil
+        
+        init(nodes: [FunctionNode],
+            isCollapsed: Bool = false,
+            openedByClick: Bool = false,
+            providerId: String? = nil,
+            contentIdentifier: String? = nil) {
+                self.nodes = nodes
+                self.hoveredIndex = nil
+                self.selectedIndex = nil
+                self.isCollapsed = isCollapsed
+                self.openedByClick = openedByClick
+                self.providerId = providerId
+                self.contentIdentifier = contentIdentifier
+            }
     }
     
     // MARK: - Published State
@@ -629,8 +639,12 @@ class FunctionManager: ObservableObject {
         
         guard !currentNodes.isEmpty else { return }
         
-        // Always have at least the base ring
-        rings.append(RingState(nodes: currentNodes))
+        // 🆕 Ring 0 has no single providerId (it's a mix of all providers)
+        rings.append(RingState(
+            nodes: currentNodes,
+            providerId: nil,
+            contentIdentifier: nil
+        ))
         
         // If there's a selected category in ring 0, show its children in ring 1
         if let ring0 = rings.first,
@@ -638,7 +652,15 @@ class FunctionManager: ObservableObject {
            selectedIndex < ring0.nodes.count {
             let selectedNode = ring0.nodes[selectedIndex]
             if selectedNode.isBranch, let children = selectedNode.children, !children.isEmpty {
-                rings.append(RingState(nodes: children))
+                // 🆕 Ring 1 gets context from the selected Ring 0 node
+                let providerId = selectedNode.providerId
+                let contentIdentifier = selectedNode.metadata?["folderURL"] as? String
+                
+                rings.append(RingState(
+                    nodes: children,
+                    providerId: providerId,
+                    contentIdentifier: contentIdentifier
+                ))
             }
         }
         
@@ -742,11 +764,21 @@ class FunctionManager: ObservableObject {
             rings.removeSubrange((ringLevel + 1)...)
         }
         
-        // Add new ring with displayed children - use the openedByClick parameter
-        rings.append(RingState(nodes: displayedChildren, isCollapsed: false, openedByClick: openedByClick))
+        // 🆕 Get context from the node
+        let providerId = node.providerId
+        let contentIdentifier = node.metadata?["folderURL"] as? String
+        
+        // Add new ring with displayed children and context tracking
+        rings.append(RingState(
+            nodes: displayedChildren,
+            isCollapsed: false,
+            openedByClick: openedByClick,
+            providerId: providerId,
+            contentIdentifier: contentIdentifier
+        ))
         activeRingLevel = ringLevel + 1
         
-        print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes (openedByClick=\(openedByClick))")
+        print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes (providerId: \(providerId ?? "nil"), contentId: \(contentIdentifier ?? "nil"))")
     }
 
     // MARK: - Direct Category Expansion
@@ -871,7 +903,16 @@ class FunctionManager: ObservableObject {
             }
             
             // Add new ring with children
-            rings.append(RingState(nodes: childrenToDisplay, isCollapsed: false, openedByClick: true))
+            let providerId = node.providerId
+            let contentIdentifier = node.metadata?["folderURL"] as? String
+            rings.append(RingState(
+                nodes: childrenToDisplay,
+                isCollapsed: false,
+                openedByClick: true,
+                providerId: providerId,
+                contentIdentifier: contentIdentifier
+            ))
+            
             activeRingLevel = ringLevel + 1
             
             // Clear loading state
@@ -918,5 +959,101 @@ class FunctionManager: ObservableObject {
         
         rebuildRings()
         print("Loaded \(rootNodes.count) total root nodes from \(providers.count) provider(s)")
+    }
+    
+    // MARK: - Surgical Ring Updates
+
+    /// Update a specific ring with fresh data from its provider
+    /// Preserves navigation state and only updates the affected ring
+    func updateRing(providerId: String, contentIdentifier: String? = nil) {
+        print("🔄 [updateRing] Looking for ring with providerId: \(providerId), contentId: \(contentIdentifier ?? "nil")")
+        
+        // Find the provider
+        guard let provider = providers.first(where: { $0.providerId == providerId }) else {
+            print("❌ Provider '\(providerId)' not found")
+            return
+        }
+        
+        // Find the ring(s) that match this context
+        for (level, ring) in rings.enumerated() {
+            // Check if this ring matches
+            let providerMatches = ring.providerId == providerId
+            let contentMatches = contentIdentifier == nil || ring.contentIdentifier == contentIdentifier
+            
+            if providerMatches && contentMatches {
+                print("✅ Found matching ring at level \(level)")
+                
+                // Refresh the provider
+                provider.refresh()
+                
+                // Get fresh nodes
+                let freshNodes: [FunctionNode]
+                
+                if level == 0 {
+                    // Ring 0: This ring is a mix of providers, so we need to update just this provider's node
+                    // Find the node in Ring 0 that belongs to this provider
+                    let updatedRootNodes = provider.provideFunctions()
+                    
+                    // Replace the old node(s) from this provider with new ones
+                    var newRing0Nodes = rings[0].nodes.filter { $0.providerId != providerId }
+                    newRing0Nodes.append(contentsOf: updatedRootNodes)
+                    
+                    rings[0].nodes = newRing0Nodes
+                    print("✅ Updated Ring 0: replaced nodes from provider '\(providerId)'")
+                    
+                } else {
+                    // Ring 1+: Get children from FRESH parent node
+                    guard level > 0, level - 1 < rings.count else {
+                        print("❌ Cannot find parent ring for level \(level)")
+                        continue
+                    }
+                    
+                    let parentRing = rings[level - 1]
+                    guard let selectedIndex = parentRing.selectedIndex,
+                          selectedIndex < parentRing.nodes.count else {
+                        print("❌ No selected node in parent ring")
+                        continue
+                    }
+                    
+                    // 🆕 Get FRESH parent node after provider refresh
+                    let freshRootNodes = provider.provideFunctions()
+                    
+                    // If parent is Ring 0, find the fresh root node
+                    if level == 1 && !freshRootNodes.isEmpty {
+                        let freshParentNode = freshRootNodes[0]  // Provider returns one root node
+                        
+                        // For dynamic loading (folders)
+                        if freshParentNode.needsDynamicLoading {
+                            Task { @MainActor in
+                                let loadedNodes = await provider.loadChildren(for: freshParentNode)
+                                
+                                // Check if ring still exists and matches
+                                guard level < self.rings.count,
+                                      self.rings[level].providerId == providerId,
+                                      self.rings[level].contentIdentifier == contentIdentifier else {
+                                    print("⚠️ Ring changed during async load - ignoring update")
+                                    return
+                                }
+                                
+                                self.rings[level].nodes = loadedNodes
+                                print("✅ Updated Ring \(level) with \(loadedNodes.count) dynamically loaded nodes")
+                            }
+                        } else {
+                            // For static children (apps) - use FRESH displayedChildren
+                            freshNodes = freshParentNode.displayedChildren
+                            rings[level].nodes = freshNodes
+                            print("✅ Updated Ring \(level) with \(freshNodes.count) nodes")
+                        }
+                    } else {
+                        print("⚠️ Cannot get fresh parent node for Ring \(level)")
+                    }
+                }
+                
+                // Only update the first matching ring
+                return
+            }
+        }
+        
+        print("⚠️ No matching ring found for providerId: \(providerId), contentId: \(contentIdentifier ?? "nil")")
     }
 }
