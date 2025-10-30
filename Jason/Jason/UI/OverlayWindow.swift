@@ -131,7 +131,7 @@ class OverlayWindow: NSWindow {
         // Don't call super to prevent any default scroll behavior
     }
     
-    // NEW: Detect when window loses focus
+    //Detect when window loses focus
     override func resignKey() {
         print("🔴 [OverlayWindow] Window lost focus")
         super.resignKey()

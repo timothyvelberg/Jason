@@ -254,22 +254,20 @@ class CircularUIManager: ObservableObject {
         
         let currentLevel = functionManager.activeRingLevel
         
-        if currentLevel > 0 {
-            let targetLevel = currentLevel - 1
-            print("🔙 [CircularUIManager] Scrolling back from ring \(currentLevel) to \(targetLevel)")
-            functionManager.collapseToRing(level: targetLevel)
-            
-            // Only hide UI if we just collapsed TO Ring 0
-            if targetLevel == 0 {
-                print("👋 [handleScrollBack] Collapsed to Ring 0 - hiding UI")
-                hide()
-            } else {
-                print("✅ [handleScrollBack] Collapsed to Ring \(targetLevel) - staying open")
-                mouseTracker?.pauseAfterScroll()
-            }
-        } else {
-            print("⚠️ [CircularUIManager] Already at Ring 0 - cannot scroll back further")
+        // ✅ Check if we're AT Ring 0 (not collapsing TO Ring 0)
+        if currentLevel == 0 {
+            print("👋 [handleScrollBack] Already at Ring 0 - hiding UI")
+            hide()
+            return
         }
+        
+        // Otherwise, collapse to previous ring and STAY VISIBLE
+        let targetLevel = currentLevel - 1
+        print("🔙 [CircularUIManager] Scrolling back from ring \(currentLevel) to \(targetLevel)")
+        functionManager.collapseToRing(level: targetLevel)
+        
+        print("✅ [handleScrollBack] Collapsed to Ring \(targetLevel) - staying open")
+        mouseTracker?.pauseAfterScroll()
     }
     
     // MARK: - Gesture Event Handler

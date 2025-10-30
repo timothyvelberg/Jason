@@ -19,7 +19,7 @@ struct RingView: View {
     
     // Animation configuration
     private let animationInitialDelay: Double = 0.1// Initial delay before animation starts (seconds)
-    private let animationStaggerDelay: Double = 0.025   // Delay between each icon (seconds)
+    private let animationBaseStaggerDelay: Double = 0.025   // Delay between each icon (seconds)
     private let animationDuration: Double = 0.25       // Duration of fade/scale animation
     private let animationStartScale: CGFloat = 0.9     // Starting scale (0.9 = 90% size)
     private let animationRotationOffset: Double = -10  // Starting rotation offset in degrees (negative = counter-clockwise)
@@ -34,6 +34,23 @@ struct RingView: View {
     @State private var iconOpacities: [String: Double] = [:]       // Track opacity per icon ID
     @State private var iconScales: [String: CGFloat] = [:]         // Track scale per icon ID
     @State private var iconRotationOffsets: [String: Double] = [:] // Track rotation offset per icon ID
+    
+    // Computed adaptive stagger delay based on item count
+    private var adaptiveStaggerDelay: Double {
+        let itemCount = nodes.count
+        
+        // For small rings (≤10 items), use base delay
+        if itemCount <= 10 {
+            return animationBaseStaggerDelay
+        }
+        
+        // For larger rings, reduce delay to keep total animation time reasonable
+        let maxTotalStagger: Double = 0.005
+        let calculatedDelay = maxTotalStagger / Double(itemCount - 1)
+        
+        // Clamp to reasonable bounds (20ms minimum, base delay maximum)
+        return max(0.01, min(calculatedDelay, animationBaseStaggerDelay))
+    }
     
     // Calculated properties
     private var endRadius: CGFloat {
@@ -355,7 +372,7 @@ struct RingView: View {
         
         // Animate each icon in with initial delay + staggered delay
         for (index, node) in nodes.enumerated() {
-            let delay = animationInitialDelay + (Double(index) * animationStaggerDelay)
+            let delay = animationInitialDelay + (Double(index) * adaptiveStaggerDelay)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 withAnimation(.easeOut(duration: self.animationDuration)) {
