@@ -69,6 +69,18 @@ class MouseTracker {
         print("⏸️ [MouseTracker] Paused tracking - clicked in ring level: \(ringLevelAtPause ?? -1)")
     }
     
+    private var isPausedForDrag = false
+
+    func pauseForDrag() {
+        isPausedForDrag = true
+        print("⏸️ [MouseTracker] Paused for drag operation")
+    }
+
+    func resumeFromDrag() {
+        isPausedForDrag = false
+        print("▶️ [MouseTracker] Resumed from drag")
+    }
+    
     func resumeTracking() {
         isPausedAfterScroll = false
         lastMouseLocation = NSEvent.mouseLocation
@@ -79,6 +91,11 @@ class MouseTracker {
         guard let start = trackingStartPoint else { return }
 
         let current = NSEvent.mouseLocation
+        
+        //Check if paused for drag FIRST (don't auto-resume)
+        if isPausedForDrag {
+            return  // Stay paused until explicitly resumed
+        }
         
         // Check if paused and if mouse moved enough to resume
         if isPausedAfterScroll {

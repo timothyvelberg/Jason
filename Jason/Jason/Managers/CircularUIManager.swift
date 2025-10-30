@@ -372,22 +372,21 @@ class CircularUIManager: ObservableObject {
             print("🎯 Node '\(node.name)' is not draggable")
             return
         }
-        
-        // NEW: Set up drag lifecycle callbacks to freeze UI during drag
+
+        // Set up drag lifecycle callbacks to freeze UI during drag
         provider.onDragStarted = { [weak self] in
             print("⏸️ [Drag] Started - pausing mouse tracking")
-            self?.mouseTracker?.pauseAfterScroll()
+            self?.mouseTracker?.pauseForDrag()  // ← Changed from pauseAfterScroll()
         }
-        
+
         provider.onDragCompleted = { [weak self] success in
             print("▶️ [Drag] Completed - resuming mouse tracking")
-            // Resume tracking after a brief delay to avoid immediate hover updates
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self?.mouseTracker?.resumeTracking()
+                self?.mouseTracker?.resumeFromDrag()  // ← Changed from resumeTracking()
             }
         }
-        
-        // NEW: Capture current modifier flags
+
+        // Capture current modifier flags
         let currentModifiers = NSEvent.modifierFlags
         provider.modifierFlags = currentModifiers
         
