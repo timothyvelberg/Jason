@@ -106,7 +106,8 @@ class GestureManager {
     // MARK: - Lifecycle
     
     init() {
-        print("🖱️ GestureManager initialized")
+//        print("🖱️ GestureManager initialized")
+        return
     }
     
     deinit {

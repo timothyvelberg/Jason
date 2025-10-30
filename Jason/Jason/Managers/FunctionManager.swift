@@ -604,7 +604,6 @@ class FunctionManager: ObservableObject {
         self.providers = providers
         let appsProvider = FavoriteAppsProvider()
         self.favoriteAppsProvider = appsProvider
-        print("FunctionManager initialized with \(providers.count) provider(s)")
     }
     
     // MARK: - Provider Management

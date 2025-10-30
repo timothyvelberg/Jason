@@ -153,7 +153,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
                 children: appNodes,
                 
                 preferredLayout: .partialSlice,  // Use partial slice for compact display
-                slicePositioning: .center,
+                slicePositioning: .startClockwise,
 
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .expand,           // Click to expand favorites

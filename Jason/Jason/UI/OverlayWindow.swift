@@ -45,12 +45,12 @@ class OverlayWindow: NSWindow {
         self.acceptsMouseMovedEvents = true
         self.ignoresMouseEvents = false
         
-        print("🪟 [OverlayWindow] Created fullscreen overlay: \(screenFrame.size)")
+//        print("🪟 [OverlayWindow] Created fullscreen overlay: \(screenFrame.size)")
         
         // Initially hidden
         self.orderOut(nil)
         
-        print("🪟 Overlay window created")
+//        print("🪟 Overlay window created")
     }
     
     func showOverlay(at mouseLocation: NSPoint) {

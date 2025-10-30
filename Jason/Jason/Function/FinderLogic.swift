@@ -333,13 +333,13 @@ class FinderLogic: FunctionProvider {
             icon: icon,
             
             contextActions: [
-                StandardContextActions.deleteFile(url),
                 StandardContextActions.copyFile(url),
+                StandardContextActions.deleteFile(url),
                 StandardContextActions.showInFinder(url)
             ],
             
             preferredLayout: .partialSlice,
-            itemAngleSize: 15,
+            itemAngleSize: 20,
             previewURL: url,
             showLabel: true,
             slicePositioning: .center,
@@ -395,10 +395,10 @@ class FinderLogic: FunctionProvider {
                 StandardContextActions.deleteFile(url)
             ],
             preferredLayout: .partialSlice,
-            itemAngleSize: 15,
+            itemAngleSize: 20,
             previewURL: url,
             showLabel: true,
-            slicePositioning: .center,
+            slicePositioning: .startClockwise,
             
             metadata: [
                 "folderURL": item.path,
@@ -521,7 +521,7 @@ class FinderLogic: FunctionProvider {
             icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
             children: favoriteChildren,
             preferredLayout: .partialSlice,
-            slicePositioning: .center,
+            slicePositioning: .startClockwise,
             onLeftClick: .expand,
             onRightClick: .expand,
             onBoundaryCross: .expand
@@ -911,7 +911,7 @@ class FinderLogic: FunctionProvider {
                 StandardContextActions.deleteFile(url)
             ],
             preferredLayout: .partialSlice,
-            itemAngleSize: 15,
+            itemAngleSize: 20,
             previewURL: url,
             showLabel: true,
             slicePositioning: .center,

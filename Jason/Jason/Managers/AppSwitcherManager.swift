@@ -58,7 +58,6 @@ class AppSwitcherManager: ObservableObject {
     
     func setupServices() {
         print("🎹 Setting up services (timer always runs)")
-        startAutoRefresh()
         loadRunningApplications()
         
         // Only initialize MRU if we have permission
@@ -371,8 +370,8 @@ extension AppSwitcherManager: FunctionProvider {
         let appNodes = runningApps.map { app in
             // Create context actions for each app using StandardContextActions
             let contextActions = [
-                StandardContextActions.quitApp(app, manager: self),
                 StandardContextActions.bringToFront(app, manager: self),
+                StandardContextActions.quitApp(app, manager: self),
                 StandardContextActions.hideApp(app, manager: self)
             ]
             
@@ -382,7 +381,8 @@ extension AppSwitcherManager: FunctionProvider {
                 icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
                 contextActions: contextActions,
                 preferredLayout: .partialSlice,
-                itemAngleSize: 12,
+                itemAngleSize: 20,
+                slicePositioning: .center,
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .execute { [weak self] in
                     // Primary action: switch to app and close UI
@@ -412,8 +412,7 @@ extension AppSwitcherManager: FunctionProvider {
                 name: providerName,
                 icon: providerIcon,
                 children: appNodes,
-                maxDisplayedChildren: 25,  // Limit to 12 apps in the pie slice
-                preferredLayout: .partialSlice,  // Use full circle for many apps
+                maxDisplayedChildren: 25,
                 providerId: self.providerId,
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .expand,           // Click to expand applications

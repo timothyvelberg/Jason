@@ -237,7 +237,7 @@ class CircularUIManager: ObservableObject {
     // MARK: - Gesture Manager Setup
     
     private func setupGestureManager() {
-        print("🖱️ Setting up GestureManager")
+//        print("🖱️ Setting up GestureManager")
         
         gestureManager = GestureManager()
         
@@ -484,7 +484,7 @@ class CircularUIManager: ObservableObject {
     // MARK: - Modified setupGlobalHotkeys method
 
     private func setupGlobalHotkeys() {
-        print("⌨️ Setting up circular UI hotkeys (Ctrl+Shift+K and Ctrl+`)")
+//        print("⌨️ Setting up circular UI hotkeys (Ctrl+Shift+K and Ctrl+`)")
         
         // Listen for global key events (keyDown only)
         NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
@@ -506,7 +506,7 @@ class CircularUIManager: ObservableObject {
             return self?.handleLocalFlagsChanged(event) ?? event
         }
         
-        print("✅ Circular UI hotkey monitoring started")
+//        print("✅ Circular UI hotkey monitoring started")
     }
     
     // MARK: - Modified handleGlobalKeyEvent
@@ -789,7 +789,7 @@ class CircularUIManager: ObservableObject {
         )
         overlayWindow?.contentView = NSHostingView(rootView: contentView)
         
-        print("Overlay window created and configured")
+//        print("Overlay window created and configured")
     }
     
     // MARK: - Preview Handler

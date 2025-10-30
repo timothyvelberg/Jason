@@ -30,38 +30,38 @@ class FolderWatcherManager {
         refreshQueue.qualityOfService = .utility       // Background priority
         refreshQueue.name = "com.jason.folderrefresh"
         
-        print("[FolderWatcher] 🎬 Manager initialized (queue: max 2 concurrent)")
+//        print("[FolderWatcher] 🎬 Manager initialized (queue: max 2 concurrent)")
     }
     
     // MARK: - Public API
     
     /// Start watching all favorite heavy folders
     func startWatchingFavorites() {
-        print("🔍 [FolderWatcher] ========== Starting Favorite Watchers ==========")
+//        print("🔍 [FolderWatcher] ========== Starting Favorite Watchers ==========")
         
         // Get all database data on MAIN thread FIRST (avoid threading issues)
         let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
-        print("🔍 [FolderWatcher] Found \(favoriteFolders.count) favorite folders total")
+//        print("🔍 [FolderWatcher] Found \(favoriteFolders.count) favorite folders total")
         
         // Build list of folders to watch (also check heavy status on main thread)
         var foldersToWatch: [(path: String, name: String)] = []
         for (folder, _) in favoriteFolders {
-            print("🔍 [FolderWatcher] Checking: '\(folder.title)'")
-            print("   📂 Path: \(folder.path)")
+//            print("🔍 [FolderWatcher] Checking: '\(folder.title)'")
+//            print("   📂 Path: \(folder.path)")
             
             let isHeavy = DatabaseManager.shared.isHeavyFolder(path: folder.path)
-            print("   ⚖️ Is heavy: \(isHeavy)")
+//            print("   ⚖️ Is heavy: \(isHeavy)")
             
             if isHeavy {
                 foldersToWatch.append((path: folder.path, name: folder.title))
-                print("   ✅ Will watch this folder")
+//                print("   ✅ Will watch this folder")
             } else {
-                print("   ⭕️ Skipping (not marked as heavy)")
+//                print("   ⭕️ Skipping (not marked as heavy)")
             }
         }
         
-        print("🔍 [FolderWatcher] Total folders to watch: \(foldersToWatch.count)")
-        print("🔍 [FolderWatcher] ===============================================")
+//        print("🔍 [FolderWatcher] Total folders to watch: \(foldersToWatch.count)")
+//        print("🔍 [FolderWatcher] ===============================================")
         
         // Now dispatch to background thread with the data we already fetched
         watcherQueue.async { [weak self] in
@@ -73,7 +73,7 @@ class FolderWatcherManager {
                 watchedCount += 1
             }
             
-            print("[FolderWatcher] 👀 Started watching \(watchedCount) favorite heavy folders")
+//            print("[FolderWatcher] 👀 Started watching \(watchedCount) favorite heavy folders")
         }
     }
     
@@ -106,7 +106,7 @@ class FolderWatcherManager {
             )
             
             self.watchers[path] = watcher
-            print("[FolderWatcher] ✅ Started watching: \(itemName) (\(path))")
+//            print("[FolderWatcher] ✅ Started watching: \(itemName) (\(path))")
         }
     }
     
@@ -281,9 +281,11 @@ private class FolderWatcher {
         
         // Start monitoring
         if FSEventStreamStart(stream) {
-            print("[FolderWatcher] 🎬 Monitoring started for: \(name)")
+//            print("[FolderWatcher] 🎬 Monitoring started for: \(name)")
+            return
         } else {
             print("[FolderWatcher] ❌ Failed to start monitoring for: \(name)")
+            
         }
     }
     
