@@ -20,6 +20,9 @@ class AppSwitcherManager: ObservableObject {
     private var refreshTimer: Timer?
     internal var isCtrlPressed: Bool = false
     
+    // Prevent race conditions during updates
+    private var isUpdating: Bool = false
+    
     // MARK: - MRU (Most Recently Used) Tracking
     private var appUsageHistory: [pid_t] = [] // Track PIDs in MRU order
     
@@ -99,6 +102,15 @@ class AppSwitcherManager: ObservableObject {
     }
     
     func loadRunningApplications() {
+        // Prevent re-entrant updates (race condition protection)
+        guard !isUpdating else {
+            print("⏭️ [AppSwitcher] Update already in progress - skipping")
+            return
+        }
+        
+        isUpdating = true
+        defer { isUpdating = false }  // Always reset flag when function exits
+        
         let allApps = NSWorkspace.shared.runningApplications
         
         // Filter to only show regular applications (not background processes) and exclude our own app
@@ -231,12 +243,6 @@ class AppSwitcherManager: ObservableObject {
         
         let sortedApps = sortAppsByMRU(newApps)
         runningApps = sortedApps
-        
-        // 🆕 OPTIONAL: Trigger surgical UI update immediately
-        DispatchQueue.main.async {
-            NotificationCenter.default.postProviderUpdate(providerId: "app-switcher")
-            print("📢 Posted update notification after force resort")
-        }
     }
     
     // MARK: - App Switcher Control
@@ -370,8 +376,8 @@ extension AppSwitcherManager: FunctionProvider {
         let appNodes = runningApps.map { app in
             // Create context actions for each app using StandardContextActions
             let contextActions = [
-                StandardContextActions.bringToFront(app, manager: self),
                 StandardContextActions.quitApp(app, manager: self),
+                StandardContextActions.bringToFront(app, manager: self),
                 StandardContextActions.hideApp(app, manager: self)
             ]
             
@@ -381,8 +387,7 @@ extension AppSwitcherManager: FunctionProvider {
                 icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
                 contextActions: contextActions,
                 preferredLayout: .partialSlice,
-                itemAngleSize: 20,
-                slicePositioning: .center,
+                itemAngleSize: 12,
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .execute { [weak self] in
                     // Primary action: switch to app and close UI
@@ -412,7 +417,8 @@ extension AppSwitcherManager: FunctionProvider {
                 name: providerName,
                 icon: providerIcon,
                 children: appNodes,
-                maxDisplayedChildren: 25,
+                maxDisplayedChildren: 12,  // Limit to 12 apps in the pie slice
+                preferredLayout: .partialSlice,  // Use full circle for many apps
                 providerId: self.providerId,
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .expand,           // Click to expand applications
