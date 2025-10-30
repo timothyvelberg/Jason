@@ -29,10 +29,10 @@ struct DragProvider {
     let dragImage: NSImage?
     let allowedOperations: NSDragOperation
     let onClick: (() -> Void)?
-    let onDragStarted: (() -> Void)?
-    let onDragCompleted: ((Bool) -> Void)?
+    var onDragStarted: (() -> Void)?  // ← Changed from let to var
+    var onDragCompleted: ((Bool) -> Void)?  // ← Changed from let to var
     
-    //Modifier flags captured when drag starts
+    // Modifier flags captured when drag starts
     var modifierFlags: NSEvent.ModifierFlags = []
     
     init(fileURLs: [URL],

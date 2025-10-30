@@ -60,7 +60,7 @@ class AppSwitcherManager: ObservableObject {
     // MARK: - Service Setup
     
     func setupServices() {
-        print("🎹 Setting up services (timer always runs)")
+        print("🎹 Setting up services ")
         loadRunningApplications()
         
         // Only initialize MRU if we have permission
@@ -336,6 +336,10 @@ extension AppSwitcherManager {
     /// Quit an application
     func quitApp(_ app: NSRunningApplication) {
         print("🚪 Quitting app: \(app.localizedName ?? "Unknown")")
+        
+        // Ignore focus changes for 500ms to prevent UI from hiding when app window closes
+        circularUIManager?.ignoreFocusChangesTemporarily(duration: 0.5)
+        
         app.terminate()
     }
     

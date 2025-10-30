@@ -167,19 +167,19 @@ class CircularUIManager: ObservableObject {
     /// Reload all visible rings
 //    private func reloadVisibleRings() {
 //        guard let functionManager = functionManager else { return }
-//        
+//
 //        let currentLevel = functionManager.activeRingLevel
-//        
+//
 //        print("🔄 Reloading rings (current level: \(currentLevel))")
-//        
+//
 //        // Simple approach: Reload from root
 //        // This recreates the entire ring hierarchy
 //        functionManager.loadFunctions()
-//        
+//
 //        // If we were deeper than Ring 0, we might need to re-expand
 //        // For now, this is acceptable - user can navigate again if needed
 //        // TODO: Preserve navigation state during reload
-//        
+//
 //        print("✅ Rings reloaded")
 //    }
     
@@ -254,20 +254,22 @@ class CircularUIManager: ObservableObject {
         
         let currentLevel = functionManager.activeRingLevel
         
-        // ✅ Check if we're AT Ring 0 (not collapsing TO Ring 0)
-        if currentLevel == 0 {
-            print("👋 [handleScrollBack] Already at Ring 0 - hiding UI")
-            hide()
-            return
+        if currentLevel > 0 {
+            let targetLevel = currentLevel - 1
+            print("🔙 [CircularUIManager] Scrolling back from ring \(currentLevel) to \(targetLevel)")
+            functionManager.collapseToRing(level: targetLevel)
+            
+            // Only hide UI if we just collapsed TO Ring 0
+            if targetLevel == 0 {
+                print("👋 [handleScrollBack] Collapsed to Ring 0 - hiding UI")
+//                hide()
+            } else {
+                print("✅ [handleScrollBack] Collapsed to Ring \(targetLevel) - staying open")
+                mouseTracker?.pauseAfterScroll()
+            }
+        } else {
+            print("⚠️ [CircularUIManager] Already at Ring 0 - cannot scroll back further")
         }
-        
-        // Otherwise, collapse to previous ring and STAY VISIBLE
-        let targetLevel = currentLevel - 1
-        print("🔙 [CircularUIManager] Scrolling back from ring \(currentLevel) to \(targetLevel)")
-        functionManager.collapseToRing(level: targetLevel)
-        
-        print("✅ [handleScrollBack] Collapsed to Ring \(targetLevel) - staying open")
-        mouseTracker?.pauseAfterScroll()
     }
     
     // MARK: - Gesture Event Handler
@@ -369,6 +371,20 @@ class CircularUIManager: ObservableObject {
         guard node.isDraggable, var provider = node.onDrag.dragProvider else {
             print("🎯 Node '\(node.name)' is not draggable")
             return
+        }
+        
+        // NEW: Set up drag lifecycle callbacks to freeze UI during drag
+        provider.onDragStarted = { [weak self] in
+            print("⏸️ [Drag] Started - pausing mouse tracking")
+            self?.mouseTracker?.pauseAfterScroll()
+        }
+        
+        provider.onDragCompleted = { [weak self] success in
+            print("▶️ [Drag] Completed - resuming mouse tracking")
+            // Resume tracking after a brief delay to avoid immediate hover updates
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self?.mouseTracker?.resumeTracking()
+            }
         }
         
         // NEW: Capture current modifier flags
@@ -966,6 +982,11 @@ class CircularUIManager: ObservableObject {
         print("Hiding circular UI")
         
         appSwitcher?.stopAutoRefresh()
+    }
+    
+    /// Temporarily ignore focus changes (used during app quit/launch to prevent unwanted UI hiding)
+    func ignoreFocusChangesTemporarily(duration: TimeInterval = 0.5) {
+        overlayWindow?.ignoreFocusChangesTemporarily(duration: duration)
     }
     
     func hideAndSwitchTo(app: NSRunningApplication) {

@@ -68,6 +68,12 @@ class MouseTracker {
         ringLevelAtPause = lastRingLevel  // Remember which ring we clicked in
         print("⏸️ [MouseTracker] Paused tracking - clicked in ring level: \(ringLevelAtPause ?? -1)")
     }
+    
+    func resumeTracking() {
+        isPausedAfterScroll = false
+        lastMouseLocation = NSEvent.mouseLocation
+        print("▶️ [MouseTracker] Resumed tracking")
+    }
 
     private func trackMousePosition(distance: CGFloat) {
         guard let start = trackingStartPoint else { return }

@@ -15,6 +15,9 @@ class OverlayWindow: NSWindow {
     
     private var normalLevel: NSWindow.Level = .statusBar
     
+    // Flag to ignore focus changes during app operations (quit/launch)
+    private var shouldIgnoreFocusChanges: Bool = false
+    
     // Add callback property for scroll events
     var onScrollBack: (() -> Void)?
     
@@ -100,6 +103,17 @@ class OverlayWindow: NSWindow {
         print("🔼 [OverlayWindow] Restored window level to \(normalLevel)")
     }
     
+    // Temporarily ignore focus changes (for app quit/launch operations)
+    func ignoreFocusChangesTemporarily(duration: TimeInterval = 0.5) {
+        shouldIgnoreFocusChanges = true
+        print("🔇 [OverlayWindow] Ignoring focus changes for \(duration)s")
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+            self?.shouldIgnoreFocusChanges = false
+            print("🔊 [OverlayWindow] Resumed listening to focus changes")
+        }
+    }
+    
     // Handle scroll events
     override func scrollWheel(with event: NSEvent) {
         // Detect device type
@@ -135,6 +149,12 @@ class OverlayWindow: NSWindow {
     override func resignKey() {
         print("🔴 [OverlayWindow] Window lost focus")
         super.resignKey()
+        
+        // Don't hide if we're ignoring focus changes (app quit/launch in progress)
+        if shouldIgnoreFocusChanges {
+            print("   🔇 Ignoring focus change (app operation in progress)")
+            return
+        }
         
         // Don't hide if Quick Look is showing - it steals focus but we want to stay visible
         if QuickLookManager.shared.isShowing {
