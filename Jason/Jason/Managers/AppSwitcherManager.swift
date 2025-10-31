@@ -380,8 +380,8 @@ extension AppSwitcherManager: FunctionProvider {
         let appNodes = runningApps.map { app in
             // Create context actions for each app using StandardContextActions
             let contextActions = [
-                StandardContextActions.quitApp(app, manager: self),
                 StandardContextActions.bringToFront(app, manager: self),
+                StandardContextActions.quitApp(app, manager: self),
                 StandardContextActions.hideApp(app, manager: self)
             ]
             
@@ -390,7 +390,8 @@ extension AppSwitcherManager: FunctionProvider {
                 name: app.localizedName ?? "Unknown",
                 icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
                 contextActions: contextActions,
-                itemAngleSize: 12,
+                itemAngleSize: 16,
+                slicePositioning: .center,
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .execute { [weak self] in
                     // Primary action: switch to app and close UI
@@ -420,7 +421,7 @@ extension AppSwitcherManager: FunctionProvider {
                 name: providerName,
                 icon: providerIcon,
                 children: appNodes,
-                maxDisplayedChildren: 12,  // Limit to 12 apps in the pie slice
+                maxDisplayedChildren: 25,
                 preferredLayout: .partialSlice,  // Use full circle for many apps
                 slicePositioning: .center,
                 providerId: self.providerId,
