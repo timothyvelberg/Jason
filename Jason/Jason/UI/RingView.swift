@@ -46,6 +46,14 @@ struct RingView: View {
     @State private var iconScales: [String: CGFloat] = [:]         // Track scale per icon ID
     @State private var iconRotationOffsets: [String: Double] = [:] // Track rotation offset per icon ID
     
+    // Animated slice background angles (for partial slice opening animation)
+    @State private var animatedSliceStartAngle: Angle = .degrees(0)
+    @State private var animatedSliceEndAngle: Angle = .degrees(0)
+    
+    // Selection indicator opacity (delayed fade-in)
+    @State private var selectionIndicatorOpacity: Double = 0
+    @State private var hasCompletedInitialSelectionFade: Bool = false
+    
     // Computed adaptive stagger delay based on item count
     private var adaptiveStaggerDelay: Double {
         let itemCount = nodes.count
@@ -141,8 +149,8 @@ struct RingView: View {
                 ZStack {
                     // Dark tint layer
                     PieSliceShape(
-                        startAngle: .degrees(sliceConfig.startAngle - 90),
-                        endAngle: .degrees(sliceConfig.endAngle - 90),
+                        startAngle: animatedSliceStartAngle - .degrees(90),
+                        endAngle: animatedSliceEndAngle - .degrees(90),
                         innerRadiusRatio: innerRadiusRatio,
                         outerRadiusRatio: 1.0
                     )
@@ -150,8 +158,8 @@ struct RingView: View {
                     
                     // Blur material layer
                     PieSliceShape(
-                        startAngle: .degrees(sliceConfig.startAngle - 90),
-                        endAngle: .degrees(sliceConfig.endAngle - 90),
+                        startAngle: animatedSliceStartAngle - .degrees(90),
+                        endAngle: animatedSliceEndAngle - .degrees(90),
                         innerRadiusRatio: innerRadiusRatio,
                         outerRadiusRatio: 1.0
                     )
@@ -159,8 +167,8 @@ struct RingView: View {
                     
                     // Border
                     PieSliceShape(
-                        startAngle: .degrees(sliceConfig.startAngle - 90),
-                        endAngle: .degrees(sliceConfig.endAngle - 90),
+                        startAngle: animatedSliceStartAngle - .degrees(90),
+                        endAngle: animatedSliceEndAngle - .degrees(90),
                         innerRadiusRatio: innerRadiusRatio,
                         outerRadiusRatio: 1.0
                     )
@@ -182,6 +190,7 @@ struct RingView: View {
                 )
                 .fill(selectionColor, style: FillStyle(eoFill: true))
                 .frame(width: totalDiameter, height: totalDiameter)
+                .opacity(selectionIndicatorOpacity)  // Animated opacity
                 .allowsHitTesting(false)  // Don't block clicks
             }
             
@@ -226,15 +235,166 @@ struct RingView: View {
                 previousIndex = nil
             }
             
+            // Reset selection indicator opacity and completion flag
+            selectionIndicatorOpacity = 0
+            hasCompletedInitialSelectionFade = false
+            
+            // Reset and re-animate the background slice
+            if !sliceConfig.isFullCircle && sliceConfig.positioning == .center {
+                let initialSliceSize = 10.0  // Start with 10° slice
+                
+                // Calculate true center angle, handling wraparound
+                let centerAngle: Double
+                if sliceConfig.endAngle < sliceConfig.startAngle {
+                    // Wraparound case: add 360 to endAngle for proper center calculation
+                    centerAngle = (sliceConfig.startAngle + (sliceConfig.endAngle + 360)) / 2
+                } else {
+                    centerAngle = (sliceConfig.startAngle + sliceConfig.endAngle) / 2
+                }
+                
+                // Handle angle wraparound for animation target
+                let adjustedEndAngle = sliceConfig.endAngle < sliceConfig.startAngle
+                    ? sliceConfig.endAngle + 360
+                    : sliceConfig.endAngle
+                
+                animatedSliceStartAngle = Angle(degrees: centerAngle - initialSliceSize / 2)
+                animatedSliceEndAngle = Angle(degrees: centerAngle + initialSliceSize / 2)
+                
+                withAnimation(.easeOut(duration: 0.3).delay(animationInitialDelay)) {
+                    animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                    animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
+                }
+                
+                // Fade in selection indicator with a simple hardcoded delay
+                let selectionDelay = 0.05
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        selectionIndicatorOpacity = 1.0
+                    }
+                }
+                
+                // Mark as completed after animation finishes
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
+                    hasCompletedInitialSelectionFade = true
+                }
+            } else {
+                animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                animatedSliceEndAngle = Angle(degrees: sliceConfig.endAngle)
+                
+                // Fade in selection indicator with a simple hardcoded delay
+                let selectionDelay = 0.05
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        selectionIndicatorOpacity = 1.0
+                    }
+                }
+                
+                // Mark as completed after animation finishes
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
+                    hasCompletedInitialSelectionFade = true
+                }
+            }
+            
             // Trigger staggered fade-in animation for icons
             animateIconsIn()
         }
         .onChange(of: selectedIndex) {
             if let index = selectedIndex {
                 updateSlice(for: index, totalCount: nodes.count)
+                // Only set opacity immediately AFTER the initial fade-in has completed
+                // This prevents overriding the delayed fade-in on first appearance
+                print("📍 [Selection] onChange fired - hasCompleted: \(hasCompletedInitialSelectionFade), current opacity: \(selectionIndicatorOpacity)")
+                if hasCompletedInitialSelectionFade {
+                    selectionIndicatorOpacity = 1.0
+                    print("   ✅ Setting opacity to 1.0 (hover change)")
+                } else {
+                    print("   ⏳ Waiting for initial fade to complete")
+                }
             }
         }
         .onAppear {
+            // Reset selection indicator opacity and completion flag
+            selectionIndicatorOpacity = 0
+            hasCompletedInitialSelectionFade = false
+            print("🎬 [Selection] onAppear - reset opacity=0, selectedIndex: \(selectedIndex?.description ?? "nil")")
+            
+            // Animate the background slice opening
+            if !sliceConfig.isFullCircle && sliceConfig.positioning == .center {
+                // For center positioning: start with small slice, then expand to full size
+                let initialSliceSize = 10.0  // Start with 10° slice (smaller = more obvious)
+                
+                // Calculate true center angle, handling wraparound
+                let centerAngle: Double
+                if sliceConfig.endAngle < sliceConfig.startAngle {
+                    // Wraparound case: slice crosses 0°/360°
+                    // Add 360 to endAngle for proper center calculation
+                    centerAngle = (sliceConfig.startAngle + (sliceConfig.endAngle + 360)) / 2
+                    // Normalize if needed
+                } else {
+                    centerAngle = (sliceConfig.startAngle + sliceConfig.endAngle) / 2
+                }
+                
+                // Handle angle wraparound for animation target
+                let adjustedEndAngle = sliceConfig.endAngle < sliceConfig.startAngle
+                    ? sliceConfig.endAngle + 360
+                    : sliceConfig.endAngle
+                
+                animatedSliceStartAngle = Angle(degrees: centerAngle - initialSliceSize / 2)
+                animatedSliceEndAngle = Angle(degrees: centerAngle + initialSliceSize / 2)
+                
+                print("🎭 [RingView] SLICE ANIMATION START")
+                print("   Center: \(centerAngle)° (wraparound: \(sliceConfig.endAngle < sliceConfig.startAngle))")
+                print("   Initial: [\(centerAngle - initialSliceSize / 2)°, \(centerAngle + initialSliceSize / 2)°] (size: \(initialSliceSize)°)")
+                print("   Final: [\(sliceConfig.startAngle)°, \(adjustedEndAngle)°]")
+                
+                withAnimation(.easeOut(duration: 0.24).delay(animationInitialDelay)) {
+                    animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                    animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
+                    print("   ✅ Animation triggered!")
+                }
+                
+                // Fade in selection indicator with a simple hardcoded delay
+                let     % = 0.05
+                print("🕐 [Selection] Scheduling delayed fade-in: delay=\(selectionDelay)s, duration=0.2s")
+                
+                // Use DispatchQueue instead of withAnimation delay to survive view recreation
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        selectionIndicatorOpacity = 1.0
+                        print("   ✅ Selection opacity -> 1.0")
+                    }
+                }
+                
+                // Mark as completed after animation finishes
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
+                    hasCompletedInitialSelectionFade = true
+                    print("   ✅ Selection fade completed - flag set to true")
+                }
+            } else {
+                // For non-center or full circle: set angles directly without animation
+                print("🎭 [RingView] No slice animation (fullCircle: \(sliceConfig.isFullCircle), positioning: \(sliceConfig.positioning))")
+                animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                animatedSliceEndAngle = Angle(degrees: sliceConfig.endAngle)
+                
+                // Fade in selection indicator with a simple hardcoded delay
+                let selectionDelay = 0.05
+                print("🕐 [Selection] Scheduling delayed fade-in (no bg animation): delay=\(selectionDelay)s, duration=0.2s")
+                
+                // Use DispatchQueue instead of withAnimation delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        selectionIndicatorOpacity = 1.0
+                        print("   ✅ Selection opacity -> 1.0")
+                    }
+                }
+                
+                // Mark as completed after animation finishes
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
+                    hasCompletedInitialSelectionFade = true
+                    print("   ✅ Selection fade completed - flag set to true")
+                }
+            }
+            
             // Trigger staggered fade-in animation
             animateIconsIn()
             
