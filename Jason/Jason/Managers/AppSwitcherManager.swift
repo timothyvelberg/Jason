@@ -390,7 +390,6 @@ extension AppSwitcherManager: FunctionProvider {
                 name: app.localizedName ?? "Unknown",
                 icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
                 contextActions: contextActions,
-                preferredLayout: .partialSlice,
                 itemAngleSize: 12,
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .execute { [weak self] in
@@ -423,6 +422,7 @@ extension AppSwitcherManager: FunctionProvider {
                 children: appNodes,
                 maxDisplayedChildren: 12,  // Limit to 12 apps in the pie slice
                 preferredLayout: .partialSlice,  // Use full circle for many apps
+                slicePositioning: .startClockwise,
                 providerId: self.providerId,
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .expand,           // Click to expand applications

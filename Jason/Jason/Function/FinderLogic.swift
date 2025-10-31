@@ -398,7 +398,7 @@ class FinderLogic: FunctionProvider {
             itemAngleSize: 20,
             previewURL: url,
             showLabel: true,
-            slicePositioning: .startClockwise,
+            slicePositioning: .center,
             
             metadata: [
                 "folderURL": item.path,
@@ -521,7 +521,7 @@ class FinderLogic: FunctionProvider {
             icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
             children: favoriteChildren,
             preferredLayout: .partialSlice,
-            slicePositioning: .startClockwise,
+            slicePositioning: .center,
             onLeftClick: .expand,
             onRightClick: .expand,
             onBoundaryCross: .expand

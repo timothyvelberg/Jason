@@ -24,6 +24,17 @@ struct RingView: View {
     private let animationStartScale: CGFloat = 0.9     // Starting scale (0.9 = 90% size)
     private let animationRotationOffset: Double = -10  // Starting rotation offset in degrees (negative = counter-clockwise)
     
+    // Animation mode selection
+    enum AnimationMode {
+        case linear       // Animate from start to end (clockwise/counter-clockwise layouts)
+        case centerOut    // Animate from center outward (center layout)
+    }
+    
+    // Automatically select animation mode based on slice positioning
+    private var animationMode: AnimationMode {
+        return sliceConfig.positioning == .center ? .centerOut : .linear
+    }
+    
     // Animation state
     @State private var startAngle: Angle = .degrees(0)
     @State private var endAngle: Angle = .degrees(90)
@@ -50,6 +61,17 @@ struct RingView: View {
         
         // Clamp to reasonable bounds (20ms minimum, base delay maximum)
         return max(0.01, min(calculatedDelay, animationBaseStaggerDelay))
+    }
+    
+    // Effective stagger delay based on animation mode
+    private var effectiveStaggerDelay: Double {
+        switch animationMode {
+        case .linear:
+            return adaptiveStaggerDelay
+        case .centerOut:
+            // Use 3x larger delay for center-out to make the effect more pronounced
+            return adaptiveStaggerDelay * 3.0
+        }
     }
     
     // Calculated properties
@@ -363,6 +385,19 @@ struct RingView: View {
     // MARK: - Staggered Animation
     
     private func animateIconsIn() {
+        // Dispatch to appropriate animation based on mode
+        print("🎬 [RingView] animateIconsIn called - mode: \(animationMode)")
+        switch animationMode {
+        case .linear:
+            animateIconsInLinear()
+        case .centerOut:
+            animateIconsInFromCenter()
+        }
+    }
+    
+    // MARK: - Linear Animation (Original)
+    
+    private func animateIconsInLinear() {
         // Reset all opacities to 0, scales to starting value, and rotation offsets
         for node in nodes {
             iconOpacities[node.id] = 0
@@ -372,13 +407,140 @@ struct RingView: View {
         
         // Animate each icon in with initial delay + staggered delay
         for (index, node) in nodes.enumerated() {
-            let delay = animationInitialDelay + (Double(index) * adaptiveStaggerDelay)
+            let delay = animationInitialDelay + (Double(index) * effectiveStaggerDelay)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 withAnimation(.easeOut(duration: self.animationDuration)) {
                     iconOpacities[node.id] = 1.0
                     iconScales[node.id] = 1.0
                     iconRotationOffsets[node.id] = 0  // Rotate to final position
+                }
+            }
+        }
+    }
+    
+    // MARK: - Center-Out Animation
+    
+    private func animateIconsInFromCenter() {
+        print("🎯 [CENTER-OUT] Starting animation for \(nodes.count) nodes")
+        
+        let totalCount = nodes.count
+        guard totalCount > 0 else { return }
+        
+        // Determine center point for rotation offset calculation
+        let centerPoint: Double
+        if totalCount % 2 == 1 {
+            // Odd count: center is at the middle index
+            centerPoint = Double(totalCount / 2)
+        } else {
+            // Even count: center is between the two middle indices
+            centerPoint = Double(totalCount) / 2.0 - 0.5
+        }
+        
+        // Reset all opacities to 0, scales to starting value, and rotation offsets
+        // Apply symmetric rotation: left of center = +10°, right of center = -10°
+        print("   Center point: \(centerPoint)")
+        for (index, node) in nodes.enumerated() {
+            iconOpacities[node.id] = 0
+            iconScales[node.id] = animationStartScale
+            
+            // Determine rotation offset based on position relative to center
+            let rotationOffset: Double
+            if Double(index) < centerPoint {
+                // Left of center: rotate from +10° to 0° (counter-clockwise)
+                rotationOffset = abs(animationRotationOffset)
+            } else if Double(index) > centerPoint {
+                // Right of center: rotate from -10° to 0° (clockwise)
+                rotationOffset = -abs(animationRotationOffset)
+            } else {
+                // Exactly at center (odd count only): no rotation
+                rotationOffset = 0
+            }
+            iconRotationOffsets[node.id] = rotationOffset
+            print("   Item \(index): rotation offset = \(rotationOffset)°")
+        }
+        
+        // Build animation groups: items at same distance from center animate together
+        var animationGroups: [[Int]] = []
+        var processed = Set<Int>()
+        
+        // Start with center item(s)
+        if totalCount % 2 == 1 {
+            // Odd count: one center item
+            let centerIndex = totalCount / 2
+            animationGroups.append([centerIndex])
+            processed.insert(centerIndex)
+            print("   Group 0 (center): [\(centerIndex)]")
+        } else {
+            // Even count: two center items
+            let centerLeft = (totalCount / 2) - 1
+            let centerRight = totalCount / 2
+            animationGroups.append([centerLeft, centerRight])
+            processed.insert(centerLeft)
+            processed.insert(centerRight)
+            print("   Group 0 (center): [\(centerLeft), \(centerRight)]")
+        }
+        
+        // Build outward groups symmetrically
+        var distance = 1
+        while processed.count < totalCount {
+            var group: [Int] = []
+            
+            if totalCount % 2 == 1 {
+                // Odd count: expand from single center
+                let centerIndex = totalCount / 2
+                let leftIndex = centerIndex - distance
+                let rightIndex = centerIndex + distance
+                
+                if leftIndex >= 0 && !processed.contains(leftIndex) {
+                    group.append(leftIndex)
+                    processed.insert(leftIndex)
+                }
+                if rightIndex < totalCount && !processed.contains(rightIndex) {
+                    group.append(rightIndex)
+                    processed.insert(rightIndex)
+                }
+            } else {
+                // Even count: expand from the gap between center items
+                let centerLeft = (totalCount / 2) - 1
+                let leftIndex = centerLeft - distance
+                let rightIndex = centerLeft + 1 + distance
+                
+                if leftIndex >= 0 && !processed.contains(leftIndex) {
+                    group.append(leftIndex)
+                    processed.insert(leftIndex)
+                }
+                if rightIndex < totalCount && !processed.contains(rightIndex) {
+                    group.append(rightIndex)
+                    processed.insert(rightIndex)
+                }
+            }
+            
+            if !group.isEmpty {
+                print("   Group \(animationGroups.count) (distance \(distance)): \(group)")
+                animationGroups.append(group)
+            }
+            
+            distance += 1
+        }
+        
+        print("   Total groups: \(animationGroups.count)")
+        print("   Stagger delay: \(effectiveStaggerDelay)s")
+        
+        // Animate each group with increasing delay
+        for (groupIndex, group) in animationGroups.enumerated() {
+            let delay = animationInitialDelay + (Double(groupIndex) * effectiveStaggerDelay)
+            print("   Group \(groupIndex) will animate at \(delay)s")
+            
+            for index in group {
+                let node = nodes[index]
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    withAnimation(.easeOut(duration: self.animationDuration)) {
+                        iconOpacities[node.id] = 1.0
+                        iconScales[node.id] = 1.0
+                        iconRotationOffsets[node.id] = 0
+                    }
                 }
             }
         }
