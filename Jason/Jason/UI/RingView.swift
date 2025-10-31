@@ -18,11 +18,11 @@ struct RingView: View {
     let iconSize: CGFloat
     
     // Animation configuration
-    private let animationInitialDelay: Double = 0.1// Initial delay before animation starts (seconds)
-    private let animationBaseStaggerDelay: Double = 0.025   // Delay between each icon (seconds)
-    private let animationDuration: Double = 0.25       // Duration of fade/scale animation
-    private let animationStartScale: CGFloat = 0.9     // Starting scale (0.9 = 90% size)
-    private let animationRotationOffset: Double = -10  // Starting rotation offset in degrees (negative = counter-clockwise)
+    private let animationInitialDelay: Double = 0.06         // Initial delay before animation starts (seconds)
+    private let animationBaseStaggerDelay: Double = 0.02    // Delay between each icon (seconds)
+    private let animationDuration: Double = 0.25            // Duration of fade/scale animation
+    private let animationStartScale: CGFloat = 0.9          // Starting scale (0.9 = 90% size)
+    private let animationRotationOffset: Double = -10       // Starting rotation offset in degrees (negative = counter-clockwise)
     
     // Animation mode selection
     enum AnimationMode {
@@ -260,7 +260,7 @@ struct RingView: View {
                 animatedSliceStartAngle = Angle(degrees: centerAngle - initialSliceSize / 2)
                 animatedSliceEndAngle = Angle(degrees: centerAngle + initialSliceSize / 2)
                 
-                withAnimation(.easeOut(duration: 0.3).delay(animationInitialDelay)) {
+                withAnimation(.easeOut(duration: 0.3)) {
                     animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
                     animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
                 }
@@ -347,14 +347,14 @@ struct RingView: View {
                 print("   Initial: [\(centerAngle - initialSliceSize / 2)°, \(centerAngle + initialSliceSize / 2)°] (size: \(initialSliceSize)°)")
                 print("   Final: [\(sliceConfig.startAngle)°, \(adjustedEndAngle)°]")
                 
-                withAnimation(.easeOut(duration: 0.24).delay(animationInitialDelay)) {
+                withAnimation(.easeOut(duration: 0.24)) {
                     animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
                     animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
                     print("   ✅ Animation triggered!")
                 }
                 
                 // Fade in selection indicator with a simple hardcoded delay
-                let     % = 0.05
+                let selectionDelay = 0.05
                 print("🕐 [Selection] Scheduling delayed fade-in: delay=\(selectionDelay)s, duration=0.2s")
                 
                 // Use DispatchQueue instead of withAnimation delay to survive view recreation
