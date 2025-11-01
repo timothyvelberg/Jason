@@ -11,6 +11,28 @@ import SwiftUI
 
 class FunctionManager: ObservableObject {
     
+    // MARK: - Configuration Constants
+    
+    /// Default angle per item when stacking (Phase 1) - for Ring 0
+    private let defaultAngle: Double = 30
+    
+    /// Maximum arc angle before switching to distribution (Phase 2 trigger) - for Ring 0
+    private let maxAngle: Double = 180
+    
+    /// Minimum angle per item - hard limit for spacing (Phase 3 trigger & hard cap) - for Ring 0
+    private let minimalAngle: Double = 20
+    
+    /// Angle scaling per ring depth (0.0-1.0)
+    /// 1.0 = no scaling (same angles for all rings)
+    /// 0.9 = each ring uses 90% of previous ring's angles (10% reduction per level)
+    /// 0.8 = each ring uses 80% of previous ring's angles (20% reduction per level)
+    private let angleScalePerRing: Double = 0.8
+    
+    /// Maximum items that can be displayed (calculated from minimalAngle)
+    private var maxItems: Int {
+        return Int(360.0 / minimalAngle)
+    }
+    
     // MARK: - Ring State Structure
     
     struct RingState {
@@ -105,6 +127,13 @@ class FunctionManager: ObservableObject {
         
         for (index, ringState) in rings.enumerated() {
 //            print("🔧 [Ring \(index)] Processing ring with \(ringState.nodes.count) nodes, collapsed: \(ringState.isCollapsed)")
+            
+            // Enforce hard cap on number of items (truncate excess nodes)
+            let nodes = Array(ringState.nodes.prefix(maxItems))
+            if ringState.nodes.count > maxItems {
+                print("✂️ [Ring \(index)] Truncated from \(ringState.nodes.count) to \(nodes.count) items (hard cap)")
+            }
+            
             let sliceConfig: PieSliceConfig
             
             // Determine thickness and icon size
@@ -119,16 +148,20 @@ class FunctionManager: ObservableObject {
                 
                 // Collapsed rings use their existing slice config
                 if index == 0 {
-                    sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                    let itemCount = nodes.count
+                    let itemAngle = 360.0 / Double(itemCount)
+                    sliceConfig = .fullCircle(itemCount: itemCount, anglePerItem: itemAngle)
                 } else {
                     guard let parentInfo = getParentInfo(for: index, configs: configs) else {
                         print("❌ [Ring \(index)] No parent info - using defaults and CONTINUING")
-                        sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                        let itemCount = nodes.count
+                        let itemAngle = 360.0 / Double(itemCount)
+                        sliceConfig = .fullCircle(itemCount: itemCount, anglePerItem: itemAngle)
                         configs.append(RingConfiguration(
                             level: index,
                             startRadius: currentRadius,
                             thickness: ringThickness,
-                            nodes: ringState.nodes,
+                            nodes: nodes,
                             selectedIndex: ringState.hoveredIndex,
                             sliceConfig: sliceConfig,
                             iconSize: iconSize
@@ -137,60 +170,47 @@ class FunctionManager: ObservableObject {
                         continue
                     }
                     
-                    let itemCount = ringState.nodes.count
+                    let itemCount = nodes.count
                     let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
                     
-                    let threshold = parentInfo.node.partialSliceThreshold ?? calculateThreshold(
-                        for: index,
-                        startRadius: currentRadius,
-                        thickness: ringThickness
-                    )
-                    if preferredLayout == .partialSlice && itemCount >= threshold {
-                        // Choose angle based on positioning
-                        let positioning = parentInfo.node.slicePositioning ?? .startClockwise
-                        let itemAngle = 360.0 / Double(max(itemCount, 1))
-                        let startAngle: Double
-                        
-                        switch positioning {
-                        case .center:
-                            // For center positioning, we want the CENTER ITEM to be at parent angle
-                            // Calculate which item is the center
-                            let centerIndex = Double(itemCount) / 2.0 - 0.5  // For 11 items: 5.0, for 10 items: 4.5
-                            let parentAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
-                            // Offset start angle so center item ends up at parent angle
-                            // iconAngle = startAngle + (index * itemAngle) + (itemAngle / 2)
-                            // We want: parentAngle = startAngle + (centerIndex * itemAngle) + (itemAngle / 2)
-                            // Therefore: startAngle = parentAngle - (centerIndex * itemAngle) - (itemAngle / 2)
-                            startAngle = parentAngle - (centerIndex * itemAngle) - (itemAngle / 2)
-                        case .startCounterClockwise:
-                            startAngle = parentInfo.rightEdge
-                        case .startClockwise:
-                            startAngle = parentInfo.leftEdge
+                    // Check if node has custom itemAngleSize override
+                    let (shouldConvertToFull, anglePerItem, totalAngle): (Bool, Double, Double)
+                    if let customAngle = parentInfo.node.itemAngleSize {
+                        // Override: use custom angle size
+                        let total = Double(itemCount) * customAngle
+                        if total >= 360.0 {
+                            // Exceeds full circle - convert and distribute
+                            let distributed = 360.0 / Double(itemCount)
+                            print("📐 Custom Override: \(itemCount) items × \(customAngle)° = \(total)° → Full Circle at \(distributed)° each")
+                            (shouldConvertToFull, anglePerItem, totalAngle) = (true, distributed, 360.0)
+                        } else {
+                            // Use custom angle as-is
+                            print("📐 Custom Override: \(itemCount) items × \(customAngle)° = \(total)°")
+                            (shouldConvertToFull, anglePerItem, totalAngle) = (false, customAngle, total)
                         }
-                        sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle, positioning: positioning)
-                    } else if preferredLayout == .fullCircle {
-                        let positioning = parentInfo.node.slicePositioning ?? .startClockwise
-                        let itemAngle = 360.0 / Double(max(itemCount, 1))
+                    } else {
+                        // Use phase-based configuration system
+                        (shouldConvertToFull, anglePerItem, totalAngle) = calculateSliceConfiguration(itemCount: itemCount, ringIndex: index)
+                    }
+                    
+                    let positioning = parentInfo.node.slicePositioning ?? .startClockwise
+                    
+                    if preferredLayout == .fullCircle || shouldConvertToFull {
+                        // Full circle layout
                         let startAngle: Double
-                        
                         switch positioning {
                         case .center:
-                            // For center positioning, center item should be at parent angle
                             let centerIndex = Double(itemCount) / 2.0 - 0.5
                             let parentAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
-                            startAngle = parentAngle - (centerIndex * itemAngle) - (itemAngle / 2)
+                            startAngle = parentAngle - (centerIndex * anglePerItem) - (anglePerItem / 2)
                         case .startCounterClockwise:
                             startAngle = parentInfo.rightEdge
                         case .startClockwise:
                             startAngle = parentInfo.leftEdge
                         }
-                        sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle, positioning: positioning)
+                        sliceConfig = .fullCircle(itemCount: itemCount, anglePerItem: anglePerItem, startingAt: startAngle, positioning: positioning)
                     } else {
-                        // Partial slice with positioning
-                        let customAngle = parentInfo.node.itemAngleSize ?? 30.0
-                        let positioning = parentInfo.node.slicePositioning ?? .startClockwise
-                        
-                        // Choose the correct angle based on positioning
+                        // Partial slice layout
                         let startingAngle: Double
                         switch positioning {
                         case .center:
@@ -201,21 +221,12 @@ class FunctionManager: ObservableObject {
                             startingAngle = parentInfo.leftEdge
                         }
                         
-                        if itemCount == 1 {
-                            sliceConfig = .partialSlice(
-                                itemCount: 1,
-                                centeredAt: startingAngle,
-                                defaultItemAngle: parentInfo.node.itemAngleSize ?? parentInfo.parentItemAngle,
-                                positioning: positioning
-                            )
-                        } else {
-                            sliceConfig = .partialSlice(
-                                itemCount: itemCount,
-                                centeredAt: startingAngle,
-                                defaultItemAngle: customAngle,
-                                positioning: positioning
-                            )
-                        }
+                        sliceConfig = .partialSlice(
+                            itemCount: itemCount,
+                            centeredAt: startingAngle,
+                            defaultItemAngle: anglePerItem,
+                            positioning: positioning
+                        )
                     }
                 }
             }else if index == 0 {
@@ -224,23 +235,25 @@ class FunctionManager: ObservableObject {
                 iconSize = defaultIconSize
                 
                 // Calculate offset to center first item at 0° (top) this sets the default angle on the first ring
-                let itemCount = ringState.nodes.count
+                let itemCount = nodes.count
                 let itemAngle = 360.0 / Double(itemCount)
                 let offset = -(itemAngle / 2)
                 
-                sliceConfig = .fullCircle(itemCount: itemCount, startingAt: offset)
+                sliceConfig = .fullCircle(itemCount: itemCount, anglePerItem: itemAngle, startingAt: offset)
 //                print("🎯 Ring 0: Shifted by \(offset)° to center first item at 0° (itemAngle: \(itemAngle)°)")
             } else {
                 // Ring 1+ - get parent info
                 guard let parentInfo = getParentInfo(for: index, configs: configs) else {
                     ringThickness = defaultRingThickness
                     iconSize = defaultIconSize
-                    sliceConfig = .fullCircle(itemCount: ringState.nodes.count)
+                    let itemCount = nodes.count
+                    let itemAngle = 360.0 / Double(itemCount)
+                    sliceConfig = .fullCircle(itemCount: itemCount, anglePerItem: itemAngle)
                     configs.append(RingConfiguration(
                         level: index,
                         startRadius: currentRadius,
                         thickness: ringThickness,
-                        nodes: ringState.nodes,
+                        nodes: nodes,
                         selectedIndex: ringState.hoveredIndex,
                         sliceConfig: sliceConfig,
                         iconSize: iconSize
@@ -253,62 +266,47 @@ class FunctionManager: ObservableObject {
                 ringThickness = parentInfo.node.childRingThickness ?? defaultRingThickness
                 iconSize = parentInfo.node.childIconSize ?? defaultIconSize
                 
-                let itemCount = ringState.nodes.count
+                let itemCount = nodes.count
                 let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
                 
-                
-                // Decide slice type based on preference and item count
-                // Get threshold: use node's custom value OR calculate from ring size
-                let threshold = parentInfo.node.partialSliceThreshold ?? calculateThreshold(
-                    for: index,
-                    startRadius: currentRadius,
-                    thickness: ringThickness
-                )
-                if preferredLayout == .partialSlice && itemCount >= threshold {
-                        print("Ring \(index): Auto-converting to FULL CIRCLE (\(itemCount) items >= threshold \(threshold))")
-                    let positioning = parentInfo.node.slicePositioning ?? .startClockwise
-                    let itemAngle = 360.0 / Double(max(itemCount, 1))
-                    let startAngle: Double
-                    
-                    switch positioning {
-                    case .center:
-                        // For center positioning, center item should be at parent angle
-                        let centerIndex = Double(itemCount) / 2.0 - 0.5
-                        let parentAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
-                        startAngle = parentAngle - (centerIndex * itemAngle) - (itemAngle / 2)
-                    case .startCounterClockwise:
-                        startAngle = parentInfo.rightEdge
-                    case .startClockwise:
-                        startAngle = parentInfo.leftEdge
+                // Check if node has custom itemAngleSize override
+                let (shouldConvertToFull, anglePerItem, totalAngle): (Bool, Double, Double)
+                if let customAngle = parentInfo.node.itemAngleSize {
+                    // Override: use custom angle size
+                    let total = Double(itemCount) * customAngle
+                    if total >= 360.0 {
+                        // Exceeds full circle - convert and distribute
+                        let distributed = 360.0 / Double(itemCount)
+                        print("📐 Custom Override: \(itemCount) items × \(customAngle)° = \(total)° → Full Circle at \(distributed)° each")
+                        (shouldConvertToFull, anglePerItem, totalAngle) = (true, distributed, 360.0)
+                    } else {
+                        // Use custom angle as-is
+                        print("📐 Custom Override: \(itemCount) items × \(customAngle)° = \(total)°")
+                        (shouldConvertToFull, anglePerItem, totalAngle) = (false, customAngle, total)
                     }
-                    sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle, positioning: positioning)
-                    
-                } else if preferredLayout == .fullCircle {
-//                    print("Ring \(index): Using FULL CIRCLE layout (parent '\(parentInfo.node.name)' preference)")
-                    let positioning = parentInfo.node.slicePositioning ?? .startClockwise
-                    let itemAngle = 360.0 / Double(max(itemCount, 1))
-                    let startAngle: Double
-                    
-                    switch positioning {
-                    case .center:
-                        // For center positioning, center item should be at parent angle
-                        let centerIndex = Double(itemCount) / 2.0 - 0.5
-                        let parentAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
-                        startAngle = parentAngle - (centerIndex * itemAngle) - (itemAngle / 2)
-                    case .startCounterClockwise:
-                        startAngle = parentInfo.rightEdge
-                    case .startClockwise:
-                        startAngle = parentInfo.leftEdge
-                    }
-                    sliceConfig = .fullCircle(itemCount: itemCount, startingAt: startAngle, positioning: positioning)
-                    
                 } else {
-//                    print("Ring \(index): Using PARTIAL SLICE layout (parent '\(parentInfo.node.name)' preference, \(itemCount) items)")
-                    
-                    let customAngle = parentInfo.node.itemAngleSize ?? 30.0
-                    let positioning = parentInfo.node.slicePositioning ?? .startClockwise
-                    
-                    // Choose the correct angle based on positioning
+                    // Use phase-based configuration system
+                    (shouldConvertToFull, anglePerItem, totalAngle) = calculateSliceConfiguration(itemCount: itemCount, ringIndex: index)
+                }
+                
+                let positioning = parentInfo.node.slicePositioning ?? .startClockwise
+                
+                if preferredLayout == .fullCircle || shouldConvertToFull {
+                    // Full circle layout
+                    let startAngle: Double
+                    switch positioning {
+                    case .center:
+                        let centerIndex = Double(itemCount) / 2.0 - 0.5
+                        let parentAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
+                        startAngle = parentAngle - (centerIndex * anglePerItem) - (anglePerItem / 2)
+                    case .startCounterClockwise:
+                        startAngle = parentInfo.rightEdge
+                    case .startClockwise:
+                        startAngle = parentInfo.leftEdge
+                    }
+                    sliceConfig = .fullCircle(itemCount: itemCount, anglePerItem: anglePerItem, startingAt: startAngle, positioning: positioning)
+                } else {
+                    // Partial slice layout
                     let startingAngle: Double
                     switch positioning {
                     case .center:
@@ -319,28 +317,12 @@ class FunctionManager: ObservableObject {
                         startingAngle = parentInfo.leftEdge
                     }
                     
-//                    print("🎯 Ring \(index) alignment:")
-//                    print("   Parent left edge: \(parentInfo.leftEdge)°, right edge: \(parentInfo.rightEdge)°")
-//                    print("   Positioning: \(positioning), using angle: \(startingAngle)°")
-//                    print("   itemAngleSize: \(customAngle)°")
-                    
-                    if itemCount == 1 {
-                        sliceConfig = .partialSlice(
-                            itemCount: 1,
-                            centeredAt: startingAngle,
-                            defaultItemAngle: parentInfo.node.itemAngleSize ?? parentInfo.parentItemAngle,
-                            positioning: positioning
-                        )
-                    } else {
-                        sliceConfig = .partialSlice(
-                            itemCount: itemCount,
-                            centeredAt: startingAngle,
-                            defaultItemAngle: customAngle,
-                            positioning: positioning
-                        )
-                    }
-                    
-                    print("   Result: startAngle=\(sliceConfig.startAngle)°, endAngle=\(sliceConfig.endAngle)°")
+                    sliceConfig = .partialSlice(
+                        itemCount: itemCount,
+                        centeredAt: startingAngle,
+                        defaultItemAngle: anglePerItem,
+                        positioning: positioning
+                    )
                 }
             }
             
@@ -348,7 +330,7 @@ class FunctionManager: ObservableObject {
                 level: index,
                 startRadius: currentRadius,
                 thickness: ringThickness,
-                nodes: ringState.nodes,
+                nodes: nodes,
                 selectedIndex: ringState.hoveredIndex,
                 sliceConfig: sliceConfig,
                 iconSize: iconSize
@@ -359,31 +341,64 @@ class FunctionManager: ObservableObject {
         return configs
     }
     
-    /// Calculate the threshold for when to switch from partial to fullCircle based on ring depth
-    /// Deeper rings (larger radius) can hold more items before needing to switch
-    private func calculateThreshold(for ringIndex: Int, startRadius: CGFloat, thickness: CGFloat) -> Int {
-        // Calculate the radius at the center of the ring (where icons sit)
-        let iconCenterRadius = startRadius + (thickness / 2)
+    /// Calculate configuration for a partial slice based on item count
+    /// Returns: (shouldConvertToFullCircle, anglePerItem, totalAngle)
+    private func calculateSliceConfiguration(itemCount: Int, ringIndex: Int) -> (shouldConvertToFullCircle: Bool, anglePerItem: Double, totalAngle: Double) {
+        // Apply scaling based on ring depth
+        let scaleFactor = pow(angleScalePerRing, Double(ringIndex))
+        let scaledDefaultAngle = defaultAngle * scaleFactor
+        let scaledMaxAngle = maxAngle * scaleFactor
+        let scaledMinimalAngle = minimalAngle * scaleFactor
         
-        // Calculate circumference at icon center
-        let circumference = 2 * .pi * iconCenterRadius
+        // Enforce hard cap
+        let cappedCount = min(itemCount, maxItems)
         
-        // Assume each item needs ~42 points of space (32pt icon + 10pt spacing)
-        let spacePerItem: CGFloat = 42
+        // Phase 1: Stacking at defaultAngle
+        // Continue until total would exceed maxAngle
+        let phase1Threshold = Int(scaledMaxAngle / scaledDefaultAngle)
         
-        // For partial slice (~180° = half circle), we can fit:
-        let halfCircleCapacity = Int((circumference / 2) / spacePerItem)
+        if cappedCount <= phase1Threshold {
+            // Phase 1: Stack at defaultAngle
+            let totalAngle = Double(cappedCount) * scaledDefaultAngle
+            print("📐 Ring \(ringIndex) Phase 1 (Stack): \(cappedCount) items × \(scaledDefaultAngle)° = \(totalAngle)° [scale: \(scaleFactor)]")
+            return (false, scaledDefaultAngle, totalAngle)
+        }
         
-        // Use 80% of theoretical capacity for comfortable spacing
-        let threshold = Int(Double(halfCircleCapacity) * 0.8)
+        // Phase 2: Distribute over maxAngle
+        // Continue until anglePerItem would drop below minimalAngle
+        let phase2Threshold = Int(scaledMaxAngle / scaledMinimalAngle)
         
-        // Clamp to reasonable bounds: minimum 6, maximum 25
-        let finalThreshold = max(6, min(threshold, 25))
+        if cappedCount <= phase2Threshold {
+            // Phase 2: Distribute over maxAngle
+            let anglePerItem = scaledMaxAngle / Double(cappedCount)
+            print("📐 Ring \(ringIndex) Phase 2 (Distribute): \(cappedCount) items over \(scaledMaxAngle)° = \(anglePerItem)° each [scale: \(scaleFactor)]")
+            return (false, anglePerItem, scaledMaxAngle)
+        }
         
-        // 🆕 Debug logging
-        print("📐 Ring \(ringIndex): radius=\(Int(iconCenterRadius)), circumference=\(Int(circumference)), halfCapacity=\(halfCircleCapacity), threshold=\(finalThreshold)")
+        // Phase 3: Stack at minimalAngle
+        // Continue until total reaches 360°
+        let totalAngle = Double(cappedCount) * scaledMinimalAngle
         
-        return finalThreshold
+        // If we're close to 360° (within one item's worth), convert to full circle
+        let fullCircleThreshold = 360.0 - scaledMinimalAngle
+        
+        if totalAngle >= fullCircleThreshold {
+            // Close enough to 360° - convert to full circle and distribute evenly
+            let anglePerItem = 360.0 / Double(cappedCount)
+            print("📐 Ring \(ringIndex) Phase 3→4 (Near Full): \(cappedCount) items at \(totalAngle)° → Full Circle at \(anglePerItem)° each [scale: \(scaleFactor)]")
+            return (true, anglePerItem, 360.0)
+        }
+        
+        if totalAngle < 360.0 {
+            // Phase 3: Stack at minimalAngle
+            print("📐 Ring \(ringIndex) Phase 3 (Stack Min): \(cappedCount) items × \(scaledMinimalAngle)° = \(totalAngle)° [scale: \(scaleFactor)]")
+            return (false, scaledMinimalAngle, totalAngle)
+        }
+        
+        // Phase 4: Full circle (total >= 360°)
+        let anglePerItem = 360.0 / Double(cappedCount)
+        print("📐 Ring \(ringIndex) Phase 4 (Full Circle): \(cappedCount) items at \(anglePerItem)° each [scale: \(scaleFactor)]")
+        return (true, anglePerItem, 360.0)
     }
     
     private func getParentInfo(for ringIndex: Int, configs: [RingConfiguration]) -> ParentInfo? {

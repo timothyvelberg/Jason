@@ -339,7 +339,7 @@ class FinderLogic: FunctionProvider {
             ],
             
             preferredLayout: .partialSlice,
-            itemAngleSize: 20,
+            itemAngleSize: 16,
             previewURL: url,
             showLabel: true,
             slicePositioning: .center,
@@ -395,7 +395,7 @@ class FinderLogic: FunctionProvider {
                 StandardContextActions.deleteFile(url)
             ],
             preferredLayout: .partialSlice,
-            itemAngleSize: 20,
+            itemAngleSize: 16,
             previewURL: url,
             showLabel: true,
             slicePositioning: .center,
@@ -911,7 +911,7 @@ class FinderLogic: FunctionProvider {
                 StandardContextActions.deleteFile(url)
             ],
             preferredLayout: .partialSlice,
-            itemAngleSize: 20,
+            itemAngleSize: 16,
             previewURL: url,
             showLabel: true,
             slicePositioning: .center,
@@ -994,13 +994,13 @@ class FinderLogic: FunctionProvider {
             icon: dragImage,
             
             contextActions: [
-                StandardContextActions.deleteFile(url),
                 StandardContextActions.copyFile(url),
+                StandardContextActions.deleteFile(url),
                 StandardContextActions.showInFinder(url)
             ],
 
             preferredLayout: .partialSlice,
-            itemAngleSize: 15,
+            itemAngleSize: 16,
             previewURL: url,
             showLabel: true,
             slicePositioning: .center,

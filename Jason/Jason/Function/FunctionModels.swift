@@ -288,23 +288,21 @@ struct PieSliceConfig {
     }
     
     // Factory method for full circle
-    static func fullCircle(itemCount: Int, positioning: SlicePositioning = .startClockwise) -> PieSliceConfig {
-        let itemAngle = 360.0 / Double(max(itemCount, 1))
+    static func fullCircle(itemCount: Int, anglePerItem: Double, positioning: SlicePositioning = .startClockwise) -> PieSliceConfig {
         return PieSliceConfig(
             startAngle: 0,
             endAngle: 360,
-            itemAngle: itemAngle,
+            itemAngle: anglePerItem,
             positioning: positioning
         )
     }
     
     // Factory method for full circle with custom start
-    static func fullCircle(itemCount: Int, startingAt angle: Double = 0, positioning: SlicePositioning = .startClockwise) -> PieSliceConfig {
-        let itemAngle = 360.0 / Double(max(itemCount, 1))
+    static func fullCircle(itemCount: Int, anglePerItem: Double, startingAt angle: Double = 0, positioning: SlicePositioning = .startClockwise) -> PieSliceConfig {
         return PieSliceConfig(
             startAngle: angle,
             endAngle: angle + 360,
-            itemAngle: itemAngle,
+            itemAngle: anglePerItem,
             positioning: positioning
         )
     }
