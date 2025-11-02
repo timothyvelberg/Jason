@@ -20,6 +20,7 @@ class CircularUIManager: ObservableObject {
     
     private var overlayWindow: OverlayWindow?
     private(set) var appSwitcher: AppSwitcherManager?
+    private(set) var combinedAppsProvider: CombinedAppsProvider?
     var functionManager: FunctionManager?
     private var mouseTracker: MouseTracker?
     private var gestureManager: GestureManager?
@@ -184,7 +185,7 @@ class CircularUIManager: ObservableObject {
 //    }
     
     func setup() {
-        // Create AppSwitcherManager internally
+        // Create AppSwitcherManager internally (still needed for MRU tracking and app management)
         let appSwitcher = AppSwitcherManager()
         self.appSwitcher = appSwitcher
         
@@ -193,15 +194,14 @@ class CircularUIManager: ObservableObject {
         // Create FunctionManager with providers
         self.functionManager = FunctionManager()
         
-        // Register AppSwitcher as a provider
-        functionManager?.registerProvider(appSwitcher)
+        //Register CombinedAppsProvider (replaces separate AppSwitcher and FavoriteApps providers)
+        let combinedAppsProvider = CombinedAppsProvider()
+        combinedAppsProvider.appSwitcherManager = appSwitcher
+        combinedAppsProvider.circularUIManager = self
+        self.combinedAppsProvider = combinedAppsProvider  // 🆕 Store reference
+        functionManager?.registerProvider(combinedAppsProvider)
         
         functionManager?.registerProvider(SystemActionsProvider())
-        
-        // Register Favorites Provider
-        let favoriteAppsProvider = FavoriteAppsProvider()
-        favoriteAppsProvider.appSwitcherManager = appSwitcher
-        functionManager?.registerProvider(favoriteAppsProvider)
 
         functionManager?.registerProvider(FinderLogic())
 
@@ -944,7 +944,7 @@ class CircularUIManager: ObservableObject {
         print("   Active ring level: \(functionManager.activeRingLevel)")
         print("   Total rings: \(functionManager.rings.count)")
         
-        appSwitcher?.startAutoRefresh()
+        combinedAppsProvider?.startAutoRefresh()
     }
     
     // MARK: - Modified hide() method
@@ -980,7 +980,7 @@ class CircularUIManager: ObservableObject {
         
         print("Hiding circular UI")
         
-        appSwitcher?.stopAutoRefresh()
+        combinedAppsProvider?.stopAutoRefresh()
     }
     
     /// Temporarily ignore focus changes (used during app quit/launch to prevent unwanted UI hiding)
