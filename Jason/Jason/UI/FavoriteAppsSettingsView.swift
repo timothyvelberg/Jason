@@ -56,25 +56,23 @@ struct FavoriteAppsSettingsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 1) {
-                        ForEach(favoriteApps) { app in
-                            FavoriteAppRow(
-                                app: app,
-                                onEdit: {
-                                    editingApp = app
-                                    showingEditSheet = true
-                                },
-                                onRemove: {
-                                    removeApp(app)
-                                }
-                            )
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                        }
+                List {
+                    ForEach(favoriteApps) { app in
+                        FavoriteAppRow(
+                            app: app,
+                            onEdit: {
+                                editingApp = app
+                                showingEditSheet = true
+                            },
+                            onRemove: {
+                                removeApp(app)
+                            }
+                        )
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
-                    .padding(.vertical, 8)
+                    .onMove(perform: moveApp)
                 }
+                .listStyle(.inset)
             }
             
             Divider()
@@ -149,6 +147,28 @@ struct FavoriteAppsSettingsView: View {
             loadFavoriteApps()
         }
     }
+    
+    private func moveApp(from source: IndexSet, to destination: Int) {
+        // Update local state first for immediate UI feedback
+        favoriteApps.move(fromOffsets: source, toOffset: destination)
+        
+        // Get the index we're moving from
+        guard let sourceIndex = source.first else { return }
+        
+        // Calculate actual destination (accounting for the removal)
+        let actualDestination = sourceIndex < destination ? destination - 1 : destination
+        
+        print("🔄 Moving app from index \(sourceIndex) to \(actualDestination)")
+        
+        // Update database order
+        if appsProvider.reorderFavorites(from: sourceIndex, to: actualDestination) {
+            print("✅ Successfully reordered favorites in database")
+        } else {
+            print("❌ Failed to reorder favorites - reverting")
+            // Revert local changes if database update failed
+            loadFavoriteApps()
+        }
+    }
 }
 
 // MARK: - Favorite App Row
@@ -162,6 +182,12 @@ struct FavoriteAppRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
+            // Drag indicator
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 14))
+                .foregroundColor(.secondary.opacity(0.5))
+                .help("Drag to reorder")
+            
             // App icon
             if let icon = appIcon {
                 Image(nsImage: icon)
