@@ -261,6 +261,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 contextActions: contextActions.isEmpty ? nil : contextActions,
                 itemAngleSize: 16,
                 slicePositioning: .center,
+                metadata: ["isRunning": entry.isRunning],  // 🆕 Add running state to metadata
                 providerId: providerId,
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: .execute { [weak self] in

@@ -45,6 +45,7 @@ struct RingView: View {
     @State private var iconOpacities: [String: Double] = [:]       // Track opacity per icon ID
     @State private var iconScales: [String: CGFloat] = [:]         // Track scale per icon ID
     @State private var iconRotationOffsets: [String: Double] = [:] // Track rotation offset per icon ID
+    @State private var runningIndicatorOpacities: [String: Double] = [:]  // Track running indicator opacity per icon ID
     
     // Animated slice background angles (for partial slice opening animation)
     @State private var animatedSliceStartAngle: Angle = .degrees(0)
@@ -185,13 +186,42 @@ struct RingView: View {
                     endAngle: endAngle,
                     innerRadiusRatio: innerRadiusRatio,
                     outerRadiusRatio: 1.0,
-                    insetPercentage: 1,
-                    cornerRadius: 8
+                    insetPercentage: 1
                 )
                 .fill(selectionColor, style: FillStyle(eoFill: true))
                 .frame(width: totalDiameter, height: totalDiameter)
                 .opacity(selectionIndicatorOpacity)  // Animated opacity
                 .allowsHitTesting(false)  // Don't block clicks
+            }
+            
+            // Running app indicators (thin arc at inner edge)
+            ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
+                if let metadata = node.metadata,
+                   let isRunning = metadata["isRunning"] as? Bool,
+                   isRunning {
+                    
+                    let centerAngle = calculateCenterAngle(for: index)
+                    let itemAngle = sliceConfig.itemAngle
+                    
+                    // Make indicator 5° narrower on each side (10° total)
+                    let indicatorStartAngle = centerAngle - (itemAngle / 2)
+                    let indicatorEndAngle = centerAngle + (itemAngle / 2)
+                    
+                    // Calculate outer radius ratio for thin band (5 points)
+                    let indicatorThickness: CGFloat = 2
+                    let indicatorOuterRadiusRatio = innerRadiusRatio + (indicatorThickness / endRadius)
+                    
+                    PieSliceShape(
+                        startAngle: .degrees(indicatorStartAngle - 90),
+                        endAngle: .degrees(indicatorEndAngle - 90),
+                        innerRadiusRatio: innerRadiusRatio,
+                        outerRadiusRatio: indicatorOuterRadiusRatio
+                    )
+                    .fill(Color.white.opacity(0.4))
+                    .opacity(runningIndicatorOpacities[node.id] ?? 0)  // Animated opacity
+                    .frame(width: totalDiameter, height: totalDiameter)
+                    .allowsHitTesting(false)
+                }
             }
             
             // Icons positioned around the ring (non-interactive, just visual)
@@ -563,6 +593,7 @@ struct RingView: View {
             iconOpacities[node.id] = 0
             iconScales[node.id] = animationStartScale
             iconRotationOffsets[node.id] = animationRotationOffset
+            runningIndicatorOpacities[node.id] = 0  // 🆕 Initialize running indicators to 0
         }
         
         // Animate each icon in with initial delay + staggered delay
@@ -574,6 +605,23 @@ struct RingView: View {
                     iconOpacities[node.id] = 1.0
                     iconScales[node.id] = 1.0
                     iconRotationOffsets[node.id] = 0  // Rotate to final position
+                }
+            }
+        }
+        
+        // 🆕 Animate running indicators after all icons are done
+        let lastIconDelay = animationInitialDelay + (Double(nodes.count - 1) * effectiveStaggerDelay)
+        let indicatorDelay = lastIconDelay + animationDuration
+        
+        for node in nodes {
+            // Check if this node is a running app
+            if let metadata = node.metadata,
+               let isRunning = metadata["isRunning"] as? Bool,
+               isRunning {
+                DispatchQueue.main.asyncAfter(deadline: .now() + indicatorDelay) {
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        runningIndicatorOpacities[node.id] = 1.0
+                    }
                 }
             }
         }
@@ -603,6 +651,7 @@ struct RingView: View {
         for (index, node) in nodes.enumerated() {
             iconOpacities[node.id] = 0
             iconScales[node.id] = animationStartScale
+            runningIndicatorOpacities[node.id] = 0  // 🆕 Initialize running indicators to 0
             
             // Determine rotation offset based on position relative to center
             let rotationOffset: Double
@@ -700,6 +749,23 @@ struct RingView: View {
                         iconOpacities[node.id] = 1.0
                         iconScales[node.id] = 1.0
                         iconRotationOffsets[node.id] = 0
+                    }
+                }
+            }
+        }
+        
+        // 🆕 Animate running indicators after all icons are done
+        let lastGroupDelay = animationInitialDelay + (Double(animationGroups.count - 1) * effectiveStaggerDelay)
+        let indicatorDelay = lastGroupDelay + animationDuration
+        
+        for node in nodes {
+            // Check if this node is a running app
+            if let metadata = node.metadata,
+               let isRunning = metadata["isRunning"] as? Bool,
+               isRunning {
+                DispatchQueue.main.asyncAfter(deadline: .now() + indicatorDelay) {
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        runningIndicatorOpacities[node.id] = 1.0
                     }
                 }
             }
