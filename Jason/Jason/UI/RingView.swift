@@ -64,7 +64,7 @@ struct RingView: View {
         }
         
         // For larger rings, reduce delay to keep total animation time reasonable
-        let maxTotalStagger: Double = 0.005
+        let maxTotalStagger: Double = 0.05
         let calculatedDelay = maxTotalStagger / Double(itemCount - 1)
         
         // Clamp to reasonable bounds (20ms minimum, base delay maximum)

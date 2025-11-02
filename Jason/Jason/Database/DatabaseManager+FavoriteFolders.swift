@@ -293,7 +293,7 @@ extension DatabaseManager {
                 if let angleSize = settings.itemAngleSize {
                     sqlite3_bind_int(settingsStatement, 3, Int32(angleSize))
                 } else {
-                    sqlite3_bind_int(settingsStatement, 3, 30)
+                    sqlite3_bind_null(settingsStatement, 3)  //Save NULL to use default calculation
                 }
                 
                 if let positioning = settings.slicePositioning {

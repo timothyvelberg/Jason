@@ -345,7 +345,7 @@ class FunctionManager: ObservableObject {
     /// Returns: (shouldConvertToFullCircle, anglePerItem, totalAngle)
     private func calculateSliceConfiguration(itemCount: Int, ringIndex: Int) -> (shouldConvertToFullCircle: Bool, anglePerItem: Double, totalAngle: Double) {
         // Apply scaling based on ring depth
-        let scaleFactor = pow(angleScalePerRing, Double(ringIndex))
+        let scaleFactor = pow(angleScalePerRing, Double(ringIndex - 1))
         let scaledDefaultAngle = defaultAngle * scaleFactor
         let scaledMaxAngle = maxAngle * scaleFactor
         let scaledMinimalAngle = minimalAngle * scaleFactor
@@ -360,7 +360,7 @@ class FunctionManager: ObservableObject {
         if cappedCount <= phase1Threshold {
             // Phase 1: Stack at defaultAngle
             let totalAngle = Double(cappedCount) * scaledDefaultAngle
-            print("📐 Ring \(ringIndex) Phase 1 (Stack): \(cappedCount) items × \(scaledDefaultAngle)° = \(totalAngle)° [scale: \(scaleFactor)]")
+            print("📐 🥕 Ring \(ringIndex) Phase 1 (Stack): \(cappedCount) items × \(scaledDefaultAngle)° = \(totalAngle)° [scale: \(scaleFactor)]")
             return (false, scaledDefaultAngle, totalAngle)
         }
         
@@ -371,7 +371,7 @@ class FunctionManager: ObservableObject {
         if cappedCount <= phase2Threshold {
             // Phase 2: Distribute over maxAngle
             let anglePerItem = scaledMaxAngle / Double(cappedCount)
-            print("📐 Ring \(ringIndex) Phase 2 (Distribute): \(cappedCount) items over \(scaledMaxAngle)° = \(anglePerItem)° each [scale: \(scaleFactor)]")
+            print("📐 🥦 Ring \(ringIndex) Phase 2 (Distribute): \(cappedCount) items over \(scaledMaxAngle)° = \(anglePerItem)° each [scale: \(scaleFactor)]")
             return (false, anglePerItem, scaledMaxAngle)
         }
         
@@ -385,13 +385,13 @@ class FunctionManager: ObservableObject {
         if totalAngle >= fullCircleThreshold {
             // Close enough to 360° - convert to full circle and distribute evenly
             let anglePerItem = 360.0 / Double(cappedCount)
-            print("📐 Ring \(ringIndex) Phase 3→4 (Near Full): \(cappedCount) items at \(totalAngle)° → Full Circle at \(anglePerItem)° each [scale: \(scaleFactor)]")
+            print("📐 🌹 Ring \(ringIndex) Phase 3→4 (Near Full): \(cappedCount) items at \(totalAngle)° → Full Circle at \(anglePerItem)° each [scale: \(scaleFactor)]")
             return (true, anglePerItem, 360.0)
         }
         
         if totalAngle < 360.0 {
             // Phase 3: Stack at minimalAngle
-            print("📐 Ring \(ringIndex) Phase 3 (Stack Min): \(cappedCount) items × \(scaledMinimalAngle)° = \(totalAngle)° [scale: \(scaleFactor)]")
+            print("📐 🍆 Ring \(ringIndex) Phase 3 (Stack Min): \(cappedCount) items × \(scaledMinimalAngle)° = \(totalAngle)° [scale: \(scaleFactor)]")
             return (false, scaledMinimalAngle, totalAngle)
         }
         
@@ -485,7 +485,7 @@ class FunctionManager: ObservableObject {
                 return nil
             }
         }
-        
+
         // Calculate which item this angle corresponds to
         let itemIndex = getItemIndex(for: angle, sliceConfig: sliceConfig, itemCount: nodes.count)
         

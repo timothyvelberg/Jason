@@ -20,7 +20,7 @@ class FinderLogic: FunctionProvider {
         return NSWorkspace.shared.icon(forFile: "/System/Library/CoreServices/Finder.app")
     }
     
-    private let maxItemsPerFolder: Int = 20
+    private let maxItemsPerFolder: Int = 40
     private var nodeCache: [String: [FunctionNode]] = [:]
     
     // MARK: - Cache
@@ -141,7 +141,7 @@ class FinderLogic: FunctionProvider {
            // Get custom max items from metadata
            let customMaxItems = metadata["maxItems"] as? Int
            
-           // 🔍 DIAGNOSTIC: Get sort order EARLY
+           //Get sort order EARLY
            let requestedSortOrder = getSortOrderForFolder(path: folderPath)
            print("🎯 [SORT DIAGNOSTIC] Folder: \(node.name)")
            print("   Requested sort order: \(requestedSortOrder.displayName) (\(requestedSortOrder.rawValue))")
@@ -200,7 +200,6 @@ class FinderLogic: FunctionProvider {
            let actualItemCount = countFolderItems(at: folderURL)
            print("📊 [FinderLogic] Actual folder contains: \(actualItemCount) items")
            
-           // 🔧 FIXED: Pass the sort order to getFolderContents
            let nodes: [FunctionNode] = await Task.detached(priority: .userInitiated) { [weak self] () -> [FunctionNode] in
                guard let self = self else {
                    print("❌ [FinderLogic] Self deallocated during load")
@@ -208,7 +207,7 @@ class FinderLogic: FunctionProvider {
                }
                print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
                
-               // 🔧 NEW: Pass sort order parameter
+               //Pass sort order parameter
                let result = self.getFolderContents(at: folderURL, sortOrder: requestedSortOrder, maxItems: customMaxItems)
                
                print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items (displayed)")
@@ -240,7 +239,7 @@ class FinderLogic: FunctionProvider {
                print("ℹ️ [EnhancedCache] Folder has only \(actualItemCount) items - not caching (threshold: 100)")
            }
            
-           // 📝 STEP 5: Update folder access tracking (for usage stats)
+           // Update folder access tracking (for usage stats)
            db.updateFolderAccess(path: folderPath)
            
            return nodes
@@ -311,7 +310,7 @@ class FinderLogic: FunctionProvider {
         let url = URL(fileURLWithPath: item.path)
         let fileName = item.name
         
-        // 🎨 Use cached thumbnail if available, otherwise create icon from metadata
+        // Use cached thumbnail if available, otherwise create icon from metadata
         let icon: NSImage
         if let thumbnailData = item.thumbnailData, let cachedThumbnail = NSImage(data: thumbnailData) {
             // ⚡ INSTANT! No disk access!
@@ -473,7 +472,7 @@ class FinderLogic: FunctionProvider {
                 fileSize: fileSize,
                 hasCustomIcon: hasCustomIcon,
                 isImageFile: isImageFile,
-                thumbnailData: thumbnailData,  // 🎨 THE THUMBNAIL!
+                thumbnailData: thumbnailData,  //THE THUMBNAIL
                 folderConfigJSON: nil  // TODO: Add folder config if needed
             )
         }

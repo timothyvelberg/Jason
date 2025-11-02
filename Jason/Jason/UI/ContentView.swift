@@ -116,7 +116,7 @@ struct PermissionRequestView: View {
 struct MinimalView: View {
     @ObservedObject var circularUI: CircularUIManager
     @State private var showingFolderFavoritesSettings = false  // Renamed for clarity
-    @State private var showingAppFavoritesSettings = false     // NEW
+    @State private var showingAppFavoritesSettings = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -401,12 +401,13 @@ struct EditFavoriteView: View {
     
     @State private var selectedLayout: String = "fullCircle"
     @State private var itemAngleSize: String = "30"
+    @State private var useCustomAngle: Bool = false
     @State private var slicePositioning: String = "startClockwise"
     @State private var childRingThickness: String = "80"
     @State private var childIconSize: String = "32"
     
     
-    // NEW: Icon customization
+    // Icon customization
     @State private var iconName: String = ""
     @State private var selectedFolderColor: FolderColor = .blue
     @State private var selectedSortOrder: FolderSortOrder = .modifiedNewest
@@ -526,8 +527,12 @@ struct EditFavoriteView: View {
                             Text("Partial Slice").tag("partialSlice")
                         }
                         
+                        Toggle("Use Custom Angle", isOn: $useCustomAngle)
+                            .help("When OFF, uses smart default angle calculation. When ON, uses custom angle below.")
+                        
                         TextField("Item Angle (degrees)", text: $itemAngleSize)
                             .help("Angle per item: 15-60 degrees")
+                            .disabled(!useCustomAngle)
                         
                         Picker("Slice Positioning", selection: $slicePositioning) {
                             Text("Start Clockwise").tag("startClockwise")
@@ -574,6 +579,7 @@ struct EditFavoriteView: View {
             slicePositioning = settings.slicePositioning ?? "startClockwise"
             childRingThickness = settings.childRingThickness.map { String($0) } ?? "80"
             childIconSize = settings.childIconSize.map { String($0) } ?? "32"
+            useCustomAngle = settings.itemAngleSize != nil
             selectedSortOrder = settings.contentSortOrder ?? .modifiedNewest
         }
         
@@ -607,7 +613,7 @@ struct EditFavoriteView: View {
     private func saveChanges() {
         // Parse numeric values
         let maxItemsValue = Int(maxItems.trimmingCharacters(in: .whitespaces))
-        let itemAngleValue = Int(itemAngleSize.trimmingCharacters(in: .whitespaces))
+        let itemAngleValue = useCustomAngle ? Int(itemAngleSize.trimmingCharacters(in: .whitespaces)) : nil
         let thicknessValue = Int(childRingThickness.trimmingCharacters(in: .whitespaces))
         let iconSizeValue = Int(childIconSize.trimmingCharacters(in: .whitespaces))
         

@@ -421,7 +421,6 @@ extension AppSwitcherManager: FunctionProvider {
                 name: providerName,
                 icon: providerIcon,
                 children: appNodes,
-                maxDisplayedChildren: 25,
                 preferredLayout: .partialSlice,  // Use full circle for many apps
                 slicePositioning: .center,
                 providerId: self.providerId,
