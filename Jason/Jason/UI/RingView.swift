@@ -204,8 +204,8 @@ struct RingView: View {
                     let itemAngle = sliceConfig.itemAngle
                     
                     // Make indicator 5° narrower on each side (10° total)
-                    let indicatorStartAngle = centerAngle - (itemAngle / 2)
-                    let indicatorEndAngle = centerAngle + (itemAngle / 2)
+                    let indicatorStartAngle = centerAngle - (itemAngle / 2) + 1
+                    let indicatorEndAngle = centerAngle + (itemAngle / 2) - 1
                     
                     // Calculate outer radius ratio for thin band (5 points)
                     let indicatorThickness: CGFloat = 2

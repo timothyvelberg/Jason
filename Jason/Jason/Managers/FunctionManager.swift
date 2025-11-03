@@ -1044,6 +1044,12 @@ class FunctionManager: ObservableObject {
                         newRing0Nodes.append(contentsOf: updatedRootNodes)
                         
                         rings[0].nodes = newRing0Nodes
+                        
+                        // 🆕 CRITICAL: Clear hover/selection state after updating nodes
+                        // This prevents "index out of range" crashes when node count changes
+                        rings[0].hoveredIndex = nil
+                        rings[0].selectedIndex = nil
+                        
                         print("✅ Updated Ring 0: replaced nodes from provider '\(providerId)'")
                         
                     } else {
@@ -1087,12 +1093,22 @@ class FunctionManager: ObservableObject {
                                     }
                                     
                                     self.rings[level].nodes = loadedNodes
+                                    
+                                    // 🆕 CRITICAL: Clear hover/selection state after updating nodes
+                                    self.rings[level].hoveredIndex = nil
+                                    self.rings[level].selectedIndex = nil
+                                    
                                     print("✅ Updated Ring \(level) with \(loadedNodes.count) dynamically loaded nodes")
                                 }
                             } else {
                                 // For static children (apps) - use FRESH displayedChildren
                                 freshNodes = freshParentNode.displayedChildren
                                 rings[level].nodes = freshNodes
+                                
+                                // 🆕 CRITICAL: Clear hover/selection state after updating nodes
+                                rings[level].hoveredIndex = nil
+                                rings[level].selectedIndex = nil
+                                
                                 print("✅ Updated Ring \(level) with \(freshNodes.count) nodes")
                             }
                         } else {
