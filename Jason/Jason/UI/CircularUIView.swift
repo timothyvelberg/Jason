@@ -30,12 +30,35 @@ struct CircularUIView: View {
             // Existing circular UI content
             GeometryReader { geometry in
                 let window = NSApp.windows.first(where: { $0 is OverlayWindow }) as? OverlayWindow
-                let mouseX = window?.uiCenterLocation.x ?? geometry.size.width / 2
-                let mouseY = window?.uiCenterLocation.y ?? geometry.size.height / 2
-                let screenHeight = NSScreen.main?.frame.height ?? 1080
                 
-                // Convert Y coordinate from AppKit (Y=0 at bottom) to SwiftUI (Y=0 at top)
-                let swiftUIY = screenHeight - mouseY
+                // Get the screen the overlay is on (fallback to main screen)
+                let screen = window?.currentScreen ?? NSScreen.main
+                
+                // Global mouse coordinates (from NSEvent.mouseLocation)
+                let globalMouseX = window?.uiCenterLocation.x ?? 0
+                let globalMouseY = window?.uiCenterLocation.y ?? 0
+                
+                // Convert global coordinates to screen-local coordinates
+                // Global origin is at bottom-left of primary screen
+                // Screen-local origin is at bottom-left of THIS screen
+                let screenOriginX = screen?.frame.origin.x ?? 0
+                let screenOriginY = screen?.frame.origin.y ?? 0
+                let screenHeight = screen?.frame.height ?? 1080
+                
+                // Convert to screen-local AppKit coordinates
+                let localMouseX = globalMouseX - screenOriginX
+                let localMouseY = globalMouseY - screenOriginY
+                
+                // Convert Y from AppKit (Y=0 at bottom) to SwiftUI (Y=0 at top)
+                let swiftUIY = screenHeight - localMouseY
+                
+                // Debug output (can be removed once verified)
+                let _ = print("🖱️ Mouse position:")
+                let _ = print("   Global: (\(globalMouseX), \(globalMouseY))")
+                let _ = print("   Screen origin: (\(screenOriginX), \(screenOriginY))")
+                let _ = print("   Screen height: \(screenHeight)")
+                let _ = print("   Local AppKit: (\(localMouseX), \(localMouseY))")
+                let _ = print("   SwiftUI: (\(localMouseX), \(swiftUIY))")
                 
                 ZStack {
                     // Generate rings dynamically
@@ -55,7 +78,7 @@ struct CircularUIView: View {
                 }
                 .animation(.easeOut(duration: 0.2), value: rings.count)
                 .frame(width: totalSize, height: totalSize)
-                .position(x: mouseX, y: swiftUIY)
+                .position(x: localMouseX, y: swiftUIY)
             }
             .ignoresSafeArea()
             

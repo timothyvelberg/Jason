@@ -24,6 +24,9 @@ class OverlayWindow: NSWindow {
     // Store mouse location for positioning UI
     var uiCenterLocation: NSPoint = .zero
     
+    // Store which screen the overlay is currently on
+    var currentScreen: NSScreen?
+    
     init() {
         // Get the main screen size for fullscreen overlay
         let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
@@ -57,15 +60,29 @@ class OverlayWindow: NSWindow {
     }
     
     func showOverlay(at mouseLocation: NSPoint) {
-        print("Showing fullscreen overlay with UI centered at: \(mouseLocation)")
+        print("🎯 Showing fullscreen overlay with UI centered at global point: \(mouseLocation)")
         
-        // Store the location
+        // Find which screen contains the mouse cursor
+        let targetScreen = NSScreen.screens.first { screen in
+            NSMouseInRect(mouseLocation, screen.frame, false)
+        } ?? NSScreen.main
+        
+        guard let screen = targetScreen else {
+            print("❌ No screen found for mouse location")
+            return
+        }
+        
+        self.currentScreen = screen
+        
+        print("📺 Mouse is on screen: \(screen.localizedName)")
+        print("   Screen frame: \(screen.frame)")
+        print("   Screen origin: (\(screen.frame.origin.x), \(screen.frame.origin.y))")
+        
+        // Store the location (in global coordinates)
         self.uiCenterLocation = mouseLocation
         
-        // Position window to cover entire screen
-        if let screenFrame = NSScreen.main?.frame {
-            self.setFrame(screenFrame, display: true)
-        }
+        // Position window to cover the screen containing the mouse
+        self.setFrame(screen.frame, display: true)
         
         // Bring to front and show
         self.makeKeyAndOrderFront(nil)
@@ -74,7 +91,9 @@ class OverlayWindow: NSWindow {
         NSApp.activate(ignoringOtherApps: true)
         self.makeKey()
         
-        print("🪟 Window is now fullscreen, key: \(self.isKeyWindow), ignoresMouseEvents: \(self.ignoresMouseEvents)")
+        print("🪟 Window now covers screen: \(screen.frame.size)")
+        print("   Key window: \(self.isKeyWindow)")
+        print("   UI center (global): \(mouseLocation)")
     }
     
     func hideOverlay() {
