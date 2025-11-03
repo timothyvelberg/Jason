@@ -217,7 +217,7 @@ struct RingView: View {
                         innerRadiusRatio: innerRadiusRatio,
                         outerRadiusRatio: indicatorOuterRadiusRatio
                     )
-                    .fill(Color.white.opacity(0.4))
+                    .fill(Color.white.opacity(0.32))
                     .opacity(runningIndicatorOpacities[node.id] ?? 0)  // Animated opacity
                     .frame(width: totalDiameter, height: totalDiameter)
                     .allowsHitTesting(false)
