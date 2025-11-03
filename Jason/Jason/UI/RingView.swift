@@ -55,6 +55,10 @@ struct RingView: View {
     @State private var selectionIndicatorOpacity: Double = 0
     @State private var hasCompletedInitialSelectionFade: Bool = false
     
+    // 🆕 DIFFING STATE: Track previous nodes for surgical updates
+    @State private var previousNodes: [FunctionNode] = []
+    @State private var isFirstRender: Bool = true
+    
     // Computed adaptive stagger delay based on item count
     private var adaptiveStaggerDelay: Double {
         let itemCount = nodes.count
@@ -204,8 +208,8 @@ struct RingView: View {
                     let itemAngle = sliceConfig.itemAngle
                     
                     // Make indicator 5° narrower on each side (10° total)
-                    let indicatorStartAngle = centerAngle - (itemAngle / 2) + 1
-                    let indicatorEndAngle = centerAngle + (itemAngle / 2) - 1
+                    let indicatorStartAngle = centerAngle - (itemAngle / 2) + 8
+                    let indicatorEndAngle = centerAngle + (itemAngle / 2) - 8
                     
                     // Calculate outer radius ratio for thin band (5 points)
                     let indicatorThickness: CGFloat = 2
@@ -217,7 +221,7 @@ struct RingView: View {
                         innerRadiusRatio: innerRadiusRatio,
                         outerRadiusRatio: indicatorOuterRadiusRatio
                     )
-                    .fill(Color.white.opacity(0.32))
+                    .fill(Color.white.opacity(0.66))
                     .opacity(runningIndicatorOpacities[node.id] ?? 0)  // Animated opacity
                     .frame(width: totalDiameter, height: totalDiameter)
                     .allowsHitTesting(false)
@@ -257,6 +261,9 @@ struct RingView: View {
             }
         )
         .onChange(of: nodes.count) {
+            print("🔄 [RingView] Content changed - count: \(nodes.count)")
+            print("   📌 State: isFirstRender=\(isFirstRender), previousNodes.count=\(previousNodes.count)")
+            
             if let index = selectedIndex {
                 rotationIndex = index
                 previousIndex = index
@@ -269,30 +276,64 @@ struct RingView: View {
             selectionIndicatorOpacity = 0
             hasCompletedInitialSelectionFade = false
             
-            // Reset and re-animate the background slice
+            // 🆕 DETERMINE UPDATE TYPE: First render vs Surgical update
+            let isSurgicalUpdate: Bool
+            if isFirstRender {
+                isSurgicalUpdate = false
+                isFirstRender = false
+                print("   🎬 First render - full entrance animation")
+            } else if previousNodes.isEmpty {
+                isSurgicalUpdate = false
+                print("   🎬 Previous nodes empty - full entrance animation")
+            } else {
+                // Diff the nodes to determine if surgical
+                let oldIds = Set(previousNodes.map { $0.id })
+                let newIds = Set(nodes.map { $0.id })
+                let changeCount = oldIds.symmetricDifference(newIds).count
+                isSurgicalUpdate = changeCount <= 3  // Small change = surgical
+                print("   🔧 Change count: \(changeCount), surgical: \(isSurgicalUpdate)")
+            }
+            
+            // Animate the background slice
             if !sliceConfig.isFullCircle && sliceConfig.positioning == .center {
-                let initialSliceSize = 10.0  // Start with 10° slice
-                
-                // Calculate true center angle, handling wraparound
-                let centerAngle: Double
-                if sliceConfig.endAngle < sliceConfig.startAngle {
-                    // Wraparound case: add 360 to endAngle for proper center calculation
-                    centerAngle = (sliceConfig.startAngle + (sliceConfig.endAngle + 360)) / 2
+                if isSurgicalUpdate {
+                    // 🆕 SURGICAL UPDATE: Smooth resize from current to new
+                    print("   ✨ Smooth resize animation")
+                    
+                    let adjustedEndAngle = sliceConfig.endAngle < sliceConfig.startAngle
+                        ? sliceConfig.endAngle + 360
+                        : sliceConfig.endAngle
+                    
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                        animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
+                    }
                 } else {
-                    centerAngle = (sliceConfig.startAngle + sliceConfig.endAngle) / 2
-                }
-                
-                // Handle angle wraparound for animation target
-                let adjustedEndAngle = sliceConfig.endAngle < sliceConfig.startAngle
-                    ? sliceConfig.endAngle + 360
-                    : sliceConfig.endAngle
-                
-                animatedSliceStartAngle = Angle(degrees: centerAngle - initialSliceSize / 2)
-                animatedSliceEndAngle = Angle(degrees: centerAngle + initialSliceSize / 2)
-                
-                withAnimation(.easeOut(duration: 0.3)) {
-                    animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
-                    animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
+                    // ✅ STRUCTURAL CHANGE: Full entrance animation
+                    print("   🎬 Full entrance animation for slice")
+                    
+                    let initialSliceSize = 10.0  // Start with 10° slice
+                    
+                    // Calculate true center angle, handling wraparound
+                    let centerAngle: Double
+                    if sliceConfig.endAngle < sliceConfig.startAngle {
+                        centerAngle = (sliceConfig.startAngle + (sliceConfig.endAngle + 360)) / 2
+                    } else {
+                        centerAngle = (sliceConfig.startAngle + sliceConfig.endAngle) / 2
+                    }
+                    
+                    // Handle angle wraparound for animation target
+                    let adjustedEndAngle = sliceConfig.endAngle < sliceConfig.startAngle
+                        ? sliceConfig.endAngle + 360
+                        : sliceConfig.endAngle
+                    
+                    animatedSliceStartAngle = Angle(degrees: centerAngle - initialSliceSize / 2)
+                    animatedSliceEndAngle = Angle(degrees: centerAngle + initialSliceSize / 2)
+                    
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                        animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
+                    }
                 }
                 
                 // Fade in selection indicator with a simple hardcoded delay
@@ -325,8 +366,20 @@ struct RingView: View {
                 }
             }
             
-            // Trigger staggered fade-in animation for icons
-            animateIconsIn()
+            // 🆕 ANIMATE ICONS: Full animation vs selective
+            if isSurgicalUpdate {
+                // SURGICAL: Only animate changed icons
+                print("   🎯 Surgical icon update - animating changed icons only")
+                // Store current nodes as "old" before they get updated
+                let oldNodesSnapshot = previousNodes
+                previousNodes = nodes  // Update for next time
+                animateIconsSurgical(oldNodes: oldNodesSnapshot, newNodes: nodes)
+            } else {
+                // STRUCTURAL: Full entrance animation
+                print("   🎬 Full icon entrance animation")
+                previousNodes = nodes  // Update for next time
+                animateIconsIn()
+            }
         }
         .onChange(of: selectedIndex) {
             if let index = selectedIndex {
@@ -343,6 +396,17 @@ struct RingView: View {
             }
         }
         .onAppear {
+            print("🎬 [RingView] onAppear - nodes: \(nodes.count), isFirstRender: \(isFirstRender)")
+            
+            // 🆕 FIX: If nodes already has content when we appear, this might be a view recreation
+            // during a surgical update. Initialize previousNodes so the first onChange doesn't
+            // think it's a first render.
+            if nodes.count > 0 && previousNodes.isEmpty {
+                print("   🔧 Initializing previousNodes with current nodes (view recreation case)")
+                previousNodes = nodes
+                isFirstRender = false  // This is not a first render if nodes already exist
+            }
+            
             // Reset selection indicator opacity and completion flag
             selectionIndicatorOpacity = 0
             hasCompletedInitialSelectionFade = false
@@ -766,6 +830,102 @@ struct RingView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + indicatorDelay) {
                     withAnimation(.easeIn(duration: 0.3)) {
                         runningIndicatorOpacities[node.id] = 1.0
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - 🆕 Surgical Icon Animation
+    
+    private func animateIconsSurgical(oldNodes: [FunctionNode], newNodes: [FunctionNode]) {
+        print("   🔍 [DEBUG] animateIconsSurgical called")
+        print("      Old nodes: \(oldNodes.count) - \(oldNodes.prefix(3).map { $0.name }.joined(separator: ", "))")
+        print("      New nodes: \(newNodes.count) - \(newNodes.prefix(3).map { $0.name }.joined(separator: ", "))")
+        
+        let oldIds = Set(oldNodes.map { $0.id })
+        let newIds = Set(newNodes.map { $0.id })
+        
+        let addedIds = newIds.subtracting(oldIds)
+        let removedIds = oldIds.subtracting(newIds)
+        let persistingIds = oldIds.intersection(newIds)
+        
+        print("   📊 Icon changes: +\(addedIds.count) -\(removedIds.count) =\(persistingIds.count)")
+        
+        // Guard against empty old nodes (shouldn't happen, but just in case)
+        if oldNodes.isEmpty && newNodes.count > 0 {
+            print("      ⚠️ Old nodes empty - treating as first appearance, calling full animation")
+            animateIconsIn()
+            return
+        }
+        
+        // 1. REMOVED ICONS: Fade out
+        for id in removedIds {
+            print("      ➖ Fading out: \(id)")
+            withAnimation(.easeIn(duration: 0.2)) {
+                iconOpacities[id] = 0
+                iconScales[id] = 0.8
+                runningIndicatorOpacities[id] = 0
+            }
+            
+            // Clean up after animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                iconOpacities.removeValue(forKey: id)
+                iconScales.removeValue(forKey: id)
+                iconRotationOffsets.removeValue(forKey: id)
+                runningIndicatorOpacities.removeValue(forKey: id)
+            }
+        }
+        
+        // 2. PERSISTING ICONS: Ensure visible, no animation
+        for id in persistingIds {
+            // Just make sure they're visible (in case they weren't before)
+            if iconOpacities[id] != 1.0 {
+                iconOpacities[id] = 1.0
+                iconScales[id] = 1.0
+                iconRotationOffsets[id] = 0
+            }
+            
+            // Update running indicator if metadata changed
+            if let node = newNodes.first(where: { $0.id == id }),
+               let metadata = node.metadata,
+               let isRunning = metadata["isRunning"] as? Bool {
+                let currentOpacity = runningIndicatorOpacities[id] ?? 0
+                let targetOpacity = isRunning ? 1.0 : 0.0
+                if currentOpacity != targetOpacity {
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        runningIndicatorOpacities[id] = targetOpacity
+                    }
+                }
+            }
+        }
+        
+        // 3. ADDED ICONS: Fade in
+        for id in addedIds {
+            print("      ➕ Fading in: \(id)")
+            
+            // Start invisible
+            iconOpacities[id] = 0
+            iconScales[id] = animationStartScale
+            iconRotationOffsets[id] = 0
+            runningIndicatorOpacities[id] = 0
+            
+            // Fade in with slight delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    iconOpacities[id] = 1.0
+                    iconScales[id] = 1.0
+                }
+                
+                // Check if should show running indicator
+                if let node = newNodes.first(where: { $0.id == id }),
+                   let metadata = node.metadata,
+                   let isRunning = metadata["isRunning"] as? Bool,
+                   isRunning {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        withAnimation(.easeIn(duration: 0.3)) {
+                            runningIndicatorOpacities[id] = 1.0
+                        }
                     }
                 }
             }
