@@ -208,9 +208,8 @@ struct RingView: View {
                     let itemAngle = sliceConfig.itemAngle
                     
                     // Make indicator 5° narrower on each side (10° total)
-                    let indicatorStartAngle = centerAngle - (itemAngle / 2) + 8
-                    let indicatorEndAngle = centerAngle + (itemAngle / 2) - 8
-                    
+                    let indicatorStartAngle = centerAngle - (itemAngle / 2) + 1
+                    let indicatorEndAngle = centerAngle + (itemAngle / 2) - 1
                     // Calculate outer radius ratio for thin band (5 points)
                     let indicatorThickness: CGFloat = 2
                     let indicatorOuterRadiusRatio = innerRadiusRatio + (indicatorThickness / endRadius)
@@ -221,7 +220,7 @@ struct RingView: View {
                         innerRadiusRatio: innerRadiusRatio,
                         outerRadiusRatio: indicatorOuterRadiusRatio
                     )
-                    .fill(Color.white.opacity(0.66))
+                    .fill(Color.white.opacity(0.32))
                     .opacity(runningIndicatorOpacities[node.id] ?? 0)  // Animated opacity
                     .frame(width: totalDiameter, height: totalDiameter)
                     .allowsHitTesting(false)
