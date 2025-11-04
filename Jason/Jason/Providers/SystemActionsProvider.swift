@@ -41,14 +41,14 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
                 icon: NSImage(systemSymbolName: "rectangle.3.group", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
-                onLeftClick: .execute {
+                onLeftClick: ModifierAwareInteraction(base: .execute {
                     SystemActions.showMissionControl()
-                },
-                onRightClick: .doNothing,
-                onMiddleClick: .doNothing,
-                onBoundaryCross: .execute {
+                }),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .execute {
                     SystemActions.showMissionControl()
-                }
+                })
             ),
             
             // Show Desktop
@@ -58,14 +58,14 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
                 icon: NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
-                onLeftClick: .execute {
+                onLeftClick: ModifierAwareInteraction(base: .execute {
                     SystemActions.showDesktop()
-                },
-                onRightClick: .doNothing,
-                onMiddleClick: .doNothing,
-                onBoundaryCross: .execute {
+                }),
+                onRightClick: ModifierAwareInteraction(base:  .doNothing),
+                onMiddleClick: ModifierAwareInteraction(base:  .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .execute {
                     SystemActions.showDesktop()
-                }
+                })
             )
         ]
         
@@ -81,16 +81,10 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
                 slicePositioning: .center,
                 
                 
-                onLeftClick: .expand,
-                onRightClick: .expand,
-                onMiddleClick: .expand,
-                onBoundaryCross: .expand,
-                onHover: {
-                    print("⚙️ Hovering over System category")
-                },
-                onHoverExit: {
-                    print("⚙️ Left System category")
-                }
+                onLeftClick: ModifierAwareInteraction(base: .expand),
+                onRightClick: ModifierAwareInteraction(base: .expand),
+                onMiddleClick: ModifierAwareInteraction(base: .expand),
+                onBoundaryCross: ModifierAwareInteraction(base: .expand),
             )
         ]
     }

@@ -343,7 +343,7 @@ class FinderLogic: FunctionProvider {
             showLabel: true,
             slicePositioning: .center,
             
-            onLeftClick: .drag(DragProvider(
+            onLeftClick: ModifierAwareInteraction(base: .drag(DragProvider(
                 fileURLs: [url],
                 dragImage: icon,
                 allowedOperations: .move,
@@ -361,16 +361,16 @@ class FinderLogic: FunctionProvider {
                         print("❌ Drag cancelled: \(fileName)")
                     }
                 }
-            )),
+            ))),
             
-            onRightClick: .expand,
+            onRightClick: ModifierAwareInteraction(base: .expand),
             
-            onMiddleClick: .executeKeepOpen {
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("🖱️ Middle-click opening: \(fileName)")
                 NSWorkspace.shared.open(url)
-            },
+            }),
             
-            onBoundaryCross: .doNothing
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
     }
 
@@ -403,13 +403,13 @@ class FinderLogic: FunctionProvider {
                 "folderURL": item.path,
             ],
             providerId: self.providerId,
-            onLeftClick: .navigateInto,
-            onRightClick: .expand,
-            onMiddleClick: .executeKeepOpen {
+            onLeftClick: ModifierAwareInteraction(base: .navigateInto),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("📂 Middle-click opening folder: \(folderName)")
                 NSWorkspace.shared.open(url)
-            },
-            onBoundaryCross: .doNothing
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
     }
 
@@ -521,9 +521,9 @@ class FinderLogic: FunctionProvider {
             children: favoriteChildren,
             preferredLayout: .partialSlice,
             slicePositioning: .center,
-            onLeftClick: .expand,
-            onRightClick: .expand,
-            onBoundaryCross: .expand
+            onLeftClick: ModifierAwareInteraction(base: .expand),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onBoundaryCross: ModifierAwareInteraction(base: .expand)
         )
     }
 
@@ -607,13 +607,13 @@ class FinderLogic: FunctionProvider {
             metadata: metadata,
             providerId: self.providerId,
             
-            onLeftClick: .navigateInto,
-            onRightClick: .expand,
-            onMiddleClick: .executeKeepOpen {
+            onLeftClick: ModifierAwareInteraction(base: .navigateInto),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 DatabaseManager.shared.updateFolderAccess(path: path.path)
                 NSWorkspace.shared.open(path)
-            },
-            onBoundaryCross: .doNothing
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
     }
 
@@ -742,13 +742,13 @@ class FinderLogic: FunctionProvider {
             metadata: metadata,
             providerId: self.providerId,
             
-            onLeftClick: .navigateInto,
-            onRightClick: .expand,
-            onMiddleClick: .executeKeepOpen {
+            onLeftClick: ModifierAwareInteraction(base: .navigateInto),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 DatabaseManager.shared.updateFolderAccess(path: path.path)
                 NSWorkspace.shared.open(path)
-            },
-            onBoundaryCross: .doNothing
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
     }
     
@@ -852,14 +852,14 @@ class FinderLogic: FunctionProvider {
             name: "New Window",
             icon: NSImage(systemSymbolName: "plus.rectangle", accessibilityDescription: nil) ?? NSImage(),
             preferredLayout: nil,
-            onLeftClick: .execute { [weak self] in
+            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                 self?.openNewFinderWindow()
-            },
-            onMiddleClick: .executeKeepOpen { [weak self] in
+            }),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                 self?.openNewFinderWindow()
-            }
+            })
         ))
-        
+
         return FunctionNode(
             id: "finder-windows-section",
             name: "Finder Windows",
@@ -869,12 +869,12 @@ class FinderLogic: FunctionProvider {
             
             slicePositioning: .center,
             
-            onLeftClick: .expand,
-            onRightClick: .execute { [weak self] in
+            onLeftClick: ModifierAwareInteraction(base: .expand),
+            onRightClick: ModifierAwareInteraction(base: .execute { [weak self] in
                 self?.openNewFinderWindow()
-            },
-            onMiddleClick: .expand,
-            onBoundaryCross: .expand
+            }),
+            onMiddleClick: ModifierAwareInteraction(base: .expand),
+            onBoundaryCross: ModifierAwareInteraction(base: .expand)
         )
     }
     
@@ -919,13 +919,13 @@ class FinderLogic: FunctionProvider {
                 "folderURL": url.path,
             ],
             providerId: self.providerId,
-            onLeftClick: .navigateInto,
-            onRightClick: .expand,
-            onMiddleClick: .executeKeepOpen {
+            onLeftClick: ModifierAwareInteraction(base: .navigateInto),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("📂 Middle-click opening folder: \(folderName)")
                 NSWorkspace.shared.open(url)
-            },
-            onBoundaryCross: .doNothing
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
     }
     
@@ -1006,7 +1006,7 @@ class FinderLogic: FunctionProvider {
             
             
             // 🎯 LEFT CLICK = OPEN FILE (or drag if you move the mouse!)
-            onLeftClick: .drag(DragProvider(
+            onLeftClick: ModifierAwareInteraction(base: .drag(DragProvider(
                 fileURLs: [url],
                 dragImage: dragImage,
                 allowedOperations: .move,
@@ -1024,18 +1024,18 @@ class FinderLogic: FunctionProvider {
                         print("❌ Drag cancelled: \(fileName)")
                     }
                 }
-            )),
+            ))),
             
             // RIGHT CLICK = SHOW CONTEXT MENU
-            onRightClick: .expand,
+            onRightClick: ModifierAwareInteraction(base: .expand),
             
             // MIDDLE CLICK = QUICK OPEN
-            onMiddleClick: .executeKeepOpen {
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("🖱️ Middle-click opening: \(fileName)")
                 NSWorkspace.shared.open(url)
-            },
+            }),
             
-            onBoundaryCross: .doNothing
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
     }
     
@@ -1233,24 +1233,24 @@ class FinderLogic: FunctionProvider {
                     name: "Close Window",
                     icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
                     preferredLayout: nil,
-                    onLeftClick: .execute { [weak self] in
+                    onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                         self?.closeFinderWindow(windowInfo.index)
-                    },
-                    onMiddleClick: .executeKeepOpen { [weak self] in
+                    }),
+                    onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                         self?.closeFinderWindow(windowInfo.index)
-                    }
+                    })
                 )
             ],
             preferredLayout: .partialSlice,
             itemAngleSize: 20.0,
-            onLeftClick: .execute { [weak self] in
+            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                 self?.bringFinderWindowToFront(windowInfo.index)
-            },
-            onRightClick: .expand,
-            onMiddleClick: .executeKeepOpen { [weak self] in
+            }),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                 self?.bringFinderWindowToFront(windowInfo.index)
-            },
-            onBoundaryCross: .doNothing
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
     }
     

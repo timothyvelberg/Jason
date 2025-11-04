@@ -127,14 +127,14 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
                 preferredLayout: nil,
                 showLabel: true,
                 // EXPLICIT INTERACTION MODEL:
-                onLeftClick: .execute { [weak self] in
+                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                     self?.launchApp(appInfo)
-                },
-                onRightClick: .doNothing,  // Could add "Remove from Favorites" context menu later
-                onMiddleClick: .executeKeepOpen { [weak self] in
+                }),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),  // Could add "Remove from Favorites" context menu later
+                onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                     self?.launchApp(appInfo)
-                },
-                onBoundaryCross: .doNothing,
+                }),
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing),
                 onHover: {
                     print("Hovering over favorite: \(appInfo.name)")
                 },
@@ -156,10 +156,10 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
                 slicePositioning: .center,
 
                 // EXPLICIT INTERACTION MODEL:
-                onLeftClick: .expand,           // Click to expand favorites
-                onRightClick: .expand,          // Right-click also expands
-                onMiddleClick: .expand,         // Middle-click expands
-                onBoundaryCross: .expand,       // Auto-expand on boundary cross
+                onLeftClick: ModifierAwareInteraction(base: .expand),           // Click to expand favorites
+                onRightClick: ModifierAwareInteraction(base: .expand),          // Right-click also expands
+                onMiddleClick: ModifierAwareInteraction(base: .expand),         // Middle-click expands
+                onBoundaryCross: ModifierAwareInteraction(base: .expand),       // Auto-expand on boundary cross
                 onHover: {
                     print("⭐ Hovering over Favorites category")
                 },

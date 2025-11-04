@@ -264,14 +264,26 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 metadata: ["isRunning": entry.isRunning],  // 🆕 Add running state to metadata
                 providerId: providerId,
                 // EXPLICIT INTERACTION MODEL:
-                onLeftClick: .execute { [weak self] in
+                onLeftClick: ModifierAwareInteraction(
+                        base: .execute { [weak self] in
+                            self?.launchOrSwitchToApp(entry)
+                        },
+                        shift: .executeKeepOpen { [weak self] in
+                            self?.launchOrSwitchToApp(entry)
+                        },
+                        command: .executeKeepOpen { [weak self] in
+                            // Cmd+Click = Quit the app (if running)
+                            if let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: entry.bundleIdentifier).first {
+                                print("🚪 [Cmd+Click] Quitting app: \(entry.name)")
+                                self?.appSwitcherManager?.quitApp(runningApp)
+                            }
+                        }
+                    ),
+                onRightClick: ModifierAwareInteraction(base: contextActions.isEmpty ? .doNothing : .expand),
+                onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                     self?.launchOrSwitchToApp(entry)
-                },
-                onRightClick: contextActions.isEmpty ? .doNothing : .expand,
-                onMiddleClick: .executeKeepOpen { [weak self] in
-                    self?.launchOrSwitchToApp(entry)
-                },
-                onBoundaryCross: .doNothing,
+                }),
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing),
                 onHover: {
                     print("Hovering over \(entry.name) (⭐: \(entry.isFavorite), 🏃: \(entry.isRunning))")
                 },
@@ -290,12 +302,12 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 preferredLayout: .partialSlice,
                 slicePositioning: .center,
                 providerId: providerId,
-                onLeftClick: .expand,
-                onRightClick: .execute { [weak self] in
+                onLeftClick: ModifierAwareInteraction(base: .expand),
+                onRightClick: ModifierAwareInteraction(base: .execute { [weak self] in
                     self?.openApplicationsFolder()
-                },
-                onMiddleClick: .expand,
-                onBoundaryCross: .expand,
+                }),
+                onMiddleClick: ModifierAwareInteraction(base: .expand),
+                onBoundaryCross: ModifierAwareInteraction(base: .expand),
                 onHover: {
                     print("📱 Hovering over Applications category")
                 },
@@ -365,12 +377,14 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     
     // MARK: - Favorite Management Actions
     
+    // MARK: - Favorite Management Actions
+
     private func createAddToFavoritesAction(bundleIdentifier: String, name: String) -> FunctionNode {
         return FunctionNode(
             id: "add-favorite-\(bundleIdentifier)",
             name: "Add to Favorites",
             icon: NSImage(systemSymbolName: "star", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: .execute { [weak self] in
+            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                 print("⭐ Adding \(name) to favorites")
                 let success = DatabaseManager.shared.addFavoriteApp(
                     bundleIdentifier: bundleIdentifier,
@@ -382,19 +396,19 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                     self?.refresh()
                     NotificationCenter.default.postProviderUpdate(providerId: self?.providerId ?? "combined-apps")
                 }
-            },
-            onRightClick: .doNothing,
-            onMiddleClick: .doNothing,
-            onBoundaryCross: .doNothing
+            }),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
     }
-    
+
     private func createRemoveFromFavoritesAction(bundleIdentifier: String, name: String) -> FunctionNode {
         return FunctionNode(
             id: "remove-favorite-\(bundleIdentifier)",
             name: "Remove from Favorites",
             icon: NSImage(systemSymbolName: "star.slash", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: .execute { [weak self] in
+            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                 print("⭐ Removing \(name) from favorites")
                 let success = DatabaseManager.shared.removeFavoriteApp(bundleIdentifier: bundleIdentifier)
                 if success {
@@ -402,10 +416,10 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                     self?.refresh()
                     NotificationCenter.default.postProviderUpdate(providerId: self?.providerId ?? "combined-apps")
                 }
-            },
-            onRightClick: .doNothing,
-            onMiddleClick: .doNothing,
-            onBoundaryCross: .doNothing
+            }),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
     }
     

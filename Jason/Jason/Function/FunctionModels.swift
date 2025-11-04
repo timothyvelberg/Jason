@@ -32,7 +32,7 @@ struct DragProvider {
     var onDragStarted: (() -> Void)?  // ← Changed from let to var
     var onDragCompleted: ((Bool) -> Void)?  // ← Changed from let to var
     
-    // Modifier flags captured when drag starts
+    // Modifier flags captured when drag starts (and updated during drag)
     var modifierFlags: NSEvent.ModifierFlags = []
     
     init(fileURLs: [URL],
@@ -135,10 +135,10 @@ class FunctionNode: Identifiable, ObservableObject {
     let providerId: String?
     
     // MARK: - Interaction Model (Explicit Behavior)
-    let onLeftClick: InteractionBehavior
-    let onRightClick: InteractionBehavior
-    let onMiddleClick: InteractionBehavior
-    let onBoundaryCross: InteractionBehavior
+    let onLeftClick: ModifierAwareInteraction
+    let onRightClick: ModifierAwareInteraction
+    let onMiddleClick: ModifierAwareInteraction
+    let onBoundaryCross: ModifierAwareInteraction
     
     // MARK: - Events
     let onHover: (() -> Void)?
@@ -170,10 +170,10 @@ class FunctionNode: Identifiable, ObservableObject {
          providerId: String? = nil,
         
         // Explicit interaction declarations
-        onLeftClick: InteractionBehavior = .doNothing,
-        onRightClick: InteractionBehavior = .doNothing,
-        onMiddleClick: InteractionBehavior = .doNothing,
-        onBoundaryCross: InteractionBehavior = .doNothing,
+        onLeftClick: ModifierAwareInteraction = ModifierAwareInteraction(base: .doNothing),
+        onRightClick: ModifierAwareInteraction = ModifierAwareInteraction(base: .doNothing),
+        onMiddleClick: ModifierAwareInteraction = ModifierAwareInteraction(base: .doNothing),
+        onBoundaryCross: ModifierAwareInteraction = ModifierAwareInteraction(base: .doNothing),
         
         onHover: (() -> Void)? = nil,
         onHoverExit: (() -> Void)? = nil
@@ -215,7 +215,7 @@ class FunctionNode: Identifiable, ObservableObject {
     
     // Leaf = has executable left-click action, no children or contextActions
     var isLeaf: Bool {
-        return children == nil && contextActions == nil && onLeftClick.shouldExecute
+        return children == nil && contextActions == nil && onLeftClick.base.shouldExecute
     }
     
     // Branch = has children OR contextActions
@@ -226,10 +226,10 @@ class FunctionNode: Identifiable, ObservableObject {
     //Check if this node needs dynamic loading
     var needsDynamicLoading: Bool {
         // If it has navigateInto behavior and metadata, it needs dynamic loading
-        if case .navigateInto = onLeftClick, metadata != nil {
+        if case .navigateInto = onLeftClick.base, metadata != nil {
             return true
         }
-        if case .navigateInto = onBoundaryCross, metadata != nil {
+        if case .navigateInto = onBoundaryCross.base, metadata != nil {
             return true
         }
         return false
@@ -353,6 +353,51 @@ struct PieSliceConfig {
     }
 }
 
+// MARK: - Modifier-Aware Interaction
+
+struct ModifierAwareInteraction {
+    let base: InteractionBehavior
+    var shift: InteractionBehavior?
+    var command: InteractionBehavior?
+    var option: InteractionBehavior?
+    
+    /// Resolve the appropriate behavior based on current modifier flags
+    func resolve(with modifiers: NSEvent.ModifierFlags) -> InteractionBehavior {
+        // Check in priority order: Shift > Command > Option
+        if modifiers.contains(.shift), let behavior = shift {
+            return behavior
+        }
+        if modifiers.contains(.command), let behavior = command {
+            return behavior
+        }
+        if modifiers.contains(.option), let behavior = option {
+            return behavior
+        }
+        return base
+    }
+    
+    // Convenience initializer for simple cases (no modifiers)
+    init(base: InteractionBehavior) {
+        self.base = base
+        self.shift = nil
+        self.command = nil
+        self.option = nil
+    }
+    
+    // Full initializer with all modifiers
+    init(
+        base: InteractionBehavior,
+        shift: InteractionBehavior? = nil,
+        command: InteractionBehavior? = nil,
+        option: InteractionBehavior? = nil
+    ) {
+        self.base = base
+        self.shift = shift
+        self.command = command
+        self.option = option
+    }
+}
+
 // MARK: - Legacy Direction Enum (for compatibility)
 enum SliceDirection {
     case clockwise
@@ -363,9 +408,9 @@ enum SliceDirection {
 extension FunctionNode {
     // Add drag behavior property
     var onDrag: InteractionBehavior {
-        // Check if left click is draggable
-        if case .drag = onLeftClick {
-            return onLeftClick
+        // Check if base left click is draggable
+        if case .drag = onLeftClick.base {
+            return onLeftClick.base
         }
         // Default: not draggable
         return .doNothing

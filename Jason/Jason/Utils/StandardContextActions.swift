@@ -19,12 +19,12 @@ struct StandardContextActions {
             id: "activate-\(app.processIdentifier)",
             name: "Bring to Front",
             icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: .execute { [weak manager] in
+            onLeftClick: ModifierAwareInteraction(base: .execute { [weak manager] in
                 manager?.switchToApp(app)
-            },
-            onMiddleClick: .executeKeepOpen { [weak manager] in
+            }),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak manager] in
                 manager?.switchToApp(app)
-            }
+            })
         )
     }
     
@@ -34,12 +34,12 @@ struct StandardContextActions {
             id: "hide-\(app.processIdentifier)",
             name: "Hide",
             icon: NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: .execute { [weak manager] in
+            onLeftClick: ModifierAwareInteraction(base: .execute { [weak manager] in
                 manager?.hideApp(app)
-            },
-            onMiddleClick: .executeKeepOpen { [weak manager] in
+            }),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak manager] in
                 manager?.hideApp(app)
-            }
+            })
         )
     }
     
@@ -49,12 +49,12 @@ struct StandardContextActions {
             id: "quit-\(app.processIdentifier)",
             name: "Quit",
             icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: .executeKeepOpen { [weak manager] in
+            onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak manager] in
                 manager?.quitApp(app)
-            },
-            onMiddleClick: .executeKeepOpen { [weak manager] in
+            }),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak manager] in
                 manager?.quitApp(app)
-            }
+            })
         )
     }
     
@@ -66,12 +66,12 @@ struct StandardContextActions {
             id: "open-\(url.path)",
             name: "Open",
             icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: .execute {
+            onLeftClick: ModifierAwareInteraction(base: .execute {
                 NSWorkspace.shared.open(url)
-            },
-            onMiddleClick: .executeKeepOpen {
+            }),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 NSWorkspace.shared.open(url)
-            }
+            })
         )
     }
     
@@ -81,12 +81,12 @@ struct StandardContextActions {
             id: "show-in-finder-\(url.path)",
             name: "Show in Finder",
             icon: NSImage(systemSymbolName: "folder", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: .execute {
+            onLeftClick: ModifierAwareInteraction(base: .execute {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
-            },
-            onMiddleClick: .executeKeepOpen {
+            }),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
-            }
+            })
         )
     }
     
@@ -97,7 +97,7 @@ struct StandardContextActions {
             id: "delete-\(url.path)",
             name: "Delete",
             icon: NSImage(systemSymbolName: "trash", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: .execute {
+            onLeftClick: ModifierAwareInteraction(base: .execute {
                 print("🗑️ Moving to trash: \(fileName)")
                 NSWorkspace.shared.recycle([url]) { trashedURLs, error in
                     if let error = error {
@@ -108,8 +108,8 @@ struct StandardContextActions {
                         onComplete(true)
                     }
                 }
-            },
-            onMiddleClick: .executeKeepOpen {
+            }),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("🗑️ Moving to trash (UI stays open): \(fileName)")
                 NSWorkspace.shared.recycle([url]) { trashedURLs, error in
                     if let error = error {
@@ -120,7 +120,7 @@ struct StandardContextActions {
                         onComplete(true)
                     }
                 }
-            }
+            })
         )
     }
     
@@ -131,20 +131,20 @@ struct StandardContextActions {
             id: "copy-\(url.path)",
             name: "Copy",
             icon: NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: .execute {
+            onLeftClick: ModifierAwareInteraction(base: .execute {
                 print("📋 Copying to clipboard: \(fileName)")
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.writeObjects([url as NSURL])
                 print("✅ File copied to clipboard: \(fileName)")
-            },
-            onMiddleClick: .executeKeepOpen {
+            }),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("📋 Copying to clipboard (UI stays open): \(fileName)")
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.writeObjects([url as NSURL])
                 print("✅ File copied to clipboard: \(fileName)")
-            }
+            })
         )
     }
 }

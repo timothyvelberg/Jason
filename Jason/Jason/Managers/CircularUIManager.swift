@@ -213,101 +213,37 @@ class CircularUIManager: ObservableObject {
             }
             
             mouseTracker?.onPieHover = { [weak functionManager] pieIndex in
-                guard let pieIndex = pieIndex, let fm = functionManager else { return }
+                if let functionManager = functionManager, let pieIndex = pieIndex {
+                    functionManager.hoverNode(ringLevel: functionManager.activeRingLevel, index: pieIndex)
+                }
+            }
+            
+            self.gestureManager = GestureManager()
+            
+            gestureManager?.onGesture = { [weak self] event in
+                guard let self = self else { return }
                 
-                let ringLevel = fm.activeRingLevel
-                
-                guard ringLevel < fm.rings.count else { return }
-                let nodes = fm.rings[ringLevel].nodes
-                
-                if nodes.indices.contains(pieIndex) {
-                    let node = nodes[pieIndex]
-                    let type = node.isLeaf ? "FUNCTION" : "CATEGORY"
-                    print("🎯 [RING \(ringLevel)] Hovering: index=\(pieIndex), name='\(node.name)', type=\(type)")
-                    print("   hoveredIndex=\(fm.rings[ringLevel].hoveredIndex ?? -1), selectedIndex=\(fm.rings[ringLevel].selectedIndex ?? -1)")
+                switch event.type {
+                case .click(.left):
+                    self.handleLeftClick(event: event)
+                case .click(.right):
+                    self.handleRightClick(event: event)
+                case .click(.middle):
+                    self.handleMiddleClick(event: event)
+                case .dragStarted:
+                    self.handleDragStart(event: event)
+                default:
+                    break
                 }
             }
         }
         
         setupOverlayWindow()
         setupGlobalHotkeys()
-        setupGestureManager()
     }
     
-    // MARK: - Gesture Manager Setup
+    // MARK: - Gesture Handlers (Click, Drag, Scroll)
     
-    private func setupGestureManager() {
-//        print("🖱️ Setting up GestureManager")
-        
-        gestureManager = GestureManager()
-        
-        // Use centralized event handler
-        gestureManager?.onGesture = { [weak self] event in
-            self?.handleGestureEvent(event)
-        }
-        
-        print("✅ GestureManager ready")
-    }
-    
-    private func handleScrollBack() {
-        guard let functionManager = functionManager else { return }
-        
-        let currentLevel = functionManager.activeRingLevel
-        
-        if currentLevel > 0 {
-            let targetLevel = currentLevel - 1
-            print("🔙 [CircularUIManager] Scrolling back from ring \(currentLevel) to \(targetLevel)")
-            functionManager.collapseToRing(level: targetLevel)
-            
-            // Only hide UI if we just collapsed TO Ring 0
-            if targetLevel == 0 {
-                print("👋 [handleScrollBack] Collapsed to Ring 0 - hiding UI")
-//                hide()
-            } else {
-                print("✅ [handleScrollBack] Collapsed to Ring \(targetLevel) - staying open")
-                mouseTracker?.pauseAfterScroll()
-            }
-        } else {
-            print("⚠️ [CircularUIManager] Already at Ring 0 - cannot scroll back further")
-        }
-    }
-    
-    // MARK: - Gesture Event Handler
-    
-    private func handleGestureEvent(_ event: GestureManager.GestureEvent) {
-        guard isVisible else { return }
-        
-        switch event.type {
-        case .click(.left):
-            print("🖱️ Left-click detected at \(event.position)")
-            handleLeftClick(event: event)
-            
-        case .click(.right):
-            print("🖱️ Right-click detected at \(event.position)")
-            handleRightClick(event: event)
-            
-        case .click(.middle):
-            print("🖱️ Middle-click detected at \(event.position)")
-            handleMiddleClick(event: event)
-            
-        case .dragStarted(let button, let startPoint):
-            if button == .left {
-                handleDragStarted(at: event.position, startPoint: startPoint)
-            }
-            
-        case .dragMoved(let currentPoint, let delta):
-            handleDragMoved(to: currentPoint, delta: delta)
-            
-        case .dragEnded(let endPoint, let didComplete):
-            handleDragEnded(at: endPoint, completed: didComplete)
-            
-        default:
-            break
-        }
-    }
-    
-    // MARK: - Left Click Handler
-
     private func handleLeftClick(event: GestureManager.GestureEvent) {
         guard let functionManager = functionManager else { return }
         
@@ -319,7 +255,10 @@ class CircularUIManager: ObservableObject {
         
         print("🖱️ [Left Click] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
-        switch node.onLeftClick {
+        // Resolve behavior based on current modifier flags
+        let behavior = node.onLeftClick.resolve(with: event.modifierFlags)
+        
+        switch behavior {
         case .execute(let action):
             action()
             hide()
@@ -341,94 +280,87 @@ class CircularUIManager: ObservableObject {
         }
     }
     
-    // MARK: - Drag Handlers
-    
-    private func handleDragStarted(at position: CGPoint, startPoint: CGPoint) {
-        // Get the currently hovered node from FunctionManager
-        guard let functionManager = functionManager else {
-            print("🎯 No FunctionManager available")
+    private func handleDragStart(event: GestureManager.GestureEvent) {
+        guard let functionManager = functionManager else { return }
+        
+        // Use position-based detection instead of hoveredIndex
+        guard let (ringLevel, index, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) else {
+            print("⚠️ Drag start not on any item")
             return
         }
         
-        let activeRingLevel = functionManager.activeRingLevel
-        guard activeRingLevel < functionManager.rings.count else {
-            print("🎯 No active ring for drag")
-            return
-        }
+        print("🖱️ [Drag Start] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
-        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
-            print("🎯 No node currently hovered for drag")
-            return
-        }
+        // Check if the node is draggable (resolve with current modifiers)
+        let behavior = node.onLeftClick.resolve(with: event.modifierFlags)
         
-        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
-            print("🎯 Invalid hovered index for drag")
-            return
-        }
-        
-        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
-        
-        guard node.isDraggable, var provider = node.onDrag.dragProvider else {
-            print("🎯 Node '\(node.name)' is not draggable")
-            return
-        }
-
-        // Set up drag lifecycle callbacks to freeze UI during drag
-        provider.onDragStarted = { [weak self] in
-            print("⏸️ [Drag] Started - pausing mouse tracking")
-            self?.mouseTracker?.pauseForDrag()  // ← Changed from pauseAfterScroll()
-        }
-
-        provider.onDragCompleted = { [weak self] success in
-            print("▶️ [Drag] Completed - resuming mouse tracking")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self?.mouseTracker?.resumeFromDrag()  // ← Changed from resumeTracking()
-            }
-        }
-
-        // Capture current modifier flags
-        let currentModifiers = NSEvent.modifierFlags
-        provider.modifierFlags = currentModifiers
-        
-        // Log modifiers for debugging
-        var modifierNames: [String] = []
-        if currentModifiers.contains(.option) { modifierNames.append("Option") }
-        if currentModifiers.contains(.command) { modifierNames.append("Cmd") }
-        if currentModifiers.contains(.shift) { modifierNames.append("Shift") }
-        if currentModifiers.contains(.control) { modifierNames.append("Control") }
-        
-        let modifierText = modifierNames.isEmpty ? "none" : modifierNames.joined(separator: "+")
-        print("🎯 Drag started on node: \(node.name) with modifiers: \(modifierText)")
-        
-        // Store the dragged node
-        draggedNode = node
-        
-        // Trigger the drag in the overlay view
-        DispatchQueue.main.async {
+        if case .drag(var provider) = behavior {
+            // Store modifier flags at drag start
+            provider.modifierFlags = event.modifierFlags
+            
             self.currentDragProvider = provider
-            self.dragStartPoint = startPoint
-        }
-    }
-    
-    private func handleDragMoved(to position: CGPoint, delta: CGPoint) {
-        // Optional: Update UI during drag
-        // The AppKit layer handles the drag image
-    }
-    
-    private func handleDragEnded(at position: CGPoint, completed: Bool) {
-        if completed {
-            print("✅ Drag completed successfully for: \(draggedNode?.name ?? "unknown")")
+            self.dragStartPoint = event.position
+            self.draggedNode = node
+            
+            print("✅ Drag initialized for: \(node.name)")
+            print("   Files: \(provider.fileURLs.map { $0.lastPathComponent }.joined(separator: ", "))")
+            print("   Modifiers: \(event.modifierFlags)")
+            
+            // Call onDragStarted if provided
+            provider.onDragStarted?()
         } else {
-            print("❌ Drag cancelled for: \(draggedNode?.name ?? "unknown")")
+            print("⚠️ Node is not draggable")
         }
-        
-        // Clean up
-        draggedNode = nil
-        currentDragProvider = nil
-        dragStartPoint = nil
     }
     
-    // MARK: - Click Handlers
+    private func handleScroll(delta: CGFloat) {
+        guard let functionManager = functionManager else { return }
+        
+        if delta > 0 {
+            // Scroll up/away = Navigate deeper
+            let hoveredRingLevel = functionManager.activeRingLevel
+            if let hoveredIndex = functionManager.rings[hoveredRingLevel].hoveredIndex {
+                
+                let node = functionManager.rings[hoveredRingLevel].nodes[hoveredIndex]
+                
+                // Get current modifier flags
+                let currentModifiers = NSEvent.modifierFlags
+                
+                // Resolve behavior based on modifiers
+                let behavior = node.onBoundaryCross.resolve(with: currentModifiers)
+                
+                switch behavior {
+                case .navigateInto:
+                    print("📜 Scroll detected - navigating into folder")
+                    functionManager.navigateIntoFolder(ringLevel: hoveredRingLevel, index: hoveredIndex)
+                    mouseTracker?.pauseAfterScroll()
+                    
+                case .expand:
+                    print("📜 Scroll detected - expanding category")
+                    functionManager.expandCategory(ringLevel: hoveredRingLevel, index: hoveredIndex, openedByClick: true)
+                    mouseTracker?.pauseAfterScroll()
+                    
+                default:
+                    break
+                }
+            }
+        } else if delta < 0 {
+            // Scroll down/toward = Go back
+            handleScrollBack()
+        }
+    }
+    
+    private func handleScrollBack() {
+        guard let functionManager = functionManager else { return }
+        
+        // Go back one level
+        let currentLevel = functionManager.activeRingLevel
+        if currentLevel > 0 {
+            print("📜 Scroll back detected - collapsing to ring \(currentLevel - 1)")
+            functionManager.collapseToRing(level: currentLevel - 1)
+            mouseTracker?.pauseAfterScroll()
+        }
+    }
     
     private func handleRightClick(event: GestureManager.GestureEvent) {
         guard let functionManager = functionManager else { return }
@@ -441,7 +373,10 @@ class CircularUIManager: ObservableObject {
         
         print("🖱️ [Right Click] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
-        switch node.onRightClick {
+        // Resolve behavior based on current modifier flags
+        let behavior = node.onRightClick.resolve(with: event.modifierFlags)
+        
+        switch behavior {
         case .expand:
             functionManager.expandCategory(ringLevel: ringLevel, index: index, openedByClick: true)
             // Pause mouse tracking to prevent immediate collapse
@@ -464,6 +399,7 @@ class CircularUIManager: ObservableObject {
             break
         }
     }
+    
     private func handleMiddleClick(event: GestureManager.GestureEvent) {
         guard let functionManager = functionManager else { return }
         
@@ -482,8 +418,10 @@ class CircularUIManager: ObservableObject {
             return
         }
         
-        // Otherwise, execute the middle-click action
-        switch node.onMiddleClick {
+        // Otherwise, execute the middle-click action (resolve with modifiers)
+        let behavior = node.onMiddleClick.resolve(with: event.modifierFlags)
+        
+        switch behavior {
         case .execute(let action):
             action()
             hide()
@@ -509,133 +447,79 @@ class CircularUIManager: ObservableObject {
             self?.handleGlobalFlagsChanged(event)
         }
         
-        // Also listen for local events
+        // Listen for local key events (when our window is active)
         NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-            return self?.handleLocalKeyEvent(event) ?? event
+            self?.handleLocalKeyEvent(event)
+            return event
         }
         
-        // Listen for local modifier key changes
+        // Listen for local modifier changes
         NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged]) { [weak self] event in
-            return self?.handleLocalFlagsChanged(event) ?? event
+            self?.handleGlobalFlagsChanged(event)
+            return event
         }
         
-//        print("✅ Circular UI hotkey monitoring started")
+        print("✅ Global hotkeys setup complete:")
+        print("   Ctrl+Shift+K → Show UI (root)")
+        print("   Ctrl+` → Show UI (expanded to Apps)")
+        print("   Escape → Hide UI")
+        print("   Shift → Toggle QuickLook preview")
     }
     
-    // MARK: - Modified handleGlobalKeyEvent
-
     private func handleGlobalKeyEvent(_ event: NSEvent) {
         let isCtrlPressed = event.modifierFlags.contains(.control)
         let isShiftPressed = event.modifierFlags.contains(.shift)
-        let isKKey = event.keyCode == 40  // K key
-        let isTildeKey = event.keyCode == 50  // ` key (backtick/tilde)
         
-        // CTRL+` - App Switcher Mode
-        if event.type == .keyDown && isCtrlPressed && isTildeKey {
-            print("⌨️ [GLOBAL] Ctrl+` detected - showing app switcher")
-            
-            if !isVisible {
-                // Show app switcher
-                isInAppSwitcherMode = true
-                wasCtrlPressedInAppSwitcherMode = true
-                show(expandingCategory: "app-switcher")
-                
-                // Automatically select next app (index 1) to mimic Cmd+Tab behavior
-                selectNextAppInSwitcher()
-            } else if isInAppSwitcherMode {
-                // Already visible in app switcher mode - cycle to next app
-                selectNextAppInSwitcher()
-            }
-            
+        // Ctrl+Shift+K = Show root UI
+        if isCtrlPressed && isShiftPressed && event.keyCode == 40 && !isVisible {
+            print("⌨️ Ctrl+Shift+K detected - showing circular UI (root)")
+            show()
             return
         }
         
-        // Toggle UI when Ctrl + Shift + K is pressed
-        if event.type == .keyDown && isCtrlPressed && isShiftPressed && isKKey {
-            // Prevent double-handling
-            guard !isHandlingShortcut else {
-                print("⚠️ Already handling shortcut, ignoring duplicate")
-                return
-            }
+        // Ctrl+` (grave accent/tilde key = keyCode 50) = Show expanded to Apps
+        if isCtrlPressed && !isShiftPressed && event.keyCode == 50 && !isVisible {
+            print("⌨️ Ctrl+` detected - showing circular UI (expanded to Apps)")
             
-            isHandlingShortcut = true
-            print("⌨️ [GLOBAL] Ctrl+Shift+K detected - toggling UI")
+            // Enter app switcher mode when Ctrl is held
+            print("🎯 Entering app switcher mode (Ctrl held)")
+            isInAppSwitcherMode = true
+            wasCtrlPressedInAppSwitcherMode = true
             
-            if isVisible {
-                hide()
-            } else {
-                show()
-            }
-            
-            // Reset flag after a short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.isHandlingShortcut = false
-            }
-            
+            show(expandingCategory: "combined-apps")
             return
         }
         
-        // Hide UI on Escape (when visible)
-        if event.type == .keyDown && event.keyCode == 53 && isVisible {
-            print("⌨️ [GLOBAL] Escape pressed - hiding circular UI")
-            exitAppSwitcherMode()
+        // Escape = Hide UI
+        if event.keyCode == 53 && isVisible {
+            print("⌨️ Escape pressed - hiding circular UI")
             hide()
-        }
-        
-        if event.type == .keyDown && event.keyCode == 56 && isVisible {  // 56 = Left Shift
-            print("⌨️ [GLOBAL] SHIFT pressed - checking for previewable node")
-            handlePreviewRequest()
             return
         }
     }
     
-    // MARK: - App Switcher Mode Helper Methods
-
-    private func selectNextAppInSwitcher() {
-        guard let functionManager = functionManager else { return }
-        
-        // Make sure we're at Ring 1 (app switcher)
-        guard functionManager.activeRingLevel == 1 else {
-            print("⚠️ Not in app switcher ring (level \(functionManager.activeRingLevel))")
-            return
-        }
-        
-        guard functionManager.rings.count > 1 else {
-            print("⚠️ App switcher ring not available")
-            return
-        }
-        
-        let ring = functionManager.rings[1]
-        let nodeCount = ring.nodes.count
-        
-        guard nodeCount > 0 else {
-            print("⚠️ No apps in switcher")
-            return
-        }
-        
-        // Get current hovered index, or start at -1
-        let currentIndex = ring.hoveredIndex ?? -1
-        
-        // Move to next app
-        let nextIndex = (currentIndex + 1) % nodeCount
-        
-        print("⌨️ Cycling to next app: index \(nextIndex) (\(ring.nodes[nextIndex].name))")
-        functionManager.hoverNode(ringLevel: 1, index: nextIndex)
+    private func handleLocalKeyEvent(_ event: NSEvent) {
+        handleGlobalKeyEvent(event)
     }
-
+    
+    // MARK: - App Switcher Mode Handlers
+    
     private func handleCtrlReleaseInAppSwitcher() {
-        guard let functionManager = functionManager else { return }
+        guard isInAppSwitcherMode else { return }
         
-        // Only act on Ctrl release if we're still in Ring 1 (app switcher)
-        guard functionManager.activeRingLevel == 1 else {
-            print("✅ Ctrl released but not in Ring 1 (level \(functionManager.activeRingLevel)) - exiting app switcher mode")
+        print("⌨️ [App Switcher] Ctrl released - switching to hovered app")
+        
+        guard let functionManager = functionManager else {
+            print("❌ No FunctionManager")
             exitAppSwitcherMode()
+            hide()
             return
         }
         
-        // Get the currently hovered app
-        guard functionManager.rings.count > 1 else {
-            print("⚠️ No app switcher ring available")
+        // We should be in Ring 1 (apps ring)
+        guard functionManager.activeRingLevel == 1,
+              functionManager.rings.count > 1 else {
+            print("❌ Not in apps ring (level: \(functionManager.activeRingLevel))")
             exitAppSwitcherMode()
             hide()
             return
@@ -643,9 +527,8 @@ class CircularUIManager: ObservableObject {
         
         let ring = functionManager.rings[1]
         
-        guard let hoveredIndex = ring.hoveredIndex,
-              hoveredIndex < ring.nodes.count else {
-            print("⚠️ No app selected in switcher")
+        guard let hoveredIndex = ring.hoveredIndex else {
+            print("❌ No app currently hovered")
             exitAppSwitcherMode()
             hide()
             return
@@ -655,8 +538,10 @@ class CircularUIManager: ObservableObject {
         
         print("✅ Ctrl released - switching to app: \(selectedNode.name)")
         
-        // Execute the app's left click action (which switches to it)
-        switch selectedNode.onLeftClick {
+        // Execute the app's left click action (resolve with no modifiers since Ctrl was just released)
+        let behavior = selectedNode.onLeftClick.resolve(with: [])
+        
+        switch behavior {
         case .execute(let action):
             action()
             exitAppSwitcherMode()
@@ -678,122 +563,23 @@ class CircularUIManager: ObservableObject {
     
     
     
-    
-    // MARK: - Modified handleLocalKeyEvent
-
-    private func handleLocalKeyEvent(_ event: NSEvent) -> NSEvent? {
-        let isCtrlPressed = event.modifierFlags.contains(.control)
-        let isShiftPressed = event.modifierFlags.contains(.shift)
-        let isKKey = event.keyCode == 40  // K key
-        let isTildeKey = event.keyCode == 50  // ` key
-        let isEscapeKey = event.keyCode == 53
-        
-        // CTRL+` - App Switcher Mode (LOCAL)
-        if event.type == .keyDown && isCtrlPressed && isTildeKey {
-            print("⌨️ [LOCAL] Ctrl+` detected - showing app switcher")
-            
-            if !isVisible {
-                isInAppSwitcherMode = true
-                wasCtrlPressedInAppSwitcherMode = true
-                show(expandingCategory: "app-switcher")
-                selectNextAppInSwitcher()
-            } else if isInAppSwitcherMode {
-                selectNextAppInSwitcher()
-            }
-            
-            return nil  // Consume event
-        }
-        
-        // Check if this is our shortcut (Ctrl+Shift+K)
-        if event.type == .keyDown && isCtrlPressed && isShiftPressed && isKKey {
-            // Prevent double-handling
-            guard !isHandlingShortcut else {
-                print("⚠️ Already handling shortcut, ignoring duplicate")
-                return nil
-            }
-            
-            isHandlingShortcut = true
-            print("⌨️ [LOCAL] Ctrl+Shift+K detected - toggling UI")
-            
-            // Handle the toggle
-            if isVisible {
-                hide()
-            } else {
-                show()
-            }
-            
-            // Reset flag after a short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.isHandlingShortcut = false
-            }
-            
-            return nil  // Consume the event - prevents system beep!
-        }
-        
-        // Check if this is Escape and UI is visible
-        if event.type == .keyDown && isEscapeKey && isVisible {
-            print("⌨️ [LOCAL] Escape pressed - hiding circular UI")
-            exitAppSwitcherMode()
-            hide()
-            return nil  // Consume the event
-        }
-
-        // NEW: Check if this is SHIFT and UI is visible
-        if event.type == .keyDown && event.keyCode == 56 && isVisible {  // 56 = Left Shift
-            print("⌨️ [LOCAL] SHIFT pressed - checking for previewable node")
-            handlePreviewRequest()
-            return nil  // Consume the event
-        }
-
-        // Not our shortcut - let the system handle it
-        return event
-    }
-
-    // MARK: - Modified handleLocalFlagsChanged
-
-    private func handleLocalFlagsChanged(_ event: NSEvent) -> NSEvent? {
-        guard isVisible else { return event }
-        
-        let isShiftPressed = event.modifierFlags.contains(.shift)
-        let isCtrlPressed = event.modifierFlags.contains(.control)
-        
-        // Handle Ctrl release in App Switcher Mode
-        if isInAppSwitcherMode && wasCtrlPressedInAppSwitcherMode && !isCtrlPressed {
-            print("⌨️ [LOCAL] Ctrl released in app switcher mode")
-            handleCtrlReleaseInAppSwitcher()
-            wasCtrlPressedInAppSwitcherMode = isCtrlPressed
-            return nil  // Consume event
-        }
-        
-        // Track Ctrl state
-        wasCtrlPressedInAppSwitcherMode = isCtrlPressed
-        
-        // Only trigger on SHIFT press (transition from not-pressed to pressed)
-        if isShiftPressed && !wasShiftPressed {
-            print("⌨️ [LOCAL] SHIFT pressed - toggling preview")
-            handlePreviewRequest()
-            wasShiftPressed = isShiftPressed
-            return nil  // Consume the event
-        }
-        
-        wasShiftPressed = isShiftPressed
-        return event
-    }
-    // MARK: - Overlay Window
+    // MARK: - Overlay Window Setup
     
     private func setupOverlayWindow() {
-        guard let functionManager = functionManager else { return }
-        
         overlayWindow = OverlayWindow()
         
-        // Connect the callback for scroll events
-        overlayWindow?.onScrollBack = { [weak self] in
-            self?.handleScrollBack()
+        guard let functionManager = functionManager else {
+            print("FunctionManager not initialized")
+            return
         }
         
-        // Set up focus loss callback
         overlayWindow?.onLostFocus = { [weak self] in
-            self?.hide()
+            guard let self = self else { return }
+            
+            // Close QuickLook when focus is lost
+            QuickLookManager.shared.hidePreview()
+            
+            self.hide()
         }
         
         let contentView = CircularUIView(

@@ -393,16 +393,16 @@ extension AppSwitcherManager: FunctionProvider {
                 itemAngleSize: 16,
                 slicePositioning: .center,
                 // EXPLICIT INTERACTION MODEL:
-                onLeftClick: .execute { [weak self] in
+                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                     // Primary action: switch to app and close UI
                     self?.switchToApp(app)
-                },
-                onRightClick: .expand,  // Right-click: Show context menu
-                onMiddleClick: .executeKeepOpen { [weak self] in
+                }),
+                onRightClick: ModifierAwareInteraction(base: .expand),  // Right-click: Show context menu
+                onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                     // Middle-click: Switch to app but keep UI open
                     self?.switchToApp(app)
-                },
-                onBoundaryCross: .doNothing,  // Don't auto-expand context menus
+                }),
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing),  // Don't auto-expand context menus
                 onHover: {
                     // Optional: Could preview app windows here
                     print("Hovering over \(app.localizedName ?? "Unknown")")
@@ -425,20 +425,14 @@ extension AppSwitcherManager: FunctionProvider {
                 slicePositioning: .center,
                 providerId: self.providerId,
                 // EXPLICIT INTERACTION MODEL:
-                onLeftClick: .expand,           // Click to expand applications
-                onRightClick: .execute { [weak self] in
-                    // Right-click: Open Applications folder
-                    print("📂 Opening Applications folder")
-                    self?.openApplicationsFolder()
-                },
-                onMiddleClick: .expand,         // Middle-click: Expand
-                onBoundaryCross: .expand,       // Auto-expand on boundary cross
-                onHover: {
-                    print("📱 Hovering over Applications category")
-                },
-                onHoverExit: {
-                    print("📱 Left Applications category")
-                }
+                onLeftClick: ModifierAwareInteraction(base: .expand),           // Click to expand applications
+                onRightClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                   // Right-click: Open Applications folder
+                   print("📂 Opening Applications folder")
+                   self?.openApplicationsFolder()
+                }),
+                onMiddleClick: ModifierAwareInteraction(base: .expand),         // Middle-click: Expand
+                onBoundaryCross: ModifierAwareInteraction(base: .expand),       // Auto-expand on boundary cross
             )
         ]
     }

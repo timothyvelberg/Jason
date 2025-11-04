@@ -248,7 +248,7 @@ class MouseTracker {
                             let node = nodes[pieIndex]
                             
                             // USE EXPLICIT INTERACTION MODEL
-                            switch node.onBoundaryCross {
+                            switch node.onBoundaryCross.base {
                             case .expand:
                                 functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)
                                 lastFunctionIndex = pieIndex
@@ -346,7 +346,7 @@ class MouseTracker {
                     // If hovering over a different category and there's an expanded ring above
                     // Check if this node wants to auto-expand or auto-navigate
                     if hoveredIndex != currentSelectedIndex && functionManager.rings.count > activeRingLevel + 1 {
-                        switch node.onBoundaryCross {
+                        switch node.onBoundaryCross.base {
                         case .expand:
                             print("🔄 Switching to category '\(node.name)'")
                             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
