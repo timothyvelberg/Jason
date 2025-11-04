@@ -117,6 +117,7 @@ struct MinimalView: View {
     @ObservedObject var circularUI: CircularUIManager
     @State private var showingFolderFavoritesSettings = false  // Renamed for clarity
     @State private var showingAppFavoritesSettings = false
+    @State private var showingFileFavoritesSettings = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -158,6 +159,11 @@ struct MinimalView: View {
                 }
                 .buttonStyle(.bordered)
                 
+                Button("Manage Favorite Files") {  // Add this
+                    showingFileFavoritesSettings = true
+                }
+                .buttonStyle(.bordered)
+                
                 // Two separate buttons for each type of favorites
                 Button("Manage Favorite Folders") {
                     showingFolderFavoritesSettings = true
@@ -168,14 +174,6 @@ struct MinimalView: View {
                     showingAppFavoritesSettings = true
                 }
                 .buttonStyle(.bordered)
-                
-                Button("Show DB Path") {
-                    if let path = try? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-                        .appendingPathComponent("Jason") {
-                        print("📍 Database folder: \(path.path)")
-                        NSWorkspace.shared.selectFile(path.appendingPathComponent("Jason.db").path, inFileViewerRootedAtPath: path.path)
-                    }
-                }
             }
         }
         .padding(30)
@@ -186,6 +184,11 @@ struct MinimalView: View {
         .sheet(isPresented: $showingAppFavoritesSettings) {
             if let appsProvider = circularUI.functionManager?.favoriteAppsProvider {
                 FavoriteAppsSettingsView(appsProvider: appsProvider)
+            }
+        }
+        .sheet(isPresented: $showingFileFavoritesSettings) {  // Add this
+            if let filesProvider = circularUI.favoriteFilesProvider {
+                FavoriteFilesSettingsView(filesProvider: filesProvider)
             }
         }
     }

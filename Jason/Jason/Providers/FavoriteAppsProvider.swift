@@ -304,26 +304,4 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         
         return success
     }
-    
-    // MARK: - Migration Helper (One-time use)
-    
-    /// Migrate hardcoded favorites to database (call this once)
-    func migrateHardcodedFavorites() {
-        let hardcodedBundleIds = [
-            "com.vivaldi.Vivaldi",
-            "net.whatsapp.WhatsApp",
-            "com.anthropic.claudefordesktop"
-        ]
-        
-        print("🔄 [FavoriteAppsProvider] Migrating hardcoded favorites to database...")
-        
-        var migratedCount = 0
-        for bundleId in hardcodedBundleIds {
-            if addFavorite(bundleIdentifier: bundleId) {
-                migratedCount += 1
-            }
-        }
-        
-        print("✅ [FavoriteAppsProvider] Migrated \(migratedCount)/\(hardcodedBundleIds.count) apps")
-    }
 }

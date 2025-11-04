@@ -124,6 +124,35 @@ class DatabaseManager {
         );
         """
         
+        // Create favorite_files table (static file references)
+        let favoriteFilesSQL = """
+        CREATE TABLE IF NOT EXISTS favorite_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            path TEXT UNIQUE NOT NULL,
+            display_name TEXT,
+            sort_order INTEGER NOT NULL,
+            icon_data BLOB,
+            last_accessed INTEGER,
+            access_count INTEGER DEFAULT 0
+        );
+        """
+        
+        // Create favorite_dynamic_files table (rule-based file queries)
+        let favoriteDynamicFilesSQL = """
+        CREATE TABLE IF NOT EXISTS favorite_dynamic_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            display_name TEXT NOT NULL,
+            folder_path TEXT NOT NULL,
+            query_type TEXT NOT NULL,
+            file_extensions TEXT,
+            name_pattern TEXT,
+            sort_order INTEGER NOT NULL,
+            icon_data BLOB,
+            last_accessed INTEGER,
+            access_count INTEGER DEFAULT 0
+        );
+        """
+        
         // Create folder_cache table (performance optimization)
         let folderCacheSQL = """
         CREATE TABLE IF NOT EXISTS folder_cache (
@@ -143,7 +172,7 @@ class DatabaseManager {
         """
         
         // Execute all schema creation
-        let tables = [foldersSQL, favoriteFoldersSQL, favoriteAppsSQL, folderCacheSQL, preferencesSQL]
+        let tables = [foldersSQL, favoriteFoldersSQL, favoriteAppsSQL, favoriteFilesSQL, favoriteDynamicFilesSQL, folderCacheSQL, preferencesSQL]
         
         for sql in tables {
             if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {

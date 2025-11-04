@@ -77,10 +77,7 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
                 icon: providerIcon,
                 children: systemNodes,
                 preferredLayout: .partialSlice,
-                itemAngleSize: 48,
                 slicePositioning: .center,
-                
-                
                 onLeftClick: ModifierAwareInteraction(base: .expand),
                 onRightClick: ModifierAwareInteraction(base: .expand),
                 onMiddleClick: ModifierAwareInteraction(base: .expand),

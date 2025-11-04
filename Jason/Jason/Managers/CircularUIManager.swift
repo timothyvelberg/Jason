@@ -21,6 +21,7 @@ class CircularUIManager: ObservableObject {
     private var overlayWindow: OverlayWindow?
     private(set) var appSwitcher: AppSwitcherManager?
     private(set) var combinedAppsProvider: CombinedAppsProvider?
+    var favoriteFilesProvider: FavoriteFilesProvider?
     var functionManager: FunctionManager?
     private var mouseTracker: MouseTracker?
     private var gestureManager: GestureManager?
@@ -200,6 +201,13 @@ class CircularUIManager: ObservableObject {
         combinedAppsProvider.circularUIManager = self
         self.combinedAppsProvider = combinedAppsProvider  // 🆕 Store reference
         functionManager?.registerProvider(combinedAppsProvider)
+        
+        
+        // Register FavoriteFilesProvider
+       let favoriteFilesProvider = FavoriteFilesProvider()
+       favoriteFilesProvider.circularUIManager = self
+       self.favoriteFilesProvider = favoriteFilesProvider  // Store reference
+       functionManager?.registerProvider(favoriteFilesProvider)
         
         functionManager?.registerProvider(SystemActionsProvider())
 

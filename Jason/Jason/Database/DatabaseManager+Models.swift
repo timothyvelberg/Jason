@@ -83,4 +83,29 @@ struct FavoriteFolderSettings {
     let contentSortOrder: FolderSortOrder?
 }
 
+// Static file - direct reference to a specific file
+struct FavoriteFileEntry: Identifiable {
+    let id: Int?
+    let path: String
+    let displayName: String?
+    let sortOrder: Int
+    let iconData: Data?
+    let lastAccessed: Int?
+    let accessCount: Int
+}
+
+// Dynamic file - rule-based query that resolves to a file
+struct FavoriteDynamicFileEntry: Identifiable {
+    let id: Int?
+    let displayName: String
+    let folderPath: String
+    let queryType: String
+    let fileExtensions: String?
+    let namePattern: String?
+    let sortOrder: Int
+    let iconData: Data?
+    let lastAccessed: Int?
+    let accessCount: Int
+}
+
 // MARK: - Errors
