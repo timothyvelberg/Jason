@@ -72,22 +72,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create the ContentView window (hidden initially)
         setupContentWindow()
         
-        // Add local monitor to consume Ctrl+Shift+K in main window
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            let isCtrlPressed = event.modifierFlags.contains(.control)
-            let isShiftPressed = event.modifierFlags.contains(.shift)
-            let isKKey = event.keyCode == 40  // K key
-            
-            // If this is our shortcut, consume it (prevent beep)
-            if isCtrlPressed && isShiftPressed && isKKey {
-                print("🎯 [AppDelegate] Consuming Ctrl+Shift+K in main window (no beep)")
-                return nil  // Consume event - prevents beep!
-            }
-            
-            // Let other keys through
-            return event
-        }
-        
         print("✅ AppDelegate: Menu bar app ready")
     }
     

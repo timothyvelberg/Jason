@@ -681,8 +681,6 @@ class CircularUIManager: ObservableObject {
         }
         print("   Active ring level: \(functionManager.activeRingLevel)")
         print("   Total rings: \(functionManager.rings.count)")
-        
-        combinedAppsProvider?.startAutoRefresh()
     }
     
     // MARK: - Hide Method
@@ -727,8 +725,6 @@ class CircularUIManager: ObservableObject {
         isIntentionallySwitching = false
         
         print("Hiding circular UI")
-        
-        combinedAppsProvider?.stopAutoRefresh()
     }
     
     /// Temporarily ignore focus changes (used during app quit/launch to prevent unwanted UI hiding)

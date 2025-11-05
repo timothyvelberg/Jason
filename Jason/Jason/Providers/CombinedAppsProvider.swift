@@ -29,7 +29,6 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     
     weak var appSwitcherManager: AppSwitcherManager?
     weak var circularUIManager: CircularUIManager?
-    private var refreshTimer: Timer?
     
     // MARK: - App Entry Structure
     
@@ -71,7 +70,6 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     
     deinit {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
-        stopAutoRefresh()
     }
     
     // MARK: - App Loading
@@ -91,10 +89,15 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         print("🏃 [CombinedApps] Found \(runningApps.count) running apps")
         
         // Create a map of running apps by bundle ID for quick lookup
-        let runningAppsMap = Dictionary(uniqueKeysWithValues: runningApps.compactMap { app -> (String, NSRunningApplication)? in
-            guard let bundleId = app.bundleIdentifier else { return nil }
-            return (bundleId, app)
-        })
+        // Use compactMapValues to handle potential duplicates (keeps first occurrence)
+        var runningAppsMap: [String: NSRunningApplication] = [:]
+        for app in runningApps {
+            guard let bundleId = app.bundleIdentifier else { continue }
+            // Only add if not already present (keeps first occurrence)
+            if runningAppsMap[bundleId] == nil {
+                runningAppsMap[bundleId] = app
+            }
+        }
         
         // 3. Add favorite apps first (in database order)
         for (index, favorite) in favorites.enumerated() {
@@ -421,39 +424,6 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             onMiddleClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
-    }
-    
-    // MARK: - Auto Refresh
-    
-    func startAutoRefresh() {
-        stopAutoRefresh()
-        
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            
-            // Save current state
-            let oldAppCount = self.appEntries.count
-            let oldBundleIds = Set(self.appEntries.map { $0.bundleIdentifier })
-            
-            // Reload
-            self.loadApps()
-            
-            // Check if there were changes
-            let newBundleIds = Set(self.appEntries.map { $0.bundleIdentifier })
-            
-            if oldAppCount != self.appEntries.count || oldBundleIds != newBundleIds {
-                print("🔄 [CombinedApps] Changes detected via timer - posting update")
-                NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
-            }
-        }
-        
-        print("✅ [CombinedApps] Auto-refresh timer started (1 second interval)")
-    }
-    
-    func stopAutoRefresh() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
-        print("🛑 [CombinedApps] Auto-refresh timer stopped")
     }
     
     // MARK: - App Launch/Quit Notifications
