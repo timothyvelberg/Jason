@@ -33,13 +33,14 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
     // MARK: - FunctionProvider Methods
     
     func provideFunctions() -> [FunctionNode] {
-        let systemNodes = [
+        return [
             // Mission Control
             FunctionNode(
                 id: "mission-control",
                 name: "Mission Control",
                 icon: NSImage(systemSymbolName: "rectangle.3.group", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
+                itemAngleSize: 20,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute {
                     SystemActions.showMissionControl()
@@ -57,6 +58,7 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
                 name: "Show Desktop",
                 icon: NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
+                itemAngleSize: 20,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute {
                     SystemActions.showDesktop()
@@ -66,22 +68,6 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
                 onBoundaryCross: ModifierAwareInteraction(base: .execute {
                     SystemActions.showDesktop()
                 })
-            )
-        ]
-        
-        // Return as a single category node
-        return [
-            FunctionNode(
-                id: providerId,
-                name: providerName,
-                icon: providerIcon,
-                children: systemNodes,
-                preferredLayout: .partialSlice,
-                slicePositioning: .center,
-                onLeftClick: ModifierAwareInteraction(base: .expand),
-                onRightClick: ModifierAwareInteraction(base: .expand),
-                onMiddleClick: ModifierAwareInteraction(base: .expand),
-                onBoundaryCross: ModifierAwareInteraction(base: .expand),
             )
         ]
     }

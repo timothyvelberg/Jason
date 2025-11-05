@@ -25,14 +25,14 @@ class CircularUIManager: ObservableObject {
     var functionManager: FunctionManager?
     private var mouseTracker: MouseTracker?
     private var gestureManager: GestureManager?
-    private var isHandlingShortcut: Bool = false  // Prevent double-handling
-    private var wasShiftPressed: Bool = false
+    private var hotkeyManager: HotkeyManager?  // 🆕 New hotkey manager
+    
     private var centerPoint: CGPoint = .zero
     private var previousApp: NSRunningApplication?
     private var isIntentionallySwitching: Bool = false
     
     private var isInAppSwitcherMode: Bool = false
-    private var wasCtrlPressedInAppSwitcherMode: Bool = false
+    private var isInHoldMode: Bool = false  // 🆕 Track if we're in hold-to-show mode
     
     init() {
         print("CircularUIManager initialized")
@@ -166,25 +166,6 @@ class CircularUIManager: ObservableObject {
         return false
     }
     
-    /// Reload all visible rings
-//    private func reloadVisibleRings() {
-//        guard let functionManager = functionManager else { return }
-//
-//        let currentLevel = functionManager.activeRingLevel
-//
-//        print("🔄 Reloading rings (current level: \(currentLevel))")
-//
-//        // Simple approach: Reload from root
-//        // This recreates the entire ring hierarchy
-//        functionManager.loadFunctions()
-//
-//        // If we were deeper than Ring 0, we might need to re-expand
-//        // For now, this is acceptable - user can navigate again if needed
-//        // TODO: Preserve navigation state during reload
-//
-//        print("✅ Rings reloaded")
-//    }
-    
     func setup() {
         // Create AppSwitcherManager internally (still needed for MRU tracking and app management)
         let appSwitcher = AppSwitcherManager()
@@ -247,7 +228,7 @@ class CircularUIManager: ObservableObject {
         }
         
         setupOverlayWindow()
-        setupGlobalHotkeys()
+        setupHotkeys()  // 🆕 New method
     }
     
     // MARK: - Gesture Handlers (Click, Drag, Scroll)
@@ -440,74 +421,138 @@ class CircularUIManager: ObservableObject {
         }
     }
     
-    // MARK: - Modified setupGlobalHotkeys method
+    // MARK: - Hotkey Setup (🆕 Simplified)
 
-    private func setupGlobalHotkeys() {
-//        print("⌨️ Setting up circular UI hotkeys (Ctrl+Shift+K and Ctrl+`)")
+    private func setupHotkeys() {
+        let hotkeyManager = HotkeyManager()
+        self.hotkeyManager = hotkeyManager
         
-        // Listen for global key events (keyDown only)
-        NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-            self?.handleGlobalKeyEvent(event)
+        // Configure hold-to-show key (F13 by default - no conflicts)
+        hotkeyManager.holdKeyCode = HotkeyManager.KeyCode.f13
+        
+        // Configure callbacks
+        hotkeyManager.onShowRoot = { [weak self] in
+            self?.show()
         }
         
-        // Listen for global modifier key changes (for SHIFT detection and Ctrl release)
-        NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged]) { [weak self] event in
-            self?.handleGlobalFlagsChanged(event)
-        }
-        
-        // Listen for local key events (when our window is active)
-        NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-            self?.handleLocalKeyEvent(event)
-            return event
-        }
-        
-        // Listen for local modifier changes
-        NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged]) { [weak self] event in
-            self?.handleGlobalFlagsChanged(event)
-            return event
-        }
-        
-        print("✅ Global hotkeys setup complete:")
-        print("   Ctrl+Shift+K → Show UI (root)")
-        print("   Ctrl+` → Show UI (expanded to Apps)")
-        print("   Escape → Hide UI")
-        print("   Shift → Toggle QuickLook preview")
-    }
-    
-    private func handleGlobalKeyEvent(_ event: NSEvent) {
-        let isCtrlPressed = event.modifierFlags.contains(.control)
-        let isShiftPressed = event.modifierFlags.contains(.shift)
-        
-        // Ctrl+Shift+K = Show root UI
-        if isCtrlPressed && isShiftPressed && event.keyCode == 40 && !isVisible {
-            print("⌨️ Ctrl+Shift+K detected - showing circular UI (root)")
-            show()
-            return
-        }
-        
-        // Ctrl+` (grave accent/tilde key = keyCode 50) = Show expanded to Apps
-        if isCtrlPressed && !isShiftPressed && event.keyCode == 50 && !isVisible {
-            print("⌨️ Ctrl+` detected - showing circular UI (expanded to Apps)")
-            
+        hotkeyManager.onShowApps = { [weak self] in
             // Enter app switcher mode when Ctrl is held
             print("🎯 Entering app switcher mode (Ctrl held)")
-            isInAppSwitcherMode = true
-            wasCtrlPressedInAppSwitcherMode = true
+            self?.isInAppSwitcherMode = true
+            self?.show(expandingCategory: "combined-apps")
+        }
+        
+        hotkeyManager.onHide = { [weak self] in
+            self?.hide()
+        }
+        
+        hotkeyManager.onShiftPressed = { [weak self] in
+            self?.handlePreviewRequest()
+        }
+        
+        hotkeyManager.onCtrlReleasedInAppSwitcher = { [weak self] in
+            self?.handleCtrlReleaseInAppSwitcher()
+        }
+        
+        // 🆕 Hold-to-show callbacks
+        hotkeyManager.onHoldKeyPressed = { [weak self] in
+            print("🎯 Hold key pressed - showing UI in hold mode")
+            self?.isInHoldMode = true
+            self?.show()
+        }
+        
+        hotkeyManager.onHoldKeyReleased = { [weak self] in
+            guard let self = self else { return }
+            print("🎯 Hold key released")
             
-            show(expandingCategory: "combined-apps")
+            // Only hide if we're still in hold mode AND UI is visible
+            // If an action already hid the UI, isInHoldMode will be false
+            if self.isInHoldMode && self.isVisible {
+                print("   → Hiding UI (still in hold mode)")
+                self.hide()
+            } else {
+                print("   → Not hiding (already hidden or exited hold mode)")
+                self.isInHoldMode = false  // Clean up state
+            }
+        }
+        
+        // Provide query functions
+        hotkeyManager.isUIVisible = { [weak self] in
+            return self?.isVisible ?? false
+        }
+        
+        hotkeyManager.isInAppSwitcherMode = { [weak self] in
+            return self?.isInAppSwitcherMode ?? false
+        }
+        
+        // Start monitoring
+        hotkeyManager.startMonitoring()
+    }
+    
+    // MARK: - Overlay Window Setup
+    
+    private func setupOverlayWindow() {
+        overlayWindow = OverlayWindow()
+        
+        guard let functionManager = functionManager else {
+            print("FunctionManager not initialized")
             return
         }
         
-        // Escape = Hide UI
-        if event.keyCode == 53 && isVisible {
-            print("⌨️ Escape pressed - hiding circular UI")
-            hide()
-            return
+        overlayWindow?.onLostFocus = { [weak self] in
+            guard let self = self else { return }
+            
+            // Close QuickLook when focus is lost
+            QuickLookManager.shared.hidePreview()
+            
+            self.hide()
         }
+        
+        let contentView = CircularUIView(
+            circularUI: self,
+            functionManager: functionManager
+        )
+        overlayWindow?.contentView = NSHostingView(rootView: contentView)
     }
     
-    private func handleLocalKeyEvent(_ event: NSEvent) {
-        handleGlobalKeyEvent(event)
+    // MARK: - Preview Handler
+
+    private func handlePreviewRequest() {
+        guard let functionManager = functionManager else { return }
+        
+        // If QuickLook is already showing, just close it
+        if QuickLookManager.shared.isShowing {
+            print("👁️ [Preview] QuickLook is already open - closing it")
+            QuickLookManager.shared.hidePreview()
+            return
+        }
+        
+        let activeRingLevel = functionManager.activeRingLevel
+        guard activeRingLevel < functionManager.rings.count else {
+            print("⚠️ No active ring for preview")
+            return
+        }
+        
+        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
+            print("⚠️ No item currently hovered for preview")
+            return
+        }
+        
+        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
+            print("⚠️ Invalid hovered index for preview")
+            return
+        }
+        
+        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
+        
+        // Check if node is previewable
+        guard node.isPreviewable, let previewURL = node.previewURL else {
+            print("⚠️ Node '\(node.name)' is not previewable")
+            return
+        }
+        
+        print("👁️ [Preview] Showing Quick Look for: \(node.name)")
+        QuickLookManager.shared.showPreview(for: previewURL)
     }
     
     // MARK: - App Switcher Mode Handlers
@@ -566,106 +611,6 @@ class CircularUIManager: ObservableObject {
             print("🚪 Exiting app switcher mode")
         }
         isInAppSwitcherMode = false
-        wasCtrlPressedInAppSwitcherMode = false
-    }
-    
-    
-    
-    // MARK: - Overlay Window Setup
-    
-    private func setupOverlayWindow() {
-        overlayWindow = OverlayWindow()
-        
-        guard let functionManager = functionManager else {
-            print("FunctionManager not initialized")
-            return
-        }
-        
-        overlayWindow?.onLostFocus = { [weak self] in
-            guard let self = self else { return }
-            
-            // Close QuickLook when focus is lost
-            QuickLookManager.shared.hidePreview()
-            
-            self.hide()
-        }
-        
-        let contentView = CircularUIView(
-            circularUI: self,
-            functionManager: functionManager
-        )
-        overlayWindow?.contentView = NSHostingView(rootView: contentView)
-        
-//        print("Overlay window created and configured")
-    }
-    
-    // MARK: - Preview Handler
-
-    // MARK: - Preview Handler
-
-    private func handlePreviewRequest() {
-        guard let functionManager = functionManager else { return }
-        
-        // NEW: If QuickLook is already showing, just close it
-        if QuickLookManager.shared.isShowing {
-            print("👁️ [Preview] QuickLook is already open - closing it")
-            QuickLookManager.shared.hidePreview()
-            return
-        }
-        
-        let activeRingLevel = functionManager.activeRingLevel
-        guard activeRingLevel < functionManager.rings.count else {
-            print("⚠️ No active ring for preview")
-            return
-        }
-        
-        guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
-            print("⚠️ No item currently hovered for preview")
-            return
-        }
-        
-        guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
-            print("⚠️ Invalid hovered index for preview")
-            return
-        }
-        
-        let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
-        
-        // Check if node is previewable
-        guard node.isPreviewable, let previewURL = node.previewURL else {
-            print("⚠️ Node '\(node.name)' is not previewable")
-            return
-        }
-        
-        print("👁️ [Preview] Showing Quick Look for: \(node.name)")
-        QuickLookManager.shared.showPreview(for: previewURL)  // 👈 Changed from togglePreview to showPreview
-    }
-    
-    // MARK: - Modified handleGlobalFlagsChanged
-
-    private func handleGlobalFlagsChanged(_ event: NSEvent) {
-        guard isVisible else { return }
-        
-        let isShiftPressed = event.modifierFlags.contains(.shift)
-        let isCtrlPressed = event.modifierFlags.contains(.control)
-        
-        // Handle Ctrl release in App Switcher Mode
-        if isInAppSwitcherMode && wasCtrlPressedInAppSwitcherMode && !isCtrlPressed {
-            print("⌨️ [GLOBAL] Ctrl released in app switcher mode")
-            handleCtrlReleaseInAppSwitcher()
-            return
-        }
-        
-        // Track Ctrl state
-        wasCtrlPressedInAppSwitcherMode = isCtrlPressed
-        
-        // Only trigger on SHIFT press (transition from not-pressed to pressed)
-        if isShiftPressed && !wasShiftPressed {
-            print("⌨️ [GLOBAL] SHIFT pressed - toggling preview")
-            handlePreviewRequest()
-        }
-        
-        wasShiftPressed = isShiftPressed
     }
     
     // MARK: - Show Methods
@@ -725,7 +670,6 @@ class CircularUIManager: ObservableObject {
         mousePosition = NSEvent.mouseLocation
         centerPoint = mousePosition
         isVisible = true
-        wasShiftPressed = false
         overlayWindow?.showOverlay(at: mousePosition)
         
         mouseTracker?.startTrackingMouse()
@@ -741,7 +685,7 @@ class CircularUIManager: ObservableObject {
         combinedAppsProvider?.startAutoRefresh()
     }
     
-    // MARK: - Modified hide() method
+    // MARK: - Hide Method
 
     func hide() {
         mouseTracker?.stopTrackingMouse()
@@ -753,7 +697,17 @@ class CircularUIManager: ObservableObject {
         // Exit app switcher mode when hiding
         exitAppSwitcherMode()
         
-        // 🆕 Only restore previous app if we're NOT intentionally switching
+        // 🆕 If we were in hold mode AND key is still physically pressed,
+        // require key release before allowing next show
+        // This prevents UI from re-appearing while user is still holding F13
+        if isInHoldMode && (hotkeyManager?.isHoldKeyPhysicallyPressed ?? false) {
+            hotkeyManager?.requireReleaseBeforeNextShow()
+        }
+        
+        // 🆕 Exit hold mode when hiding (prevents double-hide on key release)
+        isInHoldMode = false
+        
+        // Only restore previous app if we're NOT intentionally switching
         if !isIntentionallySwitching {
             if let prevApp = previousApp, prevApp.isTerminated == false {
                 print("🔄 Restoring focus to: \(prevApp.localizedName ?? "Unknown")")
@@ -765,12 +719,12 @@ class CircularUIManager: ObservableObject {
         
         // Reset all state for clean slate on next show
         functionManager?.reset()
+        hotkeyManager?.resetState()  // 🆕 Reset hotkey state
         
         // Close any open preview
         QuickLookManager.shared.hidePreview()
-        wasShiftPressed = false
         previousApp = nil
-        isIntentionallySwitching = false  // 🆕 Reset flag
+        isIntentionallySwitching = false
         
         print("Hiding circular UI")
         
@@ -783,7 +737,7 @@ class CircularUIManager: ObservableObject {
     }
     
     func hideAndSwitchTo(app: NSRunningApplication) {
-        // 🆕 Set flag to prevent hide() from restoring previous app
+        // Set flag to prevent hide() from restoring previous app
         isIntentionallySwitching = true
         
         // Hide the UI (this will trigger onLostFocus -> hide())
