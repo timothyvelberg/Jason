@@ -205,8 +205,10 @@ struct RingView: View {
                    isRunning {
                     
                     let centerAngle = calculateCenterAngle(for: index)
-                    let itemAngle = sliceConfig.itemAngle
+                    let itemAngle = angleForItem(at: index)  // ← Use variable angle
                     
+                    let _ = print("🏃 [Running Indicator] index=\(index), itemAngle=\(itemAngle)°, centerAngle=\(centerAngle)°")  // ← ADD THIS
+
                     // Make indicator 5° narrower on each side (10° total)
                     let indicatorStartAngle = centerAngle - (itemAngle / 2) + 1
                     let indicatorEndAngle = centerAngle + (itemAngle / 2) - 1
@@ -522,30 +524,26 @@ struct RingView: View {
     }
     
     private func updateSlice(for index: Int, totalCount: Int) {
-        guard totalCount > 0 else { return }
+        guard totalCount > 0 else {
+            angleOffset = 0
+            startAngle = .degrees(0)
+            endAngle = .degrees(0)
+            return
+        }
         
-        let itemAngle = sliceConfig.itemAngle
+        let itemAngle = angleForItem(at: index)  // Get variable angle for this specific item
+        print("🎯 [updateSlice] index=\(index), itemAngle=\(itemAngle)°")
+
         
-        if previousIndex == nil || !hasAppeared {
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                rotationIndex = index
-                previousIndex = index
-                hasAppeared = true
-                
-                let angleOffset: Double
-                if sliceConfig.direction == .counterClockwise {
-                    let baseAngle = sliceConfig.endAngle
-                    angleOffset = baseAngle - (Double(index) * itemAngle) - (itemAngle / 2)
-                } else {
-                    let baseAngle = sliceConfig.startAngle
-                    angleOffset = baseAngle + (Double(index) * itemAngle) + (itemAngle / 2)
-                }
-                
-                startAngle = Angle(degrees: angleOffset - itemAngle / 2 - 90)
-                endAngle = Angle(degrees: angleOffset + itemAngle / 2 - 90)
-            }
+        if previousIndex == nil {
+            // First selection - calculate center angle for this item
+            let centerAngle = calculateCenterAngle(for: index)
+            print("   First selection: centerAngle=\(centerAngle)°")
+            angleOffset = centerAngle
+            startAngle = Angle(degrees: centerAngle - itemAngle / 2 - 90)
+            endAngle = Angle(degrees: centerAngle + itemAngle / 2 - 90)
+            previousIndex = index
+            rotationIndex = index
             return
         }
         
@@ -566,13 +564,16 @@ struct RingView: View {
             newRotationIndex = index
         }
         
+        // Calculate angle offset using rotationIndex for smooth wraparound animation
         let newAngleOffset: Double
         if sliceConfig.direction == .counterClockwise {
             let baseAngle = sliceConfig.endAngle
-            newAngleOffset = baseAngle - (Double(newRotationIndex) * itemAngle) - (itemAngle / 2)
+            // For variable angles, calculate cumulative angle at rotationIndex
+            newAngleOffset = cumulativeAngleAtRotationIndex(newRotationIndex, baseAngle: baseAngle, clockwise: false)
         } else {
             let baseAngle = sliceConfig.startAngle
-            newAngleOffset = baseAngle + (Double(newRotationIndex) * itemAngle) + (itemAngle / 2)
+            // For variable angles, calculate cumulative angle at rotationIndex
+            newAngleOffset = cumulativeAngleAtRotationIndex(newRotationIndex, baseAngle: baseAngle, clockwise: true)
         }
         
         withAnimation(.easeOut(duration: 0.08)) {
@@ -584,26 +585,51 @@ struct RingView: View {
         previousIndex = index
         rotationIndex = newRotationIndex
     }
+
+    /// Calculate the angle at a given rotationIndex (which can be negative or > totalCount for wraparound animation)
+    private func cumulativeAngleAtRotationIndex(_ rotIndex: Int, baseAngle: Double, clockwise: Bool) -> Double {
+        let totalCount = nodes.count
+        guard totalCount > 0 else { return baseAngle }
+        
+        // Check if we have variable angles
+        guard let perItemAngles = sliceConfig.perItemAngles, perItemAngles.count == totalCount else {
+            // Fallback to uniform angle calculation
+            let itemAngle = sliceConfig.itemAngle
+            if clockwise {
+                return baseAngle + (Double(rotIndex) * itemAngle) + (itemAngle / 2)
+            } else {
+                return baseAngle - (Double(rotIndex) * itemAngle) - (itemAngle / 2)
+            }
+        }
+        
+        // Variable angles: need to calculate cumulative
+        let actualIndex = ((rotIndex % totalCount) + totalCount) % totalCount
+        let fullRotations = rotIndex >= 0 ? rotIndex / totalCount : (rotIndex - totalCount + 1) / totalCount
+        
+        // Calculate cumulative angle to actualIndex
+        var cumulative: Double = 0
+        for i in 0..<actualIndex {
+            cumulative += perItemAngles[i]
+        }
+        
+        // Add center offset for this item
+        let itemAngle = perItemAngles[actualIndex]
+        let centerOffset = cumulative + (itemAngle / 2)
+        
+        if clockwise {
+            return baseAngle + centerOffset + (Double(fullRotations) * 360.0)
+        } else {
+            return baseAngle - centerOffset - (Double(fullRotations) * 360.0)
+        }
+    }
     
     private func iconPosition(for index: Int) -> CGPoint {
         guard nodes.count > 0 else {
             return CGPoint(x: totalDiameter / 2, y: totalDiameter / 2)
         }
         
-        let itemAngle = sliceConfig.itemAngle
-        
-        let iconAngle: Double
-        
-        if sliceConfig.direction == .counterClockwise {
-            // Counter-clockwise: Position from END angle going backwards
-            // Item 0 starts at endAngle, item 1 is further counter-clockwise, etc.
-            let baseAngle = sliceConfig.endAngle
-            iconAngle = baseAngle - (itemAngle * Double(index)) - (itemAngle / 2)
-        } else {
-            // Clockwise: Position from START angle going forwards
-            let baseAngle = sliceConfig.startAngle
-            iconAngle = baseAngle + (itemAngle * Double(index)) + (itemAngle / 2)
-        }
+        // Use helper to get center angle (handles variable angles)
+        let iconAngle = calculateCenterAngle(for: index)
         
         // Apply rotation offset for animation
         let node = nodes[index]
@@ -622,17 +648,57 @@ struct RingView: View {
     private func calculateCenterAngle(for index: Int) -> Double {
         guard nodes.count > 0 else { return 0 }
         
-        let itemAngle = sliceConfig.itemAngle
+        let startAngle = cumulativeStartAngle(for: index)
+        let itemAngle = angleForItem(at: index)
         
+        // Return the center of this item's slice
         if sliceConfig.direction == .counterClockwise {
-            // Counter-clockwise: Calculate from END angle going backwards
-            let baseAngle = sliceConfig.endAngle
-            return baseAngle - (itemAngle * Double(index)) - (itemAngle / 2)
+            return startAngle - (itemAngle / 2)
         } else {
-            // Clockwise: Calculate from START angle going forwards
-            let baseAngle = sliceConfig.startAngle
-            return baseAngle + (itemAngle * Double(index)) + (itemAngle / 2)
+            return startAngle + (itemAngle / 2)
         }
+    }
+    
+    // MARK: - Variable Angle Helpers
+
+    /// Get the angle size for a specific item (supports variable angles)
+    private func angleForItem(at index: Int) -> Double {
+        if let perItemAngles = sliceConfig.perItemAngles,
+           index < perItemAngles.count {
+            let angle = perItemAngles[index]
+            print("   ✅ [angleForItem] index=\(index) -> \(angle)° (from perItemAngles)")
+            return angle
+        }
+        let fallback = sliceConfig.itemAngle
+        print("   ⚠️ [angleForItem] index=\(index) -> \(fallback)° (FALLBACK - perItemAngles is nil!)")
+        return fallback
+    }
+
+    /// Calculate the cumulative start angle for an item (where its slice begins)
+    private func cumulativeStartAngle(for index: Int) -> Double {
+        let baseAngle = sliceConfig.direction == .counterClockwise
+            ? sliceConfig.endAngle
+            : sliceConfig.startAngle
+        
+        guard let perItemAngles = sliceConfig.perItemAngles else {
+            // Uniform angles: simple multiplication
+            let offset = sliceConfig.itemAngle * Double(index)
+            return sliceConfig.direction == .counterClockwise
+                ? baseAngle - offset
+                : baseAngle + offset
+        }
+        
+        // Variable angles: sum all previous angles
+        var cumulativeAngle: Double = 0
+        for i in 0..<index {
+            if i < perItemAngles.count {
+                cumulativeAngle += perItemAngles[i]
+            }
+        }
+        
+        return sliceConfig.direction == .counterClockwise
+            ? baseAngle - cumulativeAngle
+            : baseAngle + cumulativeAngle
     }
     
     // MARK: - Staggered Animation

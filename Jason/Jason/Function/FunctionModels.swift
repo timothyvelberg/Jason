@@ -116,8 +116,11 @@ class FunctionNode: Identifiable, ObservableObject {
     let children: [FunctionNode]?
     let contextActions: [FunctionNode]?
     let maxDisplayedChildren: Int?
+    
     let preferredLayout: LayoutStyle?
     let itemAngleSize: CGFloat?
+    let parentAngleSize: CGFloat?
+    
     let previewURL: URL?
     let showLabel: Bool
     
@@ -151,8 +154,11 @@ class FunctionNode: Identifiable, ObservableObject {
         children: [FunctionNode]? = nil,
         contextActions: [FunctionNode]? = nil,
         maxDisplayedChildren: Int? = nil,
+        
         preferredLayout: LayoutStyle? = nil,
+        parentAngleSize: CGFloat? = nil,
         itemAngleSize: CGFloat? = nil,
+        
         previewURL: URL? = nil,
         showLabel: Bool = false,
         
@@ -184,8 +190,11 @@ class FunctionNode: Identifiable, ObservableObject {
         self.children = children
         self.contextActions = contextActions
         self.maxDisplayedChildren = maxDisplayedChildren
+        
         self.preferredLayout = preferredLayout
+        self.parentAngleSize = parentAngleSize
         self.itemAngleSize = itemAngleSize
+        
         self.previewURL = previewURL
         self.showLabel = showLabel
         
@@ -266,6 +275,7 @@ struct PieSliceConfig {
     let startAngle: Double  // In degrees
     let endAngle: Double    // In degrees
     let itemAngle: Double   // Angle per item (default 30°)
+    let perItemAngles: [Double]?  //Optional per-item angles for Ring 0
     let positioning: SlicePositioning
     
     var totalAngle: Double {
@@ -288,21 +298,33 @@ struct PieSliceConfig {
     }
     
     // Factory method for full circle
-    static func fullCircle(itemCount: Int, anglePerItem: Double, positioning: SlicePositioning = .startClockwise) -> PieSliceConfig {
+    static func fullCircle(
+        itemCount: Int,
+        anglePerItem: Double,
+        positioning: SlicePositioning = .startClockwise
+    ) -> PieSliceConfig {
         return PieSliceConfig(
             startAngle: 0,
             endAngle: 360,
             itemAngle: anglePerItem,
+            perItemAngles: nil,
             positioning: positioning
         )
     }
     
     // Factory method for full circle with custom start
-    static func fullCircle(itemCount: Int, anglePerItem: Double, startingAt angle: Double = 0, positioning: SlicePositioning = .startClockwise) -> PieSliceConfig {
+    static func fullCircle(
+        itemCount: Int,
+        anglePerItem: Double,
+        startingAt angle: Double = 0,
+        positioning: SlicePositioning = .startClockwise,
+        perItemAngles: [Double]? = nil
+    ) -> PieSliceConfig {
         return PieSliceConfig(
             startAngle: angle,
             endAngle: angle + 360,
             itemAngle: anglePerItem,
+            perItemAngles: perItemAngles,
             positioning: positioning
         )
     }
@@ -348,6 +370,7 @@ struct PieSliceConfig {
             startAngle: startAngle,
             endAngle: endAngle,
             itemAngle: itemAngle,
+            perItemAngles: nil,
             positioning: positioning
         )
     }

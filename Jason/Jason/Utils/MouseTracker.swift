@@ -392,6 +392,98 @@ class MouseTracker {
         let totalCount = configs[ringLevel].nodes.count
         guard totalCount > 0 else { return -1 }
         
+        // Check if we have variable angles
+        if let perItemAngles = sliceConfig.perItemAngles, perItemAngles.count == totalCount {
+            // VARIABLE ANGLES: Check cumulative ranges
+            return angleToIndexVariable(angle, sliceConfig: sliceConfig, perItemAngles: perItemAngles, totalCount: totalCount)
+        } else {
+            // UNIFORM ANGLES: Use existing logic
+            return angleToIndexUniform(angle, sliceConfig: sliceConfig, totalCount: totalCount)
+        }
+    }
+
+    /// Handle variable angle selection (new logic)
+    private func angleToIndexVariable(_ angle: CGFloat, sliceConfig: PieSliceConfig, perItemAngles: [Double], totalCount: Int) -> Int {
+        // Normalize angle to 0-360 range
+        var normalizedAngle = angle
+        while normalizedAngle < 0 { normalizedAngle += 360 }
+        while normalizedAngle >= 360 { normalizedAngle -= 360 }
+        
+        let sliceStart = CGFloat(sliceConfig.startAngle)
+        let sliceEnd = CGFloat(sliceConfig.endAngle)
+        
+        if sliceConfig.isFullCircle {
+            // Full circle with variable angles
+            var normalizedStart = sliceStart
+            while normalizedStart >= 360 { normalizedStart -= 360 }
+            while normalizedStart < 0 { normalizedStart += 360 }
+            
+            // Calculate relative angle from start
+            var relativeAngle = normalizedAngle - normalizedStart
+            if relativeAngle < 0 { relativeAngle += 360 }
+            
+            // Find which item this angle falls within
+            var cumulativeAngle: CGFloat = 0
+            for (index, itemAngle) in perItemAngles.enumerated() {
+                let itemEnd = cumulativeAngle + CGFloat(itemAngle)
+                if relativeAngle >= cumulativeAngle && relativeAngle < itemEnd {
+                    return index
+                }
+                cumulativeAngle = itemEnd
+            }
+            
+            // Edge case: very close to 360°, return last item
+            return totalCount - 1
+            
+        } else {
+            // Partial slice with variable angles
+            if sliceConfig.direction == .counterClockwise {
+                // Counter-clockwise: Items positioned from END going backwards
+                var normalizedEnd = sliceEnd
+                while normalizedEnd >= 360 { normalizedEnd -= 360 }
+                while normalizedEnd < 0 { normalizedEnd += 360 }
+                
+                // Calculate how far back from the end we are
+                var relativeAngle = normalizedEnd - normalizedAngle
+                if relativeAngle < 0 { relativeAngle += 360 }
+                
+                // Find which item this angle falls within
+                var cumulativeAngle: CGFloat = 0
+                for (index, itemAngle) in perItemAngles.enumerated() {
+                    let itemEnd = cumulativeAngle + CGFloat(itemAngle)
+                    if relativeAngle >= cumulativeAngle && relativeAngle < itemEnd {
+                        return index
+                    }
+                    cumulativeAngle = itemEnd
+                }
+                
+            } else {
+                // Clockwise: Items positioned from START going forwards
+                var normalizedStart = sliceStart
+                while normalizedStart >= 360 { normalizedStart -= 360 }
+                while normalizedStart < 0 { normalizedStart += 360 }
+                
+                // Calculate relative angle from start
+                var relativeAngle = normalizedAngle - normalizedStart
+                if relativeAngle < 0 { relativeAngle += 360 }
+                
+                // Find which item this angle falls within
+                var cumulativeAngle: CGFloat = 0
+                for (index, itemAngle) in perItemAngles.enumerated() {
+                    let itemEnd = cumulativeAngle + CGFloat(itemAngle)
+                    if relativeAngle >= cumulativeAngle && relativeAngle < itemEnd {
+                        return index
+                    }
+                    cumulativeAngle = itemEnd
+                }
+            }
+        }
+        
+        return -1
+    }
+
+    /// Handle uniform angle selection (existing logic)
+    private func angleToIndexUniform(_ angle: CGFloat, sliceConfig: PieSliceConfig, totalCount: Int) -> Int {
         let itemAngle = CGFloat(sliceConfig.itemAngle)
         let sliceStart = CGFloat(sliceConfig.startAngle)
         let sliceEnd = CGFloat(sliceConfig.endAngle)
@@ -423,7 +515,6 @@ class MouseTracker {
             
             if sliceConfig.direction == .counterClockwise {
                 // Counter-clockwise: Items positioned from END going backwards
-                // Normalize end angle
                 var normalizedEnd = sliceEnd
                 while normalizedEnd >= 360 { normalizedEnd -= 360 }
                 while normalizedEnd < 0 { normalizedEnd += 360 }
@@ -432,7 +523,7 @@ class MouseTracker {
                 var relativeAngle = normalizedEnd - normalizedAngle
                 if relativeAngle < 0 { relativeAngle += 360 }
                 
-                // Convert to index (item 0 is closest to end, item N is furthest)
+                // Convert to index
                 let index = Int(relativeAngle / itemAngle)
                 
                 if index >= 0 && index < totalCount {
@@ -441,7 +532,6 @@ class MouseTracker {
                 
             } else {
                 // Clockwise: Items positioned from START going forwards
-                // Normalize start angle
                 var normalizedStart = sliceStart
                 while normalizedStart >= 360 { normalizedStart -= 360 }
                 while normalizedStart < 0 { normalizedStart += 360 }

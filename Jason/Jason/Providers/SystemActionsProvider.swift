@@ -40,7 +40,6 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
                 name: "Mission Control",
                 icon: NSImage(systemSymbolName: "rectangle.3.group", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
-                itemAngleSize: 20,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute {
                     SystemActions.showMissionControl()
@@ -58,7 +57,6 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
                 name: "Show Desktop",
                 icon: NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
-                itemAngleSize: 20,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute {
                     SystemActions.showDesktop()

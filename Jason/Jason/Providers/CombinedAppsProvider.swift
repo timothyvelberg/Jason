@@ -262,7 +262,6 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 name: entry.name,
                 icon: entry.icon,
                 contextActions: contextActions.isEmpty ? nil : contextActions,
-                itemAngleSize: 16,
                 slicePositioning: .center,
                 metadata: ["isRunning": entry.isRunning],  // 🆕 Add running state to metadata
                 providerId: providerId,

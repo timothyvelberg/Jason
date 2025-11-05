@@ -338,7 +338,6 @@ class FinderLogic: FunctionProvider {
             ],
             
             preferredLayout: .partialSlice,
-            itemAngleSize: 16,
             previewURL: url,
             showLabel: true,
             slicePositioning: .center,
@@ -394,7 +393,6 @@ class FinderLogic: FunctionProvider {
                 StandardContextActions.deleteFile(url)
             ],
             preferredLayout: .partialSlice,
-            itemAngleSize: 16,
             previewURL: url,
             showLabel: true,
             slicePositioning: .center,
@@ -910,7 +908,6 @@ class FinderLogic: FunctionProvider {
                 StandardContextActions.deleteFile(url)
             ],
             preferredLayout: .partialSlice,
-            itemAngleSize: 16,
             previewURL: url,
             showLabel: true,
             slicePositioning: .center,
@@ -999,7 +996,6 @@ class FinderLogic: FunctionProvider {
             ],
 
             preferredLayout: .partialSlice,
-            itemAngleSize: 16,
             previewURL: url,
             showLabel: true,
             slicePositioning: .center,
@@ -1242,7 +1238,6 @@ class FinderLogic: FunctionProvider {
                 )
             ],
             preferredLayout: .partialSlice,
-            itemAngleSize: 20.0,
             onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                 self?.bringFinderWindowToFront(windowInfo.index)
             }),

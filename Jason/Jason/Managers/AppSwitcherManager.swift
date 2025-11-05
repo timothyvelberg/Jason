@@ -390,7 +390,6 @@ extension AppSwitcherManager: FunctionProvider {
                 name: app.localizedName ?? "Unknown",
                 icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
                 contextActions: contextActions,
-                itemAngleSize: 16,
                 slicePositioning: .center,
                 // EXPLICIT INTERACTION MODEL:
                 onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
