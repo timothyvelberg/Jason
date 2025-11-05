@@ -206,8 +206,6 @@ struct RingView: View {
                     
                     let centerAngle = calculateCenterAngle(for: index)
                     let itemAngle = angleForItem(at: index)  // ← Use variable angle
-                    
-                    let _ = print("🏃 [Running Indicator] index=\(index), itemAngle=\(itemAngle)°, centerAngle=\(centerAngle)°")  // ← ADD THIS
 
                     // Make indicator 5° narrower on each side (10° total)
                     let indicatorStartAngle = centerAngle - (itemAngle / 2) + 1
@@ -670,7 +668,7 @@ struct RingView: View {
             return angle
         }
         let fallback = sliceConfig.itemAngle
-        print("   ⚠️ [angleForItem] index=\(index) -> \(fallback)° (FALLBACK - perItemAngles is nil!)")
+//        print("   ⚠️ [angleForItem] index=\(index) -> \(fallback)° (FALLBACK - perItemAngles is nil!)")
         return fallback
     }
 
@@ -738,7 +736,7 @@ struct RingView: View {
             }
         }
         
-        // 🆕 Animate running indicators after all icons are done
+        // Animate running indicators after all icons are done
         let lastIconDelay = animationInitialDelay + (Double(nodes.count - 1) * effectiveStaggerDelay)
         let indicatorDelay = lastIconDelay + animationDuration
         
@@ -904,7 +902,7 @@ struct RingView: View {
     // MARK: - 🆕 Surgical Icon Animation
     
     private func animateIconsSurgical(oldNodes: [FunctionNode], newNodes: [FunctionNode]) {
-        print("   🔍 [DEBUG] animateIconsSurgical called")
+        print("   🔍 [DEBUG] anximateIconsSurgical called")
         print("      Old nodes: \(oldNodes.count) - \(oldNodes.prefix(3).map { $0.name }.joined(separator: ", "))")
         print("      New nodes: \(newNodes.count) - \(newNodes.prefix(3).map { $0.name }.joined(separator: ", "))")
         
