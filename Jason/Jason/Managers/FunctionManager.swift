@@ -384,7 +384,6 @@ class FunctionManager: ObservableObject {
         if cappedCount <= phase2Threshold {
             // Phase 2: Distribute over maxAngle
             let anglePerItem = scaledMaxAngle / Double(cappedCount)
-            print("📐 🥦 Ring \(ringIndex) Phase 2 (Distribute): \(cappedCount) items over \(scaledMaxAngle)° = \(anglePerItem)° each [scale: \(scaleFactor)]")
             return (false, anglePerItem, scaledMaxAngle)
         }
         
@@ -398,19 +397,16 @@ class FunctionManager: ObservableObject {
         if totalAngle >= fullCircleThreshold {
             // Close enough to 360° - convert to full circle and distribute evenly
             let anglePerItem = 360.0 / Double(cappedCount)
-            print("📐 🌹 Ring \(ringIndex) Phase 3→4 (Near Full): \(cappedCount) items at \(totalAngle)° → Full Circle at \(anglePerItem)° each [scale: \(scaleFactor)]")
             return (true, anglePerItem, 360.0)
         }
         
         if totalAngle < 360.0 {
             // Phase 3: Stack at minimalAngle
-            print("📐 🍆 Ring \(ringIndex) Phase 3 (Stack Min): \(cappedCount) items × \(scaledMinimalAngle)° = \(totalAngle)° [scale: \(scaleFactor)]")
             return (false, scaledMinimalAngle, totalAngle)
         }
         
         // Phase 4: Full circle (total >= 360°)
         let anglePerItem = 360.0 / Double(cappedCount)
-        print("📐 Ring \(ringIndex) Phase 4 (Full Circle): \(cappedCount) items at \(anglePerItem)° each [scale: \(scaleFactor)]")
         return (true, anglePerItem, 360.0)
     }
     
@@ -477,9 +473,6 @@ class FunctionManager: ObservableObject {
             leftEdge = Double(parentSelectedIndex) * parentItemAngle
             rightEdge = leftEdge + parentItemAngle
         }
-        
-        print("📐 Parent '\(parentNode.name)' edges: left=\(leftEdge)°, right=\(rightEdge)°")
-        
         return ParentInfo(leftEdge: leftEdge, rightEdge: rightEdge, node: parentNode, parentItemAngle: parentItemAngle)
     }
     

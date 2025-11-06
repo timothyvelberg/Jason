@@ -385,7 +385,6 @@ struct RingView: View {
                 updateSlice(for: index, totalCount: nodes.count)
                 // Only set opacity immediately AFTER the initial fade-in has completed
                 // This prevents overriding the delayed fade-in on first appearance
-                print("📍 [Selection] onChange fired - hasCompleted: \(hasCompletedInitialSelectionFade), current opacity: \(selectionIndicatorOpacity)")
                 if hasCompletedInitialSelectionFade {
                     selectionIndicatorOpacity = 1.0
                 }
@@ -406,7 +405,6 @@ struct RingView: View {
             // Reset selection indicator opacity and completion flag
             selectionIndicatorOpacity = 0
             hasCompletedInitialSelectionFade = false
-            print("🎬 [Selection] onAppear - reset opacity=0, selectedIndex: \(selectedIndex?.description ?? "nil")")
             
             // Animate the background slice opening
             if !sliceConfig.isFullCircle && sliceConfig.positioning == .center {
@@ -515,13 +513,11 @@ struct RingView: View {
         }
         
         let itemAngle = angleForItem(at: index)  // Get variable angle for this specific item
-        print("🎯 [updateSlice] index=\(index), itemAngle=\(itemAngle)°")
 
         
         if previousIndex == nil {
             // First selection - calculate center angle for this item
             let centerAngle = calculateCenterAngle(for: index)
-            print("   First selection: centerAngle=\(centerAngle)°")
             angleOffset = centerAngle
             startAngle = Angle(degrees: centerAngle - itemAngle / 2 - 90)
             endAngle = Angle(degrees: centerAngle + itemAngle / 2 - 90)
@@ -686,7 +682,6 @@ struct RingView: View {
     
     private func animateIconsIn() {
         // Dispatch to appropriate animation based on mode
-        print("🎬 [RingView] animateIconsIn called - mode: \(animationMode)")
         switch animationMode {
         case .linear:
             animateIconsInLinear()
@@ -740,7 +735,6 @@ struct RingView: View {
     // MARK: - Center-Out Animation
     
     private func animateIconsInFromCenter() {
-        print("🎯 [CENTER-OUT] Starting animation for \(nodes.count) nodes")
         
         let totalCount = nodes.count
         guard totalCount > 0 else { return }
@@ -757,7 +751,6 @@ struct RingView: View {
         
         // Reset all opacities to 0, scales to starting value, and rotation offsets
         // Apply symmetric rotation: left of center = +10°, right of center = -10°
-        print("   Center point: \(centerPoint)")
         for (index, node) in nodes.enumerated() {
             iconOpacities[node.id] = 0
             iconScales[node.id] = animationStartScale
@@ -776,7 +769,6 @@ struct RingView: View {
                 rotationOffset = 0
             }
             iconRotationOffsets[node.id] = rotationOffset
-            print("   Item \(index): rotation offset = \(rotationOffset)°")
         }
         
         // Build animation groups: items at same distance from center animate together
@@ -789,7 +781,6 @@ struct RingView: View {
             let centerIndex = totalCount / 2
             animationGroups.append([centerIndex])
             processed.insert(centerIndex)
-            print("   Group 0 (center): [\(centerIndex)]")
         } else {
             // Even count: two center items
             let centerLeft = (totalCount / 2) - 1
@@ -797,7 +788,6 @@ struct RingView: View {
             animationGroups.append([centerLeft, centerRight])
             processed.insert(centerLeft)
             processed.insert(centerRight)
-            print("   Group 0 (center): [\(centerLeft), \(centerRight)]")
         }
         
         // Build outward groups symmetrically
@@ -836,20 +826,15 @@ struct RingView: View {
             }
             
             if !group.isEmpty {
-                print("   Group \(animationGroups.count) (distance \(distance)): \(group)")
                 animationGroups.append(group)
             }
             
             distance += 1
         }
-        
-        print("   Total groups: \(animationGroups.count)")
-        print("   Stagger delay: \(effectiveStaggerDelay)s")
-        
+
         // Animate each group with increasing delay
         for (groupIndex, group) in animationGroups.enumerated() {
             let delay = animationInitialDelay + (Double(groupIndex) * effectiveStaggerDelay)
-            print("   Group \(groupIndex) will animate at \(delay)s")
             
             for index in group {
                 let node = nodes[index]
@@ -891,9 +876,7 @@ struct RingView: View {
         let addedIds = newIds.subtracting(oldIds)
         let removedIds = oldIds.subtracting(newIds)
         let persistingIds = oldIds.intersection(newIds)
-        
-        print("   📊 Icon changes: +\(addedIds.count) -\(removedIds.count) =\(persistingIds.count)")
-        
+
         // Guard against empty old nodes (shouldn't happen, but just in case)
         if oldNodes.isEmpty && newNodes.count > 0 {
             print("      ⚠️ Old nodes empty - treating as first appearance, calling full animation")
@@ -903,7 +886,6 @@ struct RingView: View {
         
         // 1. REMOVED ICONS: Fade out
         for id in removedIds {
-            print("      ➖ Fading out: \(id)")
             withAnimation(.easeIn(duration: 0.2)) {
                 iconOpacities[id] = 0
                 iconScales[id] = 0.8
