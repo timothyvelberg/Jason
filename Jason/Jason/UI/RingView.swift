@@ -388,9 +388,6 @@ struct RingView: View {
                 print("📍 [Selection] onChange fired - hasCompleted: \(hasCompletedInitialSelectionFade), current opacity: \(selectionIndicatorOpacity)")
                 if hasCompletedInitialSelectionFade {
                     selectionIndicatorOpacity = 1.0
-                    print("   ✅ Setting opacity to 1.0 (hover change)")
-                } else {
-                    print("   ⏳ Waiting for initial fade to complete")
                 }
             }
         }

@@ -249,7 +249,6 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
     // MARK: - Provide Functions
     
     func provideFunctions() -> [FunctionNode] {
-        loadFiles() // Refresh data
         
         // Create nodes for each file
         let fileNodes: [FunctionNode] = fileEntries.map { entry in

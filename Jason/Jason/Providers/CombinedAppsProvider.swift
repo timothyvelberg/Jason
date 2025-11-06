@@ -307,13 +307,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                     self?.openApplicationsFolder()
                 }),
                 onMiddleClick: ModifierAwareInteraction(base: .expand),
-                onBoundaryCross: ModifierAwareInteraction(base: .expand),
-                onHover: {
-                    print("📱 Hovering over Applications category")
-                },
-                onHoverExit: {
-                    print("📱 Left Applications category")
-                }
+                onBoundaryCross: ModifierAwareInteraction(base: .expand)
             )
         ]
     }

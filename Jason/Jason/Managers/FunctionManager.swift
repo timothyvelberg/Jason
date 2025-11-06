@@ -817,6 +817,11 @@ class FunctionManager: ObservableObject {
         guard rings.indices.contains(ringLevel) else { return }
         guard rings[ringLevel].nodes.indices.contains(index) else { return }
         
+        // Early return if already hovering this node
+        if rings[ringLevel].hoveredIndex == index {
+            return
+        }
+        
         // Call onHoverExit on previously hovered node
         if let prevIndex = rings[ringLevel].hoveredIndex,
            prevIndex != index,
