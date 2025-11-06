@@ -394,16 +394,7 @@ extension AppSwitcherManager: FunctionProvider {
                 onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                     // Middle-click: Switch to app but keep UI open
                     self?.switchToApp(app)
-                }),
-                onBoundaryCross: ModifierAwareInteraction(base: .doNothing),  // Don't auto-expand context menus
-                onHover: {
-                    // Optional: Could preview app windows here
-                    print("Hovering over \(app.localizedName ?? "Unknown")")
-                },
-                onHoverExit: {
-                    // Optional: Clean up preview
-                    print("Left \(app.localizedName ?? "Unknown")")
-                }
+                })
             )
         }
         

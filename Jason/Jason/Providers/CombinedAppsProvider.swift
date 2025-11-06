@@ -283,13 +283,8 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                     self?.launchOrSwitchToApp(entry)
                 }),
-                onBoundaryCross: ModifierAwareInteraction(base: .doNothing),
-                onHover: {
-                    print("Hovering over \(entry.name) (⭐: \(entry.isFavorite), 🏃: \(entry.isRunning))")
-                },
-                onHoverExit: {
-                    print("Left \(entry.name)")
-                }
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+
             )
         }
         

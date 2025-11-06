@@ -373,7 +373,6 @@ class FunctionManager: ObservableObject {
         if cappedCount <= phase1Threshold {
             // Phase 1: Stack at defaultAngle
             let totalAngle = Double(cappedCount) * scaledDefaultAngle
-            print("📐 🥕 Ring \(ringIndex) Phase 1 (Stack): \(cappedCount) items × \(scaledDefaultAngle)° = \(totalAngle)° [scale: \(scaleFactor)]")
             return (false, scaledDefaultAngle, totalAngle)
         }
         
@@ -829,8 +828,6 @@ class FunctionManager: ObservableObject {
         
         // Call onHover on newly hovered node
         node.onHover?()
-        
-        print("Hovering ring \(ringLevel), index \(index): \(node.name)")
     }
     
     func selectNode(ringLevel: Int, index: Int) {
