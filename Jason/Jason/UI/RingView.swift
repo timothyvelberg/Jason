@@ -296,7 +296,7 @@ struct RingView: View {
             // Animate the background slice
             if !sliceConfig.isFullCircle && sliceConfig.positioning == .center {
                 if isSurgicalUpdate {
-                    // 🆕 SURGICAL UPDATE: Smooth resize from current to new
+                    // Smooth resize from current to new
                     print("   ✨ Smooth resize animation")
                     
                     let adjustedEndAngle = sliceConfig.endAngle < sliceConfig.startAngle
@@ -308,7 +308,7 @@ struct RingView: View {
                         animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
                     }
                 } else {
-                    // ✅ STRUCTURAL CHANGE: Full entrance animation
+                    //Full entrance animation
                     print("   🎬 Full entrance animation for slice")
                     
                     let initialSliceSize = 10.0  // Start with 10° slice
@@ -435,11 +435,6 @@ struct RingView: View {
                 animatedSliceStartAngle = Angle(degrees: centerAngle - initialSliceSize / 2)
                 animatedSliceEndAngle = Angle(degrees: centerAngle + initialSliceSize / 2)
                 
-                print("🎭 [RingView] SLICE ANIMATION START")
-                print("   Center: \(centerAngle)° (wraparound: \(sliceConfig.endAngle < sliceConfig.startAngle))")
-                print("   Initial: [\(centerAngle - initialSliceSize / 2)°, \(centerAngle + initialSliceSize / 2)°] (size: \(initialSliceSize)°)")
-                print("   Final: [\(sliceConfig.startAngle)°, \(adjustedEndAngle)°]")
-                
                 withAnimation(.easeOut(duration: 0.24)) {
                     animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
                     animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
@@ -448,43 +443,36 @@ struct RingView: View {
                 
                 // Fade in selection indicator with a simple hardcoded delay
                 let selectionDelay = 0.05
-                print("🕐 [Selection] Scheduling delayed fade-in: delay=\(selectionDelay)s, duration=0.2s")
                 
                 // Use DispatchQueue instead of withAnimation delay to survive view recreation
                 DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
                     withAnimation(.easeIn(duration: 0.2)) {
                         selectionIndicatorOpacity = 1.0
-                        print("   ✅ Selection opacity -> 1.0")
                     }
                 }
                 
                 // Mark as completed after animation finishes
                 DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
                     hasCompletedInitialSelectionFade = true
-                    print("   ✅ Selection fade completed - flag set to true")
                 }
             } else {
                 // For non-center or full circle: set angles directly without animation
-                print("🎭 [RingView] No slice animation (fullCircle: \(sliceConfig.isFullCircle), positioning: \(sliceConfig.positioning))")
                 animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
                 animatedSliceEndAngle = Angle(degrees: sliceConfig.endAngle)
                 
                 // Fade in selection indicator with a simple hardcoded delay
                 let selectionDelay = 0.05
-                print("🕐 [Selection] Scheduling delayed fade-in (no bg animation): delay=\(selectionDelay)s, duration=0.2s")
                 
                 // Use DispatchQueue instead of withAnimation delay
                 DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
                     withAnimation(.easeIn(duration: 0.2)) {
                         selectionIndicatorOpacity = 1.0
-                        print("   ✅ Selection opacity -> 1.0")
                     }
                 }
                 
                 // Mark as completed after animation finishes
                 DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
                     hasCompletedInitialSelectionFade = true
-                    print("   ✅ Selection fade completed - flag set to true")
                 }
             }
             
@@ -664,11 +652,9 @@ struct RingView: View {
         if let perItemAngles = sliceConfig.perItemAngles,
            index < perItemAngles.count {
             let angle = perItemAngles[index]
-            print("   ✅ [angleForItem] index=\(index) -> \(angle)° (from perItemAngles)")
             return angle
         }
         let fallback = sliceConfig.itemAngle
-//        print("   ⚠️ [angleForItem] index=\(index) -> \(fallback)° (FALLBACK - perItemAngles is nil!)")
         return fallback
     }
 
@@ -902,10 +888,6 @@ struct RingView: View {
     // MARK: - 🆕 Surgical Icon Animation
     
     private func animateIconsSurgical(oldNodes: [FunctionNode], newNodes: [FunctionNode]) {
-        print("   🔍 [DEBUG] anximateIconsSurgical called")
-        print("      Old nodes: \(oldNodes.count) - \(oldNodes.prefix(3).map { $0.name }.joined(separator: ", "))")
-        print("      New nodes: \(newNodes.count) - \(newNodes.prefix(3).map { $0.name }.joined(separator: ", "))")
-        
         let oldIds = Set(oldNodes.map { $0.id })
         let newIds = Set(newNodes.map { $0.id })
         

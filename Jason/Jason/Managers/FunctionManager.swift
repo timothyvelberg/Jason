@@ -254,10 +254,6 @@ class FunctionManager: ObservableObject {
                     perItemAngles: perItemAngles
                 )
                 
-                print("🔍 [Ring 0 Config] Created sliceConfig:")
-                print("   perItemAngles: \(sliceConfig.perItemAngles?.description ?? "nil")")
-                print("   itemAngle (uniform): \(sliceConfig.itemAngle)")
-                
             } else {
                 // Ring 1+ - get parent info
                 guard let parentInfo = getParentInfo(for: index, configs: configs) else {
@@ -1077,7 +1073,6 @@ class FunctionManager: ObservableObject {
         // Collect functions from all providers
         rootNodes = providers.flatMap { provider in
             let functions = provider.provideFunctions()
-            print("Provider '\(provider.providerName)' provided \(functions.count) root node(s)")
             return functions
         }
         

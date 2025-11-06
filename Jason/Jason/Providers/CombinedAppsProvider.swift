@@ -79,14 +79,14 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         
         // 1. Get favorite apps from database (in sort_order)
         let favorites = DatabaseManager.shared.getFavoriteApps()
-        print("📋 [CombinedApps] Loaded \(favorites.count) favorite apps from database")
+//        print("📋 [CombinedApps] Loaded \(favorites.count) favorite apps from database")
         
         // 2. Get running apps
         let runningApps = NSWorkspace.shared.runningApplications.filter { app in
             app.activationPolicy == .regular &&
             app.bundleIdentifier != Bundle.main.bundleIdentifier
         }
-        print("🏃 [CombinedApps] Found \(runningApps.count) running apps")
+//        print("🏃 [CombinedApps] Found \(runningApps.count) running apps")
         
         // Create a map of running apps by bundle ID for quick lookup
         // Use compactMapValues to handle potential duplicates (keeps first occurrence)
@@ -146,9 +146,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         let favoriteCount = entries.filter { $0.isFavorite }.count
         let runningNonFavoriteCount = entries.filter { !$0.isFavorite && $0.isRunning }.count
         
-        print("✅ [CombinedApps] Total apps: \(appEntries.count)")
-        print("   ⭐ Favorites: \(favoriteCount) (running: \(entries.filter { $0.isFavorite && $0.isRunning }.count))")
-        print("   🏃 Non-favorite running: \(runningNonFavoriteCount)")
+        print("[CombinedApps] Total apps: \(appEntries.count)")
     }
     
     private func createAppEntry(

@@ -566,12 +566,6 @@ class FinderLogic: FunctionProvider {
             if folderEntry.baseAsset != "folder-blue" || folderEntry.iconName != nil {
                 let symbolName = folderEntry.iconName ?? ""
                 
-                if !symbolName.isEmpty {
-                    print("🎨 [FinderLogic] Custom folder '\(folderEntry.title)': \(folderEntry.baseAsset) + symbol '\(symbolName)'")
-                } else {
-                    print("🎨 [FinderLogic] Custom folder '\(folderEntry.title)': \(folderEntry.baseAsset)")
-                }
-                
                 return IconProvider.shared.createCompositeIcon(
                     baseAssetName: folderEntry.baseAsset,
                     symbolName: symbolName,  // Empty string if no symbol (will be ignored)

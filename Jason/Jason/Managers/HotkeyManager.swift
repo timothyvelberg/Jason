@@ -118,12 +118,6 @@ class HotkeyManager {
             self?.handleFlagsChanged(event)
             return event
         }
-        
-        print("✅ HotkeyManager monitoring started:")
-        print("   Ctrl+Shift+K → Show UI (root)")
-        print("   Ctrl+` → Show UI (expanded to Apps)")
-        print("   Escape → Hide UI")
-        print("   Shift → Toggle QuickLook preview")
         if holdKeyCode != nil {
             print("   Hold key configured → Hold to show, release to hide")
         }

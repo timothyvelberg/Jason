@@ -46,7 +46,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
     
     init() {
         print("📁 FavoriteFilesProvider initialized")
-        loadFiles()
+//        loadFiles()
     }
     
     // MARK: - File Loading
@@ -143,8 +143,6 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         fileEntries = entries
         
         print("✅ [FavoriteFiles] Total files: \(fileEntries.count)")
-        print("   📄 Static: \(entries.filter { $0.isStatic }.count)")
-        print("   🔄 Dynamic: \(entries.filter { $0.isDynamic }.count)")
     }
     
     // MARK: - Dynamic File Resolution

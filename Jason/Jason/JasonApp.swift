@@ -28,9 +28,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("🚀 AppDelegate: Setting up menu bar app")
         
-        // ✅ Run ALL database operations sequentially on main thread
+        // Run ALL database operations sequentially on main thread
         DatabaseManager.shared.setupSmartCacheTables()
         print("⚡ SmartCache: System initialized!")
         
@@ -71,8 +70,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Create the ContentView window (hidden initially)
         setupContentWindow()
-        
-        print("✅ AppDelegate: Menu bar app ready")
     }
     
     func setupMenuBar() {

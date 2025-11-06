@@ -30,13 +30,7 @@ class AppSwitcherManager: ObservableObject {
         
         checkAccessibilityPermission()
         setupServices()
-        
-        //Force timer start for debugging
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            print("🔍 [DEBUG] Checking timer status...")
-            print("   Timer exists: \(self.refreshTimer != nil)")
-            print("   Timer is valid: \(self.refreshTimer?.isValid ?? false)")
-        }
+
     }
     
     // MARK: - Permission Management
@@ -88,7 +82,7 @@ class AppSwitcherManager: ObservableObject {
         
         // Start a timer that checks for changes every 1 second
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            print("⏰ [AppSwitcher] Timer fired - checking for app changes...")  // 🆕 ADD THIS
+            print("⏰ [AppSwitcher] Timer fired - checking for app changes...")
             self?.loadRunningApplications()
         }
         

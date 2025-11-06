@@ -52,14 +52,6 @@ struct CircularUIView: View {
                 // Convert Y from AppKit (Y=0 at bottom) to SwiftUI (Y=0 at top)
                 let swiftUIY = screenHeight - localMouseY
                 
-                // Debug output (can be removed once verified)
-                let _ = print("🖱️ Mouse position:")
-                let _ = print("   Global: (\(globalMouseX), \(globalMouseY))")
-                let _ = print("   Screen origin: (\(screenOriginX), \(screenOriginY))")
-                let _ = print("   Screen height: \(screenHeight)")
-                let _ = print("   Local AppKit: (\(localMouseX), \(localMouseY))")
-                let _ = print("   SwiftUI: (\(localMouseX), \(swiftUIY))")
-                
                 ZStack {
                     // Generate rings dynamically
                     ForEach(rings) { ring in

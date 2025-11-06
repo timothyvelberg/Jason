@@ -60,7 +60,6 @@ class OverlayWindow: NSWindow {
     }
     
     func showOverlay(at mouseLocation: NSPoint) {
-        print("🎯 Showing fullscreen overlay with UI centered at global point: \(mouseLocation)")
         
         // Find which screen contains the mouse cursor
         let targetScreen = NSScreen.screens.first { screen in
@@ -74,10 +73,6 @@ class OverlayWindow: NSWindow {
         
         self.currentScreen = screen
         
-        print("📺 Mouse is on screen: \(screen.localizedName)")
-        print("   Screen frame: \(screen.frame)")
-        print("   Screen origin: (\(screen.frame.origin.x), \(screen.frame.origin.y))")
-        
         // Store the location (in global coordinates)
         self.uiCenterLocation = mouseLocation
         
@@ -90,10 +85,6 @@ class OverlayWindow: NSWindow {
         
         NSApp.activate(ignoringOtherApps: true)
         self.makeKey()
-        
-        print("🪟 Window now covers screen: \(screen.frame.size)")
-        print("   Key window: \(self.isKeyWindow)")
-        print("   UI center (global): \(mouseLocation)")
     }
     
     func hideOverlay() {
