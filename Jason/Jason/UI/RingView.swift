@@ -40,12 +40,14 @@ struct RingView: View {
     @State private var endAngle: Angle = .degrees(90)
     @State private var angleOffset: Double = 0
     @State private var previousIndex: Int? = nil
+    @State private var previousTotalCount: Int = 0
     @State private var rotationIndex: Int = 0
     @State private var hasAppeared: Bool = false
     @State private var iconOpacities: [String: Double] = [:]       // Track opacity per icon ID
     @State private var iconScales: [String: CGFloat] = [:]         // Track scale per icon ID
     @State private var iconRotationOffsets: [String: Double] = [:] // Track rotation offset per icon ID
     @State private var runningIndicatorOpacities: [String: Double] = [:]  // Track running indicator opacity per icon ID
+    
     
     // Animated slice background angles (for partial slice opening animation)
     @State private var animatedSliceStartAngle: Angle = .degrees(0)
@@ -263,6 +265,18 @@ struct RingView: View {
             print("🔄 [RingView] Content changed - count: \(nodes.count)")
             print("   📌 State: isFirstRender=\(isFirstRender), previousNodes.count=\(previousNodes.count)")
             
+            // 🆕 ADD THIS LOGGING:
+            print("   🎯 Selection state: selectedIndex=\(selectedIndex?.description ?? "nil")")
+            if let index = selectedIndex {
+                if index < nodes.count {
+                    let selectedNode = nodes[index]
+                    print("   ✅ Selected node at index \(index): \(selectedNode.name)")
+                } else {
+                    print("   ❌ Selected index \(index) is OUT OF BOUNDS (count=\(nodes.count))")
+                }
+            }
+            print("   📐 Current slice angles: start=\(startAngle.degrees)°, end=\(endAngle.degrees)°")
+            
             if let index = selectedIndex {
                 rotationIndex = index
                 previousIndex = index
@@ -381,6 +395,18 @@ struct RingView: View {
             }
         }
         .onChange(of: selectedIndex) {
+            // 🆕 ADD THIS LOGGING:
+            print("🎯 [RingView] selectedIndex changed to: \(selectedIndex?.description ?? "nil")")
+            if let index = selectedIndex {
+                if index < nodes.count {
+                    let selectedNode = nodes[index]
+                    print("   ✅ Valid selection at index \(index): \(selectedNode.name)")
+                    print("   📐 About to call updateSlice(for: \(index), totalCount: \(nodes.count))")
+                } else {
+                    print("   ❌ INVALID: index \(index) >= count \(nodes.count)")
+                }
+            }
+            
             if let index = selectedIndex {
                 updateSlice(for: index, totalCount: nodes.count)
                 // Only set opacity immediately AFTER the initial fade-in has completed
@@ -405,6 +431,7 @@ struct RingView: View {
             // Reset selection indicator opacity and completion flag
             selectionIndicatorOpacity = 0
             hasCompletedInitialSelectionFade = false
+
             
             // Animate the background slice opening
             if !sliceConfig.isFullCircle && sliceConfig.positioning == .center {
@@ -505,15 +532,20 @@ struct RingView: View {
     }
     
     private func updateSlice(for index: Int, totalCount: Int) {
+        // 🆕 Logging
+        print("🔧 [updateSlice] Called with index=\(index), totalCount=\(totalCount)")
+        print("   Previous state: previousIndex=\(previousIndex?.description ?? "nil"), rotationIndex=\(rotationIndex), previousTotalCount=\(previousTotalCount)")
+        
         guard totalCount > 0 else {
             angleOffset = 0
             startAngle = .degrees(0)
             endAngle = .degrees(0)
+            print("   ⚠️ totalCount is 0, resetting angles")
             return
         }
         
-        let itemAngle = angleForItem(at: index)  // Get variable angle for this specific item
-
+        let itemAngle = angleForItem(at: index)
+        print("   📏 itemAngle for index \(index): \(itemAngle)°")
         
         if previousIndex == nil {
             // First selection - calculate center angle for this item
@@ -521,12 +553,32 @@ struct RingView: View {
             angleOffset = centerAngle
             startAngle = Angle(degrees: centerAngle - itemAngle / 2 - 90)
             endAngle = Angle(degrees: centerAngle + itemAngle / 2 - 90)
+            
+            print("   🆕 FIRST SELECTION:")
+            print("      centerAngle=\(centerAngle)°")
+            print("      angleOffset=\(angleOffset)°")
+            print("      startAngle=\(startAngle.degrees)°, endAngle=\(endAngle.degrees)°")
+            
             previousIndex = index
+            previousTotalCount = totalCount  // 🆕 Track totalCount
             rotationIndex = index
             return
         }
         
-        guard let prevIndex = previousIndex, index != prevIndex else { return }
+        // 🆕 FIXED: Also check if totalCount changed
+        guard let prevIndex = previousIndex,
+              index != prevIndex || totalCount != previousTotalCount else {
+            print("   ⏭️ SKIPPING: index and totalCount unchanged (index=\(index), totalCount=\(totalCount))")
+            return
+        }
+        
+        // 🆕 Check if totalCount changed even though index stayed the same
+        if index == prevIndex && totalCount != previousTotalCount {
+            print("   🔄 TOTALCOUNT CHANGED: Same index (\(index)) but count changed from \(previousTotalCount) to \(totalCount)")
+            print("      Need to recalculate angles for new layout!")
+        } else {
+            print("   🔄 UPDATING SELECTION: from \(prevIndex) to \(index)")
+        }
         
         var newRotationIndex: Int
         
@@ -536,33 +588,47 @@ struct RingView: View {
             
             if forwardSteps <= backwardSteps {
                 newRotationIndex = rotationIndex + forwardSteps
+                print("      Moving FORWARD: \(forwardSteps) steps, newRotationIndex=\(newRotationIndex)")
             } else {
                 newRotationIndex = rotationIndex - backwardSteps
+                print("      Moving BACKWARD: \(backwardSteps) steps, newRotationIndex=\(newRotationIndex)")
             }
         } else {
             newRotationIndex = index
+            print("      Partial slice: newRotationIndex=\(newRotationIndex)")
         }
         
         // Calculate angle offset using rotationIndex for smooth wraparound animation
         let newAngleOffset: Double
         if sliceConfig.direction == .counterClockwise {
             let baseAngle = sliceConfig.endAngle
-            // For variable angles, calculate cumulative angle at rotationIndex
             newAngleOffset = cumulativeAngleAtRotationIndex(newRotationIndex, baseAngle: baseAngle, clockwise: false)
+            print("      CCW: baseAngle=\(baseAngle)°, newAngleOffset=\(newAngleOffset)°")
         } else {
             let baseAngle = sliceConfig.startAngle
-            // For variable angles, calculate cumulative angle at rotationIndex
             newAngleOffset = cumulativeAngleAtRotationIndex(newRotationIndex, baseAngle: baseAngle, clockwise: true)
+            print("      CW: baseAngle=\(baseAngle)°, newAngleOffset=\(newAngleOffset)°")
         }
+        
+        let newStartAngle = newAngleOffset - itemAngle / 2 - 90
+        let newEndAngle = newAngleOffset + itemAngle / 2 - 90
+        print("   📐 FINAL ANGLES:")
+        print("      newAngleOffset=\(newAngleOffset)°")
+        print("      newStartAngle=\(newStartAngle)°")
+        print("      newEndAngle=\(newEndAngle)°")
+        print("      itemAngle=\(itemAngle)° (slice width)")
         
         withAnimation(.easeOut(duration: 0.08)) {
             angleOffset = newAngleOffset
-            startAngle = Angle(degrees: angleOffset - itemAngle / 2 - 90)
-            endAngle = Angle(degrees: angleOffset + itemAngle / 2 - 90)
+            startAngle = Angle(degrees: newStartAngle)
+            endAngle = Angle(degrees: newEndAngle)
         }
         
         previousIndex = index
+        previousTotalCount = totalCount  // 🆕 Track totalCount for next time
         rotationIndex = newRotationIndex
+        
+        print("   ✅ Update complete: previousIndex=\(previousIndex?.description ?? "nil"), previousTotalCount=\(previousTotalCount), rotationIndex=\(rotationIndex)")
     }
 
     /// Calculate the angle at a given rotationIndex (which can be negative or > totalCount for wraparound animation)
