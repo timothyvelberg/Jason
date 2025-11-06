@@ -108,4 +108,24 @@ struct FavoriteDynamicFileEntry: Identifiable {
     let accessCount: Int
 }
 
+struct RingConfigurationEntry: Identifiable {
+    let id: Int
+    let name: String
+    let shortcut: String
+    let ringRadius: CGFloat
+    let iconSize: CGFloat
+    let createdAt: Int
+    let isActive: Bool
+    let displayOrder: Int
+}
+
+struct RingProviderEntry: Identifiable {
+    let id: Int
+    let ringId: Int
+    let providerType: String
+    let providerOrder: Int
+    let parentItemAngle: CGFloat?
+    let providerConfig: String?
+}
+
 // MARK: - Errors

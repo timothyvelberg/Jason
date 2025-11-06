@@ -1,0 +1,200 @@
+//
+//  RingConfiguration.swift
+//  Jason
+//
+//  Domain models for ring configurations
+//
+
+import Foundation
+
+/// Domain model representing a stored ring configuration from the database
+/// This is distinct from:
+/// - The database entry model (RingConfigurationEntry)
+/// - FunctionManager's RingConfiguration (used for rendering/geometry)
+struct StoredRingConfiguration: Identifiable, Equatable {
+    let id: Int
+    let name: String
+    let shortcut: String
+    let ringRadius: Double
+    let iconSize: Double
+    let isActive: Bool
+    let providers: [ProviderConfiguration]
+    
+    // MARK: - Computed Properties
+    
+    /// Total number of providers in this ring
+    var providerCount: Int {
+        return providers.count
+    }
+    
+    /// Check if this ring has any providers
+    var hasProviders: Bool {
+        return !providers.isEmpty
+    }
+    
+    /// Get providers sorted by their order
+    var sortedProviders: [ProviderConfiguration] {
+        return providers.sorted { $0.order < $1.order }
+    }
+    
+    /// Get provider by type
+    func provider(ofType type: String) -> ProviderConfiguration? {
+        return providers.first { $0.providerType == type }
+    }
+    
+    /// Check if this ring contains a specific provider type
+    func hasProvider(ofType type: String) -> Bool {
+        return providers.contains { $0.providerType == type }
+    }
+    
+    // MARK: - Display Helpers
+    
+    /// Human-readable description for debugging
+    var debugDescription: String {
+        return """
+        StoredRingConfiguration(
+            id: \(id),
+            name: "\(name)",
+            shortcut: "\(shortcut)",
+            radius: \(ringRadius),
+            iconSize: \(iconSize),
+            active: \(isActive),
+            providers: \(providers.count)
+        )
+        """
+    }
+    
+    // MARK: - Equatable
+    
+    static func == (lhs: StoredRingConfiguration, rhs: StoredRingConfiguration) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.name == rhs.name &&
+               lhs.shortcut == rhs.shortcut &&
+               lhs.ringRadius == rhs.ringRadius &&
+               lhs.iconSize == rhs.iconSize &&
+               lhs.isActive == rhs.isActive &&
+               lhs.providers == rhs.providers
+    }
+}
+
+/// Domain model representing a provider within a ring configuration
+struct ProviderConfiguration: Identifiable, Equatable {
+    let id: Int
+    let providerType: String
+    let order: Int
+    let parentItemAngle: Double?
+    let config: [String: Any]?
+    
+    // MARK: - Computed Properties
+    
+    /// Check if this provider has custom angle positioning
+    var hasCustomAngle: Bool {
+        return parentItemAngle != nil
+    }
+    
+    /// Check if this provider has additional configuration
+    var hasConfig: Bool {
+        return config != nil && !(config?.isEmpty ?? true)
+    }
+    
+    /// Get a specific config value by key
+    func configValue<T>(forKey key: String) -> T? {
+        return config?[key] as? T
+    }
+    
+    /// Get a string config value
+    func stringConfig(forKey key: String) -> String? {
+        return configValue(forKey: key)
+    }
+    
+    /// Get an integer config value
+    func intConfig(forKey key: String) -> Int? {
+        return configValue(forKey: key)
+    }
+    
+    /// Get a boolean config value
+    func boolConfig(forKey key: String) -> Bool? {
+        return configValue(forKey: key)
+    }
+    
+    /// Get a double config value
+    func doubleConfig(forKey key: String) -> Double? {
+        return configValue(forKey: key)
+    }
+    
+    // MARK: - Display Helpers
+    
+    /// Human-readable description for debugging
+    var debugDescription: String {
+        let angleStr = parentItemAngle.map { String(format: "%.1f°", $0) } ?? "dynamic"
+        let configStr = hasConfig ? "\(config!.count) params" : "no config"
+        return "\(providerType) [order: \(order), angle: \(angleStr), \(configStr)]"
+    }
+    
+    // MARK: - Equatable
+    
+    static func == (lhs: ProviderConfiguration, rhs: ProviderConfiguration) -> Bool {
+        // Compare all properties except config (since [String: Any] isn't Equatable)
+        let basicMatch = lhs.id == rhs.id &&
+                        lhs.providerType == rhs.providerType &&
+                        lhs.order == rhs.order &&
+                        lhs.parentItemAngle == rhs.parentItemAngle
+        
+        // Compare config dictionaries by converting to JSON
+        let configMatch: Bool
+        if lhs.config == nil && rhs.config == nil {
+            configMatch = true
+        } else if let lhsConfig = lhs.config, let rhsConfig = rhs.config {
+            // Deep comparison via JSON serialization
+            configMatch = NSDictionary(dictionary: lhsConfig).isEqual(to: rhsConfig)
+        } else {
+            configMatch = false
+        }
+        
+        return basicMatch && configMatch
+    }
+}
+
+// MARK: - Error Types
+
+/// Errors that can occur when working with stored ring configurations
+enum StoredRingConfigurationError: LocalizedError {
+    case duplicateShortcut(String)
+    case invalidShortcut(String)
+    case invalidRingId(Int)
+    case invalidProviderId(Int)
+    case duplicateProviderOrder(Int, ringId: Int)
+    case invalidProviderType(String)
+    case databaseError(String)
+    case configurationNotFound(Int)
+    case noActiveConfigurations
+    case invalidRadius(Double)
+    case invalidIconSize(Double)
+    
+    var errorDescription: String? {
+        switch self {
+        case .duplicateShortcut(let shortcut):
+            return "Shortcut '\(shortcut)' is already in use by another active ring"
+        case .invalidShortcut(let shortcut):
+            return "Invalid shortcut: '\(shortcut)'"
+        case .invalidRingId(let id):
+            return "Ring configuration with ID \(id) not found"
+        case .invalidProviderId(let id):
+            return "Provider with ID \(id) not found"
+        case .duplicateProviderOrder(let order, let ringId):
+            return "Provider order \(order) is already used in ring \(ringId)"
+        case .invalidProviderType(let type):
+            return "Invalid provider type: '\(type)'"
+        case .databaseError(let message):
+            return "Database error: \(message)"
+        case .configurationNotFound(let id):
+            return "Configuration with ID \(id) not found"
+        case .noActiveConfigurations:
+            return "No active ring configurations found"
+        case .invalidRadius(let radius):
+            return "Invalid ring radius: \(radius). Must be greater than 0"
+        case .invalidIconSize(let size):
+            return "Invalid icon size: \(size). Must be greater than 0"
+        }
+    }
+}

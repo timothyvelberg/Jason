@@ -171,8 +171,59 @@ class DatabaseManager {
         );
         """
         
-        // Execute all schema creation
-        let tables = [foldersSQL, favoriteFoldersSQL, favoriteAppsSQL, favoriteFilesSQL, favoriteDynamicFilesSQL, folderCacheSQL, preferencesSQL]
+        // Create ring_configurations table
+        let ringConfigurationsSQL = """
+        CREATE TABLE IF NOT EXISTS ring_configurations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            shortcut TEXT NOT NULL,
+            ring_radius REAL NOT NULL,
+            icon_size REAL NOT NULL,
+            created_at INTEGER DEFAULT (strftime('%s', 'now')),
+            is_active INTEGER DEFAULT 1,
+            display_order INTEGER DEFAULT 0
+        );
+        """
+
+        // Create unique index for active shortcuts
+        let ringConfigurationsIndexSQL = """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_shortcut 
+        ON ring_configurations(shortcut) 
+        WHERE is_active = 1;
+        """
+
+        // Create ring_providers table
+        let ringProvidersSQL = """
+        CREATE TABLE IF NOT EXISTS ring_providers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ring_id INTEGER NOT NULL,
+            provider_type TEXT NOT NULL,
+            provider_order INTEGER NOT NULL,
+            parent_item_angle REAL,
+            provider_config TEXT,
+            FOREIGN KEY (ring_id) REFERENCES ring_configurations(id) ON DELETE CASCADE
+        );
+        """
+
+        // Create unique index for provider order within rings
+        let ringProvidersIndexSQL = """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ring_provider_order 
+        ON ring_providers(ring_id, provider_order);
+        """
+        
+        let tables = [
+            foldersSQL,
+            favoriteFoldersSQL,
+            favoriteAppsSQL,
+            favoriteFilesSQL,
+            favoriteDynamicFilesSQL,
+            folderCacheSQL,
+            preferencesSQL,
+            ringConfigurationsSQL,
+            ringConfigurationsIndexSQL,
+            ringProvidersSQL,
+            ringProvidersIndexSQL
+        ]
         
         for sql in tables {
             if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
