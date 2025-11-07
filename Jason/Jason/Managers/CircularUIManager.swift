@@ -151,6 +151,7 @@ class CircularUIManager: ObservableObject {
                     print("   🎯 Found matching provider in Ring \(index)")
                     return true
                 }
+                
                 // If content identifier specified, check it too
                 if ring.contentIdentifier == contentIdentifier {
                     print("   🎯 Found matching provider + content in Ring \(index): \(contentIdentifier ?? "")")

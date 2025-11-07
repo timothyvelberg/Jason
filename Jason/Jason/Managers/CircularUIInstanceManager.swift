@@ -22,6 +22,9 @@ class CircularUIInstanceManager: ObservableObject {
     /// Dictionary of active instances, keyed by configuration ID
     @Published private(set) var instances: [Int: CircularUIManager] = [:]
     
+    /// Track which instance is currently visible (nil if none are visible)
+    private(set) var activeInstanceId: Int? = nil
+    
     // MARK: - Dependencies
     
     private let configurationManager = RingConfigurationManager.shared
@@ -116,6 +119,12 @@ class CircularUIInstanceManager: ObservableObject {
             instance.hide()
         }
         
+        // Clear active instance tracking if this was the active instance
+        if activeInstanceId == configId {
+            activeInstanceId = nil
+            print("   ⚠️ Removed active instance, cleared activeInstanceId")
+        }
+        
         // Remove from dictionary
         instances.removeValue(forKey: configId)
         
@@ -135,6 +144,9 @@ class CircularUIInstanceManager: ObservableObject {
         
         // Clear dictionary
         instances.removeAll()
+        
+        // Clear active instance tracking
+        activeInstanceId = nil
         
         print("   ✅ All instances removed")
     }
@@ -184,10 +196,12 @@ class CircularUIInstanceManager: ObservableObject {
     func printDebugInfo() {
         print("🔍 [InstanceManager] Debug Info:")
         print("   Total instances: \(instances.count)")
+        print("   Active instance ID: \(activeInstanceId?.description ?? "none")")
         
         for (configId, instance) in instances.sorted(by: { $0.key < $1.key }) {
             let visibleStatus = instance.isVisible ? "👁️ VISIBLE" : "😴 hidden"
-            print("   - Config \(configId): \(visibleStatus)")
+            let activeMarker = (configId == activeInstanceId) ? " ⭐️ ACTIVE" : ""
+            print("   - Config \(configId): \(visibleStatus)\(activeMarker)")
         }
     }
     
@@ -214,18 +228,33 @@ extension CircularUIInstanceManager {
             return
         }
         
+        // Hide currently active instance if different
+        if let currentActiveId = activeInstanceId, currentActiveId != configId {
+            print("🔄 [InstanceManager] Hiding previous instance (config \(currentActiveId))")
+            if let previousInstance = getInstance(forConfigId: currentActiveId) {
+                previousInstance.hide()
+            }
+        }
+        
+        // Update active instance tracking
+        activeInstanceId = configId
+        print("✅ [InstanceManager] Setting active instance to config \(configId)")
+        
+        // Show the new instance
         instance.show()
     }
     
     /// Show a specific instance by shortcut
     /// - Parameter shortcut: The keyboard shortcut
     func show(forShortcut shortcut: String) {
-        guard let instance = getInstance(forShortcut: shortcut) else {
-            print("❌ [InstanceManager] Cannot show - no instance for shortcut '\(shortcut)'")
+        // Find config with matching shortcut
+        guard let config = configurationManager.getConfiguration(forShortcut: shortcut) else {
+            print("❌ [InstanceManager] Cannot show - no configuration for shortcut '\(shortcut)'")
             return
         }
         
-        instance.show()
+        // Use the coordinated show method
+        show(configId: config.id)
     }
     
     /// Hide all visible instances
@@ -235,5 +264,38 @@ extension CircularUIInstanceManager {
         for instance in visibleInstances {
             instance.hide()
         }
+        
+        // Clear active instance tracking
+        activeInstanceId = nil
+    }
+    
+    /// Hide the currently active instance
+    func hideActive() {
+        guard let activeId = activeInstanceId else {
+            print("⚠️ [InstanceManager] No active instance to hide")
+            return
+        }
+        
+        print("🔄 [InstanceManager] Hiding active instance (config \(activeId))")
+        
+        if let activeInstance = getInstance(forConfigId: activeId) {
+            activeInstance.hide()
+        }
+        
+        activeInstanceId = nil
+    }
+    
+    /// Get the currently active instance (the one that should handle notifications)
+    /// - Returns: The active CircularUIManager instance, or nil if none is active
+    func getActiveInstance() -> CircularUIManager? {
+        guard let activeId = activeInstanceId else { return nil }
+        return getInstance(forConfigId: activeId)
+    }
+    
+    /// Check if a specific instance is currently active
+    /// - Parameter configId: The configuration ID to check
+    /// - Returns: True if this instance is currently active, false otherwise
+    func isInstanceActive(_ configId: Int) -> Bool {
+        return activeInstanceId == configId
     }
 }
