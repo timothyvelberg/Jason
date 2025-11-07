@@ -2,137 +2,126 @@
 //  ContentView.swift
 //  Jason
 //
-//  Created by Timothy Velberg on 31/07/2025.
+//  Updated to use CircularUIInstanceManager for multi-ring support
 //
 
 import SwiftUI
 import AppKit
 
 struct ContentView: View {
-    @StateObject private var circularUI = CircularUIManager()
-    @State private var selectedSortOrder: FolderSortOrder = .modifiedNewest
+    @StateObject private var instanceManager = CircularUIInstanceManager.shared
+    @State private var isSetupComplete = false
     
     var body: some View {
         Group {
-            MinimalView(circularUI: circularUI)
-//            if !(circularUI.appSwitcher?.hasAccessibilityPermission ?? true) {
-//                PermissionRequestView(circularUI: circularUI)
-//            } else {
-//                MinimalView(circularUI: circularUI)
-//            }
+            if isSetupComplete {
+                MinimalView(instanceManager: instanceManager)
+            } else {
+                Text("Setting up...")
+                    .font(.title2)
+                    .foregroundColor(.secondary)
+            }
         }
         .onAppear {
-            print("🚀 ContentView appeared")
-            circularUI.setup()
-        }
-        .onDisappear {
-            print("👋 ContentView disappeared - stopping services")
-            circularUI.appSwitcher?.stopAutoRefresh()
+            setupApplication()
         }
     }
-}
-
-// MARK: - Permission Request View
-
-struct PermissionRequestView: View {
-    @ObservedObject var circularUI: CircularUIManager
     
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "key.fill")
-                .font(.system(size: 48))
-                .foregroundColor(.blue)
-            
-            Text("Accessibility Permission Required")
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            Text("Jason needs Accessibility permission to detect global keyboard shortcuts and function as an app switcher.")
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
-            VStack(spacing: 10) {
-                Text("To grant permission:")
-                    .fontWeight(.medium)
-                
-                Text("1. Click 'Open System Preferences' below")
-                Text("2. Find 'Jason' in the list")
-                Text("3. Check the box next to 'Jason'")
-                Text("4. Come back and click 'Check Again'")
-            }
-            .font(.system(size: 14))
-            .padding()
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(8)
-            
-            HStack(spacing: 15) {
-                Button("Open System Preferences") {
-                    circularUI.appSwitcher?.openAccessibilityPreferences()
-                }
-                .buttonStyle(.borderedProminent)
-                
-                Button("Check Again") {
-                    circularUI.appSwitcher?.checkAccessibilityPermission()
-                }
-                .buttonStyle(.bordered)
-            }
-            
-            // Development testing buttons
-            Divider()
-                .padding(.vertical, 10)
-            
-            Text("Development Testing")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            HStack(spacing: 10) {
-                Button("Test Circular UI") {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        circularUI.show()
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                
-                Button("Test App Switcher Direct") {
-                    circularUI.show(expandingCategory: "app-switcher")
-                }
-                .buttonStyle(.bordered)
-                
-                Button("Hide") {
-                    circularUI.hide()
-                }
-                .buttonStyle(.bordered)
-            }
+    private func setupApplication() {
+        print("🚀 [ContentView] Application setup starting...")
+        
+        // Step 1: Ensure default configuration exists (first launch)
+        FirstLaunchConfiguration.ensureDefaultConfiguration()
+        
+        // Step 2: Load active configurations
+        let configManager = RingConfigurationManager.shared
+        configManager.loadActiveConfigurations()
+        let activeConfigs = configManager.getActiveConfigurations()
+        
+        print("   📋 Found \(activeConfigs.count) active configuration(s)")
+        
+        // Step 3: Create CircularUIManager instances
+        instanceManager.createInstances(for: activeConfigs)
+        
+        // Step 4: Setup each instance
+        for (_, instance) in instanceManager.instances {
+            instance.setup()
         }
-        .padding(30)
-        .frame(maxWidth: 500)
+        
+        print("   ✅ Setup complete - \(instanceManager.instances.count) instance(s) ready")
+        
+        // Mark setup as complete
+        isSetupComplete = true
     }
 }
-
-// MARK: - Minimal Hidden View
 
 // MARK: - Minimal Hidden View
 
 struct MinimalView: View {
-    @ObservedObject var circularUI: CircularUIManager
-    @State private var showingFolderFavoritesSettings = false  // Renamed for clarity
+    @ObservedObject var instanceManager: CircularUIInstanceManager
+    @State private var showingFolderFavoritesSettings = false
     @State private var showingAppFavoritesSettings = false
     @State private var showingFileFavoritesSettings = false
+    
+    // Get the first instance for testing buttons
+    private var firstInstance: CircularUIManager? {
+        instanceManager.getFirstInstance()
+    }
     
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "circle.grid.3x3.fill")
-                .font(.system(size: 48))
+                .font(.system(size: 24))
                 .foregroundColor(.blue)
             
-            Text("Jason App Switcher")
+            Text("Jason - Multi-Ring Launcher")
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Press your keyboard shortcut to show the circular UI")
+            Text("Press your configured shortcuts to show rings")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+            
+            // Show active configurations
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Active Rings:")
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+                
+                let configs = RingConfigurationManager.shared.getActiveConfigurations()
+                ForEach(configs) { config in
+                    HStack {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 8, height: 8)
+                        
+                        Text(config.name)
+                            .font(.body)
+                        
+                        Spacer()
+                        
+                        Text(config.shortcut)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.gray.opacity(0.2))
+                            .cornerRadius(4)
+                    }
+                }
+                
+                if configs.isEmpty {
+                    Text("No active rings configured")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .italic()
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(8)
             
             Divider()
                 .padding(.vertical, 10)
@@ -142,57 +131,72 @@ struct MinimalView: View {
                 .foregroundColor(.secondary)
             
             VStack(spacing: 10) {
-                Button("Test Circular UI") {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        circularUI.show()
+                Button("Test First Ring") {
+                    if let instance = firstInstance {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            instance.show()
+                        }
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(firstInstance == nil)
                 
-                Button("Test App Switcher Direct") {
-                    circularUI.show(expandingCategory: "app-switcher")
+                Button("Hide All Rings") {
+                    instanceManager.hideAll()
                 }
                 .buttonStyle(.bordered)
                 
-                Button("Hide Circular UI") {
-                    circularUI.hide()
+                Button("Refresh Instances") {
+                    instanceManager.syncWithConfigurations()
                 }
                 .buttonStyle(.bordered)
                 
-                Button("Manage Favorite Files") {  // Add this
+                Button("Debug Info") {
+                    instanceManager.printDebugInfo()
+                }
+                .buttonStyle(.bordered)
+                
+                Button("Manage Favorite Files") {
                     showingFileFavoritesSettings = true
                 }
                 .buttonStyle(.bordered)
+                .disabled(firstInstance == nil)
                 
-                // Two separate buttons for each type of favorites
                 Button("Manage Favorite Folders") {
                     showingFolderFavoritesSettings = true
                 }
                 .buttonStyle(.bordered)
+                .disabled(firstInstance == nil)
                 
                 Button("Manage Favorite Apps") {
                     showingAppFavoritesSettings = true
                 }
                 .buttonStyle(.bordered)
+                .disabled(firstInstance == nil)
             }
         }
         .padding(30)
-        .frame(width: 300, height: 400)
+        .frame(width: 400, height: 600)
         .sheet(isPresented: $showingFolderFavoritesSettings) {
-            FavoritesSettingsView(circularUI: circularUI)
+            if let instance = firstInstance {
+                FavoritesSettingsView(circularUI: instance)
+            }
         }
         .sheet(isPresented: $showingAppFavoritesSettings) {
-            if let appsProvider = circularUI.functionManager?.favoriteAppsProvider {
+            if let instance = firstInstance,
+               let appsProvider = instance.functionManager?.favoriteAppsProvider {
                 FavoriteAppsSettingsView(appsProvider: appsProvider)
             }
         }
-        .sheet(isPresented: $showingFileFavoritesSettings) {  // Add this
-            if let filesProvider = circularUI.favoriteFilesProvider {
+        .sheet(isPresented: $showingFileFavoritesSettings) {
+            if let instance = firstInstance,
+               let filesProvider = instance.favoriteFilesProvider {
                 FavoriteFilesSettingsView(filesProvider: filesProvider)
             }
         }
     }
 }
+
 
 // MARK: - Favorites Settings View
 

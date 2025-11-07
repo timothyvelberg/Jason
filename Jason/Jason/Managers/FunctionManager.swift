@@ -33,6 +33,20 @@ class FunctionManager: ObservableObject {
         return Int(360.0 / minimalAngle)
     }
     
+    // MARK: - Ring Configuration (Phase 3)
+    
+    /// Default ring thickness (radius) in points - can be overridden by configuration
+    private let defaultRingThickness: CGFloat
+    
+    /// Default icon size in points - can be overridden by configuration
+    private let defaultIconSize: CGFloat
+    
+    /// Collapsed ring thickness (for breadcrumb trail)
+    private let collapsedRingThickness: CGFloat = 32
+    
+    /// Collapsed icon size (for breadcrumb trail)
+    private let collapsedIconSize: CGFloat = 16
+    
     // MARK: - Ring State Structure
     
     struct RingState {
@@ -87,6 +101,26 @@ class FunctionManager: ObservableObject {
     private var cachedConfigurations: [RingConfiguration] = []
     private var lastRingsHash: Int = 0
     
+    // MARK: - Initialization
+    
+    /// Initialize FunctionManager with ring configuration
+    /// - Parameters:
+    ///   - ringThickness: Thickness of rings in points
+    ///   - iconSize: Size of icons in points
+    init(ringThickness: CGFloat, iconSize: CGFloat) {
+        self.defaultRingThickness = ringThickness
+        self.defaultIconSize = iconSize
+        
+        // Initialize providers and favoriteAppsProvider
+        self.providers = []
+        let appsProvider = FavoriteAppsProvider()
+        self.favoriteAppsProvider = appsProvider
+        
+        print("🎯 [FunctionManager] Initialized with:")
+        print("   - Ring Thickness: \(ringThickness)px")
+        print("   - Icon Size: \(iconSize)px")
+    }
+    
     // MARK: - Helper Types
     
     private struct ParentInfo {
@@ -116,10 +150,9 @@ class FunctionManager: ObservableObject {
     private func calculateRingConfigurations() -> [RingConfiguration] {
         var configs: [RingConfiguration] = []
         let centerHoleRadius: CGFloat = 56
-        let defaultRingThickness: CGFloat = 80
-        let defaultIconSize: CGFloat = 32
-        let collapsedRingThickness: CGFloat = 32
-        let collapsedIconSize: CGFloat = 16
+        // Use instance properties instead of local variables
+        let ringThickness = defaultRingThickness
+        let iconSize = defaultIconSize
         let ringMargin: CGFloat = 2
         var currentRadius = centerHoleRadius
         
@@ -136,15 +169,15 @@ class FunctionManager: ObservableObject {
             
             let sliceConfig: PieSliceConfig
             
-            // Determine thickness and icon size
-            let ringThickness: CGFloat
-            let iconSize: CGFloat
+            // Determine thickness and icon size for this specific ring
+            let thisRingThickness: CGFloat
+            let thisIconSize: CGFloat
             
             // Check if ring is collapsed
             if ringState.isCollapsed {
-                ringThickness = collapsedRingThickness
-                iconSize = collapsedIconSize
-                print("📦 Ring \(index) is COLLAPSED: thickness=\(ringThickness), iconSize=\(iconSize)")
+                thisRingThickness = collapsedRingThickness
+                thisIconSize = collapsedIconSize
+                print("📦 Ring \(index) is COLLAPSED: thickness=\(thisRingThickness), iconSize=\(thisIconSize)")
                 
                 // Collapsed rings use their existing slice config
                 if index == 0 {
@@ -231,8 +264,8 @@ class FunctionManager: ObservableObject {
                 }
             }else if index == 0 {
                 // Ring 0 is always a full circle, shifted so first item is at top (0°)
-                ringThickness = defaultRingThickness
-                iconSize = defaultIconSize
+                thisRingThickness = ringThickness  // Use default from config
+                thisIconSize = iconSize  // Use default from config
                 
                 let itemCount = nodes.count
                 
@@ -257,27 +290,27 @@ class FunctionManager: ObservableObject {
             } else {
                 // Ring 1+ - get parent info
                 guard let parentInfo = getParentInfo(for: index, configs: configs) else {
-                    ringThickness = defaultRingThickness
-                    iconSize = defaultIconSize
+                    thisRingThickness = ringThickness  // Use default from config
+                    thisIconSize = iconSize  // Use default from config
                     let itemCount = nodes.count
                     let itemAngle = 360.0 / Double(itemCount)
                     sliceConfig = .fullCircle(itemCount: itemCount, anglePerItem: itemAngle)
                     configs.append(RingConfiguration(
                         level: index,
                         startRadius: currentRadius,
-                        thickness: ringThickness,
+                        thickness: thisRingThickness,
                         nodes: nodes,
                         selectedIndex: ringState.hoveredIndex,
                         sliceConfig: sliceConfig,
-                        iconSize: iconSize
+                        iconSize: thisIconSize
                     ))
-                    currentRadius += ringThickness + ringMargin
+                    currentRadius += thisRingThickness + ringMargin
                     continue
                 }
                 
                 // Use parent's specified sizes or defaults
-                ringThickness = parentInfo.node.childRingThickness ?? defaultRingThickness
-                iconSize = parentInfo.node.childIconSize ?? defaultIconSize
+                thisRingThickness = parentInfo.node.childRingThickness ?? ringThickness
+                thisIconSize = parentInfo.node.childIconSize ?? iconSize
                 
                 let itemCount = nodes.count
                 let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
@@ -342,13 +375,13 @@ class FunctionManager: ObservableObject {
             configs.append(RingConfiguration(
                 level: index,
                 startRadius: currentRadius,
-                thickness: ringThickness,
+                thickness: thisRingThickness,
                 nodes: nodes,
                 selectedIndex: ringState.hoveredIndex,
                 sliceConfig: sliceConfig,
-                iconSize: iconSize
+                iconSize: thisIconSize
             ))
-            currentRadius += ringThickness + ringMargin
+            currentRadius += thisRingThickness + ringMargin
         }
         
         return configs
@@ -709,14 +742,6 @@ class FunctionManager: ObservableObject {
         degrees = (360 - degrees).truncatingRemainder(dividingBy: 360)
         
         return degrees
-    }
-    
-    // MARK: - Initialization
-    
-    init(providers: [FunctionProvider] = []) {
-        self.providers = providers
-        let appsProvider = FavoriteAppsProvider()
-        self.favoriteAppsProvider = appsProvider
     }
     
     // MARK: - Provider Management

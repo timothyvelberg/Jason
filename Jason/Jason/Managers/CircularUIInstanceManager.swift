@@ -2,8 +2,6 @@
 //  CircularUIInstanceManager.swift
 //  Jason
 //
-//  Created by Timothy Velberg on 07/11/2025.
-//
 //  Manages multiple CircularUIManager instances, each tied to a ring configuration.
 //  Handles instance lifecycle: creation, updates, and removal based on active configs.
 //
@@ -59,12 +57,11 @@ class CircularUIInstanceManager: ObservableObject {
             removeInstance(forConfigId: config.id)
         }
         
-        // TODO: Step 2 - Create new instance with configuration
-        // This will be enabled once CircularUIManager has init(configuration:)
-        // let instance = CircularUIManager(configuration: config)
-        // instances[config.id] = instance
+        // Create new instance with configuration
+        let instance = CircularUIManager(configuration: config)
+        instances[config.id] = instance
         
-        print("   ⚠️ Instance creation not yet implemented (Step 2 pending)")
+        print("   ✅ Instance created with:")
         print("      - Shortcut: \(config.shortcut)")
         print("      - Ring Radius: \(config.ringRadius)")
         print("      - Icon Size: \(config.iconSize)")

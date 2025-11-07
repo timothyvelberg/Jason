@@ -34,8 +34,36 @@ class CircularUIManager: ObservableObject {
     private var isInAppSwitcherMode: Bool = false
     private var isInHoldMode: Bool = false  // 🆕 Track if we're in hold-to-show mode
     
-    init() {
-        print("CircularUIManager initialized")
+    // MARK: - Configuration (Phase 3 Refactoring)
+    
+    /// Ring configuration for this instance
+    private let configuration: StoredRingConfiguration
+    
+    /// Configuration ID for identification
+    let configId: Int
+    
+    // MARK: - Initializer
+    
+    /// Initialize CircularUIManager with a ring configuration
+    /// Each CircularUIManager instance is tied to a specific ring configuration
+    init(configuration: StoredRingConfiguration) {
+        self.configuration = configuration
+        self.configId = configuration.id
+        
+        print("🎯 CircularUIManager initialized with configuration:")
+        print("   - ID: \(configuration.id)")
+        print("   - Name: \(configuration.name)")
+        print("   - Shortcut: \(configuration.shortcut)")
+        print("   - Ring Radius: \(configuration.ringRadius)")
+        print("   - Icon Size: \(configuration.iconSize)")
+        print("   - Providers: \(configuration.providers.count)")
+        
+        commonInit()
+    }
+    
+    /// Common initialization logic shared by both initializers
+    private func commonInit() {
+        print("🔧 CircularUIManager common initialization")
         
         // Connect scroll handler
         overlayWindow?.onScrollBack = { [weak self] in
@@ -173,26 +201,40 @@ class CircularUIManager: ObservableObject {
         
         appSwitcher.circularUIManager = self
         
-        // Create FunctionManager with providers
-        self.functionManager = FunctionManager()
+        // Create FunctionManager with configuration values
+        self.functionManager = FunctionManager(
+            ringThickness: CGFloat(configuration.ringRadius),
+            iconSize: CGFloat(configuration.iconSize)
+        )
+        print("   ✅ FunctionManager initialized with config values")
         
-        //Register CombinedAppsProvider (replaces separate AppSwitcher and FavoriteApps providers)
-        let combinedAppsProvider = CombinedAppsProvider()
-        combinedAppsProvider.appSwitcherManager = appSwitcher
-        combinedAppsProvider.circularUIManager = self
-        self.combinedAppsProvider = combinedAppsProvider  // 🆕 Store reference
-        functionManager?.registerProvider(combinedAppsProvider)
+        // Create provider factory
+        let factory = ProviderFactory(
+            circularUIManager: self,
+            appSwitcherManager: appSwitcher
+        )
         
+        // Create providers from configuration
+        print("🎯 [Setup] Loading providers from configuration")
+        print("   Configuration: \(configuration.name)")
+        print("   Providers: \(configuration.providers.count)")
         
-        // Register FavoriteFilesProvider
-       let favoriteFilesProvider = FavoriteFilesProvider()
-       favoriteFilesProvider.circularUIManager = self
-       self.favoriteFilesProvider = favoriteFilesProvider  // Store reference
-       functionManager?.registerProvider(favoriteFilesProvider)
+        let providers = factory.createProviders(from: configuration)
         
-        functionManager?.registerProvider(SystemActionsProvider())
-
-        functionManager?.registerProvider(FinderLogic())
+        // Register all providers
+        for provider in providers {
+            functionManager?.registerProvider(provider)
+            
+            // Store references for specific provider types
+            if let combinedApps = provider as? CombinedAppsProvider {
+                self.combinedAppsProvider = combinedApps
+            }
+            if let favoriteFiles = provider as? FavoriteFilesProvider {
+                self.favoriteFilesProvider = favoriteFiles
+            }
+        }
+        
+        print("   ✅ Registered \(providers.count) provider(s)")
 
         if let functionManager = functionManager {
             self.mouseTracker = MouseTracker(functionManager: functionManager)
