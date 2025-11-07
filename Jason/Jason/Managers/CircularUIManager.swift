@@ -204,6 +204,7 @@ class CircularUIManager: ObservableObject {
         // Create FunctionManager with configuration values
         self.functionManager = FunctionManager(
             ringThickness: CGFloat(configuration.ringRadius),
+            centerHoleRadius: CGFloat(configuration.centerHoleRadius),
             iconSize: CGFloat(configuration.iconSize)
         )
         print("   ✅ FunctionManager initialized with config values")

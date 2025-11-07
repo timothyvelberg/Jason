@@ -16,6 +16,7 @@ struct StoredRingConfiguration: Identifiable, Equatable {
     let name: String
     let shortcut: String
     let ringRadius: Double
+    let centerHoleRadius: Double
     let iconSize: Double
     let isActive: Bool
     let providers: [ProviderConfiguration]
@@ -37,6 +38,16 @@ struct StoredRingConfiguration: Identifiable, Equatable {
         return providers.sorted { $0.order < $1.order }
     }
     
+    /// Calculate the outer radius of the ring
+    var outerRadius: Double {
+        return centerHoleRadius + ringRadius
+    }
+    
+    /// Get the ring thickness (same as ringRadius, for semantic clarity)
+    var thickness: Double {
+        return ringRadius
+    }
+    
     /// Get provider by type
     func provider(ofType type: String) -> ProviderConfiguration? {
         return providers.first { $0.providerType == type }
@@ -56,7 +67,8 @@ struct StoredRingConfiguration: Identifiable, Equatable {
             id: \(id),
             name: "\(name)",
             shortcut: "\(shortcut)",
-            radius: \(ringRadius),
+            centerHole: \(centerHoleRadius),
+            ringRadius: \(ringRadius),
             iconSize: \(iconSize),
             active: \(isActive),
             providers: \(providers.count)
@@ -71,6 +83,7 @@ struct StoredRingConfiguration: Identifiable, Equatable {
                lhs.name == rhs.name &&
                lhs.shortcut == rhs.shortcut &&
                lhs.ringRadius == rhs.ringRadius &&
+               lhs.centerHoleRadius == rhs.centerHoleRadius &&
                lhs.iconSize == rhs.iconSize &&
                lhs.isActive == rhs.isActive &&
                lhs.providers == rhs.providers
@@ -169,6 +182,7 @@ enum StoredRingConfigurationError: LocalizedError {
     case configurationNotFound(Int)
     case noActiveConfigurations
     case invalidRadius(Double)
+    case invalidCenterHoleRadius(Double)
     case invalidIconSize(Double)
     
     var errorDescription: String? {
@@ -193,6 +207,8 @@ enum StoredRingConfigurationError: LocalizedError {
             return "No active ring configurations found"
         case .invalidRadius(let radius):
             return "Invalid ring radius: \(radius). Must be greater than 0"
+        case .invalidCenterHoleRadius(let radius):
+            return "Invalid center hole radius: \(radius). Must be greater than 0"
         case .invalidIconSize(let size):
             return "Invalid icon size: \(size). Must be greater than 0"
         }

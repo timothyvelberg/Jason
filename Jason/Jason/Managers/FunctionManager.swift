@@ -37,6 +37,7 @@ class FunctionManager: ObservableObject {
     
     /// Default ring thickness (radius) in points - can be overridden by configuration
     private let defaultRingThickness: CGFloat
+    private let centerHoleRadius: CGFloat
     
     /// Default icon size in points - can be overridden by configuration
     private let defaultIconSize: CGFloat
@@ -107,8 +108,13 @@ class FunctionManager: ObservableObject {
     /// - Parameters:
     ///   - ringThickness: Thickness of rings in points
     ///   - iconSize: Size of icons in points
-    init(ringThickness: CGFloat, iconSize: CGFloat) {
+    init(
+        ringThickness: CGFloat,
+        centerHoleRadius: CGFloat,
+        iconSize: CGFloat)
+    {
         self.defaultRingThickness = ringThickness
+        self.centerHoleRadius = centerHoleRadius
         self.defaultIconSize = iconSize
         
         // Initialize providers and favoriteAppsProvider
@@ -149,7 +155,7 @@ class FunctionManager: ObservableObject {
     
     private func calculateRingConfigurations() -> [RingConfiguration] {
         var configs: [RingConfiguration] = []
-        let centerHoleRadius: CGFloat = 56
+        let centerHoleRadius = self.centerHoleRadius
         // Use instance properties instead of local variables
         let ringThickness = defaultRingThickness
         let iconSize = defaultIconSize

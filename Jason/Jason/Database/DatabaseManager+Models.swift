@@ -108,11 +108,14 @@ struct FavoriteDynamicFileEntry: Identifiable {
     let accessCount: Int
 }
 
+// MARK: - Ring Configuration Models
+
 struct RingConfigurationEntry: Identifiable {
     let id: Int
     let name: String
     let shortcut: String
     let ringRadius: CGFloat
+    let centerHoleRadius: CGFloat
     let iconSize: CGFloat
     let createdAt: Int
     let isActive: Bool

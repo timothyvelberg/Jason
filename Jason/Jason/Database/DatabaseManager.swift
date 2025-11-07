@@ -178,6 +178,7 @@ class DatabaseManager {
             name TEXT NOT NULL,
             shortcut TEXT NOT NULL,
             ring_radius REAL NOT NULL,
+            center_hole_radius REAL NOT NULL DEFAULT 56.0,
             icon_size REAL NOT NULL,
             created_at INTEGER DEFAULT (strftime('%s', 'now')),
             is_active INTEGER DEFAULT 1,

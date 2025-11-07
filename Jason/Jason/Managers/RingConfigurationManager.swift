@@ -115,7 +115,8 @@ class RingConfigurationManager: ObservableObject {
     /// - Parameters:
     ///   - name: Display name for the ring
     ///   - shortcut: Keyboard shortcut (e.g., "Cmd+Shift+A")
-    ///   - ringRadius: Radius of the ring in points
+    ///   - ringRadius: Radius (thickness) of the ring band in points
+    ///   - centerHoleRadius: Radius of the center hole in points
     ///   - iconSize: Size of icons in the ring
     ///   - providers: Array of provider specifications (type, order, angle)
     /// - Returns: The newly created configuration
@@ -124,6 +125,7 @@ class RingConfigurationManager: ObservableObject {
         name: String,
         shortcut: String,
         ringRadius: Double,
+        centerHoleRadius: Double = 56.0,
         iconSize: Double,
         providers: [(type: String, order: Int, angle: Double?)] = []
     ) throws -> StoredRingConfiguration {
@@ -134,6 +136,7 @@ class RingConfigurationManager: ObservableObject {
             name: name,
             shortcut: shortcut,
             ringRadius: ringRadius,
+            centerHoleRadius: centerHoleRadius,
             iconSize: iconSize
         )
         
@@ -147,6 +150,7 @@ class RingConfigurationManager: ObservableObject {
             name: name,
             shortcut: shortcut,
             ringRadius: CGFloat(ringRadius),
+            centerHoleRadius: CGFloat(centerHoleRadius),
             iconSize: CGFloat(iconSize)
         ) else {
             throw StoredRingConfigurationError.databaseError("Failed to create ring configuration")
@@ -186,6 +190,7 @@ class RingConfigurationManager: ObservableObject {
             name: name,
             shortcut: shortcut,
             ringRadius: ringRadius,
+            centerHoleRadius: centerHoleRadius,
             iconSize: iconSize,
             isActive: true,
             providers: providerConfigs
@@ -205,7 +210,8 @@ class RingConfigurationManager: ObservableObject {
     ///   - id: ID of the configuration to update
     ///   - name: New name (nil to keep current)
     ///   - shortcut: New shortcut (nil to keep current)
-    ///   - ringRadius: New radius (nil to keep current)
+    ///   - ringRadius: New ring radius/thickness (nil to keep current)
+    ///   - centerHoleRadius: New center hole radius (nil to keep current)
     ///   - iconSize: New icon size (nil to keep current)
     /// - Throws: StoredRingConfigurationError if validation fails or configuration not found
     func updateConfiguration(
@@ -213,6 +219,7 @@ class RingConfigurationManager: ObservableObject {
         name: String? = nil,
         shortcut: String? = nil,
         ringRadius: Double? = nil,
+        centerHoleRadius: Double? = nil,
         iconSize: Double? = nil
     ) throws {
         print("✏️ [RingConfigManager] Updating configuration \(id)")
@@ -226,6 +233,7 @@ class RingConfigurationManager: ObservableObject {
         let finalName = name ?? existingConfig.name
         let finalShortcut = shortcut ?? existingConfig.shortcut
         let finalRadius = ringRadius ?? existingConfig.ringRadius
+        let finalCenterHoleRadius = centerHoleRadius ?? existingConfig.centerHoleRadius
         let finalIconSize = iconSize ?? existingConfig.iconSize
         
         // Validate inputs
@@ -233,6 +241,7 @@ class RingConfigurationManager: ObservableObject {
             name: finalName,
             shortcut: finalShortcut,
             ringRadius: finalRadius,
+            centerHoleRadius: finalCenterHoleRadius,
             iconSize: finalIconSize
         )
         
@@ -249,6 +258,7 @@ class RingConfigurationManager: ObservableObject {
             name: name,
             shortcut: shortcut,
             ringRadius: ringRadius.map { CGFloat($0) },
+            centerHoleRadius: centerHoleRadius.map { CGFloat($0) },
             iconSize: iconSize.map { CGFloat($0) }
         )
         
@@ -259,6 +269,7 @@ class RingConfigurationManager: ObservableObject {
                 name: finalName,
                 shortcut: finalShortcut,
                 ringRadius: finalRadius,
+                centerHoleRadius: finalCenterHoleRadius,
                 iconSize: finalIconSize,
                 isActive: existingConfig.isActive,
                 providers: existingConfig.providers
@@ -345,6 +356,7 @@ class RingConfigurationManager: ObservableObject {
                 name: configurations[index].name,
                 shortcut: configurations[index].shortcut,
                 ringRadius: configurations[index].ringRadius,
+                centerHoleRadius: configurations[index].centerHoleRadius,
                 iconSize: configurations[index].iconSize,
                 isActive: configurations[index].isActive,
                 providers: updatedProviders
@@ -386,6 +398,7 @@ class RingConfigurationManager: ObservableObject {
                 name: configurations[index].name,
                 shortcut: configurations[index].shortcut,
                 ringRadius: configurations[index].ringRadius,
+                centerHoleRadius: configurations[index].centerHoleRadius,
                 iconSize: configurations[index].iconSize,
                 isActive: configurations[index].isActive,
                 providers: updatedProviders
@@ -434,6 +447,7 @@ class RingConfigurationManager: ObservableObject {
                 name: existingConfig.name,
                 shortcut: existingConfig.shortcut,
                 ringRadius: existingConfig.ringRadius,
+                centerHoleRadius: existingConfig.centerHoleRadius,
                 iconSize: existingConfig.iconSize,
                 isActive: isActive,
                 providers: existingConfig.providers
@@ -529,6 +543,7 @@ class RingConfigurationManager: ObservableObject {
             name: dbConfig.name,
             shortcut: dbConfig.shortcut,
             ringRadius: Double(dbConfig.ringRadius),
+            centerHoleRadius: Double(dbConfig.centerHoleRadius),
             iconSize: Double(dbConfig.iconSize),
             isActive: dbConfig.isActive,
             providers: providers
@@ -540,6 +555,7 @@ class RingConfigurationManager: ObservableObject {
         name: String,
         shortcut: String,
         ringRadius: Double,
+        centerHoleRadius: Double,
         iconSize: Double
     ) throws {
         // Validate name
@@ -552,9 +568,14 @@ class RingConfigurationManager: ObservableObject {
             throw StoredRingConfigurationError.invalidShortcut("Shortcut cannot be empty")
         }
         
-        // Validate radius
+        // Validate ring radius
         guard ringRadius > 0 else {
             throw StoredRingConfigurationError.invalidRadius(ringRadius)
+        }
+        
+        // Validate center hole radius
+        guard centerHoleRadius > 0 else {
+            throw StoredRingConfigurationError.invalidCenterHoleRadius(centerHoleRadius)
         }
         
         // Validate icon size
@@ -577,7 +598,8 @@ class RingConfigurationManager: ObservableObject {
  let newRing = try await manager.createConfiguration(
      name: "Quick Apps",
      shortcut: "Cmd+Shift+A",
-     ringRadius: 350.0,
+     ringRadius: 80.0,
+     centerHoleRadius: 56.0,
      iconSize: 64.0,
      providers: [
          ("RunningAppsProvider", 1, 180.0),

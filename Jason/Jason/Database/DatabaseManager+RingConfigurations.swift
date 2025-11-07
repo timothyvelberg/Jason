@@ -18,6 +18,7 @@ extension DatabaseManager {
         name: String,
         shortcut: String,
         ringRadius: CGFloat,
+        centerHoleRadius: CGFloat,  // NEW PARAMETER
         iconSize: CGFloat,
         displayOrder: Int = 0
     ) -> Int? {
@@ -35,8 +36,8 @@ extension DatabaseManager {
             let now = Int(Date().timeIntervalSince1970)
             
             let sql = """
-            INSERT INTO ring_configurations (name, shortcut, ring_radius, icon_size, created_at, is_active, display_order)
-            VALUES (?, ?, ?, ?, ?, 1, ?);
+            INSERT INTO ring_configurations (name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?);
             """
             var statement: OpaquePointer?
             
@@ -44,9 +45,10 @@ extension DatabaseManager {
                 sqlite3_bind_text(statement, 1, (name as NSString).utf8String, -1, nil)
                 sqlite3_bind_text(statement, 2, (shortcut as NSString).utf8String, -1, nil)
                 sqlite3_bind_double(statement, 3, Double(ringRadius))
-                sqlite3_bind_double(statement, 4, Double(iconSize))
-                sqlite3_bind_int64(statement, 5, Int64(now))
-                sqlite3_bind_int(statement, 6, Int32(displayOrder))
+                sqlite3_bind_double(statement, 4, Double(centerHoleRadius))  // NEW
+                sqlite3_bind_double(statement, 5, Double(iconSize))
+                sqlite3_bind_int64(statement, 6, Int64(now))
+                sqlite3_bind_int(statement, 7, Int32(displayOrder))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     ringId = Int(sqlite3_last_insert_rowid(db))
@@ -75,7 +77,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, icon_size, created_at, is_active, display_order
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order
             FROM ring_configurations
             ORDER BY display_order, name;
             """
@@ -87,16 +89,18 @@ extension DatabaseManager {
                     let name = String(cString: sqlite3_column_text(statement, 1))
                     let shortcut = String(cString: sqlite3_column_text(statement, 2))
                     let ringRadius = CGFloat(sqlite3_column_double(statement, 3))
-                    let iconSize = CGFloat(sqlite3_column_double(statement, 4))
-                    let createdAt = Int(sqlite3_column_int64(statement, 5))
-                    let isActive = sqlite3_column_int(statement, 6) == 1
-                    let displayOrder = Int(sqlite3_column_int(statement, 7))
+                    let centerHoleRadius = CGFloat(sqlite3_column_double(statement, 4))  // NEW
+                    let iconSize = CGFloat(sqlite3_column_double(statement, 5))
+                    let createdAt = Int(sqlite3_column_int64(statement, 6))
+                    let isActive = sqlite3_column_int(statement, 7) == 1
+                    let displayOrder = Int(sqlite3_column_int(statement, 8))
                     
                     results.append(RingConfigurationEntry(
                         id: id,
                         name: name,
                         shortcut: shortcut,
                         ringRadius: ringRadius,
+                        centerHoleRadius: centerHoleRadius,  // NEW
                         iconSize: iconSize,
                         createdAt: createdAt,
                         isActive: isActive,
@@ -113,7 +117,7 @@ extension DatabaseManager {
         
         return results
     }
-    
+
     /// Get active ring configurations only
     func getActiveRingConfigurations() -> [RingConfigurationEntry] {
         guard let db = db else { return [] }
@@ -122,7 +126,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, icon_size, created_at, is_active, display_order
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order
             FROM ring_configurations
             WHERE is_active = 1
             ORDER BY display_order, name;
@@ -135,16 +139,18 @@ extension DatabaseManager {
                     let name = String(cString: sqlite3_column_text(statement, 1))
                     let shortcut = String(cString: sqlite3_column_text(statement, 2))
                     let ringRadius = CGFloat(sqlite3_column_double(statement, 3))
-                    let iconSize = CGFloat(sqlite3_column_double(statement, 4))
-                    let createdAt = Int(sqlite3_column_int64(statement, 5))
-                    let isActive = sqlite3_column_int(statement, 6) == 1
-                    let displayOrder = Int(sqlite3_column_int(statement, 7))
+                    let centerHoleRadius = CGFloat(sqlite3_column_double(statement, 4))  // NEW
+                    let iconSize = CGFloat(sqlite3_column_double(statement, 5))
+                    let createdAt = Int(sqlite3_column_int64(statement, 6))
+                    let isActive = sqlite3_column_int(statement, 7) == 1
+                    let displayOrder = Int(sqlite3_column_int(statement, 8))
                     
                     results.append(RingConfigurationEntry(
                         id: id,
                         name: name,
                         shortcut: shortcut,
                         ringRadius: ringRadius,
+                        centerHoleRadius: centerHoleRadius,  // NEW
                         iconSize: iconSize,
                         createdAt: createdAt,
                         isActive: isActive,
@@ -161,7 +167,7 @@ extension DatabaseManager {
         
         return results
     }
-    
+
     /// Get a single ring configuration by ID
     func getRingConfiguration(id: Int) -> RingConfigurationEntry? {
         guard let db = db else { return nil }
@@ -170,7 +176,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, icon_size, created_at, is_active, display_order
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order
             FROM ring_configurations
             WHERE id = ?;
             """
@@ -184,16 +190,18 @@ extension DatabaseManager {
                     let name = String(cString: sqlite3_column_text(statement, 1))
                     let shortcut = String(cString: sqlite3_column_text(statement, 2))
                     let ringRadius = CGFloat(sqlite3_column_double(statement, 3))
-                    let iconSize = CGFloat(sqlite3_column_double(statement, 4))
-                    let createdAt = Int(sqlite3_column_int64(statement, 5))
-                    let isActive = sqlite3_column_int(statement, 6) == 1
-                    let displayOrder = Int(sqlite3_column_int(statement, 7))
+                    let centerHoleRadius = CGFloat(sqlite3_column_double(statement, 4))  // NEW
+                    let iconSize = CGFloat(sqlite3_column_double(statement, 5))
+                    let createdAt = Int(sqlite3_column_int64(statement, 6))
+                    let isActive = sqlite3_column_int(statement, 7) == 1
+                    let displayOrder = Int(sqlite3_column_int(statement, 8))
                     
                     result = RingConfigurationEntry(
                         id: id,
                         name: name,
                         shortcut: shortcut,
                         ringRadius: ringRadius,
+                        centerHoleRadius: centerHoleRadius,  // NEW
                         iconSize: iconSize,
                         createdAt: createdAt,
                         isActive: isActive,
@@ -217,6 +225,7 @@ extension DatabaseManager {
         name: String? = nil,
         shortcut: String? = nil,
         ringRadius: CGFloat? = nil,
+        centerHoleRadius: CGFloat? = nil,  // NEW PARAMETER
         iconSize: CGFloat? = nil,
         isActive: Bool? = nil,
         displayOrder: Int? = nil
@@ -250,6 +259,7 @@ extension DatabaseManager {
             if name != nil { updates.append("name = ?") }
             if shortcut != nil { updates.append("shortcut = ?") }
             if ringRadius != nil { updates.append("ring_radius = ?") }
+            if centerHoleRadius != nil { updates.append("center_hole_radius = ?") }  // NEW
             if iconSize != nil { updates.append("icon_size = ?") }
             if isActive != nil { updates.append("is_active = ?") }
             if displayOrder != nil { updates.append("display_order = ?") }
@@ -275,6 +285,10 @@ extension DatabaseManager {
                 }
                 if let ringRadius = ringRadius {
                     sqlite3_bind_double(statement, paramIndex, Double(ringRadius))
+                    paramIndex += 1
+                }
+                if let centerHoleRadius = centerHoleRadius {  // NEW
+                    sqlite3_bind_double(statement, paramIndex, Double(centerHoleRadius))
                     paramIndex += 1
                 }
                 if let iconSize = iconSize {

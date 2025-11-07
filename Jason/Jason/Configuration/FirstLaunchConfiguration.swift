@@ -32,7 +32,8 @@ class FirstLaunchConfiguration {
             let defaultConfig = try configManager.createConfiguration(
                 name: "Everything",
                 shortcut: "Cmd+Shift+Space",
-                ringRadius: 100.0,  // Smaller ring (was 300.0)
+                ringRadius: 80.0,  // Smaller ring (was 300.0)
+                centerHoleRadius: 40.0,
                 iconSize: 32.0,     // Smaller icons (was 64.0)
                 providers: [
                     ("CombinedAppsProvider", 1, nil),
