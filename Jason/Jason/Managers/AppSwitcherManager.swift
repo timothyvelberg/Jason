@@ -54,14 +54,13 @@ class AppSwitcherManager: ObservableObject {
     // MARK: - Service Setup
     
     func setupServices() {
-        print("🎹 Setting up services ")
         loadRunningApplications()
         
         // Only initialize MRU if we have permission
         if hasAccessibilityPermission {
             initializeMRUHistory()
         } else {
-            print("⚠️ MRU tracking disabled (no accessibility permission)")
+            print("MRU tracking disabled (no accessibility permission)")
         }
     }
     
@@ -114,14 +113,14 @@ class AppSwitcherManager: ObservableObject {
         }
         
         //Log current state
-        print("🔍 [AppSwitcher] Checking apps: current=\(runningApps.count), new=\(newApps.count)")
+        print("[AppSwitcher] Checking apps: current=\(runningApps.count), new=\(newApps.count)")
         
         // Only update if there's actually a change (to reduce unnecessary UI updates)
         let oldAppIDs = Set(runningApps.map { $0.processIdentifier })
         let newAppIDs = Set(newApps.map { $0.processIdentifier })
         
         if oldAppIDs != newAppIDs {
-            print("✅ [AppSwitcher] CHANGE DETECTED!")
+            print("[AppSwitcher] CHANGE DETECTED!")
             // Only do expensive sorting when the app list actually changes
             let sortedApps = sortAppsByMRU(newApps)
             
@@ -134,7 +133,7 @@ class AppSwitcherManager: ObservableObject {
             
             if !added.isEmpty {
                 let addedApps = sortedApps.filter { added.contains($0.processIdentifier) }
-                print("   ➕ Added: \(addedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: ", "))")
+                print("   Added: \(addedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: ", "))")
                 
                 // Add new apps to the end of usage history
                 for app in addedApps {
@@ -144,7 +143,7 @@ class AppSwitcherManager: ObservableObject {
             
             if !removed.isEmpty {
                 let removedApps = runningApps.filter { removed.contains($0.processIdentifier) }
-                print("   ➖ Removed: \(removedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: ", "))")
+                print("   Removed: \(removedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: ", "))")
                 
                 // Remove apps from usage history
                 for app in removedApps {
@@ -159,15 +158,15 @@ class AppSwitcherManager: ObservableObject {
                 NotificationCenter.default.postProviderUpdate(providerId: "app-switcher")
                 print("📢 Posted update notification for app-switcher")
             }
-            print("📊 Applications changed: \(oldCount) → \(newCount)")
-            print("🏆 MRU Order: \(runningApps.prefix(5).map { $0.localizedName ?? "Unknown" }.joined(separator: " → "))")
+            print("Applications changed: \(oldCount) → \(newCount)")
+            print("MRU Order: \(runningApps.prefix(5).map { $0.localizedName ?? "Unknown" }.joined(separator: " → "))")
         }
     }
     
     // MARK: - MRU Management
     
     private func sortAppsByMRU(_ apps: [NSRunningApplication]) -> [NSRunningApplication] {
-        print("🔍 Sorting apps by MRU. Usage history: \(appUsageHistory)")
+        print("Sorting apps by MRU. Usage history: \(appUsageHistory)")
         
         // Create a dictionary for quick lookup
         let appDict = Dictionary(uniqueKeysWithValues: apps.map { ($0.processIdentifier, $0) })
@@ -198,7 +197,6 @@ class AppSwitcherManager: ObservableObject {
     }
     
     private func addToUsageHistory(_ pid: pid_t) {
-//        print("➕ Adding PID \(pid) to usage history")
         // Remove if already exists
         appUsageHistory.removeAll { $0 == pid }
         // Add to front (most recent)
@@ -208,8 +206,6 @@ class AppSwitcherManager: ObservableObject {
         if appUsageHistory.count > 50 {
             appUsageHistory = Array(appUsageHistory.prefix(50))
         }
-        
-//        print("📚 Updated usage history: \(appUsageHistory.prefix(5))")
     }
     
     private func removeFromUsageHistory(_ pid: pid_t) {
@@ -217,7 +213,7 @@ class AppSwitcherManager: ObservableObject {
     }
     
     func recordAppUsage(_ app: NSRunningApplication) {
-        print("📝 Recording usage for: \(app.localizedName ?? "Unknown") (PID: \(app.processIdentifier))")
+        print("Recording usage for: \(app.localizedName ?? "Unknown") (PID: \(app.processIdentifier))")
         addToUsageHistory(app.processIdentifier)
         
         // Force immediate re-sort without waiting for app list changes
@@ -227,7 +223,7 @@ class AppSwitcherManager: ObservableObject {
     }
     
     private func forceResortApps() {
-        print("🔄 Force resorting apps by MRU")
+        print("Force resorting apps by MRU")
         let allApps = NSWorkspace.shared.runningApplications
         
         let newApps = allApps.filter { app in
@@ -242,7 +238,7 @@ class AppSwitcherManager: ObservableObject {
     // MARK: - App Switcher Control
     
     func showAppSwitcher() {
-        print("👁️  Showing app switcher")
+        print("Showing app switcher")
         isVisible = true
         selectedAppIndex = 0
         isCtrlPressed = true
@@ -253,14 +249,14 @@ class AppSwitcherManager: ObservableObject {
     }
     
     func hideAppSwitcher() {
-        print("🙈 Hiding app switcher")
+        print("Hiding app switcher")
         isVisible = false
         selectedAppIndex = 0
         isCtrlPressed = false
     }
     
     func bringJasonToFront() {
-        print("🔝 Bringing Jason to front")
+        print("Bringing Jason to front")
         
         // Activate our own application
         NSApp.activate(ignoringOtherApps: true)
@@ -276,14 +272,14 @@ class AppSwitcherManager: ObservableObject {
     func navigateNext() {
         if !runningApps.isEmpty {
             selectedAppIndex = (selectedAppIndex + 1) % runningApps.count
-            print("➡️  Selected: \(runningApps[selectedAppIndex].localizedName ?? "Unknown") (\(selectedAppIndex + 1)/\(runningApps.count))")
+            print("Selected: \(runningApps[selectedAppIndex].localizedName ?? "Unknown") (\(selectedAppIndex + 1)/\(runningApps.count))")
         }
     }
     
     func navigatePrevious() {
         if !runningApps.isEmpty {
             selectedAppIndex = selectedAppIndex > 0 ? selectedAppIndex - 1 : runningApps.count - 1
-            print("⬅️  Selected: \(runningApps[selectedAppIndex].localizedName ?? "Unknown") (\(selectedAppIndex + 1)/\(runningApps.count))")
+            print("Selected: \(runningApps[selectedAppIndex].localizedName ?? "Unknown") (\(selectedAppIndex + 1)/\(runningApps.count))")
         }
     }
     
@@ -295,7 +291,7 @@ class AppSwitcherManager: ObservableObject {
     }
     
     func switchToApp(_ app: NSRunningApplication) {
-        print("🔄 Switching to app: \(app.localizedName ?? "Unknown")")
+        print("Switching to app: \(app.localizedName ?? "Unknown")")
         
         // Record this app usage BEFORE hiding the switcher
         recordAppUsage(app)
@@ -305,16 +301,16 @@ class AppSwitcherManager: ObservableObject {
         
         // 🆕 ADD THIS LOG:
         if circularUIManager == nil {
-            print("❌ circularUIManager is NIL!")
+            print("circularUIManager is NIL!")
         } else {
-            print("✅ Calling hideAndSwitchTo...")
+            print("Calling hideAndSwitchTo...")
         }
         
         // Hide the circular UI and activate the selected app
         // This uses the special hideAndSwitchTo which doesn't restore previous app
         circularUIManager?.hideAndSwitchTo(app: app)
         
-        print("✅ Successfully switched to \(app.localizedName ?? "Unknown")")
+        print("Successfully switched to \(app.localizedName ?? "Unknown")")
         
         // Force a refresh to update the active state indicators and MRU order
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -339,19 +335,19 @@ extension AppSwitcherManager {
     
     /// Hide an application
     func hideApp(_ app: NSRunningApplication) {
-        print("👁️ Hiding app: \(app.localizedName ?? "Unknown")")
+        print("Hiding app: \(app.localizedName ?? "Unknown")")
         app.hide()
     }
     
     /// Unhide an application (show it)
     func unhideApp(_ app: NSRunningApplication) {
-        print("👀 Unhiding app: \(app.localizedName ?? "Unknown")")
+        print("Unhiding app: \(app.localizedName ?? "Unknown")")
         app.unhide()
     }
     
     /// Force quit an application (future)
     func forceQuitApp(_ app: NSRunningApplication) {
-        print("⚠️ Force quitting app: \(app.localizedName ?? "Unknown")")
+        print("Force quitting app: \(app.localizedName ?? "Unknown")")
         app.forceTerminate()
     }
 }
@@ -412,7 +408,7 @@ extension AppSwitcherManager: FunctionProvider {
                 onLeftClick: ModifierAwareInteraction(base: .expand),           // Click to expand applications
                 onRightClick: ModifierAwareInteraction(base: .execute { [weak self] in
                    // Right-click: Open Applications folder
-                   print("📂 Opening Applications folder")
+                   print("Opening Applications folder")
                    self?.openApplicationsFolder()
                 }),
                 onMiddleClick: ModifierAwareInteraction(base: .expand),         // Middle-click: Expand

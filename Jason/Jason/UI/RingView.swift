@@ -378,10 +378,8 @@ struct RingView: View {
                     hasCompletedInitialSelectionFade = true
                 }
             }
-            
-            // 🆕 ANIMATE ICONS: Full animation vs selective
             if isSurgicalUpdate {
-                // SURGICAL: Only animate changed icons
+                // Only animate changed icons
                 print("   🎯 Surgical icon update - animating changed icons only")
                 // Store current nodes as "old" before they get updated
                 let oldNodesSnapshot = previousNodes
@@ -395,13 +393,9 @@ struct RingView: View {
             }
         }
         .onChange(of: selectedIndex) {
-            // 🆕 ADD THIS LOGGING:
-            print("🎯 [RingView] selectedIndex changed to: \(selectedIndex?.description ?? "nil")")
             if let index = selectedIndex {
                 if index < nodes.count {
                     let selectedNode = nodes[index]
-                    print("   ✅ Valid selection at index \(index): \(selectedNode.name)")
-                    print("   📐 About to call updateSlice(for: \(index), totalCount: \(nodes.count))")
                 } else {
                     print("   ❌ INVALID: index \(index) >= count \(nodes.count)")
                 }
@@ -417,9 +411,7 @@ struct RingView: View {
             }
         }
         .onAppear {
-            print("🎬 [RingView] onAppear - nodes: \(nodes.count), isFirstRender: \(isFirstRender)")
-            
-            // 🆕 FIX: If nodes already has content when we appear, this might be a view recreation
+            // If nodes already has content when we appear, this might be a view recreation
             // during a surgical update. Initialize previousNodes so the first onChange doesn't
             // think it's a first render.
             if nodes.count > 0 && previousNodes.isEmpty {
@@ -612,11 +604,6 @@ struct RingView: View {
         
         let newStartAngle = newAngleOffset - itemAngle / 2 - 90
         let newEndAngle = newAngleOffset + itemAngle / 2 - 90
-        print("   📐 FINAL ANGLES:")
-        print("      newAngleOffset=\(newAngleOffset)°")
-        print("      newStartAngle=\(newStartAngle)°")
-        print("      newEndAngle=\(newEndAngle)°")
-        print("      itemAngle=\(itemAngle)° (slice width)")
         
         withAnimation(.easeOut(duration: 0.08)) {
             angleOffset = newAngleOffset

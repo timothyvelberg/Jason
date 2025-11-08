@@ -102,8 +102,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         contentWindow?.contentView = NSHostingView(rootView: contentView)
         contentWindow?.isReleasedWhenClosed = false
         contentWindow?.level = .floating
-        
-        print("🪟 Content window created (hidden)")
     }
     
     @objc func toggleContentWindow() {

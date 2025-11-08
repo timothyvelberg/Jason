@@ -37,7 +37,7 @@ class RingConfigurationManager: ObservableObject {
     /// Load all ring configurations from the database
     /// Updates the in-memory cache with all configurations
     func loadConfigurations() {
-        print("📥 [RingConfigManager] Loading all configurations from database...")
+        print("[RingConfigManager] Loading all configurations from database...")
         
         let dbConfigs = databaseManager.getAllRingConfigurations()
         
@@ -51,11 +51,11 @@ class RingConfigurationManager: ObservableObject {
         }
         
         configurations = domainConfigs
-        print("✅ [RingConfigManager] Loaded \(configurations.count) configuration(s)")
+        print("[RingConfigManager] Loaded \(configurations.count) configuration(s)")
         
         // Log summary
         for config in configurations {
-            let status = config.isActive ? "🟢 ACTIVE" : "⚫️ inactive"
+            let status = config.isActive ? "ACTIVE" : "INACTIVE"
             let shortcutDisplay = config.hasShortcut ? config.shortcutDescription : config.shortcut
             print("   \(status) - \(config.name) (\(shortcutDisplay)) - \(config.providers.count) provider(s)")
         }
@@ -64,7 +64,7 @@ class RingConfigurationManager: ObservableObject {
     /// Load only active ring configurations from the database
     /// Updates the in-memory cache with active configurations only
     func loadActiveConfigurations() {
-        print("📥 [RingConfigManager] Loading active configurations from database...")
+        print("[RingConfigManager] Loading active configurations from database...")
         
         let dbConfigs = databaseManager.getAllRingConfigurations()
         
@@ -78,12 +78,12 @@ class RingConfigurationManager: ObservableObject {
         }
         
         configurations = domainConfigs
-        print("✅ [RingConfigManager] Loaded \(configurations.count) active configuration(s)")
+        print("[RingConfigManager] Loaded \(configurations.count) active configuration(s)")
         
         // Log summary
         for config in configurations {
             let shortcutDisplay = config.hasShortcut ? config.shortcutDescription : config.shortcut
-            print("   🟢 \(config.name) (\(shortcutDisplay)) - \(config.providers.count) provider(s)")
+            print("   \(config.name) (\(shortcutDisplay)) - \(config.providers.count) provider(s)")
         }
     }
     
@@ -148,7 +148,7 @@ class RingConfigurationManager: ObservableObject {
         providers: [(type: String, order: Int, angle: Double?)] = []
     ) throws -> StoredRingConfiguration {
         let shortcutDisplay = keyCode != nil ? formatShortcut(keyCode: keyCode!, modifiers: modifierFlags ?? 0) : shortcut
-        print("➕ [RingConfigManager] Creating configuration '\(name)' with shortcut '\(shortcutDisplay)'")
+        print("[RingConfigManager] Creating configuration '\(name)' with shortcut '\(shortcutDisplay)'")
         
         // Validate inputs
         try validateConfigurationInputs(
@@ -178,7 +178,7 @@ class RingConfigurationManager: ObservableObject {
             throw StoredRingConfigurationError.databaseError("Failed to create ring configuration")
         }
         
-        print("   ✅ Created ring configuration with ID: \(ringId)")
+        print("   Created ring configuration with ID: \(ringId)")
         
         // Add providers if specified
         var providerConfigs: [ProviderConfiguration] = []
@@ -190,7 +190,7 @@ class RingConfigurationManager: ObservableObject {
                     providerOrder: provider.order,
                     parentItemAngle: provider.angle.map { CGFloat($0) }
                 ) else {
-                    print("   ⚠️ Failed to add provider '\(provider.type)': database returned nil")
+                    print("   Failed to add provider '\(provider.type)': database returned nil")
                     continue
                 }
                 
@@ -202,7 +202,7 @@ class RingConfigurationManager: ObservableObject {
                     config: nil
                 ))
                 
-                print("   ✅ Added provider \(index + 1)/\(providers.count): \(provider.type)")
+                print("  Added provider \(index + 1)/\(providers.count): \(provider.type)")
             }
         }
         
@@ -223,7 +223,7 @@ class RingConfigurationManager: ObservableObject {
         // Update in-memory cache
         configurations.append(newConfig)
         
-        print("✅ [RingConfigManager] Created configuration successfully")
+        print("[RingConfigManager] Created configuration successfully")
         print("   Total configurations now: \(configurations.count)")
         
         return newConfig
@@ -250,7 +250,7 @@ class RingConfigurationManager: ObservableObject {
         keyCode: UInt16? = nil,        // NEW
         modifierFlags: UInt? = nil     // NEW
     ) throws {
-        print("📝 [RingConfigManager] Updating configuration \(id)")
+        print("[RingConfigManager] Updating configuration \(id)")
         
         // Verify configuration exists
         guard let existingConfig = getConfiguration(id: id) else {
@@ -296,7 +296,7 @@ class RingConfigurationManager: ObservableObject {
             }
         }
         
-        print("✅ [RingConfigManager] Configuration updated successfully")
+        print("[RingConfigManager] Configuration updated successfully")
     }
     
     /// Delete a ring configuration
@@ -316,7 +316,7 @@ class RingConfigurationManager: ObservableObject {
         // Remove from in-memory cache
         configurations.removeAll { $0.id == id }
         
-        print("✅ [RingConfigManager] Configuration deleted")
+        print("[RingConfigManager] Configuration deleted")
         print("   Total configurations now: \(configurations.count)")
     }
     
@@ -338,7 +338,7 @@ class RingConfigurationManager: ObservableObject {
         angle: Double? = nil,
         config: [String: Any]? = nil
     ) throws -> Int {
-        print("➕ [RingConfigManager] Adding provider '\(providerType)' to ring \(ringId)")
+        print("[RingConfigManager] Adding provider '\(providerType)' to ring \(ringId)")
         
         // Verify ring exists
         guard getConfiguration(id: ringId) != nil else {
@@ -382,7 +382,7 @@ class RingConfigurationManager: ObservableObject {
             }
         }
         
-        print("✅ [RingConfigManager] Provider added successfully (ID: \(providerId))")
+        print("[RingConfigManager] Provider added successfully (ID: \(providerId))")
         
         return providerId
     }
@@ -404,7 +404,7 @@ class RingConfigurationManager: ObservableObject {
         clearAngle: Bool = false,
         clearConfig: Bool = false
     ) throws {
-        print("📝 [RingConfigManager] Updating provider \(providerId)")
+        print("[RingConfigManager] Updating provider \(providerId)")
         
         // Find which ring this provider belongs to
         var ringId: Int?
@@ -457,7 +457,7 @@ class RingConfigurationManager: ObservableObject {
             }
         }
         
-        print("✅ [RingConfigManager] Provider updated successfully")
+        print("[RingConfigManager] Provider updated successfully")
     }
     
     /// Remove a provider from a ring
@@ -490,7 +490,7 @@ class RingConfigurationManager: ObservableObject {
             }
         }
         
-        print("✅ [RingConfigManager] Provider removed successfully")
+        print("[RingConfigManager] Provider removed successfully")
     }
     
     // MARK: - Active Status Management
@@ -501,7 +501,7 @@ class RingConfigurationManager: ObservableObject {
     ///   - isActive: New active status
     /// - Throws: StoredRingConfigurationError if configuration not found
     func setConfigurationActive(_ id: Int, isActive: Bool) throws {
-        print("🔄 [RingConfigManager] Setting configuration \(id) active: \(isActive)")
+        print("[RingConfigManager] Setting configuration \(id) active: \(isActive)")
         
         // Verify configuration exists
         guard let existingConfig = getConfiguration(id: id) else {
@@ -535,8 +535,8 @@ class RingConfigurationManager: ObservableObject {
             configurations[index] = updatedConfig
         }
         
-        let status = isActive ? "🟢 ACTIVE" : "⚫️ INACTIVE"
-        print("✅ [RingConfigManager] Configuration now: \(status)")
+        let status = isActive ? "ACTIVE" : "INACTIVE"
+        print("[RingConfigManager] Configuration now: \(status)")
     }
     
     // MARK: - Validation Methods
@@ -559,7 +559,7 @@ class RingConfigurationManager: ObservableObject {
             // Check for duplicate
             if config.keyCode == keyCode && config.modifierFlags == modifierFlags {
                 let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
-                print("⚠️ [RingConfigManager] Shortcut '\(shortcutDisplay)' already used by '\(config.name)'")
+                print("[RingConfigManager] Shortcut '\(shortcutDisplay)' already used by '\(config.name)'")
                 return false
             }
         }
@@ -583,7 +583,7 @@ class RingConfigurationManager: ObservableObject {
             
             // Check for duplicate
             if config.shortcut == shortcut {
-                print("⚠️ [RingConfigManager] Shortcut '\(shortcut)' already used by '\(config.name)'")
+                print("[RingConfigManager] Shortcut '\(shortcut)' already used by '\(config.name)'")
                 return false
             }
         }
@@ -610,7 +610,7 @@ class RingConfigurationManager: ObservableObject {
             
             // Check for duplicate order
             if provider.order == order {
-                print("⚠️ [RingConfigManager] Order \(order) already used by '\(provider.providerType)'")
+                print("[RingConfigManager] Order \(order) already used by '\(provider.providerType)'")
                 return false
             }
         }

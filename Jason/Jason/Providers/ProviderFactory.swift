@@ -32,7 +32,7 @@ class ProviderFactory {
     /// - Parameter config: The provider configuration from the database
     /// - Returns: A provider instance conforming to FunctionProvider, or nil if type is unknown
     func createProvider(from config: ProviderConfiguration) -> (any FunctionProvider)? {
-        print("🏭 [ProviderFactory] Creating provider: \(config.providerType)")
+        print("[ProviderFactory] Creating provider: \(config.providerType)")
         
         let provider: (any FunctionProvider)?
         
@@ -55,7 +55,7 @@ class ProviderFactory {
         }
         
         if provider != nil {
-            print("   ✅ Created \(config.providerType)")
+            print("   [ProviderFactory] created \(config.providerType)")
         } else {
             print("   ❌ Failed to create \(config.providerType)")
         }
@@ -67,13 +67,13 @@ class ProviderFactory {
     /// - Parameter configs: Array of provider configurations
     /// - Returns: Array of successfully created providers
     func createProviders(from configs: [ProviderConfiguration]) -> [any FunctionProvider] {
-        print("🏭 [ProviderFactory] Creating \(configs.count) provider(s)")
+        print("[ProviderFactory] Creating \(configs.count) provider(s)")
         
         let providers = configs.compactMap { config -> (any FunctionProvider)? in
             return createProvider(from: config)
         }
         
-        print("   ✅ Successfully created \(providers.count)/\(configs.count) provider(s)")
+        print("   Successfully created \(providers.count)/\(configs.count) provider(s)")
         
         return providers
     }
@@ -170,7 +170,7 @@ extension ProviderFactory {
     /// - Parameter configuration: The ring configuration containing provider configs
     /// - Returns: Array of created providers in the correct order
     func createProviders(from configuration: StoredRingConfiguration) -> [any FunctionProvider] {
-        print("🏭 [ProviderFactory] Creating providers for ring: \(configuration.name)")
+        print("[ProviderFactory] Creating providers for ring: \(configuration.name)")
         
         // Use sorted providers to maintain order
         let sortedConfigs = configuration.sortedProviders

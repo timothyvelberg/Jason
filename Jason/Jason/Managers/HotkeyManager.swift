@@ -68,12 +68,12 @@ class HotkeyManager {
     // MARK: - Initialization
     
     init() {
-        print("⌨️ [HotkeyManager] Initialized")
+        print("[HotkeyManager] Initialized")
     }
     
     deinit {
         stopMonitoring()
-        print("🧹 [HotkeyManager] Deallocated")
+        print("[HotkeyManager] Deallocated")
     }
     
     // MARK: - Public Interface
@@ -81,7 +81,7 @@ class HotkeyManager {
     /// Start monitoring for hotkeys
     func startMonitoring() {
         guard globalKeyMonitor == nil else {
-            print("⚠️ [HotkeyManager] Already monitoring")
+            print("[HotkeyManager] Already monitoring")
             return
         }
         
@@ -118,7 +118,7 @@ class HotkeyManager {
             return event
         }
         
-        print("✅ [HotkeyManager] Monitoring started")
+        print("[HotkeyManager] Monitoring started")
         if holdKeyCode != nil {
             print("   Hold key configured → Hold to show, release to hide")
         }
@@ -131,7 +131,7 @@ class HotkeyManager {
                 print("      Config \(configId): \(display) (keyCode=\(registration.keyCode), modifiers=\(registration.modifierFlags))")
             }
         } else {
-            print("   ⚠️ No shortcuts registered yet!")
+            print("   No shortcuts registered yet!")
         }
     }
     
@@ -167,7 +167,7 @@ class HotkeyManager {
             localFlagsMonitor = nil
         }
         
-        print("🛑 [HotkeyManager] Monitoring stopped")
+        print("[HotkeyManager] Monitoring stopped")
     }
     
     /// Reset internal state (call when UI hides)
@@ -186,9 +186,9 @@ class HotkeyManager {
     func setHoldKey(_ keyCode: UInt16?) {
         holdKeyCode = keyCode
         if let keyCode = keyCode {
-            print("⚙️ [HotkeyManager] Hold key configured: keyCode \(keyCode)")
+            print("[HotkeyManager] Hold key configured: keyCode \(keyCode)")
         } else {
-            print("⚙️ [HotkeyManager] Hold-to-show disabled")
+            print("[HotkeyManager] Hold-to-show disabled")
         }
     }
     
@@ -196,7 +196,7 @@ class HotkeyManager {
     /// Call this when an action is executed while the hold key is still pressed
     func requireReleaseBeforeNextShow() {
         requiresReleaseBeforeNextShow = true
-        print("🔒 [HotkeyManager] Hold key must be released before next show")
+        print("[HotkeyManager] Hold key must be released before next show")
     }
     
     // MARK: - Dynamic Shortcut Registration
@@ -214,17 +214,13 @@ class HotkeyManager {
         callback: @escaping () -> Void
     ) {
         let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
-        print("📝 [HotkeyManager] Attempting to register shortcut for config \(configId):")
-        print("   Display: \(shortcutDisplay)")
-        print("   KeyCode: \(keyCode)")
-        print("   Modifiers: \(modifierFlags) (raw value)")
-        print("   Modifiers: \(NSEvent.ModifierFlags(rawValue: modifierFlags)) (flags)")
+        print("[HotkeyManager] Attempting to register shortcut for config \(configId):")
         
         // Check for conflicts with existing shortcuts
         for (existingId, existing) in registeredShortcuts {
             if existing.keyCode == keyCode && existing.modifierFlags == modifierFlags {
                 let existingDisplay = formatShortcut(keyCode: existing.keyCode, modifiers: existing.modifierFlags)
-                print("⚠️ [HotkeyManager] Shortcut conflict!")
+                print("   [HotkeyManager] Shortcut conflict!")
                 print("   Existing: Config \(existingId) with \(existingDisplay)")
                 print("   New: Config \(configId) with \(shortcutDisplay)")
                 print("   Unregistering old shortcut...")
@@ -235,15 +231,12 @@ class HotkeyManager {
         
         // Store registration
         registeredShortcuts[configId] = (keyCode, modifierFlags, callback)
-        
-        print("✅ [HotkeyManager] Successfully registered shortcut for config \(configId): \(shortcutDisplay)")
-        print("   Total registered shortcuts: \(registeredShortcuts.count)")
     }
     
     /// Unregister a shortcut
     func unregisterShortcut(forConfigId configId: Int) {
         if let _ = registeredShortcuts.removeValue(forKey: configId) {
-            print("🗑️ [HotkeyManager] Unregistered shortcut for config \(configId)")
+            print("[HotkeyManager] Unregistered shortcut for config \(configId)")
         }
     }
     
@@ -251,7 +244,7 @@ class HotkeyManager {
     func unregisterAllShortcuts() {
         let count = registeredShortcuts.count
         registeredShortcuts.removeAll()
-        print("🗑️ [HotkeyManager] Unregistered all \(count) shortcut(s)")
+        print("[HotkeyManager] Unregistered all \(count) shortcut(s)")
     }
     
     // MARK: - Private Handlers
@@ -261,13 +254,13 @@ class HotkeyManager {
         
         // Log every key event for debugging
         let eventModifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
-        print("🔍 [HotkeyManager] Key event: keyCode=\(event.keyCode), modifiers=\(eventModifiers.rawValue), UI visible=\(isUIVisible)")
+        print("[HotkeyManager] Key event: keyCode=\(event.keyCode), modifiers=\(eventModifiers.rawValue), UI visible=\(isUIVisible)")
         
         // Hold key pressed (if configured)
         if let holdKeyCode = holdKeyCode, event.keyCode == holdKeyCode && !isHoldKeyCurrentlyPressed {
             // Check if we need to wait for a release first
             if requiresReleaseBeforeNextShow {
-                print("⌨️ [HotkeyManager] Hold key pressed but waiting for release - ignoring")
+                print("[HotkeyManager] Hold key pressed but waiting for release - ignoring")
                 return
             }
             
@@ -295,34 +288,34 @@ class HotkeyManager {
                 
                 if event.keyCode == registration.keyCode &&
                    eventModifiers == registeredModifiers {
-                    print("✅ [HotkeyManager] Dynamic shortcut MATCHED for config \(configId)!")
+                    print("[HotkeyManager] Dynamic shortcut MATCHED for config \(configId)!")
                     registration.callback()
                     return
                 } else {
                     if event.keyCode != registration.keyCode {
-                        print("   ❌ KeyCode mismatch: \(event.keyCode) != \(registration.keyCode)")
+                        print("   KeyCode mismatch: \(event.keyCode) != \(registration.keyCode)")
                     }
                     if eventModifiers != registeredModifiers {
-                        print("   ❌ Modifier mismatch: \(eventModifiers.rawValue) != \(registeredModifiers.rawValue)")
+                        print("   Modifier mismatch: \(eventModifiers.rawValue) != \(registeredModifiers.rawValue)")
                     }
                 }
             }
             
-            print("⚠️ [HotkeyManager] No matching shortcut found")
+            print("[HotkeyManager] No matching shortcut found")
         } else {
-            print("🔍 [HotkeyManager] UI is visible, skipping shortcut check")
+            print("[HotkeyManager] UI is visible, skipping shortcut check")
         }
     }
     
     private func handleKeyUpEvent(_ event: NSEvent) {
         // Hold key released (if configured and was pressed)
         if let holdKeyCode = holdKeyCode, event.keyCode == holdKeyCode {
-            print("⌨️ [HotkeyManager] Hold key released")
+            print("[HotkeyManager] Hold key released")
             
             // Clear the "requires release" flag now that key is actually released
             if requiresReleaseBeforeNextShow {
                 requiresReleaseBeforeNextShow = false
-                print("🔓 Hold key released - ready for next show")
+                print("Hold key released - ready for next show")
             }
             
             // Only trigger hide callback if key was actually pressed (not just waiting for release)
@@ -344,7 +337,7 @@ class HotkeyManager {
         // Handle Ctrl release in App Switcher Mode
         let inAppSwitcherMode = isInAppSwitcherMode?() ?? false
         if inAppSwitcherMode && wasCtrlPressed && !isCtrlPressed {
-            print("⌨️ [HotkeyManager] Ctrl released in app switcher mode")
+            print("[HotkeyManager] Ctrl released in app switcher mode")
             onCtrlReleasedInAppSwitcher?()
             wasCtrlPressed = false
             return
@@ -355,7 +348,7 @@ class HotkeyManager {
         
         // Only trigger on SHIFT press (transition from not-pressed to pressed)
         if isShiftPressed && !wasShiftPressed {
-            print("⌨️ [HotkeyManager] Shift pressed")
+            print("[HotkeyManager] Shift pressed")
             onShiftPressed?()
         }
         

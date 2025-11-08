@@ -49,21 +49,13 @@ class CircularUIManager: ObservableObject {
         self.configuration = configuration
         self.configId = configuration.id
         
-        print("🎯 CircularUIManager initialized with configuration:")
-        print("   - ID: \(configuration.id)")
-        print("   - Name: \(configuration.name)")
-        print("   - Shortcut: \(configuration.shortcut)")
-        print("   - Ring Radius: \(configuration.ringRadius)")
-        print("   - Icon Size: \(configuration.iconSize)")
-        print("   - Providers: \(configuration.providers.count)")
+        print("[CircularUIManager] initialized")
         
         commonInit()
     }
     
     /// Common initialization logic shared by both initializers
     private func commonInit() {
-        print("🔧 CircularUIManager common initialization")
-        
         // Connect scroll handler
         overlayWindow?.onScrollBack = { [weak self] in
             self?.handleScrollBack()
@@ -87,7 +79,7 @@ class CircularUIManager: ObservableObject {
             object: nil
         )
         
-        print("✅ Registered for provider update notifications")
+        print("Registered for provider update notifications")
     }
     
     deinit {

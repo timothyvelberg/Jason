@@ -38,7 +38,7 @@ struct ContentView: View {
         configManager.loadActiveConfigurations()
         let activeConfigs = configManager.getActiveConfigurations()
         
-        print("   📋 Found \(activeConfigs.count) active configuration(s)")
+        print("   Found \(activeConfigs.count) active configuration(s)")
         
         // Step 3: Create CircularUIManager instances
         instanceManager.createInstances(for: activeConfigs)

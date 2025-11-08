@@ -41,20 +41,20 @@ class CircularUIInstanceManager: ObservableObject {
     /// Create CircularUIManager instances for all active configurations
     /// - Parameter configurations: Array of configurations to instantiate
     func createInstances(for configurations: [StoredRingConfiguration]) {
-        print("🔧 [InstanceManager] Creating instances for \(configurations.count) configuration(s)")
+        print("[InstanceManager] Creating instances for \(configurations.count) configuration(s)")
         
         for config in configurations where config.isActive {
             createOrUpdateInstance(for: config)
         }
         
-        print("✅ [InstanceManager] Now managing \(instances.count) instance(s)")
+        print("[InstanceManager] Now managing \(instances.count) instance(s)")
     }
     
     /// Create or update a single CircularUIManager instance
     /// - Parameter config: The configuration to instantiate/update
     func createOrUpdateInstance(for config: StoredRingConfiguration) {
         let action = instances[config.id] != nil ? "Updating" : "Creating"
-        print("🔧 [InstanceManager] \(action) instance for '\(config.name)' (ID: \(config.id))")
+        print("[InstanceManager] \(action) instance for '\(config.name)' (ID: \(config.id))")
         
         // Remove old instance if it exists (to ensure clean state)
         if instances[config.id] != nil {
@@ -64,12 +64,6 @@ class CircularUIInstanceManager: ObservableObject {
         // Create new instance with configuration
         let instance = CircularUIManager(configuration: config)
         instances[config.id] = instance
-        
-        print("   ✅ Instance created with:")
-        print("      - Shortcut: \(config.shortcut)")
-        print("      - Ring Radius: \(config.ringRadius)")
-        print("      - Icon Size: \(config.iconSize)")
-        print("      - Providers: \(config.providers.count)")
     }
     
     // MARK: - Instance Retrieval
@@ -219,11 +213,9 @@ class CircularUIInstanceManager: ObservableObject {
                 print("🎯 [InstanceManager] Shortcut triggered for '\(config.name)' (ID: \(config.id))")
                 self?.show(configId: config.id)
             }
-            
-            print("   ✅ \(config.shortcutDescription) → \(config.name)")
         }
         
-        print("✅ [InstanceManager] Registration complete!")
+        print("[InstanceManager] Registration complete!")
     }
     
     /// Start monitoring for hotkeys
