@@ -106,7 +106,7 @@ class FirstLaunchConfiguration {
                 shortcut: "Cmd+Shift+A",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
-                iconSize: 44.0,
+                iconSize: 32,
                 keyCode: DefaultShortcut.ctrlShiftA.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftA.modifierFlags,
                 providers: [
@@ -121,7 +121,7 @@ class FirstLaunchConfiguration {
                 shortcut: "Cmd+Shift+F",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
-                iconSize: 40.0,
+                iconSize: 32.0,
                 keyCode: DefaultShortcut.ctrlShiftF.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftF.modifierFlags,
                 providers: [
@@ -131,7 +131,7 @@ class FirstLaunchConfiguration {
             )
             print("   ✅ Created '\(filesRing.name)' - \(filesRing.shortcutDescription)")
             
-            // Example 4: Files & Actions ring with Cmd+Shift+E
+            // Example 3: Files & Actions ring with Cmd+Shift+E
             let filesActionsRing = try configManager.createConfiguration(
                 name: "Files & Actions",
                 shortcut: "Cmd+Shift+E",  // For display
@@ -152,6 +152,8 @@ class FirstLaunchConfiguration {
         } catch {
             print("   ⚠️ Failed to create some example configurations: \(error)")
         }
+        
+        
     }
     
     /// Reset all configurations and recreate defaults

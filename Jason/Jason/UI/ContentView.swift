@@ -236,7 +236,7 @@ struct MinimalView: View {
             }
         }
         .padding(30)
-        .frame(width: 400, height: 600)
+        .frame(width: 400, height: 800)
         .onAppear {
             loadConfigurations()
         }
