@@ -28,6 +28,7 @@ class CircularUIInstanceManager: ObservableObject {
     // MARK: - Dependencies
     
     private let configurationManager = RingConfigurationManager.shared
+    private let hotkeyManager = HotkeyManager()
     
     // MARK: - Initialization
     
@@ -188,6 +189,53 @@ class CircularUIInstanceManager: ObservableObject {
         }
         
         print("   ✅ Sync complete: \(instances.count) active instance(s)")
+    }
+    
+    // MARK: - Keyboard Shortcut Management
+    
+    /// Register keyboard shortcuts for all active instances
+    func registerShortcuts() {
+        print("⌨️ [InstanceManager] Registering shortcuts for all instances...")
+        
+        // Unregister existing first
+        hotkeyManager.unregisterAllShortcuts()
+        
+        let activeConfigs = configurationManager.getActiveConfigurations()
+        
+        for config in activeConfigs {
+            // Skip configs without shortcuts
+            guard let keyCode = config.keyCode,
+                  let modifierFlags = config.modifierFlags else {
+                print("   ⏭️ Skipping '\(config.name)' - no shortcut configured")
+                continue
+            }
+            
+            hotkeyManager.registerShortcut(
+                keyCode: keyCode,
+                modifierFlags: modifierFlags,
+                forConfigId: config.id
+            ) { [weak self] in
+                // When shortcut is pressed, show this ring
+                print("🎯 [InstanceManager] Shortcut triggered for '\(config.name)' (ID: \(config.id))")
+                self?.show(configId: config.id)
+            }
+            
+            print("   ✅ \(config.shortcutDescription) → \(config.name)")
+        }
+        
+        print("✅ [InstanceManager] Registration complete!")
+    }
+    
+    /// Start monitoring for hotkeys
+    func startHotkeyMonitoring() {
+        print("🎹 [InstanceManager] Starting hotkey monitoring...")
+        hotkeyManager.startMonitoring()
+    }
+    
+    /// Stop monitoring for hotkeys
+    func stopHotkeyMonitoring() {
+        print("🛑 [InstanceManager] Stopping hotkey monitoring...")
+        hotkeyManager.stopMonitoring()
     }
     
     // MARK: - Debugging & Diagnostics

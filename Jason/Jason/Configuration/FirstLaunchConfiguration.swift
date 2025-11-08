@@ -2,12 +2,45 @@
 //  FirstLaunchConfiguration.swift
 //  Jason
 //
-//  Creates a sensible default ring configuration on first launch
+//  Creates sensible default ring configurations on first launch
+//  Now includes keyboard shortcuts with raw key codes and modifier flags
 //
 
 import Foundation
+import AppKit
 
 class FirstLaunchConfiguration {
+    
+    // MARK: - Default Shortcuts
+    
+    /// Default keyboard shortcuts (using raw key codes + modifiers)
+    private struct DefaultShortcut {
+        let keyCode: UInt16
+        let modifierFlags: UInt
+        
+        // Common shortcuts for ring configurations
+        static let ctrlShiftD = DefaultShortcut(
+            keyCode: 2, // "D"
+            modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
+        )
+        
+        static let ctrlShiftA = DefaultShortcut(
+            keyCode: 0, //"A"
+            modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
+        )
+        
+        static let ctrlShiftF = DefaultShortcut(
+            keyCode: 3,  // "F"
+            modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
+        )
+        
+        static let ctrlShiftS = DefaultShortcut(
+            keyCode: 1,  // "S"
+            modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
+        )
+    }
+    
+    // MARK: - First Launch Setup
     
     /// Ensure at least one ring configuration exists
     /// Call this on app launch before creating instances
@@ -27,14 +60,16 @@ class FirstLaunchConfiguration {
         
         print("🆕 [FirstLaunch] No configurations found - creating default 'Everything' ring")
         
-        // Create default "Everything" ring with all providers
+        // Create default "Everything" ring with Cmd+Shift+Space
         do {
             let defaultConfig = try configManager.createConfiguration(
                 name: "Everything",
-                shortcut: "Cmd+Shift+Space",
-                ringRadius: 80.0,  // Smaller ring (was 300.0)
-                centerHoleRadius: 40.0,
-                iconSize: 32.0,     // Smaller icons (was 64.0)
+                shortcut: "Cmd+Shift+Space",  // For display only
+                ringRadius: 80.0,
+                centerHoleRadius: 56.0,
+                iconSize: 32.0,
+                keyCode: DefaultShortcut.ctrlShiftD.keyCode,
+                modifierFlags: DefaultShortcut.ctrlShiftD.modifierFlags,
                 providers: [
                     ("CombinedAppsProvider", 1, nil),
                     ("FavoriteFilesProvider", 2, nil),
@@ -45,7 +80,7 @@ class FirstLaunchConfiguration {
             print("   ✅ Created default configuration:")
             print("      - ID: \(defaultConfig.id)")
             print("      - Name: \(defaultConfig.name)")
-            print("      - Shortcut: \(defaultConfig.shortcut)")
+            print("      - Shortcut: \(defaultConfig.shortcutDescription)")
             print("      - Providers: \(defaultConfig.providers.count)")
             
         } catch {
@@ -65,44 +100,56 @@ class FirstLaunchConfiguration {
         print("🎨 [FirstLaunch] Creating example configurations...")
         
         do {
-            // Example 1: Apps-only ring
+            // Example 1: Apps-only ring with Cmd+Shift+A
             let appsRing = try configManager.createConfiguration(
-                name: "Apps",
-                shortcut: "Cmd+Shift+A",
-                ringRadius: 100.0,  // Compact for apps
-                iconSize: 32.0,
+                name: "Quick Apps",
+                shortcut: "Cmd+Shift+A",  // For display
+                ringRadius: 80.0,
+                centerHoleRadius: 56.0,
+                iconSize: 44.0,
+                keyCode: DefaultShortcut.ctrlShiftA.keyCode,
+                modifierFlags: DefaultShortcut.ctrlShiftA.modifierFlags,
                 providers: [
                     ("CombinedAppsProvider", 1, nil)
                 ]
             )
-            print("   ✅ Created 'Apps' ring (ID: \(appsRing.id))")
+            print("   ✅ Created '\(appsRing.name)' - \(appsRing.shortcutDescription)")
             
-            // Example 2: Files-focused ring
+            // Example 2: Files-focused ring with Cmd+Shift+F
             let filesRing = try configManager.createConfiguration(
-                name: "Files",
-                shortcut: "Cmd+Shift+F",
-                ringRadius: 100.0,  // Slightly bigger for files
-                iconSize: 32.0,
+                name: "My Files",
+                shortcut: "Cmd+Shift+F",  // For display
+                ringRadius: 80.0,
+                centerHoleRadius: 56.0,
+                iconSize: 40.0,
+                keyCode: DefaultShortcut.ctrlShiftF.keyCode,
+                modifierFlags: DefaultShortcut.ctrlShiftF.modifierFlags,
                 providers: [
                     ("FavoriteFilesProvider", 1, nil),
                     ("FinderLogic", 2, nil)
                 ]
             )
-            print("   ✅ Created 'Files' ring (ID: \(filesRing.id))")
+            print("   ✅ Created '\(filesRing.name)' - \(filesRing.shortcutDescription)")
             
-            // Example 3: System actions ring
-            let systemRing = try configManager.createConfiguration(
-                name: "System",
-                shortcut: "Cmd+Shift+S",
-                ringRadius: 100.0,  // Small - fewer items
-                iconSize: 32.0,
+            // Example 3: Everything ring with Cmd+Shift+Space
+            let everythingRing = try configManager.createConfiguration(
+                name: "Everything",
+                shortcut: "Cmd+Shift+Space",  // For display
+                ringRadius: 80.0,
+                centerHoleRadius: 56.0,
+                iconSize: 36.0,
+                keyCode: DefaultShortcut.ctrlShiftS.keyCode,
+                modifierFlags: DefaultShortcut.ctrlShiftS.modifierFlags,
                 providers: [
-                    ("SystemActionsProvider", 1, nil)
+                    ("CombinedAppsProvider", 1, nil),
+                    ("FavoriteFilesProvider", 2, nil),
+                    ("SystemActionsProvider", 3, nil),
+                    ("FinderLogic", 4, nil)
                 ]
             )
-            print("   ✅ Created 'System' ring (ID: \(systemRing.id))")
+            print("   ✅ Created '\(everythingRing.name)' - \(everythingRing.shortcutDescription)")
             
-            print("   ✅ Created \(3) example configurations")
+            print("   ✅ Created 3 example configurations")
             
         } catch {
             print("   ⚠️ Failed to create some example configurations: \(error)")

@@ -13,12 +13,6 @@ class HotkeyManager {
     
     // MARK: - Callbacks
     
-    /// Called when Ctrl+Shift+K is pressed (show root UI)
-    var onShowRoot: (() -> Void)?
-    
-    /// Called when Ctrl+` is pressed (show expanded to Apps)
-    var onShowApps: (() -> Void)?
-    
     /// Called when Escape is pressed while UI is visible
     var onHide: (() -> Void)?
     
@@ -57,6 +51,11 @@ class HotkeyManager {
     private var isHoldKeyCurrentlyPressed: Bool = false
     private var requiresReleaseBeforeNextShow: Bool = false  // Prevents re-show while key still held
     
+    // MARK: - Dynamic Shortcuts
+    
+    /// Registered shortcuts: [configId: (keyCode, modifierFlags, callback)]
+    private var registeredShortcuts: [Int: (keyCode: UInt16, modifierFlags: UInt, callback: () -> Void)] = [:]
+    
     // MARK: - Event Monitors
     
     private var globalKeyMonitor: Any?
@@ -69,12 +68,12 @@ class HotkeyManager {
     // MARK: - Initialization
     
     init() {
-        print("⌨️ HotkeyManager initialized")
+        print("⌨️ [HotkeyManager] Initialized")
     }
     
     deinit {
         stopMonitoring()
-        print("🧹 HotkeyManager deallocated")
+        print("🧹 [HotkeyManager] Deallocated")
     }
     
     // MARK: - Public Interface
@@ -82,7 +81,7 @@ class HotkeyManager {
     /// Start monitoring for hotkeys
     func startMonitoring() {
         guard globalKeyMonitor == nil else {
-            print("⚠️ HotkeyManager already monitoring")
+            print("⚠️ [HotkeyManager] Already monitoring")
             return
         }
         
@@ -118,8 +117,21 @@ class HotkeyManager {
             self?.handleFlagsChanged(event)
             return event
         }
+        
+        print("✅ [HotkeyManager] Monitoring started")
         if holdKeyCode != nil {
             print("   Hold key configured → Hold to show, release to hide")
+        }
+        
+        // Log all registered shortcuts with details
+        if !registeredShortcuts.isEmpty {
+            print("   📋 Registered shortcuts:")
+            for (configId, registration) in registeredShortcuts {
+                let display = formatShortcut(keyCode: registration.keyCode, modifiers: registration.modifierFlags)
+                print("      Config \(configId): \(display) (keyCode=\(registration.keyCode), modifiers=\(registration.modifierFlags))")
+            }
+        } else {
+            print("   ⚠️ No shortcuts registered yet!")
         }
     }
     
@@ -155,7 +167,7 @@ class HotkeyManager {
             localFlagsMonitor = nil
         }
         
-        print("🛑 HotkeyManager monitoring stopped")
+        print("🛑 [HotkeyManager] Monitoring stopped")
     }
     
     /// Reset internal state (call when UI hides)
@@ -174,9 +186,9 @@ class HotkeyManager {
     func setHoldKey(_ keyCode: UInt16?) {
         holdKeyCode = keyCode
         if let keyCode = keyCode {
-            print("⚙️ Hold key configured: keyCode \(keyCode)")
+            print("⚙️ [HotkeyManager] Hold key configured: keyCode \(keyCode)")
         } else {
-            print("⚙️ Hold-to-show disabled")
+            print("⚙️ [HotkeyManager] Hold-to-show disabled")
         }
     }
     
@@ -184,15 +196,72 @@ class HotkeyManager {
     /// Call this when an action is executed while the hold key is still pressed
     func requireReleaseBeforeNextShow() {
         requiresReleaseBeforeNextShow = true
-        print("🔒 Hold key must be released before next show")
+        print("🔒 [HotkeyManager] Hold key must be released before next show")
+    }
+    
+    // MARK: - Dynamic Shortcut Registration
+    
+    /// Register a keyboard shortcut for a ring configuration
+    /// - Parameters:
+    ///   - keyCode: The key code
+    ///   - modifierFlags: The modifier flags bitfield
+    ///   - configId: The ring configuration ID
+    ///   - callback: The callback to execute when shortcut is pressed
+    func registerShortcut(
+        keyCode: UInt16,
+        modifierFlags: UInt,
+        forConfigId configId: Int,
+        callback: @escaping () -> Void
+    ) {
+        let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
+        print("📝 [HotkeyManager] Attempting to register shortcut for config \(configId):")
+        print("   Display: \(shortcutDisplay)")
+        print("   KeyCode: \(keyCode)")
+        print("   Modifiers: \(modifierFlags) (raw value)")
+        print("   Modifiers: \(NSEvent.ModifierFlags(rawValue: modifierFlags)) (flags)")
+        
+        // Check for conflicts with existing shortcuts
+        for (existingId, existing) in registeredShortcuts {
+            if existing.keyCode == keyCode && existing.modifierFlags == modifierFlags {
+                let existingDisplay = formatShortcut(keyCode: existing.keyCode, modifiers: existing.modifierFlags)
+                print("⚠️ [HotkeyManager] Shortcut conflict!")
+                print("   Existing: Config \(existingId) with \(existingDisplay)")
+                print("   New: Config \(configId) with \(shortcutDisplay)")
+                print("   Unregistering old shortcut...")
+                unregisterShortcut(forConfigId: existingId)
+                break
+            }
+        }
+        
+        // Store registration
+        registeredShortcuts[configId] = (keyCode, modifierFlags, callback)
+        
+        print("✅ [HotkeyManager] Successfully registered shortcut for config \(configId): \(shortcutDisplay)")
+        print("   Total registered shortcuts: \(registeredShortcuts.count)")
+    }
+    
+    /// Unregister a shortcut
+    func unregisterShortcut(forConfigId configId: Int) {
+        if let _ = registeredShortcuts.removeValue(forKey: configId) {
+            print("🗑️ [HotkeyManager] Unregistered shortcut for config \(configId)")
+        }
+    }
+    
+    /// Unregister all shortcuts
+    func unregisterAllShortcuts() {
+        let count = registeredShortcuts.count
+        registeredShortcuts.removeAll()
+        print("🗑️ [HotkeyManager] Unregistered all \(count) shortcut(s)")
     }
     
     // MARK: - Private Handlers
     
     private func handleKeyEvent(_ event: NSEvent) {
-        let isCtrlPressed = event.modifierFlags.contains(.control)
-        let isShiftPressed = event.modifierFlags.contains(.shift)
         let isUIVisible = isUIVisible?() ?? false
+        
+        // Log every key event for debugging
+        let eventModifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        print("🔍 [HotkeyManager] Key event: keyCode=\(event.keyCode), modifiers=\(eventModifiers.rawValue), UI visible=\(isUIVisible)")
         
         // Hold key pressed (if configured)
         if let holdKeyCode = holdKeyCode, event.keyCode == holdKeyCode && !isHoldKeyCurrentlyPressed {
@@ -208,25 +277,40 @@ class HotkeyManager {
             return
         }
         
-        // Ctrl+Shift+K = Show root UI (only when UI is hidden)
-        if isCtrlPressed && isShiftPressed && event.keyCode == 40 && !isUIVisible {
-            print("⌨️ [HotkeyManager] Ctrl+Shift+K detected")
-            onShowRoot?()
-            return
-        }
-        
-        // Ctrl+` (grave accent/tilde key = keyCode 50) = Show expanded to Apps (only when UI is hidden)
-        if isCtrlPressed && !isShiftPressed && event.keyCode == 50 && !isUIVisible {
-            print("⌨️ [HotkeyManager] Ctrl+` detected")
-            onShowApps?()
-            return
-        }
-        
         // Escape = Hide UI (only when UI is visible)
         if event.keyCode == 53 && isUIVisible {
             print("⌨️ [HotkeyManager] Escape pressed")
             onHide?()
             return
+        }
+        
+        // Check dynamic shortcuts (only when UI is hidden)
+        if !isUIVisible {
+            print("🔍 [HotkeyManager] Checking \(registeredShortcuts.count) registered shortcut(s)...")
+            
+            for (configId, registration) in registeredShortcuts {
+                let registeredModifiers = NSEvent.ModifierFlags(rawValue: registration.modifierFlags)
+                
+                print("   🔍 Config \(configId): keyCode=\(registration.keyCode) (want \(event.keyCode)), modifiers=\(registeredModifiers.rawValue) (have \(eventModifiers.rawValue))")
+                
+                if event.keyCode == registration.keyCode &&
+                   eventModifiers == registeredModifiers {
+                    print("✅ [HotkeyManager] Dynamic shortcut MATCHED for config \(configId)!")
+                    registration.callback()
+                    return
+                } else {
+                    if event.keyCode != registration.keyCode {
+                        print("   ❌ KeyCode mismatch: \(event.keyCode) != \(registration.keyCode)")
+                    }
+                    if eventModifiers != registeredModifiers {
+                        print("   ❌ Modifier mismatch: \(eventModifiers.rawValue) != \(registeredModifiers.rawValue)")
+                    }
+                }
+            }
+            
+            print("⚠️ [HotkeyManager] No matching shortcut found")
+        } else {
+            print("🔍 [HotkeyManager] UI is visible, skipping shortcut check")
         }
     }
     
@@ -276,6 +360,40 @@ class HotkeyManager {
         }
         
         wasShiftPressed = isShiftPressed
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Format a shortcut for display (helper for logging)
+    private func formatShortcut(keyCode: UInt16, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        parts.append(keyCodeToString(keyCode))
+        
+        return parts.joined()
+    }
+    
+    /// Convert key code to string (helper for display)
+    private func keyCodeToString(_ keyCode: UInt16) -> String {
+        switch keyCode {
+        case 0: return "A"
+        case 1: return "S"
+        case 2: return "D"
+        case 3: return "F"
+        case 4: return "H"
+        case 5: return "G"
+        case 40: return "K"
+        case 49: return "Space"
+        case 50: return "`"
+        case 53: return "Esc"
+        default: return "[\(keyCode)]"
+        }
     }
 }
 

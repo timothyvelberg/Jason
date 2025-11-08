@@ -3,7 +3,7 @@
 //  Jason
 //
 //  Created by Timothy Velberg on 06/11/2025.
-//w
+//
 
 import Foundation
 import SQLite3
@@ -16,10 +16,12 @@ extension DatabaseManager {
     /// Create a new ring configuration
     func createRingConfiguration(
         name: String,
-        shortcut: String,
+        shortcut: String,              // DEPRECATED - kept for display
         ringRadius: CGFloat,
-        centerHoleRadius: CGFloat,  // NEW PARAMETER
+        centerHoleRadius: CGFloat,
         iconSize: CGFloat,
+        keyCode: UInt16? = nil,        // NEW
+        modifierFlags: UInt? = nil,    // NEW
         displayOrder: Int = 0
     ) -> Int? {
         guard let db = db else { return nil }
@@ -27,17 +29,20 @@ extension DatabaseManager {
         var ringId: Int?
         
         queue.sync {
-            // Validate shortcut is unique among active rings
-            if _isShortcutInUse(shortcut: shortcut) {
-                print("⚠️ [DatabaseManager] Shortcut '\(shortcut)' is already in use by an active ring")
-                return
+            // Validate shortcut is unique among active rings (if keyCode/modifierFlags provided)
+            if let keyCode = keyCode, let modifierFlags = modifierFlags {
+                if _isShortcutInUse(keyCode: keyCode, modifierFlags: modifierFlags) {
+                    let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
+                    print("⚠️ [DatabaseManager] Shortcut '\(shortcutDisplay)' is already in use by an active ring")
+                    return
+                }
             }
             
             let now = Int(Date().timeIntervalSince1970)
             
             let sql = """
-            INSERT INTO ring_configurations (name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order)
-            VALUES (?, ?, ?, ?, ?, ?, 1, ?);
+            INSERT INTO ring_configurations (name, shortcut, ring_radius, center_hole_radius, icon_size, key_code, modifier_flags, created_at, is_active, display_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?);
             """
             var statement: OpaquePointer?
             
@@ -45,14 +50,30 @@ extension DatabaseManager {
                 sqlite3_bind_text(statement, 1, (name as NSString).utf8String, -1, nil)
                 sqlite3_bind_text(statement, 2, (shortcut as NSString).utf8String, -1, nil)
                 sqlite3_bind_double(statement, 3, Double(ringRadius))
-                sqlite3_bind_double(statement, 4, Double(centerHoleRadius))  // NEW
+                sqlite3_bind_double(statement, 4, Double(centerHoleRadius))
                 sqlite3_bind_double(statement, 5, Double(iconSize))
-                sqlite3_bind_int64(statement, 6, Int64(now))
-                sqlite3_bind_int(statement, 7, Int32(displayOrder))
+                
+                // Bind keyCode (NULL if not provided)
+                if let keyCode = keyCode {
+                    sqlite3_bind_int(statement, 6, Int32(keyCode))
+                } else {
+                    sqlite3_bind_null(statement, 6)
+                }
+                
+                // Bind modifierFlags (NULL if not provided)
+                if let modifierFlags = modifierFlags {
+                    sqlite3_bind_int(statement, 7, Int32(modifierFlags))
+                } else {
+                    sqlite3_bind_null(statement, 7)
+                }
+                
+                sqlite3_bind_int64(statement, 8, Int64(now))
+                sqlite3_bind_int(statement, 9, Int32(displayOrder))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     ringId = Int(sqlite3_last_insert_rowid(db))
-                    print("🔵 [DatabaseManager] Created ring configuration: '\(name)' (id: \(ringId!))")
+                    let shortcutDisplay = keyCode != nil ? formatShortcut(keyCode: keyCode!, modifiers: modifierFlags ?? 0) : "No shortcut"
+                    print("🔵 [DatabaseManager] Created ring configuration: '\(name)' (id: \(ringId!), shortcut: \(shortcutDisplay))")
                 } else {
                     if let error = sqlite3_errmsg(db) {
                         print("❌ [DatabaseManager] Failed to insert ring configuration '\(name)': \(String(cString: error))")
@@ -77,7 +98,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, key_code, modifier_flags
             FROM ring_configurations
             ORDER BY display_order, name;
             """
@@ -89,22 +110,42 @@ extension DatabaseManager {
                     let name = String(cString: sqlite3_column_text(statement, 1))
                     let shortcut = String(cString: sqlite3_column_text(statement, 2))
                     let ringRadius = CGFloat(sqlite3_column_double(statement, 3))
-                    let centerHoleRadius = CGFloat(sqlite3_column_double(statement, 4))  // NEW
+                    let centerHoleRadius = CGFloat(sqlite3_column_double(statement, 4))
                     let iconSize = CGFloat(sqlite3_column_double(statement, 5))
                     let createdAt = Int(sqlite3_column_int64(statement, 6))
                     let isActive = sqlite3_column_int(statement, 7) == 1
                     let displayOrder = Int(sqlite3_column_int(statement, 8))
+                    
+                    // Read keyCode (handle NULL)
+                    let keyCode: UInt16? = {
+                        let colType = sqlite3_column_type(statement, 9)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return UInt16(sqlite3_column_int(statement, 9))
+                    }()
+                    
+                    // Read modifierFlags (handle NULL)
+                    let modifierFlags: UInt? = {
+                        let colType = sqlite3_column_type(statement, 10)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return UInt(sqlite3_column_int(statement, 10))
+                    }()
                     
                     results.append(RingConfigurationEntry(
                         id: id,
                         name: name,
                         shortcut: shortcut,
                         ringRadius: ringRadius,
-                        centerHoleRadius: centerHoleRadius,  // NEW
+                        centerHoleRadius: centerHoleRadius,
                         iconSize: iconSize,
                         createdAt: createdAt,
                         isActive: isActive,
-                        displayOrder: displayOrder
+                        displayOrder: displayOrder,
+                        keyCode: keyCode,
+                        modifierFlags: modifierFlags
                     ))
                 }
             } else {
@@ -126,7 +167,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, key_code, modifier_flags
             FROM ring_configurations
             WHERE is_active = 1
             ORDER BY display_order, name;
@@ -139,22 +180,42 @@ extension DatabaseManager {
                     let name = String(cString: sqlite3_column_text(statement, 1))
                     let shortcut = String(cString: sqlite3_column_text(statement, 2))
                     let ringRadius = CGFloat(sqlite3_column_double(statement, 3))
-                    let centerHoleRadius = CGFloat(sqlite3_column_double(statement, 4))  // NEW
+                    let centerHoleRadius = CGFloat(sqlite3_column_double(statement, 4))
                     let iconSize = CGFloat(sqlite3_column_double(statement, 5))
                     let createdAt = Int(sqlite3_column_int64(statement, 6))
                     let isActive = sqlite3_column_int(statement, 7) == 1
                     let displayOrder = Int(sqlite3_column_int(statement, 8))
+                    
+                    // Read keyCode (handle NULL)
+                    let keyCode: UInt16? = {
+                        let colType = sqlite3_column_type(statement, 9)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return UInt16(sqlite3_column_int(statement, 9))
+                    }()
+                    
+                    // Read modifierFlags (handle NULL)
+                    let modifierFlags: UInt? = {
+                        let colType = sqlite3_column_type(statement, 10)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return UInt(sqlite3_column_int(statement, 10))
+                    }()
                     
                     results.append(RingConfigurationEntry(
                         id: id,
                         name: name,
                         shortcut: shortcut,
                         ringRadius: ringRadius,
-                        centerHoleRadius: centerHoleRadius,  // NEW
+                        centerHoleRadius: centerHoleRadius,
                         iconSize: iconSize,
                         createdAt: createdAt,
                         isActive: isActive,
-                        displayOrder: displayOrder
+                        displayOrder: displayOrder,
+                        keyCode: keyCode,
+                        modifierFlags: modifierFlags
                     ))
                 }
             } else {
@@ -176,7 +237,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, key_code, modifier_flags
             FROM ring_configurations
             WHERE id = ?;
             """
@@ -190,22 +251,42 @@ extension DatabaseManager {
                     let name = String(cString: sqlite3_column_text(statement, 1))
                     let shortcut = String(cString: sqlite3_column_text(statement, 2))
                     let ringRadius = CGFloat(sqlite3_column_double(statement, 3))
-                    let centerHoleRadius = CGFloat(sqlite3_column_double(statement, 4))  // NEW
+                    let centerHoleRadius = CGFloat(sqlite3_column_double(statement, 4))
                     let iconSize = CGFloat(sqlite3_column_double(statement, 5))
                     let createdAt = Int(sqlite3_column_int64(statement, 6))
                     let isActive = sqlite3_column_int(statement, 7) == 1
                     let displayOrder = Int(sqlite3_column_int(statement, 8))
+                    
+                    // Read keyCode (handle NULL)
+                    let keyCode: UInt16? = {
+                        let colType = sqlite3_column_type(statement, 9)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return UInt16(sqlite3_column_int(statement, 9))
+                    }()
+                    
+                    // Read modifierFlags (handle NULL)
+                    let modifierFlags: UInt? = {
+                        let colType = sqlite3_column_type(statement, 10)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return UInt(sqlite3_column_int(statement, 10))
+                    }()
                     
                     result = RingConfigurationEntry(
                         id: id,
                         name: name,
                         shortcut: shortcut,
                         ringRadius: ringRadius,
-                        centerHoleRadius: centerHoleRadius,  // NEW
+                        centerHoleRadius: centerHoleRadius,
                         iconSize: iconSize,
                         createdAt: createdAt,
                         isActive: isActive,
-                        displayOrder: displayOrder
+                        displayOrder: displayOrder,
+                        keyCode: keyCode,
+                        modifierFlags: modifierFlags
                     )
                 }
             } else {
@@ -223,30 +304,33 @@ extension DatabaseManager {
     func updateRingConfiguration(
         id: Int,
         name: String? = nil,
-        shortcut: String? = nil,
+        shortcut: String? = nil,       // DEPRECATED
         ringRadius: CGFloat? = nil,
-        centerHoleRadius: CGFloat? = nil,  // NEW PARAMETER
+        centerHoleRadius: CGFloat? = nil,
         iconSize: CGFloat? = nil,
-        isActive: Bool? = nil,
+        keyCode: UInt16? = nil,        // NEW
+        modifierFlags: UInt? = nil,    // NEW
         displayOrder: Int? = nil
     ) {
         guard let db = db else { return }
         
         queue.async {
-            // If updating shortcut, validate it's not in use by another active ring
-            if let newShortcut = shortcut {
+            // If updating keyCode/modifierFlags, validate uniqueness
+            if let keyCode = keyCode, let modifierFlags = modifierFlags {
                 let checkSQL = """
                 SELECT id FROM ring_configurations 
-                WHERE shortcut = ? AND is_active = 1 AND id != ?;
+                WHERE key_code = ? AND modifier_flags = ? AND is_active = 1 AND id != ?;
                 """
                 var checkStatement: OpaquePointer?
                 
                 if sqlite3_prepare_v2(db, checkSQL, -1, &checkStatement, nil) == SQLITE_OK {
-                    sqlite3_bind_text(checkStatement, 1, (newShortcut as NSString).utf8String, -1, nil)
-                    sqlite3_bind_int(checkStatement, 2, Int32(id))
+                    sqlite3_bind_int(checkStatement, 1, Int32(keyCode))
+                    sqlite3_bind_int(checkStatement, 2, Int32(modifierFlags))
+                    sqlite3_bind_int(checkStatement, 3, Int32(id))
                     
                     if sqlite3_step(checkStatement) == SQLITE_ROW {
-                        print("⚠️ [DatabaseManager] Cannot update: shortcut '\(newShortcut)' is already in use by another active ring")
+                        let shortcutDisplay = self.formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
+                        print("⚠️ [DatabaseManager] Cannot update: shortcut '\(shortcutDisplay)' is already in use by another active ring")
                         sqlite3_finalize(checkStatement)
                         return
                     }
@@ -259,9 +343,10 @@ extension DatabaseManager {
             if name != nil { updates.append("name = ?") }
             if shortcut != nil { updates.append("shortcut = ?") }
             if ringRadius != nil { updates.append("ring_radius = ?") }
-            if centerHoleRadius != nil { updates.append("center_hole_radius = ?") }  // NEW
+            if centerHoleRadius != nil { updates.append("center_hole_radius = ?") }
             if iconSize != nil { updates.append("icon_size = ?") }
-            if isActive != nil { updates.append("is_active = ?") }
+            if keyCode != nil { updates.append("key_code = ?") }
+            if modifierFlags != nil { updates.append("modifier_flags = ?") }
             if displayOrder != nil { updates.append("display_order = ?") }
             
             guard !updates.isEmpty else {
@@ -287,7 +372,7 @@ extension DatabaseManager {
                     sqlite3_bind_double(statement, paramIndex, Double(ringRadius))
                     paramIndex += 1
                 }
-                if let centerHoleRadius = centerHoleRadius {  // NEW
+                if let centerHoleRadius = centerHoleRadius {
                     sqlite3_bind_double(statement, paramIndex, Double(centerHoleRadius))
                     paramIndex += 1
                 }
@@ -295,8 +380,12 @@ extension DatabaseManager {
                     sqlite3_bind_double(statement, paramIndex, Double(iconSize))
                     paramIndex += 1
                 }
-                if let isActive = isActive {
-                    sqlite3_bind_int(statement, paramIndex, isActive ? 1 : 0)
+                if let keyCode = keyCode {
+                    sqlite3_bind_int(statement, paramIndex, Int32(keyCode))
+                    paramIndex += 1
+                }
+                if let modifierFlags = modifierFlags {
+                    sqlite3_bind_int(statement, paramIndex, Int32(modifierFlags))
                     paramIndex += 1
                 }
                 if let displayOrder = displayOrder {
@@ -323,7 +412,56 @@ extension DatabaseManager {
         }
     }
     
-    /// Delete a ring configuration (cascade deletes providers)
+    /// Set a ring configuration's active status
+    func setRingConfigurationActiveStatus(id: Int, isActive: Bool) {
+        guard let db = db else { return }
+        
+        queue.async {
+            let sql = "UPDATE ring_configurations SET is_active = ? WHERE id = ?;"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_int(statement, 1, isActive ? 1 : 0)
+                sqlite3_bind_int(statement, 2, Int32(id))
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    print("📊 [DatabaseManager] Set ring configuration id \(id) active status to \(isActive)")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to update active status for ring configuration id \(id): \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare UPDATE for active status (id \(id)): \(String(cString: error))")
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+    }
+    
+    /// Get count of active ring configurations
+    func getActiveRingCount() -> Int {
+        guard let db = db else { return 0 }
+        
+        var count = 0
+        
+        queue.sync {
+            let sql = "SELECT COUNT(*) FROM ring_configurations WHERE is_active = 1;"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                if sqlite3_step(statement) == SQLITE_ROW {
+                    count = Int(sqlite3_column_int(statement, 0))
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+        
+        return count
+    }
+    
+    /// Delete a ring configuration (also deletes associated providers via CASCADE)
     func deleteRingConfiguration(id: Int) {
         guard let db = db else { return }
         
@@ -335,7 +473,12 @@ extension DatabaseManager {
                 sqlite3_bind_int(statement, 1, Int32(id))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("🗑️ [DatabaseManager] Deleted ring configuration id \(id)")
+                    let changes = sqlite3_changes(db)
+                    if changes > 0 {
+                        print("🗑️ [DatabaseManager] Deleted ring configuration id \(id) (and associated providers)")
+                    } else {
+                        print("⚠️ [DatabaseManager] Ring configuration id \(id) not found")
+                    }
                 } else {
                     if let error = sqlite3_errmsg(db) {
                         print("❌ [DatabaseManager] Failed to delete ring configuration id \(id): \(String(cString: error))")
@@ -352,8 +495,8 @@ extension DatabaseManager {
     
     // MARK: - Ring Providers CRUD
     
-    /// Add a provider to a ring
-    func addProviderToRing(
+    /// Create a provider for a ring configuration
+    func createProvider(
         ringId: Int,
         providerType: String,
         providerOrder: Int,
@@ -365,9 +508,9 @@ extension DatabaseManager {
         var providerId: Int?
         
         queue.sync {
-            // Validate provider order is not already in use for this ring
+            // Validate provider order is unique within the ring
             if _isProviderOrderInUse(ringId: ringId, providerOrder: providerOrder) {
-                print("⚠️ [DatabaseManager] Provider order \(providerOrder) is already in use for ring id \(ringId)")
+                print("⚠️ [DatabaseManager] Provider order \(providerOrder) is already in use in ring id \(ringId)")
                 return
             }
             
@@ -396,7 +539,7 @@ extension DatabaseManager {
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     providerId = Int(sqlite3_last_insert_rowid(db))
-                    print("➕ [DatabaseManager] Added provider '\(providerType)' to ring id \(ringId) (provider id: \(providerId!))")
+                    print("🔵 [DatabaseManager] Created provider '\(providerType)' for ring id \(ringId) (provider id: \(providerId!))")
                 } else {
                     if let error = sqlite3_errmsg(db) {
                         print("❌ [DatabaseManager] Failed to insert provider '\(providerType)': \(String(cString: error))")
@@ -413,8 +556,8 @@ extension DatabaseManager {
         return providerId
     }
     
-    /// Get all providers for a ring
-    func getProvidersForRing(ringId: Int) -> [RingProviderEntry] {
+    /// Get all providers for a ring configuration
+    func getProviders(ringId: Int) -> [RingProviderEntry] {
         guard let db = db else { return [] }
         
         var results: [RingProviderEntry] = []
@@ -440,17 +583,15 @@ extension DatabaseManager {
                     let parentItemAngle: CGFloat? = {
                         if sqlite3_column_type(statement, 4) == SQLITE_NULL {
                             return nil
-                        } else {
-                            return CGFloat(sqlite3_column_double(statement, 4))
                         }
+                        return CGFloat(sqlite3_column_double(statement, 4))
                     }()
                     
                     let providerConfig: String? = {
                         if sqlite3_column_type(statement, 5) == SQLITE_NULL {
                             return nil
-                        } else {
-                            return String(cString: sqlite3_column_text(statement, 5))
                         }
+                        return String(cString: sqlite3_column_text(statement, 5))
                     }()
                     
                     results.append(RingProviderEntry(
@@ -602,16 +743,17 @@ extension DatabaseManager {
     
     // MARK: - Validation Helpers
     
-    /// Check if a shortcut is already in use by an active ring (UNSAFE - must be called within queue.sync)
-    private func _isShortcutInUse(shortcut: String) -> Bool {
+    /// Check if a shortcut (keyCode + modifierFlags) is already in use by an active ring (UNSAFE - must be called within queue.sync)
+    private func _isShortcutInUse(keyCode: UInt16, modifierFlags: UInt) -> Bool {
         guard let db = db else { return false }
         
-        let sql = "SELECT id FROM ring_configurations WHERE shortcut = ? AND is_active = 1;"
+        let sql = "SELECT id FROM ring_configurations WHERE key_code = ? AND modifier_flags = ? AND is_active = 1;"
         var statement: OpaquePointer?
         var inUse = false
         
         if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_text(statement, 1, (shortcut as NSString).utf8String, -1, nil)
+            sqlite3_bind_int(statement, 1, Int32(keyCode))
+            sqlite3_bind_int(statement, 2, Int32(modifierFlags))
             if sqlite3_step(statement) == SQLITE_ROW {
                 inUse = true
             }
@@ -639,5 +781,58 @@ extension DatabaseManager {
         sqlite3_finalize(statement)
         
         return inUse
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Format a shortcut for display (helper for logging)
+    private func formatShortcut(keyCode: UInt16, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        parts.append(keyCodeToString(keyCode))
+        
+        return parts.joined()
+    }
+    
+    /// Convert key code to string (helper for display)
+    private func keyCodeToString(_ keyCode: UInt16) -> String {
+        switch keyCode {
+        case 0: return "A"
+        case 1: return "S"
+        case 2: return "D"
+        case 3: return "F"
+        case 4: return "H"
+        case 5: return "G"
+        case 6: return "Z"
+        case 7: return "X"
+        case 8: return "C"
+        case 9: return "V"
+        case 11: return "B"
+        case 12: return "Q"
+        case 13: return "W"
+        case 14: return "E"
+        case 15: return "R"
+        case 16: return "Y"
+        case 17: return "T"
+        case 31: return "O"
+        case 32: return "U"
+        case 34: return "I"
+        case 35: return "P"
+        case 37: return "L"
+        case 38: return "J"
+        case 40: return "K"
+        case 45: return "N"
+        case 46: return "M"
+        case 49: return "Space"
+        case 50: return "`"
+        case 53: return "Esc"
+        default: return "[\(keyCode)]"
+        }
     }
 }

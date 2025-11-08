@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import AppKit
 
 /// Domain model representing a stored ring configuration from the database
 /// This is distinct from:
@@ -14,12 +15,29 @@ import Foundation
 struct StoredRingConfiguration: Identifiable, Equatable {
     let id: Int
     let name: String
-    let shortcut: String
+    let shortcut: String           // DEPRECATED - display only, for now
     let ringRadius: Double
     let centerHoleRadius: Double
     let iconSize: Double
     let isActive: Bool
     let providers: [ProviderConfiguration]
+    
+    // NEW: Raw shortcut data
+    let keyCode: UInt16?           // Key code for the shortcut
+    let modifierFlags: UInt?       // Modifier flags bitfield
+    
+    // MARK: - Shortcut Properties
+    
+    /// Check if this configuration has a valid shortcut
+    var hasShortcut: Bool {
+        return keyCode != nil && modifierFlags != nil
+    }
+    
+    /// Get a human-readable shortcut description
+    var shortcutDescription: String {
+        guard hasShortcut else { return "No shortcut" }
+        return formatShortcut(keyCode: keyCode!, modifiers: modifierFlags!)
+    }
     
     // MARK: - Computed Properties
     
@@ -58,6 +76,60 @@ struct StoredRingConfiguration: Identifiable, Equatable {
         return providers.contains { $0.providerType == type }
     }
     
+    // MARK: - Shortcut Formatting Helpers
+    
+    /// Format shortcut for display
+    private func formatShortcut(keyCode: UInt16, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        // Add key character
+        parts.append(keyCodeToString(keyCode))
+        
+        return parts.joined()
+    }
+    
+    /// Convert key code to string (for display purposes)
+    private func keyCodeToString(_ keyCode: UInt16) -> String {
+        switch keyCode {
+        case 0: return "A"
+        case 1: return "S"
+        case 2: return "D"
+        case 3: return "F"
+        case 4: return "H"
+        case 5: return "G"
+        case 6: return "Z"
+        case 7: return "X"
+        case 8: return "C"
+        case 9: return "V"
+        case 11: return "B"
+        case 12: return "Q"
+        case 13: return "W"
+        case 14: return "E"
+        case 15: return "R"
+        case 16: return "Y"
+        case 17: return "T"
+        case 31: return "O"
+        case 32: return "U"
+        case 34: return "I"
+        case 35: return "P"
+        case 37: return "L"
+        case 38: return "J"
+        case 40: return "K"
+        case 45: return "N"
+        case 46: return "M"
+        case 49: return "Space"
+        case 50: return "`"
+        case 53: return "Esc"
+        default: return "[\(keyCode)]"
+        }
+    }
+    
     // MARK: - Display Helpers
     
     /// Human-readable description for debugging
@@ -66,7 +138,7 @@ struct StoredRingConfiguration: Identifiable, Equatable {
         StoredRingConfiguration(
             id: \(id),
             name: "\(name)",
-            shortcut: "\(shortcut)",
+            shortcut: "\(shortcutDescription)",
             centerHole: \(centerHoleRadius),
             ringRadius: \(ringRadius),
             iconSize: \(iconSize),
@@ -86,6 +158,8 @@ struct StoredRingConfiguration: Identifiable, Equatable {
                lhs.centerHoleRadius == rhs.centerHoleRadius &&
                lhs.iconSize == rhs.iconSize &&
                lhs.isActive == rhs.isActive &&
+               lhs.keyCode == rhs.keyCode &&
+               lhs.modifierFlags == rhs.modifierFlags &&
                lhs.providers == rhs.providers
     }
 }

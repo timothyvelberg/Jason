@@ -56,7 +56,8 @@ class RingConfigurationManager: ObservableObject {
         // Log summary
         for config in configurations {
             let status = config.isActive ? "🟢 ACTIVE" : "⚫️ inactive"
-            print("   \(status) - \(config.name) (\(config.shortcut)) - \(config.providers.count) provider(s)")
+            let shortcutDisplay = config.hasShortcut ? config.shortcutDescription : config.shortcut
+            print("   \(status) - \(config.name) (\(shortcutDisplay)) - \(config.providers.count) provider(s)")
         }
     }
     
@@ -81,7 +82,8 @@ class RingConfigurationManager: ObservableObject {
         
         // Log summary
         for config in configurations {
-            print("   🟢 \(config.name) (\(config.shortcut)) - \(config.providers.count) provider(s)")
+            let shortcutDisplay = config.hasShortcut ? config.shortcutDescription : config.shortcut
+            print("   🟢 \(config.name) (\(shortcutDisplay)) - \(config.providers.count) provider(s)")
         }
     }
     
@@ -102,11 +104,22 @@ class RingConfigurationManager: ObservableObject {
         return configurations.filter { $0.isActive }
     }
     
-    /// Get configuration by shortcut
+    /// Get configuration by shortcut string (legacy)
     /// - Parameter shortcut: The keyboard shortcut to search for (e.g., "Cmd+Shift+A")
     /// - Returns: The configuration if found, nil otherwise
     func getConfiguration(forShortcut shortcut: String) -> StoredRingConfiguration? {
         return configurations.first { $0.shortcut == shortcut }
+    }
+    
+    /// Get configuration by shortcut (keyCode + modifierFlags) - NEW
+    /// - Parameters:
+    ///   - keyCode: The key code
+    ///   - modifierFlags: The modifier flags
+    /// - Returns: The configuration if found, nil otherwise
+    func getConfiguration(keyCode: UInt16, modifierFlags: UInt) -> StoredRingConfiguration? {
+        return configurations.first { config in
+            config.keyCode == keyCode && config.modifierFlags == modifierFlags
+        }
     }
     
     // MARK: - Modification Methods
@@ -114,36 +127,42 @@ class RingConfigurationManager: ObservableObject {
     /// Create a new ring configuration
     /// - Parameters:
     ///   - name: Display name for the ring
-    ///   - shortcut: Keyboard shortcut (e.g., "Cmd+Shift+A")
+    ///   - shortcut: Keyboard shortcut string (for display, DEPRECATED)
     ///   - ringRadius: Radius (thickness) of the ring band in points
     ///   - centerHoleRadius: Radius of the center hole in points
     ///   - iconSize: Size of icons in the ring
+    ///   - keyCode: Raw key code for shortcut (NEW)
+    ///   - modifierFlags: Raw modifier flags for shortcut (NEW)
     ///   - providers: Array of provider specifications (type, order, angle)
     /// - Returns: The newly created configuration
     /// - Throws: StoredRingConfigurationError if validation fails or database error occurs
     ///
     func createConfiguration(
         name: String,
-        shortcut: String,
+        shortcut: String = "",             // DEPRECATED - for display only
         ringRadius: Double,
         centerHoleRadius: Double = 56.0,
         iconSize: Double,
+        keyCode: UInt16? = nil,            // NEW
+        modifierFlags: UInt? = nil,        // NEW
         providers: [(type: String, order: Int, angle: Double?)] = []
     ) throws -> StoredRingConfiguration {
-        print("➕ [RingConfigManager] Creating configuration '\(name)' with shortcut '\(shortcut)'")
+        let shortcutDisplay = keyCode != nil ? formatShortcut(keyCode: keyCode!, modifiers: modifierFlags ?? 0) : shortcut
+        print("➕ [RingConfigManager] Creating configuration '\(name)' with shortcut '\(shortcutDisplay)'")
         
         // Validate inputs
         try validateConfigurationInputs(
             name: name,
-            shortcut: shortcut,
             ringRadius: ringRadius,
             centerHoleRadius: centerHoleRadius,
             iconSize: iconSize
         )
         
-        // Validate shortcut uniqueness (for active rings)
-        guard validateShortcut(shortcut, excludingRing: nil) else {
-            throw StoredRingConfigurationError.duplicateShortcut(shortcut)
+        // Validate shortcut uniqueness (if keyCode/modifierFlags provided)
+        if let keyCode = keyCode, let modifierFlags = modifierFlags {
+            guard validateShortcut(keyCode: keyCode, modifierFlags: modifierFlags, excludingRing: nil) else {
+                throw StoredRingConfigurationError.duplicateShortcut(shortcutDisplay)
+            }
         }
         
         // Create in database
@@ -152,7 +171,9 @@ class RingConfigurationManager: ObservableObject {
             shortcut: shortcut,
             ringRadius: CGFloat(ringRadius),
             centerHoleRadius: CGFloat(centerHoleRadius),
-            iconSize: CGFloat(iconSize)
+            iconSize: CGFloat(iconSize),
+            keyCode: keyCode,              // NEW
+            modifierFlags: modifierFlags   // NEW
         ) else {
             throw StoredRingConfigurationError.databaseError("Failed to create ring configuration")
         }
@@ -163,7 +184,7 @@ class RingConfigurationManager: ObservableObject {
         var providerConfigs: [ProviderConfiguration] = []
         for (index, provider) in providers.enumerated() {
             do {
-                guard let providerId = databaseManager.addProviderToRing(
+                guard let providerId = databaseManager.createProvider(
                     ringId: ringId,
                     providerType: provider.type,
                     providerOrder: provider.order,
@@ -194,7 +215,9 @@ class RingConfigurationManager: ObservableObject {
             centerHoleRadius: centerHoleRadius,
             iconSize: iconSize,
             isActive: true,
-            providers: providerConfigs
+            providers: providerConfigs,
+            keyCode: keyCode,              // NEW
+            modifierFlags: modifierFlags   // NEW
         )
         
         // Update in-memory cache
@@ -210,80 +233,75 @@ class RingConfigurationManager: ObservableObject {
     /// - Parameters:
     ///   - id: ID of the configuration to update
     ///   - name: New name (nil to keep current)
-    ///   - shortcut: New shortcut (nil to keep current)
+    ///   - shortcut: New shortcut string (nil to keep current, DEPRECATED)
     ///   - ringRadius: New ring radius/thickness (nil to keep current)
     ///   - centerHoleRadius: New center hole radius (nil to keep current)
     ///   - iconSize: New icon size (nil to keep current)
+    ///   - keyCode: New key code (nil to keep current) - NEW
+    ///   - modifierFlags: New modifier flags (nil to keep current) - NEW
     /// - Throws: StoredRingConfigurationError if validation fails or configuration not found
     func updateConfiguration(
         id: Int,
         name: String? = nil,
-        shortcut: String? = nil,
+        shortcut: String? = nil,       // DEPRECATED
         ringRadius: Double? = nil,
         centerHoleRadius: Double? = nil,
-        iconSize: Double? = nil
+        iconSize: Double? = nil,
+        keyCode: UInt16? = nil,        // NEW
+        modifierFlags: UInt? = nil     // NEW
     ) throws {
-        print("✏️ [RingConfigManager] Updating configuration \(id)")
+        print("📝 [RingConfigManager] Updating configuration \(id)")
         
-        // Find existing configuration
+        // Verify configuration exists
         guard let existingConfig = getConfiguration(id: id) else {
             throw StoredRingConfigurationError.configurationNotFound(id)
         }
         
-        // Determine final values (use new if provided, otherwise keep existing)
-        let finalName = name ?? existingConfig.name
-        let finalShortcut = shortcut ?? existingConfig.shortcut
-        let finalRadius = ringRadius ?? existingConfig.ringRadius
-        let finalCenterHoleRadius = centerHoleRadius ?? existingConfig.centerHoleRadius
-        let finalIconSize = iconSize ?? existingConfig.iconSize
+        // Validate inputs if provided
+        if let radius = ringRadius, radius <= 0 {
+            throw StoredRingConfigurationError.invalidRadius(radius)
+        }
+        if let holeRadius = centerHoleRadius, holeRadius <= 0 {
+            throw StoredRingConfigurationError.invalidCenterHoleRadius(holeRadius)
+        }
+        if let size = iconSize, size <= 0 {
+            throw StoredRingConfigurationError.invalidIconSize(size)
+        }
         
-        // Validate inputs
-        try validateConfigurationInputs(
-            name: finalName,
-            shortcut: finalShortcut,
-            ringRadius: finalRadius,
-            centerHoleRadius: finalCenterHoleRadius,
-            iconSize: finalIconSize
-        )
-        
-        // If shortcut is changing, validate uniqueness
-        if let newShortcut = shortcut, newShortcut != existingConfig.shortcut {
-            guard validateShortcut(newShortcut, excludingRing: id) else {
-                throw StoredRingConfigurationError.duplicateShortcut(newShortcut)
+        // Validate shortcut uniqueness if updating keyCode/modifierFlags
+        if let keyCode = keyCode, let modifierFlags = modifierFlags {
+            guard validateShortcut(keyCode: keyCode, modifierFlags: modifierFlags, excludingRing: id) else {
+                let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
+                throw StoredRingConfigurationError.duplicateShortcut(shortcutDisplay)
             }
         }
         
-        // Update in database (async operation, no error thrown)
+        // Update in database (async operation)
         databaseManager.updateRingConfiguration(
             id: id,
             name: name,
             shortcut: shortcut,
             ringRadius: ringRadius.map { CGFloat($0) },
             centerHoleRadius: centerHoleRadius.map { CGFloat($0) },
-            iconSize: iconSize.map { CGFloat($0) }
+            iconSize: iconSize.map { CGFloat($0) },
+            keyCode: keyCode,              // NEW
+            modifierFlags: modifierFlags   // NEW
         )
         
-        // Update in-memory cache
-        if let index = configurations.firstIndex(where: { $0.id == id }) {
-            let updatedConfig = StoredRingConfiguration(
-                id: id,
-                name: finalName,
-                shortcut: finalShortcut,
-                ringRadius: finalRadius,
-                centerHoleRadius: finalCenterHoleRadius,
-                iconSize: finalIconSize,
-                isActive: existingConfig.isActive,
-                providers: existingConfig.providers
-            )
-            configurations[index] = updatedConfig
+        // Reload from database to ensure consistency
+        if let dbConfig = databaseManager.getRingConfiguration(id: id),
+           let updatedConfig = transformToDomain(dbConfig) {
+            if let index = configurations.firstIndex(where: { $0.id == id }) {
+                configurations[index] = updatedConfig
+            }
         }
         
-        print("✅ [RingConfigManager] Updated configuration successfully")
+        print("✅ [RingConfigManager] Configuration updated successfully")
     }
     
     /// Delete a ring configuration
     /// - Parameter id: ID of the configuration to delete
-    /// - Throws: StoredRingConfigurationError if configuration not found or database error
+    /// - Throws: StoredRingConfigurationError if configuration not found
     func deleteConfiguration(id: Int) throws {
         print("🗑️ [RingConfigManager] Deleting configuration \(id)")
         
@@ -292,31 +310,34 @@ class RingConfigurationManager: ObservableObject {
             throw StoredRingConfigurationError.configurationNotFound(id)
         }
         
-        // Delete from database (async operation)
+        // Delete from database (CASCADE will delete providers)
         databaseManager.deleteRingConfiguration(id: id)
         
         // Remove from in-memory cache
         configurations.removeAll { $0.id == id }
         
-        print("✅ [RingConfigManager] Deleted configuration successfully")
+        print("✅ [RingConfigManager] Configuration deleted")
         print("   Total configurations now: \(configurations.count)")
     }
     
-    /// Add a provider to an existing ring configuration
+    // MARK: - Provider Management
+    
+    /// Add a provider to an existing ring
     /// - Parameters:
-    ///   - ringId: ID of the ring configuration
-    ///   - providerType: Type of provider (e.g., "CombinedAppProvider")
-    ///   - order: Display order of the provider
-    ///   - angle: Optional fixed angle for the provider
+    ///   - ringId: ID of the ring to add provider to
+    ///   - providerType: Type of provider (e.g., "RunningAppsProvider")
+    ///   - order: Display order within the ring
+    ///   - angle: Optional fixed angle for the provider's parent item
     ///   - config: Optional configuration dictionary
-    /// - Throws: StoredRingConfigurationError if validation fails
+    /// - Returns: The ID of the newly created provider
+    /// - Throws: StoredRingConfigurationError if ring not found or validation fails
     func addProvider(
         toRing ringId: Int,
         providerType: String,
         order: Int,
         angle: Double? = nil,
         config: [String: Any]? = nil
-    ) throws {
+    ) throws -> Int {
         print("➕ [RingConfigManager] Adding provider '\(providerType)' to ring \(ringId)")
         
         // Verify ring exists
@@ -324,97 +345,160 @@ class RingConfigurationManager: ObservableObject {
             throw StoredRingConfigurationError.invalidRingId(ringId)
         }
         
-        // Validate provider order is unique
+        // Validate provider order uniqueness
         guard validateProviderOrder(order, forRing: ringId, excludingProvider: nil) else {
             throw StoredRingConfigurationError.duplicateProviderOrder(order, ringId: ringId)
         }
         
-        // Add to database
-        guard let providerId = databaseManager.addProviderToRing(
+        // Serialize config to JSON if provided
+        let configJSON: String?
+        if let config = config {
+            if let jsonData = try? JSONSerialization.data(withJSONObject: config),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                configJSON = jsonString
+            } else {
+                configJSON = nil
+            }
+        } else {
+            configJSON = nil
+        }
+        
+        // Create provider in database
+        guard let providerId = databaseManager.createProvider(
             ringId: ringId,
             providerType: providerType,
             providerOrder: order,
-            parentItemAngle: angle.map { CGFloat($0) }
+            parentItemAngle: angle.map { CGFloat($0) },
+            providerConfig: configJSON
         ) else {
-            throw StoredRingConfigurationError.databaseError("Failed to add provider to ring")
+            throw StoredRingConfigurationError.databaseError("Failed to create provider")
         }
         
-        // Update in-memory cache
-        if let index = configurations.firstIndex(where: { $0.id == ringId }) {
-            let newProvider = ProviderConfiguration(
-                id: providerId,
-                providerType: providerType,
-                order: order,
-                parentItemAngle: angle,
-                config: config
-            )
-            
-            var updatedProviders = configurations[index].providers
-            updatedProviders.append(newProvider)
-            
-            let updatedConfig = StoredRingConfiguration(
-                id: configurations[index].id,
-                name: configurations[index].name,
-                shortcut: configurations[index].shortcut,
-                ringRadius: configurations[index].ringRadius,
-                centerHoleRadius: configurations[index].centerHoleRadius,
-                iconSize: configurations[index].iconSize,
-                isActive: configurations[index].isActive,
-                providers: updatedProviders
-            )
-            
-            configurations[index] = updatedConfig
+        // Reload configuration to update in-memory cache
+        if let dbConfig = databaseManager.getRingConfiguration(id: ringId),
+           let updatedConfig = transformToDomain(dbConfig) {
+            if let index = configurations.firstIndex(where: { $0.id == ringId }) {
+                configurations[index] = updatedConfig
+            }
         }
         
-        print("✅ [RingConfigManager] Added provider successfully (ID: \(providerId))")
+        print("✅ [RingConfigManager] Provider added successfully (ID: \(providerId))")
+        
+        return providerId
     }
     
-    /// Remove a provider from a ring configuration
+    /// Update a provider's settings
     /// - Parameters:
-    ///   - providerId: ID of the provider to remove
-    ///   - ringId: ID of the ring configuration
-    /// - Throws: StoredRingConfigurationError if provider or ring not found
-    func removeProvider(providerId: Int, fromRing ringId: Int) throws {
-        print("🗑️ [RingConfigManager] Removing provider \(providerId) from ring \(ringId)")
+    ///   - providerId: ID of the provider to update
+    ///   - order: New order (nil to keep current)
+    ///   - angle: New angle (nil to keep current)
+    ///   - config: New config (nil to keep current)
+    ///   - clearAngle: Set to true to clear the angle (set to nil)
+    ///   - clearConfig: Set to true to clear the config (set to nil)
+    /// - Throws: StoredRingConfigurationError if provider not found or validation fails
+    func updateProvider(
+        id providerId: Int,
+        order: Int? = nil,
+        angle: Double? = nil,
+        config: [String: Any]? = nil,
+        clearAngle: Bool = false,
+        clearConfig: Bool = false
+    ) throws {
+        print("📝 [RingConfigManager] Updating provider \(providerId)")
         
-        // Verify ring exists
-        guard let config = getConfiguration(id: ringId) else {
-            throw StoredRingConfigurationError.invalidRingId(ringId)
+        // Find which ring this provider belongs to
+        var ringId: Int?
+        for config in configurations {
+            if config.providers.contains(where: { $0.id == providerId }) {
+                ringId = config.id
+                break
+            }
         }
         
-        // Verify provider exists in this ring
-        guard config.providers.contains(where: { $0.id == providerId }) else {
+        guard let ringId = ringId else {
             throw StoredRingConfigurationError.invalidProviderId(providerId)
         }
         
-        // Remove from database (async operation)
-        databaseManager.removeProvider(id: providerId)
-        
-        // Update in-memory cache
-        if let index = configurations.firstIndex(where: { $0.id == ringId }) {
-            let updatedProviders = configurations[index].providers.filter { $0.id != providerId }
-            
-            let updatedConfig = StoredRingConfiguration(
-                id: configurations[index].id,
-                name: configurations[index].name,
-                shortcut: configurations[index].shortcut,
-                ringRadius: configurations[index].ringRadius,
-                centerHoleRadius: configurations[index].centerHoleRadius,
-                iconSize: configurations[index].iconSize,
-                isActive: configurations[index].isActive,
-                providers: updatedProviders
-            )
-            
-            configurations[index] = updatedConfig
+        // Validate order uniqueness if updating
+        if let newOrder = order {
+            guard validateProviderOrder(newOrder, forRing: ringId, excludingProvider: providerId) else {
+                throw StoredRingConfigurationError.duplicateProviderOrder(newOrder, ringId: ringId)
+            }
         }
         
-        print("✅ [RingConfigManager] Removed provider successfully")
+        // Serialize config to JSON if provided
+        let configJSON: String?
+        if let config = config {
+            if let jsonData = try? JSONSerialization.data(withJSONObject: config),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                configJSON = jsonString
+            } else {
+                configJSON = nil
+            }
+        } else {
+            configJSON = nil
+        }
+        
+        // Update in database
+        databaseManager.updateProvider(
+            id: providerId,
+            providerOrder: order,
+            parentItemAngle: angle.map { CGFloat($0) },
+            providerConfig: configJSON,
+            clearAngle: clearAngle,
+            clearConfig: clearConfig
+        )
+        
+        // Reload configuration to update in-memory cache
+        if let dbConfig = databaseManager.getRingConfiguration(id: ringId),
+           let updatedConfig = transformToDomain(dbConfig) {
+            if let index = configurations.firstIndex(where: { $0.id == ringId }) {
+                configurations[index] = updatedConfig
+            }
+        }
+        
+        print("✅ [RingConfigManager] Provider updated successfully")
     }
     
-    /// Toggle the active state of a ring configuration
+    /// Remove a provider from a ring
+    /// - Parameter providerId: ID of the provider to remove
+    /// - Throws: StoredRingConfigurationError if provider not found
+    func removeProvider(id providerId: Int) throws {
+        print("🗑️ [RingConfigManager] Removing provider \(providerId)")
+        
+        // Find which ring this provider belongs to
+        var ringId: Int?
+        for config in configurations {
+            if config.providers.contains(where: { $0.id == providerId }) {
+                ringId = config.id
+                break
+            }
+        }
+        
+        guard let ringId = ringId else {
+            throw StoredRingConfigurationError.invalidProviderId(providerId)
+        }
+        
+        // Delete from database
+        databaseManager.removeProvider(id: providerId)
+        
+        // Reload configuration to update in-memory cache
+        if let dbConfig = databaseManager.getRingConfiguration(id: ringId),
+           let updatedConfig = transformToDomain(dbConfig) {
+            if let index = configurations.firstIndex(where: { $0.id == ringId }) {
+                configurations[index] = updatedConfig
+            }
+        }
+        
+        print("✅ [RingConfigManager] Provider removed successfully")
+    }
+    
+    // MARK: - Active Status Management
+    
+    /// Set a configuration's active status
     /// - Parameters:
     ///   - id: ID of the configuration
-    ///   - isActive: New active state
+    ///   - isActive: New active status
     /// - Throws: StoredRingConfigurationError if configuration not found
     func setConfigurationActive(_ id: Int, isActive: Bool) throws {
         print("🔄 [RingConfigManager] Setting configuration \(id) active: \(isActive)")
@@ -424,22 +508,15 @@ class RingConfigurationManager: ObservableObject {
             throw StoredRingConfigurationError.configurationNotFound(id)
         }
         
-        // If activating, validate shortcut uniqueness
-        if isActive && !existingConfig.isActive {
-            guard validateShortcut(existingConfig.shortcut, excludingRing: id) else {
-                throw StoredRingConfigurationError.duplicateShortcut(existingConfig.shortcut)
+        // If activating, validate shortcut uniqueness (if shortcut exists)
+        if isActive && !existingConfig.isActive && existingConfig.hasShortcut {
+            guard validateShortcut(keyCode: existingConfig.keyCode!, modifierFlags: existingConfig.modifierFlags!, excludingRing: id) else {
+                throw StoredRingConfigurationError.duplicateShortcut(existingConfig.shortcutDescription)
             }
         }
         
         // Update in database (async operation)
-        databaseManager.updateRingConfiguration(
-            id: id,
-            name: nil,
-            shortcut: nil,
-            ringRadius: nil,
-            iconSize: nil,
-            isActive: isActive
-        )
+        databaseManager.setRingConfigurationActiveStatus(id: id, isActive: isActive)
         
         // Update in-memory cache
         if let index = configurations.firstIndex(where: { $0.id == id }) {
@@ -451,7 +528,9 @@ class RingConfigurationManager: ObservableObject {
                 centerHoleRadius: existingConfig.centerHoleRadius,
                 iconSize: existingConfig.iconSize,
                 isActive: isActive,
-                providers: existingConfig.providers
+                providers: existingConfig.providers,
+                keyCode: existingConfig.keyCode,
+                modifierFlags: existingConfig.modifierFlags
             )
             configurations[index] = updatedConfig
         }
@@ -462,7 +541,33 @@ class RingConfigurationManager: ObservableObject {
     
     // MARK: - Validation Methods
     
-    /// Validate that a shortcut is unique among active rings
+    /// Validate that a shortcut (keyCode + modifierFlags) is unique among active rings - NEW
+    /// - Parameters:
+    ///   - keyCode: The key code to validate
+    ///   - modifierFlags: The modifier flags to validate
+    ///   - excludingRing: Optional ring ID to exclude from check (for updates)
+    /// - Returns: true if shortcut is unique (or ring is excluded), false if duplicate exists
+    func validateShortcut(keyCode: UInt16, modifierFlags: UInt, excludingRing: Int?) -> Bool {
+        let activeRings = getActiveConfigurations()
+        
+        for config in activeRings {
+            // Skip the excluded ring
+            if let excludingRing = excludingRing, config.id == excludingRing {
+                continue
+            }
+            
+            // Check for duplicate
+            if config.keyCode == keyCode && config.modifierFlags == modifierFlags {
+                let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
+                print("⚠️ [RingConfigManager] Shortcut '\(shortcutDisplay)' already used by '\(config.name)'")
+                return false
+            }
+        }
+        
+        return true
+    }
+    
+    /// Validate that a shortcut string is unique among active rings (DEPRECATED - legacy support)
     /// - Parameters:
     ///   - shortcut: The shortcut to validate
     ///   - excludingRing: Optional ring ID to exclude from check (for updates)
@@ -518,7 +623,7 @@ class RingConfigurationManager: ObservableObject {
     /// Transform database entry to domain model
     private func transformToDomain(_ dbConfig: RingConfigurationEntry) -> StoredRingConfiguration? {
         // Get providers for this ring
-        let dbProviders = databaseManager.getProvidersForRing(ringId: dbConfig.id)
+        let dbProviders = databaseManager.getProviders(ringId: dbConfig.id)
         
         // Transform providers
         let providers = dbProviders.map { dbProvider in
@@ -547,14 +652,15 @@ class RingConfigurationManager: ObservableObject {
             centerHoleRadius: Double(dbConfig.centerHoleRadius),
             iconSize: Double(dbConfig.iconSize),
             isActive: dbConfig.isActive,
-            providers: providers
+            providers: providers,
+            keyCode: dbConfig.keyCode,         // NEW
+            modifierFlags: dbConfig.modifierFlags  // NEW
         )
     }
     
     /// Validate configuration inputs
     private func validateConfigurationInputs(
         name: String,
-        shortcut: String,
         ringRadius: Double,
         centerHoleRadius: Double,
         iconSize: Double
@@ -562,11 +668,6 @@ class RingConfigurationManager: ObservableObject {
         // Validate name
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw StoredRingConfigurationError.invalidShortcut("Name cannot be empty")
-        }
-        
-        // Validate shortcut
-        guard !shortcut.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw StoredRingConfigurationError.invalidShortcut("Shortcut cannot be empty")
         }
         
         // Validate ring radius
@@ -584,6 +685,38 @@ class RingConfigurationManager: ObservableObject {
             throw StoredRingConfigurationError.invalidIconSize(iconSize)
         }
     }
+    
+    /// Format a shortcut for display (helper)
+    private func formatShortcut(keyCode: UInt16, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        parts.append(keyCodeToString(keyCode))
+        
+        return parts.joined()
+    }
+    
+    /// Convert key code to string (helper)
+    private func keyCodeToString(_ keyCode: UInt16) -> String {
+        switch keyCode {
+        case 0: return "A"
+        case 1: return "S"
+        case 2: return "D"
+        case 3: return "F"
+        case 4: return "H"
+        case 5: return "G"
+        case 40: return "K"
+        case 49: return "Space"
+        case 50: return "`"
+        case 53: return "Esc"
+        default: return "[\(keyCode)]"
+        }
+    }
 }
 
 // MARK: - Example Usage (Documentation)
@@ -595,22 +728,23 @@ class RingConfigurationManager: ObservableObject {
  let manager = RingConfigurationManager.shared
  await manager.loadActiveConfigurations()
  
- // Create a new ring
+ // Create a new ring with keyboard shortcut
  let newRing = try await manager.createConfiguration(
      name: "Quick Apps",
-     shortcut: "Cmd+Shift+A",
+     shortcut: "Cmd+Shift+A",  // For display
      ringRadius: 80.0,
      centerHoleRadius: 56.0,
      iconSize: 64.0,
+     keyCode: 0,  // "A"
+     modifierFlags: NSEvent.ModifierFlags([.command, .shift]).rawValue,
      providers: [
          ("RunningAppsProvider", 1, 180.0),
          ("FavoriteAppsProvider", 2, 180.0)
      ]
  )
  
- // Query by shortcut
- if let ring = manager.getConfiguration(forShortcut: "Cmd+Shift+A") {
-     // Pass to CircularUIManager to create UI instance
+ // Query by shortcut (new method)
+ if let ring = manager.getConfiguration(keyCode: 0, modifierFlags: NSEvent.ModifierFlags([.command, .shift]).rawValue) {
      print("Found ring: \(ring.name)")
  }
  
@@ -618,7 +752,8 @@ class RingConfigurationManager: ObservableObject {
  try await manager.updateConfiguration(
      id: ringId,
      name: "Quick Apps (Updated)",
-     ringRadius: 400.0
+     ringRadius: 400.0,
+     keyCode: 3  // Change to "F"
  )
  
  // Add a provider

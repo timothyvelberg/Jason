@@ -113,13 +113,17 @@ struct FavoriteDynamicFileEntry: Identifiable {
 struct RingConfigurationEntry: Identifiable {
     let id: Int
     let name: String
-    let shortcut: String
+    let shortcut: String           // DEPRECATED - kept for display/migration
     let ringRadius: CGFloat
     let centerHoleRadius: CGFloat
     let iconSize: CGFloat
     let createdAt: Int
     let isActive: Bool
     let displayOrder: Int
+    
+    // NEW: Raw shortcut data
+    let keyCode: UInt16?
+    let modifierFlags: UInt?
 }
 
 struct RingProviderEntry: Identifiable {

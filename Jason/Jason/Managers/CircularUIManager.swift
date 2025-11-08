@@ -25,14 +25,13 @@ class CircularUIManager: ObservableObject {
     var functionManager: FunctionManager?
     private var mouseTracker: MouseTracker?
     private var gestureManager: GestureManager?
-    private var hotkeyManager: HotkeyManager?  // 🆕 New hotkey manager
     
     private var centerPoint: CGPoint = .zero
     private var previousApp: NSRunningApplication?
     private var isIntentionallySwitching: Bool = false
     
-    private var isInAppSwitcherMode: Bool = false
-    private var isInHoldMode: Bool = false  // 🆕 Track if we're in hold-to-show mode
+    var isInAppSwitcherMode: Bool = false
+    var isInHoldMode: Bool = false
     
     // MARK: - Configuration (Phase 3 Refactoring)
     
@@ -272,7 +271,6 @@ class CircularUIManager: ObservableObject {
         }
         
         setupOverlayWindow()
-        setupHotkeys()  // 🆕 New method
     }
     
     // MARK: - Gesture Handlers (Click, Drag, Scroll)
@@ -465,74 +463,6 @@ class CircularUIManager: ObservableObject {
         }
     }
     
-    // MARK: - Hotkey Setup (🆕 Simplified)
-
-    private func setupHotkeys() {
-        let hotkeyManager = HotkeyManager()
-        self.hotkeyManager = hotkeyManager
-        
-        // Configure hold-to-show key (F13 by default - no conflicts)
-        hotkeyManager.holdKeyCode = HotkeyManager.KeyCode.f13
-        
-        // Configure callbacks
-        hotkeyManager.onShowRoot = { [weak self] in
-            self?.show()
-        }
-        
-        hotkeyManager.onShowApps = { [weak self] in
-            // Enter app switcher mode when Ctrl is held
-            print("🎯 Entering app switcher mode (Ctrl held)")
-            self?.isInAppSwitcherMode = true
-            self?.show(expandingCategory: "combined-apps")
-        }
-        
-        hotkeyManager.onHide = { [weak self] in
-            self?.hide()
-        }
-        
-        hotkeyManager.onShiftPressed = { [weak self] in
-            self?.handlePreviewRequest()
-        }
-        
-        hotkeyManager.onCtrlReleasedInAppSwitcher = { [weak self] in
-            self?.handleCtrlReleaseInAppSwitcher()
-        }
-        
-        // 🆕 Hold-to-show callbacks
-        hotkeyManager.onHoldKeyPressed = { [weak self] in
-            print("🎯 Hold key pressed - showing UI in hold mode")
-            self?.isInHoldMode = true
-            self?.show()
-        }
-        
-        hotkeyManager.onHoldKeyReleased = { [weak self] in
-            guard let self = self else { return }
-            print("🎯 Hold key released")
-            
-            // Only hide if we're still in hold mode AND UI is visible
-            // If an action already hid the UI, isInHoldMode will be false
-            if self.isInHoldMode && self.isVisible {
-                print("   → Hiding UI (still in hold mode)")
-                self.hide()
-            } else {
-                print("   → Not hiding (already hidden or exited hold mode)")
-                self.isInHoldMode = false  // Clean up state
-            }
-        }
-        
-        // Provide query functions
-        hotkeyManager.isUIVisible = { [weak self] in
-            return self?.isVisible ?? false
-        }
-        
-        hotkeyManager.isInAppSwitcherMode = { [weak self] in
-            return self?.isInAppSwitcherMode ?? false
-        }
-        
-        // Start monitoring
-        hotkeyManager.startMonitoring()
-    }
-    
     // MARK: - Overlay Window Setup
     
     private func setupOverlayWindow() {
@@ -561,7 +491,7 @@ class CircularUIManager: ObservableObject {
     
     // MARK: - Preview Handler
 
-    private func handlePreviewRequest() {
+    func handlePreviewRequest() {
         guard let functionManager = functionManager else { return }
         
         // If QuickLook is already showing, just close it
@@ -601,7 +531,7 @@ class CircularUIManager: ObservableObject {
     
     // MARK: - App Switcher Mode Handlers
     
-    private func handleCtrlReleaseInAppSwitcher() {
+    func handleCtrlReleaseInAppSwitcher() {
         guard isInAppSwitcherMode else { return }
         
         print("⌨️ [App Switcher] Ctrl released - switching to hovered app")
@@ -739,13 +669,6 @@ class CircularUIManager: ObservableObject {
         // Exit app switcher mode when hiding
         exitAppSwitcherMode()
         
-        // 🆕 If we were in hold mode AND key is still physically pressed,
-        // require key release before allowing next show
-        // This prevents UI from re-appearing while user is still holding F13
-        if isInHoldMode && (hotkeyManager?.isHoldKeyPhysicallyPressed ?? false) {
-            hotkeyManager?.requireReleaseBeforeNextShow()
-        }
-        
         // 🆕 Exit hold mode when hiding (prevents double-hide on key release)
         isInHoldMode = false
         
@@ -761,7 +684,6 @@ class CircularUIManager: ObservableObject {
         
         // Reset all state for clean slate on next show
         functionManager?.reset()
-        hotkeyManager?.resetState()  // 🆕 Reset hotkey state
         
         // Close any open preview
         QuickLookManager.shared.hidePreview()

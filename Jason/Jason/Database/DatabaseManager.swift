@@ -171,7 +171,7 @@ class DatabaseManager {
         );
         """
         
-        // Create ring_configurations table
+        // Create ring_configurations table (UPDATED with key_code and modifier_flags)
         let ringConfigurationsSQL = """
         CREATE TABLE IF NOT EXISTS ring_configurations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -180,6 +180,8 @@ class DatabaseManager {
             ring_radius REAL NOT NULL,
             center_hole_radius REAL NOT NULL DEFAULT 56.0,
             icon_size REAL NOT NULL,
+            key_code INTEGER,
+            modifier_flags INTEGER,
             created_at INTEGER DEFAULT (strftime('%s', 'now')),
             is_active INTEGER DEFAULT 1,
             display_order INTEGER DEFAULT 0
