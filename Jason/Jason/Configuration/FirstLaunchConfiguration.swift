@@ -34,8 +34,8 @@ class FirstLaunchConfiguration {
             modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
         )
         
-        static let ctrlShiftS = DefaultShortcut(
-            keyCode: 1,  // "S"
+        static let ctrlShiftE = DefaultShortcut(
+            keyCode: 14,  // "E"
             modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
         )
     }
@@ -60,11 +60,11 @@ class FirstLaunchConfiguration {
         
         print("🆕 [FirstLaunch] No configurations found - creating default 'Everything' ring")
         
-        // Create default "Everything" ring with Cmd+Shift+Space
+        // Create default "Everything" ring with Cmd+Shift+SpaceCmd+Shift+SpaceCmd+Shift+SpaceCmd+Shift+Space
         do {
             let defaultConfig = try configManager.createConfiguration(
                 name: "Everything",
-                shortcut: "Cmd+Shift+Space",  // For display only
+                shortcut: "Cmd+Shift+D",  // For display only
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
                 iconSize: 32.0,
@@ -131,25 +131,23 @@ class FirstLaunchConfiguration {
             )
             print("   ✅ Created '\(filesRing.name)' - \(filesRing.shortcutDescription)")
             
-            // Example 3: Everything ring with Cmd+Shift+Space
-            let everythingRing = try configManager.createConfiguration(
-                name: "Everything",
-                shortcut: "Cmd+Shift+Space",  // For display
+            // Example 4: Files & Actions ring with Cmd+Shift+E
+            let filesActionsRing = try configManager.createConfiguration(
+                name: "Files & Actions",
+                shortcut: "Cmd+Shift+E",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
-                iconSize: 36.0,
-                keyCode: DefaultShortcut.ctrlShiftS.keyCode,
-                modifierFlags: DefaultShortcut.ctrlShiftS.modifierFlags,
+                iconSize: 38.0,
+                keyCode: DefaultShortcut.ctrlShiftE.keyCode,
+                modifierFlags: DefaultShortcut.ctrlShiftE.modifierFlags,
                 providers: [
-                    ("CombinedAppsProvider", 1, nil),
-                    ("FavoriteFilesProvider", 2, nil),
-                    ("SystemActionsProvider", 3, nil),
-                    ("FinderLogic", 4, nil)
+                    ("FavoriteFilesProvider", 1, nil),
+                    ("SystemActionsProvider", 2, nil)
                 ]
             )
-            print("   ✅ Created '\(everythingRing.name)' - \(everythingRing.shortcutDescription)")
+            print("   ✅ Created '\(filesActionsRing.name)' - \(filesActionsRing.shortcutDescription)")
             
-            print("   ✅ Created 3 example configurations")
+            print("   ✅ Created 4 example configurations")
             
         } catch {
             print("   ⚠️ Failed to create some example configurations: \(error)")

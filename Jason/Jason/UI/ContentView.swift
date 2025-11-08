@@ -69,6 +69,10 @@ struct MinimalView: View {
     @State private var showingAppFavoritesSettings = false
     @State private var showingFileFavoritesSettings = false
     
+    // Ring configuration selection for testing
+    @State private var selectedConfigId: Int?
+    @State private var availableConfigs: [StoredRingConfiguration] = []
+    
     // Get the first instance for testing buttons
     private var firstInstance: CircularUIManager? {
         instanceManager.getFirstInstance()
@@ -137,15 +141,59 @@ struct MinimalView: View {
                 .foregroundColor(.secondary)
             
             VStack(spacing: 10) {
-                Button("Test First Ring") {
-                    if let instance = firstInstance {
+                // Ring Configuration Dropdown
+                Picker("Ring Configuration", selection: $selectedConfigId) {
+                    ForEach(availableConfigs) { config in
+                        Text(config.name).tag(config.id as Int?)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .disabled(availableConfigs.isEmpty)
+                
+                // Test Ring Button
+                Button("Test Ring") {
+                    if let configId = selectedConfigId,
+                       let config = availableConfigs.first(where: { $0.id == configId }) {
+                        
+                        // Capture position at button click
+                        let clickPosition = NSEvent.mouseLocation
+                        print("📍 [ContentView] =================")
+                        print("📍 [ContentView] Testing: '\(config.name)' (ID: \(configId))")
+                        print("📍 [ContentView] Mouse at button click: \(clickPosition)")
+                        
+                        // Check if instance exists
+                        let instanceExists = CircularUIInstanceManager.shared.getInstance(forConfigId: configId) != nil
+                        print("📍 [ContentView] Instance exists: \(instanceExists)")
+                        
+                        // Create instance immediately if it doesn't exist
+                        if !instanceExists {
+                            print("🔧 [ContentView] Creating on-demand instance for '\(config.name)'")
+                            CircularUIInstanceManager.shared.createOrUpdateInstance(for: config)
+                            
+                            // Setup the instance
+                            if let instance = CircularUIInstanceManager.shared.getInstance(forConfigId: configId) {
+                                instance.setup()
+                                print("📍 [ContentView] Instance created and setup complete")
+                            }
+                        }
+                        
+                        // Delay for user to move mouse
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            instance.show()
+                            // Check position after delay
+                            let delayedPosition = NSEvent.mouseLocation
+                            print("📍 [ContentView] Mouse after 0.5s delay: \(delayedPosition)")
+                            print("📍 [ContentView] Calling show() now...")
+                            
+                            // Show the ring (this will capture position internally)
+                            CircularUIInstanceManager.shared.show(configId: configId)
+                            
+                            print("📍 [ContentView] =================")
                         }
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(firstInstance == nil)
+                .disabled(selectedConfigId == nil)
                 
                 Button("Hide All Rings") {
                     instanceManager.hideAll()
@@ -159,6 +207,12 @@ struct MinimalView: View {
                 
                 Button("Debug Info") {
                     instanceManager.printDebugInfo()
+                }
+                .buttonStyle(.bordered)
+                
+                Button("Create Example Configs") {
+                    FirstLaunchConfiguration.createExampleConfigurations()
+                    loadConfigurations() // Reload to update dropdown
                 }
                 .buttonStyle(.bordered)
                 
@@ -183,6 +237,9 @@ struct MinimalView: View {
         }
         .padding(30)
         .frame(width: 400, height: 600)
+        .onAppear {
+            loadConfigurations()
+        }
         .sheet(isPresented: $showingFolderFavoritesSettings) {
             if let instance = firstInstance {
                 FavoritesSettingsView(circularUI: instance)
@@ -199,6 +256,24 @@ struct MinimalView: View {
                let filesProvider = instance.favoriteFilesProvider {
                 FavoriteFilesSettingsView(filesProvider: filesProvider)
             }
+        }
+    }
+    
+    // MARK: - Configuration Loading
+    
+    private func loadConfigurations() {
+        // First, load configurations from database
+        RingConfigurationManager.shared.loadConfigurations()
+        
+        // Then get all configurations (not just active ones)
+        availableConfigs = RingConfigurationManager.shared.getAllConfigurations()
+        
+        print("📋 [ContentView] Loaded \(availableConfigs.count) configuration(s) for testing")
+        
+        // Set default selection to first ring if none selected
+        if selectedConfigId == nil, let firstConfig = availableConfigs.first {
+            selectedConfigId = firstConfig.id
+            print("   ✅ Default selection: \(firstConfig.name)")
         }
     }
 }

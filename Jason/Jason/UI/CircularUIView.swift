@@ -34,9 +34,10 @@ struct CircularUIView: View {
                 // Get the screen the overlay is on (fallback to main screen)
                 let screen = window?.currentScreen ?? NSScreen.main
                 
-                // Global mouse coordinates (from NSEvent.mouseLocation)
-                let globalMouseX = window?.uiCenterLocation.x ?? 0
-                let globalMouseY = window?.uiCenterLocation.y ?? 0
+                // Use CircularUIManager's published mousePosition instead of window property
+                // This ensures SwiftUI reactivity and avoids timing issues
+                let globalMouseX = circularUI.mousePosition.x
+                let globalMouseY = circularUI.mousePosition.y
                 
                 // Convert global coordinates to screen-local coordinates
                 // Global origin is at bottom-left of primary screen
