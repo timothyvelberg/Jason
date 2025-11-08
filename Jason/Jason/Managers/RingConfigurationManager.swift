@@ -121,6 +121,7 @@ class RingConfigurationManager: ObservableObject {
     ///   - providers: Array of provider specifications (type, order, angle)
     /// - Returns: The newly created configuration
     /// - Throws: StoredRingConfigurationError if validation fails or database error occurs
+    ///
     func createConfiguration(
         name: String,
         shortcut: String,
