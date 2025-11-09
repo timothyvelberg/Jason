@@ -18,7 +18,7 @@ class CircularUIManager: ObservableObject {
     @Published var dragStartPoint: CGPoint?
     private var draggedNode: FunctionNode?
     
-    private var overlayWindow: OverlayWindow?
+    var overlayWindow: OverlayWindow?
     private(set) var appSwitcher: AppSwitcherManager?
     private(set) var combinedAppsProvider: CombinedAppsProvider?
     var favoriteFilesProvider: FavoriteFilesProvider?

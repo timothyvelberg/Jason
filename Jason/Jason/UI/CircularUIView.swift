@@ -29,7 +29,7 @@ struct CircularUIView: View {
         ZStack {
             // Existing circular UI content
             GeometryReader { geometry in
-                let window = NSApp.windows.first(where: { $0 is OverlayWindow }) as? OverlayWindow
+                let window = circularUI.overlayWindow
                 
                 // Get the screen the overlay is on (fallback to main screen)
                 let screen = window?.currentScreen ?? NSScreen.main
