@@ -123,6 +123,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
             FunctionNode(
                 id: "fav-\(appInfo.bundleIdentifier)",
                 name: appInfo.name,
+                type: .app,
                 icon: appInfo.icon,
                 preferredLayout: nil,
                 showLabel: true,
@@ -149,6 +150,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
             FunctionNode(
                 id: providerId,
                 name: providerName,
+                type: .category,
                 icon: providerIcon,
                 children: appNodes,
                 

@@ -38,6 +38,7 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
             FunctionNode(
                 id: "mission-control",
                 name: "Mission Control",
+                type: .action,
                 icon: NSImage(systemSymbolName: "rectangle.3.group", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
@@ -55,6 +56,7 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
             FunctionNode(
                 id: "show-desktop",
                 name: "Show Desktop",
+                type: .action,
                 icon: NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,

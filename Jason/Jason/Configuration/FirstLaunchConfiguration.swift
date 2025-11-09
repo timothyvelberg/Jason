@@ -38,6 +38,11 @@ class FirstLaunchConfiguration {
             keyCode: 14,  // "E"
             modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
         )
+        
+        static let ctrlShiftQ = DefaultShortcut(
+            keyCode: 12,  // "Q"
+            modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
+        )
     }
     
     // MARK: - First Launch Setup
@@ -100,13 +105,13 @@ class FirstLaunchConfiguration {
         print("🎨 [FirstLaunch] Creating example configurations...")
         
         do {
-            // Example 1: Apps-only ring with Cmd+Shift+A
+            // Example 1: Apps-only ring with Ctrl+Shift+A (PARENT MODE)
             let appsRing = try configManager.createConfiguration(
-                name: "Quick Apps",
-                shortcut: "Cmd+Shift+A",  // For display
+                name: "Quick Apps (Parent)",
+                shortcut: "Ctrl+Shift+A",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
-                iconSize: 32,
+                iconSize: 44.0,
                 keyCode: DefaultShortcut.ctrlShiftA.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftA.modifierFlags,
                 providers: [
@@ -114,11 +119,44 @@ class FirstLaunchConfiguration {
                 ]
             )
             print("   ✅ Created '\(appsRing.name)' - \(appsRing.shortcutDescription)")
+            print("      Display Mode: parent (shows 'Applications' category)")
             
-            // Example 2: Files-focused ring with Cmd+Shift+F
+            // Example 2: Apps-only ring with Ctrl+Shift+Q (DIRECT MODE)
+            let appsDirectRing = try configManager.createConfiguration(
+                name: "Quick Apps (Direct)",
+                shortcut: "Ctrl+Shift+Q",  // For display
+                ringRadius: 80.0,
+                centerHoleRadius: 56.0,
+                iconSize: 44.0,
+                keyCode: DefaultShortcut.ctrlShiftQ.keyCode,
+                modifierFlags: DefaultShortcut.ctrlShiftQ.modifierFlags,
+                providers: [
+                    ("CombinedAppsProvider", 1, nil)
+                ]
+            )
+            
+            // Set display mode to "direct" for immediate app access
+            let directSuccess = DatabaseManager.shared.updateProviderDisplayMode(
+                ringId: appsDirectRing.id,
+                providerType: "CombinedAppsProvider",
+                displayMode: "direct"
+            )
+            
+            if directSuccess {
+                print("   ✅ Created '\(appsDirectRing.name)' - \(appsDirectRing.shortcutDescription)")
+                print("      Display Mode: direct (shows apps immediately)")
+            } else {
+                print("   ⚠️ Created ring but failed to set direct mode")
+            }
+            
+            // 🔧 CRITICAL: Reload configurations after database update
+            // This ensures the in-memory configs reflect the displayMode change
+            configManager.loadConfigurations()
+            
+            // Example 3: Files-focused ring with Ctrl+Shift+F
             let filesRing = try configManager.createConfiguration(
                 name: "My Files",
-                shortcut: "Cmd+Shift+F",  // For display
+                shortcut: "Ctrl+Shift+F",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
                 iconSize: 32.0,
@@ -131,10 +169,10 @@ class FirstLaunchConfiguration {
             )
             print("   ✅ Created '\(filesRing.name)' - \(filesRing.shortcutDescription)")
             
-            // Example 3: Files & Actions ring with Cmd+Shift+E
+            // Example 4: Files & Actions ring with Ctrl+Shift+E
             let filesActionsRing = try configManager.createConfiguration(
                 name: "Files & Actions",
-                shortcut: "Cmd+Shift+E",  // For display
+                shortcut: "Ctrl+Shift+E",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
                 iconSize: 38.0,
@@ -148,6 +186,9 @@ class FirstLaunchConfiguration {
             print("   ✅ Created '\(filesActionsRing.name)' - \(filesActionsRing.shortcutDescription)")
             
             print("   ✅ Created 4 example configurations")
+            print("   📊 Display Mode Comparison:")
+            print("      • Parent Mode (Ctrl+Shift+A): Ring 0 shows 'Applications' → Ring 1 shows apps")
+            print("      • Direct Mode (Ctrl+Shift+Q): Ring 0 shows apps immediately")
             
         } catch {
             print("   ⚠️ Failed to create some example configurations: \(error)")

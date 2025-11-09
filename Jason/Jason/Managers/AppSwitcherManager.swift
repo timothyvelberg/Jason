@@ -378,6 +378,7 @@ extension AppSwitcherManager: FunctionProvider {
             return FunctionNode(
                 id: "app-\(app.processIdentifier)",
                 name: app.localizedName ?? "Unknown",
+                type: .app,
                 icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
                 contextActions: contextActions,
                 slicePositioning: .center,
@@ -399,6 +400,7 @@ extension AppSwitcherManager: FunctionProvider {
             FunctionNode(
                 id: providerId,
                 name: providerName,
+                type: .category,
                 icon: providerIcon,
                 children: appNodes,
                 preferredLayout: .partialSlice,  // Use full circle for many apps

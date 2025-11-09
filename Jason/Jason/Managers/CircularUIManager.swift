@@ -214,9 +214,37 @@ class CircularUIManager: ObservableObject {
         
         let providers = factory.createProviders(from: configuration)
         
-        // Register all providers
+        // Helper to normalize provider names for matching
+        // Handles both "CombinedAppsProvider" (database) and "combined-apps" (providerId)
+        func normalizeProviderName(_ name: String) -> String {
+            // Convert camelCase/PascalCase to lowercase kebab-case
+            // "CombinedAppsProvider" -> "combinedappsprovider"
+            // "combined-apps" -> "combinedapps"
+            return name
+                .replacingOccurrences(of: "Provider", with: "", options: .caseInsensitive)
+                .replacingOccurrences(of: "-", with: "")
+                .lowercased()
+        }
+        
+        // Register all providers with their configurations
         for provider in providers {
-            functionManager?.registerProvider(provider)
+            // Look up this provider's configuration by matching normalized names
+            let normalizedProviderId = normalizeProviderName(provider.providerId)
+            
+            let providerConfig = configuration.providers.first { config in
+                let normalizedConfigType = normalizeProviderName(config.providerType)
+                return normalizedConfigType == normalizedProviderId
+            }
+            
+            if let config = providerConfig {
+                functionManager?.registerProvider(provider, configuration: config)
+                print("   ✅ Registered '\(provider.providerName)' (providerId: \(provider.providerId)) with config")
+                print("      displayMode: \(config.effectiveDisplayMode)")
+            } else {
+                functionManager?.registerProvider(provider, configuration: nil)
+                print("   ⚠️ Registered '\(provider.providerName)' (providerId: \(provider.providerId)) WITHOUT config")
+                print("      Available configs: \(configuration.providers.map { $0.providerType }.joined(separator: ", "))")
+            }
             
             // Store references for specific provider types
             if let combinedApps = provider as? CombinedAppsProvider {

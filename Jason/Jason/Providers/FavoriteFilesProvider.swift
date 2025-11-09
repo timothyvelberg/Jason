@@ -261,6 +261,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 FunctionNode(
                     id: "no-favorite-files",
                     name: "No Favorite Files",
+                    type: .action,
                     icon: NSImage(systemSymbolName: "star.slash", accessibilityDescription: nil) ?? NSImage(),
                     preferredLayout: .partialSlice,
                     onLeftClick: ModifierAwareInteraction(base: .doNothing),
@@ -275,6 +276,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             FunctionNode(
                 id: providerId,
                 name: providerName,
+                type: .category,
                 icon: providerIcon,
                 children: fileNodes,
                 preferredLayout: .partialSlice,
@@ -298,6 +300,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 FunctionNode(
                     id: "\(entry.id)-reveal",
                     name: "Reveal in Finder",
+                    type: .action,
                     icon: NSImage(systemSymbolName: "folder", accessibilityDescription: nil) ?? NSImage(),
                     onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                         self?.revealInFinder(path: entry.filePath)
@@ -313,6 +316,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 FunctionNode(
                     id: "\(entry.id)-info",
                     name: "Get Info",
+                    type: .action,
                     icon: NSImage(systemSymbolName: "info.circle", accessibilityDescription: nil) ?? NSImage(),
                     onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                         self?.showInfo(path: entry.filePath)
@@ -330,6 +334,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 FunctionNode(
                     id: "\(entry.id)-remove",
                     name: "Remove from Favorites",
+                    type: .action,
                     icon: NSImage(systemSymbolName: "star.slash", accessibilityDescription: nil) ?? NSImage(),
                     onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                         self?.removeFromFavorites(path: entry.filePath)
@@ -344,6 +349,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 FunctionNode(
                     id: "\(entry.id)-remove",
                     name: "Remove from Favorites",
+                    type: .action,
                     icon: NSImage(systemSymbolName: "star.slash", accessibilityDescription: nil) ?? NSImage(),
                     onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                         self?.removeDynamicFromFavorites(id: dynamicId)
@@ -359,6 +365,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         return FunctionNode(
             id: entry.id,
             name: entry.displayName,
+            type: .file,
             icon: entry.icon,
             contextActions: contextActions,
             preferredLayout: .partialSlice,

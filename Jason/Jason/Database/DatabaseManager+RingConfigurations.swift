@@ -20,8 +20,8 @@ extension DatabaseManager {
         ringRadius: CGFloat,
         centerHoleRadius: CGFloat,
         iconSize: CGFloat,
-        keyCode: UInt16? = nil,        // NEW
-        modifierFlags: UInt? = nil,    // NEW
+        keyCode: UInt16? = nil,
+        modifierFlags: UInt? = nil,   
         displayOrder: Int = 0
     ) -> Int? {
         guard let db = db else { return nil }
@@ -739,6 +739,96 @@ extension DatabaseManager {
             }
             sqlite3_finalize(statement)
         }
+    }
+    
+    // MARK: - Provider Configuration Helpers
+    
+    /// Update display mode for a specific provider in a ring configuration
+    /// - Parameters:
+    ///   - ringId: The ring configuration ID
+    ///   - providerType: The provider type to update
+    ///   - displayMode: The display mode ("parent" or "direct")
+    /// - Returns: true if update succeeded, false otherwise
+    func updateProviderDisplayMode(
+        ringId: Int,
+        providerType: String,
+        displayMode: String
+    ) -> Bool {
+        guard let db = db else { return false }
+        
+        var success = false
+        
+        queue.sync {
+            // Step 1: Get current provider_config JSON
+            let selectSQL = "SELECT provider_config FROM ring_providers WHERE ring_id = ? AND provider_type = ?;"
+            var selectStatement: OpaquePointer?
+            var currentConfig: [String: Any] = [:]
+            
+            if sqlite3_prepare_v2(db, selectSQL, -1, &selectStatement, nil) == SQLITE_OK {
+                sqlite3_bind_int(selectStatement, 1, Int32(ringId))
+                sqlite3_bind_text(selectStatement, 2, (providerType as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(selectStatement) == SQLITE_ROW {
+                    // Check if provider_config is NULL
+                    if sqlite3_column_type(selectStatement, 0) != SQLITE_NULL {
+                        if let configText = sqlite3_column_text(selectStatement, 0) {
+                            let configString = String(cString: configText)
+                            if let configData = configString.data(using: .utf8),
+                               let json = try? JSONSerialization.jsonObject(with: configData) as? [String: Any] {
+                                currentConfig = json
+                            }
+                        }
+                    }
+                } else {
+                    print("⚠️ [DatabaseManager] Provider '\(providerType)' not found in ring \(ringId)")
+                    sqlite3_finalize(selectStatement)
+                    return
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare SELECT for provider config: \(String(cString: error))")
+                }
+                sqlite3_finalize(selectStatement)
+                return
+            }
+            sqlite3_finalize(selectStatement)
+            
+            // Step 2: Update displayMode in the JSON
+            currentConfig["displayMode"] = displayMode
+            
+            // Step 3: Serialize back to JSON string
+            guard let jsonData = try? JSONSerialization.data(withJSONObject: currentConfig),
+                  let jsonString = String(data: jsonData, encoding: .utf8) else {
+                print("❌ [DatabaseManager] Failed to serialize provider config JSON")
+                return
+            }
+            
+            // Step 4: Update database
+            let updateSQL = "UPDATE ring_providers SET provider_config = ? WHERE ring_id = ? AND provider_type = ?;"
+            var updateStatement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, updateSQL, -1, &updateStatement, nil) == SQLITE_OK {
+                sqlite3_bind_text(updateStatement, 1, (jsonString as NSString).utf8String, -1, nil)
+                sqlite3_bind_int(updateStatement, 2, Int32(ringId))
+                sqlite3_bind_text(updateStatement, 3, (providerType as NSString).utf8String, -1, nil)
+                
+                if sqlite3_step(updateStatement) == SQLITE_DONE {
+                    print("✅ [DatabaseManager] Updated display mode for provider '\(providerType)' in ring \(ringId) to '\(displayMode)'")
+                    success = true
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to update provider display mode: \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare UPDATE for provider display mode: \(String(cString: error))")
+                }
+            }
+            sqlite3_finalize(updateStatement)
+        }
+        
+        return success
     }
     
     // MARK: - Validation Helpers

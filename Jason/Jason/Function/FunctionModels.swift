@@ -8,6 +8,38 @@
 import Foundation
 import AppKit
 
+// MARK: - Function Node Type
+
+/// Explicit type declaration for function nodes
+/// Defines the node's intent and capabilities independent of current state
+enum FunctionNodeType {
+    /// Executes a system function (Mission Control, Screenshot, etc.)
+    /// - Always leaf node (no children)
+    /// - Minimal or no context menu
+    case action
+    
+    /// Organizational UI wrapper (e.g., "Applications", "Folders" category)
+    /// - MUST have children or contextActions
+    /// - Not a real filesystem entity
+    /// - Custom context actions (provider-specific)
+    case category
+    
+    /// Application node
+    /// - Can have children (recent documents, windows)
+    /// - Context: Open, Quit, Hide, Favorite/Unfavorite, Show in Finder
+    case app
+    
+    /// Individual file or document
+    /// - Always leaf node
+    /// - Context: Open, Open With, Delete, Show in Finder
+    case file
+    
+    /// Filesystem folder or directory
+    /// - Can have children (folder contents)
+    /// - Context: Open, Show in Finder, Add to Favorites
+    case folder
+}
+
 // MARK: - Layout Style
 
 enum LayoutStyle {
@@ -112,6 +144,7 @@ enum InteractionBehavior {
 class FunctionNode: Identifiable, ObservableObject {
     let id: String
     let name: String
+    let type: FunctionNodeType
     let icon: NSImage
     let children: [FunctionNode]?
     let contextActions: [FunctionNode]?
@@ -150,6 +183,7 @@ class FunctionNode: Identifiable, ObservableObject {
     init(
         id: String,
         name: String,
+        type: FunctionNodeType,
         icon: NSImage,
         children: [FunctionNode]? = nil,
         contextActions: [FunctionNode]? = nil,
@@ -186,6 +220,7 @@ class FunctionNode: Identifiable, ObservableObject {
     ) {
         self.id = id
         self.name = name
+        self.type = type
         self.icon = icon
         self.children = children
         self.contextActions = contextActions
@@ -214,6 +249,21 @@ class FunctionNode: Identifiable, ObservableObject {
         
         self.onHover = onHover
         self.onHoverExit = onHoverExit
+        
+        // MARK: - Type Contract Validation
+        #if DEBUG
+        switch type {
+        case .action, .file:
+            assert(children == nil && contextActions == nil,
+                   "[\(type)] nodes cannot have children or contextActions (node: \(name))")
+        case .category:
+            assert((children?.count ?? 0) > 0 || (contextActions?.count ?? 0) > 0,
+                   "[.category] nodes must have children or contextActions (node: \(name))")
+        case .folder, .app:
+            // Can have children or be empty
+            break
+        }
+        #endif
     }
     
     // MARK: - Computed Properties
@@ -222,14 +272,14 @@ class FunctionNode: Identifiable, ObservableObject {
         return previewURL != nil
     }
     
-    // Leaf = has executable left-click action, no children or contextActions
+    // Leaf nodes are determined by type (actions and files are always leaves)
     var isLeaf: Bool {
-        return children == nil && contextActions == nil && onLeftClick.base.shouldExecute
+        return type == .action || type == .file
     }
     
-    // Branch = has children OR contextActions
+    // Branch nodes are determined by type (categories, folders, and apps can have children)
     var isBranch: Bool {
-        return children != nil || contextActions != nil
+        return type == .category || type == .folder || type == .app
     }
     
     //Check if this node needs dynamic loading

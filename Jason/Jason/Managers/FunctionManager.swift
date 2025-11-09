@@ -95,6 +95,10 @@ class FunctionManager: ObservableObject {
     private var navigationStack: [FunctionNode] = []
     private var providers: [FunctionProvider] = []
     
+    /// Provider configurations indexed by providerId
+    /// Used for display mode transformations and other provider-specific settings
+    private var providerConfigurations: [String: ProviderConfiguration] = [:]
+    
     private(set) var favoriteAppsProvider: FavoriteAppsProvider?
     
     // MARK: - Cache for Ring Configurations
@@ -750,16 +754,74 @@ class FunctionManager: ObservableObject {
         return degrees
     }
     
+    // MARK: - Display Mode Transformation
+    
+    /// Transform provider output based on display mode configuration
+    /// - Only applies to .category nodes - extracts children if mode is .direct
+    /// - Other node types (.action, .file, .folder, .app) are unchanged
+    /// - Parameters:
+    ///   - nodes: The nodes returned by the provider
+    ///   - providerId: The provider's ID to look up its configuration
+    /// - Returns: Transformed nodes based on display mode
+    private func applyDisplayMode(
+        _ nodes: [FunctionNode],
+        providerId: String
+    ) -> [FunctionNode] {
+        
+        // Look up provider configuration
+        guard let providerConfig = providerConfigurations[providerId] else {
+            // No configuration found - default to parent mode (no transformation)
+            return nodes
+        }
+        
+        // Get effective display mode (defaults to parent)
+        let displayMode = providerConfig.effectiveDisplayMode
+        
+        // If parent mode, return nodes unchanged
+        guard displayMode == .direct else {
+            return nodes
+        }
+        
+        // Direct mode: Extract children from category nodes
+        let transformedNodes = nodes.flatMap { node -> [FunctionNode] in
+            // Only apply to category types
+            guard node.type == .category else {
+                return [node]  // Non-categories pass through unchanged
+            }
+            
+            // Extract children from category
+            if let children = node.children, !children.isEmpty {
+                // Return children directly, discarding category wrapper
+                print("🔄 [DisplayMode] Extracting \(children.count) children from category '\(node.name)' (provider: \(providerId))")
+                return children
+            } else {
+                // Empty category - log warning and pass through
+                print("⚠️ [DisplayMode] Category '\(node.name)' has no children in direct mode (provider: \(providerId))")
+                return [node]  // Keep the category rather than showing nothing
+            }
+        }
+        
+        return transformedNodes
+    }
+    
     // MARK: - Provider Management
     
-    func registerProvider(_ provider: FunctionProvider) {
+    func registerProvider(_ provider: FunctionProvider, configuration: ProviderConfiguration? = nil) {
         providers.append(provider)
-        print("Registered provider: \(provider.providerName)")
+        
+        // Store configuration if provided
+        if let config = configuration {
+            providerConfigurations[provider.providerId] = config
+            print("📦 Registered provider: \(provider.providerName) (displayMode: \(config.effectiveDisplayMode))")
+        } else {
+            print("📦 Registered provider: \(provider.providerName)")
+        }
     }
     
     func removeProvider(withId id: String) {
         providers.removeAll { $0.providerId == id }
-        print("Removed provider: \(id)")
+        providerConfigurations.removeValue(forKey: id)
+        print("🗑️ Removed provider: \(id)")
     }
     
     // MARK: - State Management
@@ -1096,14 +1158,18 @@ class FunctionManager: ObservableObject {
             provider.refresh()
         }
         
-        // Collect functions from all providers
+        // Collect functions from all providers with display mode transformation
         rootNodes = providers.flatMap { provider in
-            let functions = provider.provideFunctions()
-            return functions
+            let providerNodes = provider.provideFunctions()
+            
+            // Apply display mode transformation based on provider configuration
+            let transformedNodes = applyDisplayMode(providerNodes, providerId: provider.providerId)
+            
+            return transformedNodes
         }
         
         rebuildRings()
-        print("Loaded \(rootNodes.count) total root nodes from \(providers.count) provider(s)")
+        print("✅ Loaded \(rootNodes.count) total root nodes from \(providers.count) provider(s)")
     }
     
     // MARK: - Surgical Ring Updates
@@ -1143,7 +1209,8 @@ class FunctionManager: ObservableObject {
                     if level == 0 {
                         // Ring 0: This ring is a mix of providers, so we need to update just this provider's node
                         // Find the node in Ring 0 that belongs to this provider
-                        let updatedRootNodes = provider.provideFunctions()
+                        let providerNodes = provider.provideFunctions()
+                        let updatedRootNodes = applyDisplayMode(providerNodes, providerId: providerId)
                         
                         // Replace the old node(s) from this provider with new ones
                         var newRing0Nodes = rings[0].nodes.filter { $0.providerId != providerId }

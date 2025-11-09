@@ -258,6 +258,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             return FunctionNode(
                 id: "combined-app-\(entry.bundleIdentifier)",
                 name: entry.name,
+                type: .app,
                 icon: entry.icon,
                 contextActions: contextActions.isEmpty ? nil : contextActions,
                 slicePositioning: .center,
@@ -292,6 +293,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             FunctionNode(
                 id: providerId,
                 name: providerName,
+                type: .category,
                 icon: providerIcon,
                 children: appNodes,
                 preferredLayout: .partialSlice,
@@ -365,13 +367,12 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     }
     
     // MARK: - Favorite Management Actions
-    
-    // MARK: - Favorite Management Actions
 
     private func createAddToFavoritesAction(bundleIdentifier: String, name: String) -> FunctionNode {
         return FunctionNode(
             id: "add-favorite-\(bundleIdentifier)",
             name: "Add to Favorites",
+            type: .action,
             icon: NSImage(systemSymbolName: "star", accessibilityDescription: nil) ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                 print("⭐ Adding \(name) to favorites")
@@ -396,6 +397,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         return FunctionNode(
             id: "remove-favorite-\(bundleIdentifier)",
             name: "Remove from Favorites",
+            type: .action,
             icon: NSImage(systemSymbolName: "star.slash", accessibilityDescription: nil) ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                 print("⭐ Removing \(name) from favorites")

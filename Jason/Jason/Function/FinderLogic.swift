@@ -329,6 +329,7 @@ class FinderLogic: FunctionProvider {
         return FunctionNode(
             id: "file-\(item.path)",
             name: fileName,
+            type: .file,
             icon: icon,
             
             contextActions: [
@@ -386,6 +387,7 @@ class FinderLogic: FunctionProvider {
         return FunctionNode(
             id: "folder-\(item.path)",
             name: folderName,
+            type: .folder,
             icon: icon,
             children: nil,
             contextActions: [
@@ -515,6 +517,7 @@ class FinderLogic: FunctionProvider {
         return FunctionNode(
             id: "favorite-folders-section",
             name: "Folders",
+            type: .category,
             icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
             children: favoriteChildren,
             preferredLayout: .partialSlice,
@@ -585,6 +588,7 @@ class FinderLogic: FunctionProvider {
         return FunctionNode(
             id: "favorite-\(path.path)",
             name: folderEntry.title,
+            type: .folder,
             icon: folderIcon,
             children: nil,
             preferredLayout: layout,
@@ -720,6 +724,7 @@ class FinderLogic: FunctionProvider {
         return FunctionNode(
             id: "favorite-\(path.path)",
             name: name,
+            type: .folder,
             icon: folderIcon,  // Use database icon instead of hardcoded
             children: nil,
             preferredLayout: layout,
@@ -842,6 +847,7 @@ class FinderLogic: FunctionProvider {
         windowNodes.append(FunctionNode(
             id: "new-finder-window",
             name: "New Window",
+            type: .action,
             icon: NSImage(systemSymbolName: "plus.rectangle", accessibilityDescription: nil) ?? NSImage(),
             preferredLayout: nil,
             onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
@@ -855,6 +861,7 @@ class FinderLogic: FunctionProvider {
         return FunctionNode(
             id: "finder-windows-section",
             name: "Finder Windows",
+            type: .category,
             icon: providerIcon,
             children: windowNodes,
             preferredLayout: .partialSlice,
@@ -895,6 +902,7 @@ class FinderLogic: FunctionProvider {
         return FunctionNode(
             id: "folder-\(url.path)",
             name: folderName,
+            type: .folder,
             icon: IconProvider.shared.getFolderIcon(for: url, size: 64, cornerRadius: 8),
             children: nil,
             contextActions: [
@@ -981,6 +989,7 @@ class FinderLogic: FunctionProvider {
         return FunctionNode(
             id: "file-\(url.path)",
             name: fileName,
+            type: .file,
             icon: dragImage,
             
             contextActions: [
@@ -1033,20 +1042,20 @@ class FinderLogic: FunctionProvider {
 //    private func createRoundedIcon(for url: URL, size: NSSize, cornerRadius: CGFloat) -> NSImage {
 //        let fileIcon = NSWorkspace.shared.icon(forFile: url.path)
 //        let roundedIcon = NSImage(size: size)
-//        
+//
 //        roundedIcon.lockFocus()
-//        
+//
 //        // Draw background with rounded corners
 //        let rect = NSRect(origin: .zero, size: size)
 //        let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-//        
+//
 //        // Optional: Add subtle background color
 //        NSColor.controlBackgroundColor.withAlphaComponent(0.1).setFill()
 //        path.fill()
-//        
+//
 //        // Clip to rounded rect
 //        path.addClip()
-//        
+//
 //        // Draw the icon slightly smaller to add padding
 //        let padding: CGFloat = 8
 //        let iconRect = rect.insetBy(dx: padding, dy: padding)
@@ -1056,9 +1065,9 @@ class FinderLogic: FunctionProvider {
 //            operation: .sourceOver,
 //            fraction: 1.0
 //        )
-//        
+//
 //        roundedIcon.unlockFocus()
-//        
+//
 //        return roundedIcon
 //    }
     
@@ -1216,11 +1225,13 @@ class FinderLogic: FunctionProvider {
         return FunctionNode(
             id: "finder-window-\(windowInfo.index)",
             name: windowInfo.name,
+            type: .folder,
             icon: NSWorkspace.shared.icon(forFile: windowInfo.url.path),
             contextActions: [
                 FunctionNode(
                     id: "close-window-\(windowInfo.index)",
                     name: "Close Window",
+                    type: .action,
                     icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
                     preferredLayout: nil,
                     onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in

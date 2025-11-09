@@ -8,6 +8,16 @@
 import Foundation
 import AppKit
 
+// MARK: - Display Mode
+
+/// Display mode for provider content in rings
+enum DisplayMode: String {
+    case parent  // Show category wrapper, children accessible via expansion
+    case direct  // Skip category, show children directly in ring 0
+}
+
+// MARK: - Ring Configuration Models
+
 /// Domain model representing a stored ring configuration from the database
 /// This is distinct from:
 /// - The database entry model (RingConfigurationEntry)
@@ -209,13 +219,38 @@ struct ProviderConfiguration: Identifiable, Equatable {
         return configValue(forKey: key)
     }
     
+    // MARK: - Display Mode
+    
+    /// Raw display mode string from config (if present)
+    var displayMode: String? {
+        return stringConfig(forKey: "displayMode")
+    }
+    
+    /// Effective display mode with fallback to parent mode
+    /// - Returns: DisplayMode enum value, defaulting to .parent if not specified or invalid
+    var effectiveDisplayMode: DisplayMode {
+        guard let mode = displayMode else { return .parent }
+        return DisplayMode(rawValue: mode) ?? .parent
+    }
+    
+    /// Check if this provider is using direct display mode
+    var isDirectMode: Bool {
+        return effectiveDisplayMode == .direct
+    }
+    
+    /// Check if this provider is using parent display mode
+    var isParentMode: Bool {
+        return effectiveDisplayMode == .parent
+    }
+    
     // MARK: - Display Helpers
     
     /// Human-readable description for debugging
     var debugDescription: String {
         let angleStr = parentItemAngle.map { String(format: "%.1f°", $0) } ?? "dynamic"
         let configStr = hasConfig ? "\(config!.count) params" : "no config"
-        return "\(providerType) [order: \(order), angle: \(angleStr), \(configStr)]"
+        let modeStr = displayMode ?? "default"
+        return "\(providerType) [order: \(order), angle: \(angleStr), mode: \(modeStr), \(configStr)]"
     }
     
     // MARK: - Equatable

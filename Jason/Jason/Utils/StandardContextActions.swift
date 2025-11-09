@@ -18,6 +18,7 @@ struct StandardContextActions {
         return FunctionNode(
             id: "activate-\(app.processIdentifier)",
             name: "Bring to Front",
+            type: .action,
             icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute { [weak manager] in
                 manager?.switchToApp(app)
@@ -33,6 +34,7 @@ struct StandardContextActions {
         return FunctionNode(
             id: "hide-\(app.processIdentifier)",
             name: "Hide",
+            type: .action,
             icon: NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil) ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute { [weak manager] in
                 manager?.hideApp(app)
@@ -48,6 +50,7 @@ struct StandardContextActions {
         return FunctionNode(
             id: "quit-\(app.processIdentifier)",
             name: "Quit",
+            type: .action,
             icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak manager] in
                 manager?.quitApp(app)
@@ -65,6 +68,7 @@ struct StandardContextActions {
         return FunctionNode(
             id: "open-\(url.path)",
             name: "Open",
+            type: .action,
             icon: NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil) ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute {
                 NSWorkspace.shared.open(url)
@@ -80,6 +84,7 @@ struct StandardContextActions {
         return FunctionNode(
             id: "show-in-finder-\(url.path)",
             name: "Show in Finder",
+            type: .action,
             icon: NSImage(systemSymbolName: "folder", accessibilityDescription: nil) ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
@@ -96,6 +101,7 @@ struct StandardContextActions {
         return FunctionNode(
             id: "delete-\(url.path)",
             name: "Delete",
+            type: .action,
             icon: NSImage(systemSymbolName: "trash", accessibilityDescription: nil) ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute {
                 print("🗑️ Moving to trash: \(fileName)")
@@ -130,6 +136,7 @@ struct StandardContextActions {
         return FunctionNode(
             id: "copy-\(url.path)",
             name: "Copy",
+            type: .action,
             icon: NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil) ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute {
                 print("📋 Copying to clipboard: \(fileName)")
