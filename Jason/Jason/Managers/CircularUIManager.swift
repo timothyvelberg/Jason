@@ -164,7 +164,7 @@ class CircularUIManager: ObservableObject {
                 // Check if this node belongs to the updated provider
                 
                 // For FinderLogic: check folderPath in metadata
-                if providerId == "finder-windows", let folderPath = folderPath {
+                if providerId == "finder-logic", let folderPath = folderPath {
                     if let metadata = node.metadata,
                        let nodeFolderPath = metadata["folderURL"] as? String,
                        nodeFolderPath == folderPath {
@@ -215,11 +215,8 @@ class CircularUIManager: ObservableObject {
         let providers = factory.createProviders(from: configuration)
         
         // Helper to normalize provider names for matching
-        // Handles both "CombinedAppsProvider" (database) and "combined-apps" (providerId)
+        // Converts both "CombinedAppsProvider" (class name) and "combined-apps" (providerId) to same form
         func normalizeProviderName(_ name: String) -> String {
-            // Convert camelCase/PascalCase to lowercase kebab-case
-            // "CombinedAppsProvider" -> "combinedappsprovider"
-            // "combined-apps" -> "combinedapps"
             return name
                 .replacingOccurrences(of: "Provider", with: "", options: .caseInsensitive)
                 .replacingOccurrences(of: "-", with: "")

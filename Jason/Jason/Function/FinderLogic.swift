@@ -14,7 +14,7 @@ class FinderLogic: FunctionProvider {
     
     // MARK: - Provider Info
     
-    var providerId: String { "finder-windows" }
+    var providerId: String { "finder-logic" }
     var providerName: String { "Finder" }
     var providerIcon: NSImage {
         return NSWorkspace.shared.icon(forFile: "/System/Library/CoreServices/Finder.app")

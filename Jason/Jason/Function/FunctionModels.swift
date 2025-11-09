@@ -19,7 +19,7 @@ enum FunctionNodeType {
     case action
     
     /// Organizational UI wrapper (e.g., "Applications", "Folders" category)
-    /// - MUST have children or contextActions
+    /// - MUST have children or contextActions 
     /// - Not a real filesystem entity
     /// - Custom context actions (provider-specific)
     case category
@@ -253,9 +253,15 @@ class FunctionNode: Identifiable, ObservableObject {
         // MARK: - Type Contract Validation
         #if DEBUG
         switch type {
-        case .action, .file:
-            assert(children == nil && contextActions == nil,
-                   "[\(type)] nodes cannot have children or contextActions (node: \(name))")
+        case .file:
+            // Files can have contextActions (right-click menu), but not children
+            assert((children?.count ?? 0) == 0,
+                "[file] nodes cannot have children (node: \(name))")
+            
+        case .action:
+            // Actions are pure leaf nodes - no children or contextActions
+            assert((children?.count ?? 0) == 0 && (contextActions?.count ?? 0) == 0,
+                "[action] nodes cannot have children or contextActions (node: \(name))")
         case .category:
             assert((children?.count ?? 0) > 0 || (contextActions?.count ?? 0) > 0,
                    "[.category] nodes must have children or contextActions (node: \(name))")

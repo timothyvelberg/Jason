@@ -149,10 +149,6 @@ class FirstLaunchConfiguration {
                 print("   ⚠️ Created ring but failed to set direct mode")
             }
             
-            // 🔧 CRITICAL: Reload configurations after database update
-            // This ensures the in-memory configs reflect the displayMode change
-            configManager.loadConfigurations()
-            
             // Example 3: Files-focused ring with Ctrl+Shift+F
             let filesRing = try configManager.createConfiguration(
                 name: "My Files",
@@ -185,10 +181,52 @@ class FirstLaunchConfiguration {
             )
             print("   ✅ Created '\(filesActionsRing.name)' - \(filesActionsRing.shortcutDescription)")
             
-            print("   ✅ Created 4 example configurations")
+            // Example 5: Everything Direct - Apps + Finder both in direct mode (Ctrl+Shift+E)
+            let everythingDirectRing = try configManager.createConfiguration(
+                name: "Everything Direct",
+                shortcut: "Ctrl+Shift+W",  // For display
+                ringRadius: 80.0,
+                centerHoleRadius: 56.0,
+                iconSize: 38.0,
+                keyCode: 13,  // "W"
+                modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue,
+                providers: [
+                    ("CombinedAppsProvider", 1, nil),
+                    ("FinderLogic", 2, nil)
+                ]
+            )
+            
+            // Set both providers to direct mode
+            let appsDirectSuccess = DatabaseManager.shared.updateProviderDisplayMode(
+                ringId: everythingDirectRing.id,
+                providerType: "CombinedAppsProvider",
+                displayMode: "direct"
+            )
+            
+            let finderDirectSuccess = DatabaseManager.shared.updateProviderDisplayMode(
+                ringId: everythingDirectRing.id,
+                providerType: "FinderLogic",
+                displayMode: "direct"
+            )
+            
+            if appsDirectSuccess && finderDirectSuccess {
+                print("   ✅ Created '\(everythingDirectRing.name)' - \(everythingDirectRing.shortcutDescription)")
+                print("      CombinedAppsProvider: direct (shows apps immediately)")
+                print("      finder-windows: direct (shows folders immediately)")
+            } else {
+                print("   ⚠️ Created ring but failed to set all providers to direct mode")
+                print("      Apps: \(appsDirectSuccess ? "✅" : "❌"), Finder: \(finderDirectSuccess ? "✅" : "❌")")
+            }
+            
+            // 🔧 CRITICAL: Reload configurations after all database updates
+            // This ensures the in-memory configs reflect all displayMode changes
+            configManager.loadConfigurations()
+            
+            print("   ✅ Created 5 example configurations")
             print("   📊 Display Mode Comparison:")
             print("      • Parent Mode (Ctrl+Shift+A): Ring 0 shows 'Applications' → Ring 1 shows apps")
             print("      • Direct Mode (Ctrl+Shift+Q): Ring 0 shows apps immediately")
+            print("      • Everything Direct (Ctrl+Shift+W): Ring 0 shows apps + folders immediately")
             
         } catch {
             print("   ⚠️ Failed to create some example configurations: \(error)")

@@ -205,7 +205,7 @@ extension DatabaseManager {
             
             DispatchQueue.main.async {
                 NotificationCenter.default.postProviderUpdate(
-                    providerId: "finder-windows",
+                    providerId: "finder-logic",
                     folderPath: folderPath
                 )
             }
@@ -215,7 +215,7 @@ extension DatabaseManager {
             print("[EnhancedCache] 💾 Cached \(savedCount) items (\(thumbnailCount) with thumbnails) for: \(folderPath)")
             DispatchQueue.main.async {
                 NotificationCenter.default.postProviderUpdate(
-                    providerId: "finder-windows",
+                    providerId: "finder-logic",
                     folderPath: folderPath
                 )
                 print("📢 Posted update notification for folder: \(folderPath)")
