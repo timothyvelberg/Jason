@@ -135,30 +135,37 @@ class CircularUIManager: ObservableObject {
         
         // Check all active rings
         for (index, ring) in functionManager.rings.enumerated() {
-            // Check if ring matches this provider
+            // 🆕 FIRST PRIORITY: Check provider contributions (Ring 0 in direct/mixed mode)
+            // This prevents matching context menus (Ring 1) when the real content is in Ring 0
+            if contentIdentifier == nil && ring.containsProvider(providerId) {
+                print("   🎯 Found provider '\(providerId)' contribution in Ring \(index)")
+                return true
+            }
+            
+            // SECOND: Check explicit ring providerId (Ring 1+)
             if ring.providerId == providerId {
-                // If no content identifier specified, provider match is enough
                 if contentIdentifier == nil {
                     print("   🎯 Found matching provider in Ring \(index)")
                     return true
                 }
                 
-                // If content identifier specified, check it too
                 if ring.contentIdentifier == contentIdentifier {
                     print("   🎯 Found matching provider + content in Ring \(index): \(contentIdentifier ?? "")")
                     return true
                 }
             }
             
-            // 🆕 For mixed rings (providerId is nil), check individual nodes
-            // This handles Ring 0 in direct mode where multiple providers' content is mixed
-            // BUT: Only match actual content nodes, not category wrappers
-            if ring.providerId == nil {
-                let hasMatchingNode = ring.nodes.contains { node in
-                    node.providerId == providerId && node.type != .category
+            // THIRD: For content-specific updates, check provider contributions with content match
+            if let contentIdentifier = contentIdentifier, ring.containsProvider(providerId) {
+                let hasContent = ring.nodes.contains { node in
+                    if let metadata = node.metadata,
+                       let nodePath = metadata["folderURL"] as? String {
+                        return nodePath == contentIdentifier
+                    }
+                    return false
                 }
-                if hasMatchingNode {
-                    print("   🎯 Found provider '\(providerId)' in mixed Ring \(index) (via node check)")
+                if hasContent {
+                    print("   🎯 Found provider '\(providerId)' content in Ring \(index): \(contentIdentifier)")
                     return true
                 }
             }
