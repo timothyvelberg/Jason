@@ -5,6 +5,8 @@
 //  Created by Timothy Velberg on 02/11/2025.
 //
 //  Provider that combines favorite apps and running apps into a single unified list
+//  🆕 REFACTORED: Now uses shared AppSwitcherManager.shared instead of per-instance manager
+//  🆕 FIXED: Removed duplicate NSWorkspace monitoring - relies on AppSwitcherManager.shared
 
 import Foundation
 import AppKit
@@ -27,6 +29,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     
     // MARK: - Properties
     
+    /// 🆕 CHANGED: This now references AppSwitcherManager.shared (set by ProviderFactory)
     weak var appSwitcherManager: AppSwitcherManager?
     weak var circularUIManager: CircularUIManager?
     
@@ -52,25 +55,12 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         print("🔄 CombinedAppsProvider initialized")
         loadApps()
         
-        // Listen for app launch/quit notifications
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self,
-            selector: #selector(handleAppLaunched(_:)),
-            name: NSWorkspace.didLaunchApplicationNotification,
-            object: nil
-        )
-        
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self,
-            selector: #selector(handleAppTerminated(_:)),
-            name: NSWorkspace.didTerminateApplicationNotification,
-            object: nil
-        )
+        // 🆕 REMOVED: NSWorkspace notification listeners
+        // AppSwitcherManager.shared already monitors apps and posts unified notifications
+        // This prevents duplicate notifications when multiple CombinedAppsProvider instances exist
     }
     
-    deinit {
-        NSWorkspace.shared.notificationCenter.removeObserver(self)
-    }
+    // 🆕 REMOVED: deinit - no notification cleanup needed
     
     // MARK: - App Loading
     
@@ -199,25 +189,32 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         }
         
         // Get app name
-        let appName = customName ?? (
-            bundle.infoDictionary?["CFBundleName"] as? String ??
-            bundle.infoDictionary?["CFBundleDisplayName"] as? String ??
-            appURL.deletingPathExtension().lastPathComponent
-        )
+        let name: String
+        if let customName = customName {
+            name = customName
+        } else if let bundleName = bundle.object(forInfoDictionaryKey: "CFBundleName") as? String {
+            name = bundleName
+        } else if let displayName = bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String {
+            name = displayName
+        } else {
+            name = appURL.deletingPathExtension().lastPathComponent
+        }
         
-        // Get icon
-        let appIcon: NSImage
+        // Get app icon
+        let icon: NSImage
         if let iconOverride = iconOverride,
            let customIcon = NSImage(systemSymbolName: iconOverride, accessibilityDescription: nil) {
-            appIcon = customIcon
+            icon = customIcon
+        } else if isRunning, let runningApp = runningApp, let appIcon = runningApp.icon {
+            icon = appIcon
         } else {
-            appIcon = NSWorkspace.shared.icon(forFile: appURL.path)
+            icon = NSWorkspace.shared.icon(forFile: appURL.path)
         }
         
         return AppEntry(
             bundleIdentifier: bundleIdentifier,
-            name: appName,
-            icon: appIcon,
+            name: name,
+            icon: icon,
             url: appURL,
             isFavorite: isFavorite,
             isRunning: isRunning,
@@ -227,15 +224,19 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         )
     }
     
-    // MARK: - FunctionProvider Methods
+    // MARK: - FunctionProvider Protocol
     
     func provideFunctions() -> [FunctionNode] {
-        let appNodes = appEntries.map { entry in
-            // Create context actions
+        // Create nodes for each app
+        let appNodes: [FunctionNode] = appEntries.map { entry in
+            // Get AppSwitcherManager for context actions
+            // 🆕 CHANGED: This is now AppSwitcherManager.shared
+            let manager = appSwitcherManager
+            
             var contextActions: [FunctionNode] = []
             
-            if entry.isRunning, let runningApp = entry.runningApp, let manager = appSwitcherManager {
-                // Running app actions (only if manager exists)
+            // Add app-specific actions if running
+            if entry.isRunning, let runningApp = entry.runningApp, let manager = manager {
                 contextActions = [
                     StandardContextActions.bringToFront(runningApp, manager: manager),
                     StandardContextActions.quitApp(runningApp, manager: manager),
@@ -322,6 +323,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             print("🔄 Switching to running app: \(entry.name)")
             
             // Record app usage in MRU tracker
+            // 🆕 CHANGED: Now using shared instance
             appSwitcherManager?.recordAppUsage(runningApp)
             
             // Hide UI and switch to app
@@ -349,13 +351,12 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                     print("✅ Successfully launched \(entry.name)")
                     
                     // Update MRU tracking
+                    // 🆕 CHANGED: Now using shared instance
                     self.appSwitcherManager?.recordAppUsage(app)
                     
-                    // Refresh to update running state
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        self.refresh()
-                        NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
-                    }
+                    // 🆕 REMOVED: No need to refresh and post notification here
+                    // AppSwitcherManager.shared will detect the launch and post ONE notification
+                    // which all CombinedAppsProvider instances will receive via CircularUIManager
                 }
             }
         }
@@ -412,29 +413,5 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             onMiddleClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
-    }
-    
-    // MARK: - App Launch/Quit Notifications
-    
-    @objc private func handleAppLaunched(_ notification: Notification) {
-        guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-              app.activationPolicy == .regular,
-              app.bundleIdentifier != Bundle.main.bundleIdentifier else {
-            return
-        }
-        
-        print("🚀 [CombinedApps] App launched: \(app.localizedName ?? "Unknown")")
-        refresh()
-        NotificationCenter.default.postProviderUpdate(providerId: providerId)
-    }
-    
-    @objc private func handleAppTerminated(_ notification: Notification) {
-        guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
-            return
-        }
-        
-        print("🛑 [CombinedApps] App terminated: \(app.localizedName ?? "Unknown")")
-        refresh()
-        NotificationCenter.default.postProviderUpdate(providerId: providerId)
     }
 }

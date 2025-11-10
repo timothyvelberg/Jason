@@ -19,7 +19,6 @@ class CircularUIManager: ObservableObject {
     private var draggedNode: FunctionNode?
     
     var overlayWindow: OverlayWindow?
-    private(set) var appSwitcher: AppSwitcherManager?
     private(set) var combinedAppsProvider: CombinedAppsProvider?
     var favoriteFilesProvider: FavoriteFilesProvider?
     var functionManager: FunctionManager?
@@ -96,7 +95,7 @@ class CircularUIManager: ObservableObject {
             return
         }
         
-        print("📢 [CircularUIManager] Received update for provider: \(updateInfo.providerId)")
+        print("📢 [CircularUIManager-\(configId)] Received update for provider: \(updateInfo.providerId)")
         if let folderPath = updateInfo.folderPath {
             print("   Folder: \(folderPath)")
         }
@@ -166,44 +165,10 @@ class CircularUIManager: ObservableObject {
         
         return false
     }
-//    /// Check if a provider is currently visible in any ring
-//    private func checkIfProviderIsVisible(providerId: String, folderPath: String?) -> Bool {
-//        guard let functionManager = functionManager else { return false }
-//        
-//        // Check all active rings
-//        for (index, ring) in functionManager.rings.enumerated() {
-//            for node in ring.nodes {
-//                // Check if this node belongs to the updated provider
-//                
-//                // For FinderLogic: check folderPath in metadata
-//                if providerId == "finder-logic", let folderPath = folderPath {
-//                    if let metadata = node.metadata,
-//                       let nodeFolderPath = metadata["folderURL"] as? String,
-//                       nodeFolderPath == folderPath {
-//                        print("   🎯 Found matching folder in Ring \(index): \(folderPath)")
-//                        return true
-//                    }
-//                }
-//                
-//                // For AppSwitcher: check node ID prefix
-//                if providerId == "app-switcher" && node.id.hasPrefix("app-") {
-//                    print("   🎯 Found app switcher content in Ring \(index)")
-//                    return true
-//                }
-//                
-//                // Add more provider-specific checks here as needed
-//            }
-//        }
-//        
-//        return false
-//    }
     
     func setup() {
-        // Create AppSwitcherManager internally (still needed for MRU tracking and app management)
-        let appSwitcher = AppSwitcherManager()
-        self.appSwitcher = appSwitcher
-        
-        appSwitcher.circularUIManager = self
+        // 🆕 REMOVED: No longer create AppSwitcherManager instance
+        // We use AppSwitcherManager.shared instead
         
         // Create FunctionManager with configuration values
         self.functionManager = FunctionManager(
@@ -214,9 +179,10 @@ class CircularUIManager: ObservableObject {
         print("   ✅ FunctionManager initialized with config values")
         
         // Create provider factory
+        // 🆕 CHANGED: Pass shared AppSwitcherManager instance
         let factory = ProviderFactory(
             circularUIManager: self,
-            appSwitcherManager: appSwitcher
+            appSwitcherManager: AppSwitcherManager.shared
         )
         
         // Create providers from configuration
@@ -410,7 +376,7 @@ class CircularUIManager: ObservableObject {
         }
     }
     
-    private func handleScrollBack() {
+    func handleScrollBack() {
         guard let functionManager = functionManager else { return }
         
         // Go back one level
@@ -631,6 +597,10 @@ class CircularUIManager: ObservableObject {
             return
         }
         
+        // 🆕 ADDED: Register as the active CircularUIManager
+        print("🔗 [CircularUIManager-\(configId)] Registering as active instance with AppSwitcherManager")
+        AppSwitcherManager.shared.activeCircularUIManager = self
+        
         // Save the currently active app BEFORE we show our UI
         previousApp = NSWorkspace.shared.frontmostApplication
         if let prevApp = previousApp {
@@ -648,22 +618,6 @@ class CircularUIManager: ObservableObject {
         } else {
             functionManager.loadFunctions()
         }
-        
-        // Check if we have any actual content (leaf nodes or branches with children)
-        let hasValidData: Bool = {
-            guard functionManager.rings.count > 0 else { return false }
-            guard !functionManager.rings[0].nodes.isEmpty else { return false }
-            
-            // Check if any root node has content
-            for node in functionManager.rings[0].nodes {
-                if node.isLeaf {
-                    return true  // Has at least one executable function
-                } else if node.childCount > 0 {
-                    return true  // Has at least one category with children
-                }
-            }
-            return false
-        }()
         
         guard !functionManager.rings.isEmpty && !functionManager.rings[0].nodes.isEmpty else {
             print("No functions to display")
@@ -700,6 +654,12 @@ class CircularUIManager: ObservableObject {
         
         // 🆕 Exit hold mode when hiding (prevents double-hide on key release)
         isInHoldMode = false
+        
+        // 🆕 ADDED: Unregister as the active CircularUIManager
+        if AppSwitcherManager.shared.activeCircularUIManager === self {
+            print("🔓 [CircularUIManager-\(configId)] Unregistering as active instance")
+            AppSwitcherManager.shared.activeCircularUIManager = nil
+        }
         
         // Only restore previous app if we're NOT intentionally switching
         if !isIntentionallySwitching {

@@ -10,12 +10,23 @@ import AppKit
 import SwiftUI
 
 class AppSwitcherManager: ObservableObject {
+    // MARK: - Singleton
+    
+    /// Shared singleton instance
+    static let shared = AppSwitcherManager()
+    
+    // MARK: - Published Properties
+    
     @Published var runningApps: [NSRunningApplication] = []
     @Published var isVisible: Bool = false
     @Published var selectedAppIndex: Int = 0
     @Published var hasAccessibilityPermission: Bool = false
     
-    weak var circularUIManager: CircularUIManager?
+    // MARK: - Instance Management
+    
+    /// Reference to the currently active CircularUIManager instance
+    /// This gets set when a CircularUIManager shows, and unset when it hides
+    weak var activeCircularUIManager: CircularUIManager?
     
     private var refreshTimer: Timer?
     internal var isCtrlPressed: Bool = false
@@ -26,11 +37,30 @@ class AppSwitcherManager: ObservableObject {
     // MARK: - MRU (Most Recently Used) Tracking
     private var appUsageHistory: [pid_t] = [] // Track PIDs in MRU order
     
-    init() {
-        
+    private init() {
+        print("🔧 [AppSwitcherManager] Initializing SHARED instance")
         checkAccessibilityPermission()
         setupServices()
-
+        
+        // 🆕 ADDED: Listen to NSWorkspace notifications for instant app change detection
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(handleAppLaunched(_:)),
+            name: NSWorkspace.didLaunchApplicationNotification,
+            object: nil
+        )
+        
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(handleAppTerminated(_:)),
+            name: NSWorkspace.didTerminateApplicationNotification,
+            object: nil
+        )
+        
+        print("✅ [AppSwitcherManager] Monitoring NSWorkspace for app changes")
+        
+        // 🆕 ADDED: Start polling as backup (detects changes if notifications miss anything)
+        startAutoRefresh()
     }
     
     // MARK: - Permission Management
@@ -79,13 +109,14 @@ class AppSwitcherManager: ObservableObject {
         // Stop any existing timer
         stopAutoRefresh()
         
-        // Start a timer that checks for changes every 1 second
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            print("⏰ [AppSwitcher] Timer fired - checking for app changes...")
+        // Start a timer that checks for changes every 5 seconds (backup to NSWorkspace notifications)
+        // Note: NSWorkspace provides instant detection, timer just catches edge cases
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            // Logging controlled by UI visibility (see loadRunningApplications)
             self?.loadRunningApplications()
         }
         
-        print("✅ Auto-refresh timer started (1 second interval)")
+        print("✅ Auto-refresh timer started (5 second backup polling)")
     }
     
     public func stopAutoRefresh() {
@@ -112,12 +143,17 @@ class AppSwitcherManager: ObservableObject {
             app.bundleIdentifier != Bundle.main.bundleIdentifier  // Exclude our own app (Jason)
         }
         
-        //Log current state
-        print("[AppSwitcher] Checking apps: current=\(runningApps.count), new=\(newApps.count)")
-        
         // Only update if there's actually a change (to reduce unnecessary UI updates)
         let oldAppIDs = Set(runningApps.map { $0.processIdentifier })
         let newAppIDs = Set(newApps.map { $0.processIdentifier })
+        
+        // Only log when UI is visible (when user is actively using it)
+        let isUIVisible = activeCircularUIManager?.isVisible ?? false
+        
+        if isUIVisible {
+            // Verbose logging when UI is open - user can see changes happening
+            print("[AppSwitcher] Checking apps: current=\(runningApps.count), new=\(newApps.count)")
+        }
         
         if oldAppIDs != newAppIDs {
             print("[AppSwitcher] CHANGE DETECTED!")
@@ -154,13 +190,42 @@ class AppSwitcherManager: ObservableObject {
             // Update the state AFTER logging
             runningApps = sortedApps
             
+            // Post notifications for both AppSwitcher and CombinedApps providers
             DispatchQueue.main.async {
                 NotificationCenter.default.postProviderUpdate(providerId: "app-switcher")
                 print("📢 Posted update notification for app-switcher")
+                
+                // 🆕 ADDED: Also notify CombinedAppsProvider instances
+                NotificationCenter.default.postProviderUpdate(providerId: "combined-apps")
+                print("📢 Posted update notification for combined-apps")
             }
             print("Applications changed: \(oldCount) → \(newCount)")
             print("MRU Order: \(runningApps.prefix(5).map { $0.localizedName ?? "Unknown" }.joined(separator: " → "))")
         }
+    }
+    
+    // MARK: - NSWorkspace Notification Handlers
+    
+    @objc private func handleAppLaunched(_ notification: Notification) {
+        guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              app.activationPolicy == .regular,
+              app.bundleIdentifier != Bundle.main.bundleIdentifier else {
+            return
+        }
+        
+        print("🚀 [AppSwitcherManager] App launched: \(app.localizedName ?? "Unknown")")
+        // Trigger immediate refresh instead of waiting for timer
+        loadRunningApplications()
+    }
+    
+    @objc private func handleAppTerminated(_ notification: Notification) {
+        guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+            return
+        }
+        
+        print("🛑 [AppSwitcherManager] App terminated: \(app.localizedName ?? "Unknown")")
+        // Trigger immediate refresh instead of waiting for timer
+        loadRunningApplications()
     }
     
     // MARK: - MRU Management
@@ -299,16 +364,16 @@ class AppSwitcherManager: ObservableObject {
         // Update app switcher state
         hideAppSwitcher()
         
-        // 🆕 ADD THIS LOG:
-        if circularUIManager == nil {
-            print("circularUIManager is NIL!")
+        // Check if we have an active UI manager
+        if activeCircularUIManager == nil {
+            print("⚠️ activeCircularUIManager is NIL! Cannot hide UI properly")
         } else {
-            print("Calling hideAndSwitchTo...")
+            print("✅ Calling hideAndSwitchTo on active instance...")
         }
         
         // Hide the circular UI and activate the selected app
         // This uses the special hideAndSwitchTo which doesn't restore previous app
-        circularUIManager?.hideAndSwitchTo(app: app)
+        activeCircularUIManager?.hideAndSwitchTo(app: app)
         
         print("Successfully switched to \(app.localizedName ?? "Unknown")")
         
@@ -328,7 +393,7 @@ extension AppSwitcherManager {
         print("🚪 Quitting app: \(app.localizedName ?? "Unknown")")
         
         // Ignore focus changes for 500ms to prevent UI from hiding when app window closes
-        circularUIManager?.ignoreFocusChangesTemporarily(duration: 0.5)
+        activeCircularUIManager?.ignoreFocusChangesTemporarily(duration: 0.5)
         
         app.terminate()
     }
