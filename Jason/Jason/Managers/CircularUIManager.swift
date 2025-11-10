@@ -149,42 +149,54 @@ class CircularUIManager: ObservableObject {
                     return true
                 }
             }
-        }
-        
-        return false
-    }
-    
-    /// Check if a provider is currently visible in any ring
-    private func checkIfProviderIsVisible(providerId: String, folderPath: String?) -> Bool {
-        guard let functionManager = functionManager else { return false }
-        
-        // Check all active rings
-        for (index, ring) in functionManager.rings.enumerated() {
-            for node in ring.nodes {
-                // Check if this node belongs to the updated provider
-                
-                // For FinderLogic: check folderPath in metadata
-                if providerId == "finder-logic", let folderPath = folderPath {
-                    if let metadata = node.metadata,
-                       let nodeFolderPath = metadata["folderURL"] as? String,
-                       nodeFolderPath == folderPath {
-                        print("   🎯 Found matching folder in Ring \(index): \(folderPath)")
-                        return true
-                    }
+            
+            // 🆕 For mixed rings (providerId is nil), check individual nodes
+            // This handles Ring 0 in direct mode where multiple providers' content is mixed
+            // BUT: Only match actual content nodes, not category wrappers
+            if ring.providerId == nil {
+                let hasMatchingNode = ring.nodes.contains { node in
+                    node.providerId == providerId && node.type != .category
                 }
-                
-                // For AppSwitcher: check node ID prefix
-                if providerId == "app-switcher" && node.id.hasPrefix("app-") {
-                    print("   🎯 Found app switcher content in Ring \(index)")
+                if hasMatchingNode {
+                    print("   🎯 Found provider '\(providerId)' in mixed Ring \(index) (via node check)")
                     return true
                 }
-                
-                // Add more provider-specific checks here as needed
             }
         }
         
         return false
     }
+//    /// Check if a provider is currently visible in any ring
+//    private func checkIfProviderIsVisible(providerId: String, folderPath: String?) -> Bool {
+//        guard let functionManager = functionManager else { return false }
+//        
+//        // Check all active rings
+//        for (index, ring) in functionManager.rings.enumerated() {
+//            for node in ring.nodes {
+//                // Check if this node belongs to the updated provider
+//                
+//                // For FinderLogic: check folderPath in metadata
+//                if providerId == "finder-logic", let folderPath = folderPath {
+//                    if let metadata = node.metadata,
+//                       let nodeFolderPath = metadata["folderURL"] as? String,
+//                       nodeFolderPath == folderPath {
+//                        print("   🎯 Found matching folder in Ring \(index): \(folderPath)")
+//                        return true
+//                    }
+//                }
+//                
+//                // For AppSwitcher: check node ID prefix
+//                if providerId == "app-switcher" && node.id.hasPrefix("app-") {
+//                    print("   🎯 Found app switcher content in Ring \(index)")
+//                    return true
+//                }
+//                
+//                // Add more provider-specific checks here as needed
+//            }
+//        }
+//        
+//        return false
+//    }
     
     func setup() {
         // Create AppSwitcherManager internally (still needed for MRU tracking and app management)
