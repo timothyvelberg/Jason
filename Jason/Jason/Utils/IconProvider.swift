@@ -597,7 +597,7 @@ class IconProvider {
         path: String,
         iconName: String?,
         iconColor: NSColor?,
-        baseAsset: String = "_folder-blue_",
+        baseAsset: String = "folder-blue",
         symbolSize: CGFloat = 24.0,
         symbolOffset: CGFloat = -8.0
     ) {

@@ -18,7 +18,7 @@ extension DatabaseManager {
         queue.sync {
             let sql = """
             SELECT f.id, f.path, f.title, f.icon, f.icon_name, f.icon_color_hex,
-                   COALESCE(f.base_asset, '_folder-blue_'), 
+                   COALESCE(f.base_asset, 'folder-blue'), 
                    COALESCE(f.symbol_size, 24.0), 
                    COALESCE(f.symbol_offset, -8.0),
                    f.last_accessed, f.access_count,
@@ -145,7 +145,7 @@ extension DatabaseManager {
                 if let layout = settings?.preferredLayout {
                     sqlite3_bind_text(statement, 4, (layout as NSString).utf8String, -1, nil)
                 } else {
-                    sqlite3_bind_text(statement, 4, ("fullCircle" as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 4, ("partialSlice" as NSString).utf8String, -1, nil)
                 }
                 
                 if let angleSize = settings?.itemAngleSize {
@@ -157,7 +157,7 @@ extension DatabaseManager {
                 if let positioning = settings?.slicePositioning {
                     sqlite3_bind_text(statement, 6, (positioning as NSString).utf8String, -1, nil)
                 } else {
-                    sqlite3_bind_text(statement, 6, ("startClockwise" as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 6, ("center" as NSString).utf8String, -1, nil)
                 }
                 
                 if let thickness = settings?.childRingThickness {
@@ -287,7 +287,7 @@ extension DatabaseManager {
                 if let layout = settings.preferredLayout {
                     sqlite3_bind_text(settingsStatement, 2, (layout as NSString).utf8String, -1, nil)
                 } else {
-                    sqlite3_bind_text(settingsStatement, 2, ("fullCircle" as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(settingsStatement, 2, ("partialSlice" as NSString).utf8String, -1, nil)
                 }
                 
                 if let angleSize = settings.itemAngleSize {
@@ -299,7 +299,7 @@ extension DatabaseManager {
                 if let positioning = settings.slicePositioning {
                     sqlite3_bind_text(settingsStatement, 4, (positioning as NSString).utf8String, -1, nil)
                 } else {
-                    sqlite3_bind_text(settingsStatement, 4, ("startClockwise" as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(settingsStatement, 4, ("center" as NSString).utf8String, -1, nil)
                 }
                 
                 if let thickness = settings.childRingThickness {

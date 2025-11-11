@@ -1220,25 +1220,35 @@ class FunctionManager: ObservableObject {
                 let freshNodes: [FunctionNode]
                 
                 if level == 0 {
-                    // Ring 0: This ring is a mix of providers, so we need to update just this provider's node
-                    // Find the node in Ring 0 that belongs to this provider
+                    // Ring 0: Mixed providers - preserve provider order during updates
+                    
                     let providerNodes = provider.provideFunctions()
                     let updatedRootNodes = applyDisplayMode(providerNodes, providerId: providerId)
                     
-                    // Replace the old node(s) from this provider with new ones
-                    var newRing0Nodes = rings[0].nodes.filter { $0.providerId != providerId }
-                    newRing0Nodes.append(contentsOf: updatedRootNodes)
+                    // Preserve provider registration order
+                    let providerOrder = providers.map { $0.providerId }
+                    
+                    var newRing0Nodes: [FunctionNode] = []
+                    
+                    for orderedProviderId in providerOrder {
+                        if orderedProviderId == providerId {
+                            // Use fresh nodes for updated provider
+                            newRing0Nodes.append(contentsOf: updatedRootNodes)
+                        } else {
+                            // Keep existing nodes from unchanged providers
+                            let existingNodes = rings[0].nodes.filter { $0.providerId == orderedProviderId }
+                            newRing0Nodes.append(contentsOf: existingNodes)
+                        }
+                    }
                     
                     rings[0].nodes = newRing0Nodes
                     
-                    // 🆕 CRITICAL: Clear hover/selection state after updating nodes
-                    // This prevents "index out of range" crashes when node count changes
+                    // Clear hover/selection state after updating nodes
                     rings[0].hoveredIndex = nil
                     rings[0].selectedIndex = nil
                     
                     print("✅ Updated Ring 0: replaced nodes from provider '\(providerId)'")
-                    
-                } else {
+                }else {
                     // Ring 1+: Get children from FRESH parent node
                     guard level > 0, level - 1 < rings.count else {
                         print("❌ Cannot find parent ring for level \(level)")

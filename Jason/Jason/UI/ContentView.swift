@@ -683,7 +683,7 @@ struct EditFavoriteView: View {
     private func matchFolderColor(_ baseAsset: String) -> FolderColor {
         // Match the base asset to our enum
         switch baseAsset {
-        case "folder-blue", "_folder-blue_":
+        case "folder-blue":
             return .blue
         case "folder-orange":
             return .orange

@@ -618,7 +618,7 @@ class FinderLogic: FunctionProvider {
         // Downloads - Newest First (see latest downloads!)
         if let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
             let settings = FavoriteFolderSettings(
-                maxItems: 20,
+                maxItems: nil,
                 preferredLayout: nil,
                 itemAngleSize: nil,
                 slicePositioning: nil,
@@ -656,7 +656,7 @@ class FinderLogic: FunctionProvider {
         let screenshotsPath = "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots"
         if FileManager.default.fileExists(atPath: screenshotsPath) {
             let settings = FavoriteFolderSettings(
-                maxItems: 10,
+                maxItems: nil,
                 preferredLayout: nil,
                 itemAngleSize: nil,
                 slicePositioning: nil,

@@ -117,7 +117,7 @@ extension DatabaseManager {
     }
 
     /// Set custom icon for a folder
-    func setFolderIcon(path: String, iconName: String?, iconColorHex: String?, baseAsset: String = "_folder-blue_", symbolSize: CGFloat = 24.0, symbolOffset: CGFloat = -8.0) {
+    func setFolderIcon(path: String, iconName: String?, iconColorHex: String?, baseAsset: String = "folder-blue", symbolSize: CGFloat = 24.0, symbolOffset: CGFloat = -8.0) {
         guard let db = db else { return }
         
         queue.async {
@@ -176,7 +176,7 @@ extension DatabaseManager {
         queue.async {
             let sql = """
             UPDATE folders 
-            SET icon_name = NULL, icon_color_hex = NULL, base_asset = '_folder-blue_', symbol_size = 24.0, symbol_offset = -8.0
+            SET icon_name = NULL, icon_color_hex = NULL, base_asset = 'folder-blue', symbol_size = 24.0, symbol_offset = -8.0
             WHERE path = ?;
             """
             var statement: OpaquePointer?
@@ -267,7 +267,7 @@ extension DatabaseManager {
         queue.sync {
             let sql = """
             SELECT id, path, title, icon, icon_name, icon_color_hex, 
-                   COALESCE(base_asset, '_folder-blue_'), 
+                   COALESCE(base_asset, 'folder-blue'), 
                    COALESCE(symbol_size, 24.0), 
                    COALESCE(symbol_offset, -8.0),
                    last_accessed, access_count 
