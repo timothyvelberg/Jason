@@ -283,6 +283,7 @@ class HotkeyManager {
             
             for (configId, registration) in registeredShortcuts {
                 let registeredModifiers = NSEvent.ModifierFlags(rawValue: registration.modifierFlags)
+                    .intersection([.command, .control, .option, .shift])
                 
                 print("   🔍 Config \(configId): keyCode=\(registration.keyCode) (want \(event.keyCode)), modifiers=\(registeredModifiers.rawValue) (have \(eventModifiers.rawValue))")
                 
