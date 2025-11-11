@@ -111,7 +111,7 @@ class FirstLaunchConfiguration {
                 shortcut: "Ctrl+Shift+A",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
-                iconSize: 44.0,
+                iconSize: 32.0,
                 keyCode: DefaultShortcut.ctrlShiftA.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftA.modifierFlags,
                 providers: [
@@ -127,7 +127,7 @@ class FirstLaunchConfiguration {
                 shortcut: "Ctrl+Shift+Q",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
-                iconSize: 44.0,
+                iconSize: 32.0,
                 keyCode: DefaultShortcut.ctrlShiftQ.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftQ.modifierFlags,
                 providers: [
@@ -171,7 +171,7 @@ class FirstLaunchConfiguration {
                 shortcut: "Ctrl+Shift+E",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
-                iconSize: 38.0,
+                iconSize: 32.0,
                 keyCode: DefaultShortcut.ctrlShiftE.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftE.modifierFlags,
                 providers: [
@@ -187,7 +187,7 @@ class FirstLaunchConfiguration {
                 shortcut: "Ctrl+Shift+W",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
-                iconSize: 38.0,
+                iconSize: 32.0,
                 keyCode: 13,  // "W"
                 modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue,
                 providers: [

@@ -133,42 +133,59 @@ class AppSwitcherManager: ObservableObject {
         }
         
         isUpdating = true
-        defer { isUpdating = false }  // Always reset flag when function exits
+        defer { isUpdating = false }
         
         let allApps = NSWorkspace.shared.runningApplications
         
         // Filter to only show regular applications (not background processes) and exclude our own app
-        let newApps = allApps.filter { app in
+        let filteredApps = allApps.filter { app in
             app.activationPolicy == .regular &&
-            app.bundleIdentifier != Bundle.main.bundleIdentifier  // Exclude our own app (Jason)
+            app.bundleIdentifier != Bundle.main.bundleIdentifier
         }
         
-        // Only update if there's actually a change (to reduce unnecessary UI updates)
-        let oldAppIDs = Set(runningApps.map { $0.processIdentifier })
-        let newAppIDs = Set(newApps.map { $0.processIdentifier })
+        // Quick deduplication by bundle ID (without sorting - cheap!)
+        var seenBundleIds = Set<String>()
+        var deduplicatedApps: [NSRunningApplication] = []
+        
+        for app in filteredApps where app.processIdentifier > 0 {
+            guard let bundleId = app.bundleIdentifier else { continue }
+            if !seenBundleIds.contains(bundleId) {
+                seenBundleIds.insert(bundleId)
+                deduplicatedApps.append(app)
+            }
+        }
+        
+        // Compare bundle IDs (cheap comparison)
+        let oldAppBundleIDs = Set(runningApps.compactMap { $0.bundleIdentifier })
+        let newAppBundleIDs = seenBundleIds  // Already a Set!
         
         // Only log when UI is visible (when user is actively using it)
         let isUIVisible = activeCircularUIManager?.isVisible ?? false
         
         if isUIVisible {
             // Verbose logging when UI is open - user can see changes happening
-            print("[AppSwitcher] Checking apps: current=\(runningApps.count), new=\(newApps.count)")
+            print("[AppSwitcher] Checking apps: current=\(runningApps.count), new=\(deduplicatedApps.count)")
         }
         
-        if oldAppIDs != newAppIDs {
+        // Only sort and update if there's an actual change
+        if oldAppBundleIDs != newAppBundleIDs {
             print("[AppSwitcher] CHANGE DETECTED!")
-            // Only do expensive sorting when the app list actually changes
-            let sortedApps = sortAppsByMRU(newApps)
+            
+            // NOW do the expensive MRU sorting
+            let sortedApps = sortAppsByMRU(deduplicatedApps)
             
             let oldCount = runningApps.count
             let newCount = sortedApps.count
             
-            // Log what changed BEFORE updating the state
-            let added = newAppIDs.subtracting(oldAppIDs)
-            let removed = oldAppIDs.subtracting(newAppIDs)
+            // Log what changed BEFORE updating the state (using bundle IDs)
+            let added = newAppBundleIDs.subtracting(oldAppBundleIDs)
+            let removed = oldAppBundleIDs.subtracting(newAppBundleIDs)
             
             if !added.isEmpty {
-                let addedApps = sortedApps.filter { added.contains($0.processIdentifier) }
+                let addedApps = sortedApps.filter { app in
+                    guard let bundleId = app.bundleIdentifier else { return false }
+                    return added.contains(bundleId)
+                }
                 print("   Added: \(addedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: ", "))")
                 
                 // Add new apps to the end of usage history
@@ -178,7 +195,10 @@ class AppSwitcherManager: ObservableObject {
             }
             
             if !removed.isEmpty {
-                let removedApps = runningApps.filter { removed.contains($0.processIdentifier) }
+                let removedApps = runningApps.filter { app in
+                    guard let bundleId = app.bundleIdentifier else { return false }
+                    return removed.contains(bundleId)
+                }
                 print("   Removed: \(removedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: ", "))")
                 
                 // Remove apps from usage history
@@ -195,7 +215,6 @@ class AppSwitcherManager: ObservableObject {
                 NotificationCenter.default.postProviderUpdate(providerId: "app-switcher")
                 print("📢 Posted update notification for app-switcher")
                 
-                // 🆕 ADDED: Also notify CombinedAppsProvider instances
                 NotificationCenter.default.postProviderUpdate(providerId: "combined-apps")
                 print("📢 Posted update notification for combined-apps")
             }
@@ -231,10 +250,17 @@ class AppSwitcherManager: ObservableObject {
     // MARK: - MRU Management
     
     private func sortAppsByMRU(_ apps: [NSRunningApplication]) -> [NSRunningApplication] {
+        // Note: This function now only gets called when there's an actual change
+        // So logging here is appropriate (won't spam console)
         print("Sorting apps by MRU. Usage history: \(appUsageHistory)")
         
-        // Create a dictionary for quick lookup
-        let appDict = Dictionary(uniqueKeysWithValues: apps.map { ($0.processIdentifier, $0) })
+        // Apps are already deduplicated by caller, but we still filter invalid PIDs
+        let validApps = apps.filter { $0.processIdentifier > 0 }
+        
+        // Create dictionary from valid apps by PID for MRU lookup
+        let appDict = Dictionary(uniqueKeysWithValues: validApps.map {
+            ($0.processIdentifier, $0)
+        })
         
         var sortedApps: [NSRunningApplication] = []
         
@@ -247,7 +273,7 @@ class AppSwitcherManager: ObservableObject {
         
         // Then add any new apps that aren't in our history yet (alphabetically)
         let appsInHistory = Set(sortedApps.map { $0.processIdentifier })
-        let newApps = apps.filter { !appsInHistory.contains($0.processIdentifier) }
+        let newApps = validApps.filter { !appsInHistory.contains($0.processIdentifier) }
             .sorted { app1, app2 in
                 let name1 = app1.localizedName ?? ""
                 let name2 = app2.localizedName ?? ""
@@ -262,6 +288,11 @@ class AppSwitcherManager: ObservableObject {
     }
     
     private func addToUsageHistory(_ pid: pid_t) {
+        // Don't track invalid PIDs (safety check)
+        guard pid > 0 else {
+            print("⚠️ Ignoring invalid PID in usage history")
+            return
+        }
         // Remove if already exists
         appUsageHistory.removeAll { $0 == pid }
         // Add to front (most recent)
@@ -279,6 +310,13 @@ class AppSwitcherManager: ObservableObject {
     
     func recordAppUsage(_ app: NSRunningApplication) {
         print("Recording usage for: \(app.localizedName ?? "Unknown") (PID: \(app.processIdentifier))")
+        
+        // Don't record apps with invalid process IDs
+        guard app.processIdentifier > 0 else {
+            print("⚠️ Skipping usage record for app with invalid PID")
+            return
+        }
+        
         addToUsageHistory(app.processIdentifier)
         
         // Force immediate re-sort without waiting for app list changes

@@ -5,8 +5,6 @@
 //  Created by Timothy Velberg on 02/11/2025.
 //
 //  Provider that combines favorite apps and running apps into a single unified list
-//  🆕 REFACTORED: Now uses shared AppSwitcherManager.shared instead of per-instance manager
-//  🆕 FIXED: Removed duplicate NSWorkspace monitoring - relies on AppSwitcherManager.shared
 
 import Foundation
 import AppKit
@@ -71,23 +69,19 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         let favorites = DatabaseManager.shared.getFavoriteApps()
 //        print("📋 [CombinedApps] Loaded \(favorites.count) favorite apps from database")
         
-        // 2. Get running apps
-        let runningApps = NSWorkspace.shared.runningApplications.filter { app in
-            app.activationPolicy == .regular &&
-            app.bundleIdentifier != Bundle.main.bundleIdentifier
-        }
+        // 2. Get running apps from AppSwitcherManager (already deduplicated!)
+        // This ensures we use the same source of truth as AppSwitcherManager
+        let runningApps = AppSwitcherManager.shared.runningApps
 //        print("🏃 [CombinedApps] Found \(runningApps.count) running apps")
         
         // Create a map of running apps by bundle ID for quick lookup
-        // Use compactMapValues to handle potential duplicates (keeps first occurrence)
-        var runningAppsMap: [String: NSRunningApplication] = [:]
-        for app in runningApps {
-            guard let bundleId = app.bundleIdentifier else { continue }
-            // Only add if not already present (keeps first occurrence)
-            if runningAppsMap[bundleId] == nil {
-                runningAppsMap[bundleId] = app
+        // AppSwitcherManager already deduplicates, so we just create the map
+        let runningAppsMap: [String: NSRunningApplication] = Dictionary(
+            uniqueKeysWithValues: runningApps.compactMap { app in
+                guard let bundleId = app.bundleIdentifier else { return nil }
+                return (bundleId, app)
             }
-        }
+        )
         
         // 3. Add favorite apps first (in database order)
         for (index, favorite) in favorites.enumerated() {
@@ -105,7 +99,8 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         
         // 4. Add non-favorite running apps (alphabetically sorted for consistency)
         let favoriteBundleIds = Set(favorites.map { $0.bundleIdentifier })
-        let nonFavoriteRunningApps = runningApps
+        // Use deduplicated map instead of original runningApps array (which can have duplicate PIDs)
+        let nonFavoriteRunningApps = Array(runningAppsMap.values)
             .filter { app in
                 guard let bundleId = app.bundleIdentifier else { return false }
                 return !favoriteBundleIds.contains(bundleId)
@@ -137,6 +132,9 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         let runningNonFavoriteCount = entries.filter { !$0.isFavorite && $0.isRunning }.count
         
         print("[CombinedApps] Total apps: \(appEntries.count)")
+        print("   Favorites: \(favoriteCount)")
+        print("   Non-favorites: \(runningNonFavoriteCount)")
+        print("   Source: AppSwitcherManager (\(runningApps.count) deduplicated apps)")
     }
     
     private func createAppEntry(
@@ -208,7 +206,18 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         } else if isRunning, let runningApp = runningApp, let appIcon = runningApp.icon {
             icon = appIcon
         } else {
-            icon = NSWorkspace.shared.icon(forFile: appURL.path)
+            // Try to get icon from file system
+            let fileIcon = NSWorkspace.shared.icon(forFile: appURL.path)
+            
+            // Validate icon - check if it's valid by checking size
+            // Invalid/missing icons typically have zero size
+            if fileIcon.size.width > 0 && fileIcon.size.height > 0 {
+                icon = fileIcon
+            } else {
+                // Fallback: use generic application icon
+                print("⚠️ [CombinedApps] Failed to load icon for \(name), using fallback")
+                icon = NSImage(systemSymbolName: "app.dashed", accessibilityDescription: nil) ?? NSImage()
+            }
         }
         
         return AppEntry(
