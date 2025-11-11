@@ -179,6 +179,13 @@ class FirstLaunchConfiguration {
                     ("SystemActionsProvider", 2, nil)
                 ]
             )
+            
+            var directSuccess2 = DatabaseManager.shared.updateProviderDisplayMode(
+                ringId: filesActionsRing.id,
+                providerType: "FavoriteFilesProvider",
+                displayMode: "direct"
+            )
+            
             print("   ✅ Created '\(filesActionsRing.name)' - \(filesActionsRing.shortcutDescription)")
             
             // Example 5: Everything Direct - Apps + Finder both in direct mode (Ctrl+Shift+E)
@@ -218,7 +225,7 @@ class FirstLaunchConfiguration {
                 print("      Apps: \(appsDirectSuccess ? "✅" : "❌"), Finder: \(finderDirectSuccess ? "✅" : "❌")")
             }
             
-            // 🔧 CRITICAL: Reload configurations after all database updates
+            // Reload configurations after all database updates
             // This ensures the in-memory configs reflect all displayMode changes
             configManager.loadConfigurations()
             
