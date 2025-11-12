@@ -76,9 +76,9 @@ class FirstLaunchConfiguration {
                 keyCode: DefaultShortcut.ctrlShiftD.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftD.modifierFlags,
                 providers: [
-                    ("CombinedAppsProvider", 1, nil),
-                    ("FavoriteFilesProvider", 2, nil),
-                    ("FinderLogic", 3, nil)
+                    ("CombinedAppsProvider", order: 1, displayMode: "parent", angle: 180.0),
+                    ("FavoriteFilesProvider", order: 2,displayMode: "parent", nil),
+                    ("FinderLogic", order: 3,displayMode: "parent", nil)
                 ]
             )
             
@@ -105,21 +105,6 @@ class FirstLaunchConfiguration {
         print("🎨 [FirstLaunch] Creating example configurations...")
         
         do {
-            // Example 1: Apps-only ring with Ctrl+Shift+A (PARENT MODE)
-            let appsRing = try configManager.createConfiguration(
-                name: "Quick Apps (Parent)",
-                shortcut: "Ctrl+Shift+A",  // For display
-                ringRadius: 80.0,
-                centerHoleRadius: 56.0,
-                iconSize: 32.0,
-                keyCode: DefaultShortcut.ctrlShiftA.keyCode,
-                modifierFlags: DefaultShortcut.ctrlShiftA.modifierFlags,
-                providers: [
-                    ("CombinedAppsProvider", 1, nil)
-                ]
-            )
-            print("   ✅ Created '\(appsRing.name)' - \(appsRing.shortcutDescription)")
-            print("      Display Mode: parent (shows 'Applications' category)")
             
             // Example 2: Apps-only ring with Ctrl+Shift+Q (DIRECT MODE)
             let appsDirectRing = try configManager.createConfiguration(
@@ -131,23 +116,9 @@ class FirstLaunchConfiguration {
                 keyCode: DefaultShortcut.ctrlShiftQ.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftQ.modifierFlags,
                 providers: [
-                    ("CombinedAppsProvider", 1, nil)
+                    ("CombinedAppsProvider", order: 1, displayMode: "direct", nil)
                 ]
             )
-            
-            // Set display mode to "direct" for immediate app access
-            let directSuccess = DatabaseManager.shared.updateProviderDisplayMode(
-                ringId: appsDirectRing.id,
-                providerType: "CombinedAppsProvider",
-                displayMode: "direct"
-            )
-            
-            if directSuccess {
-                print("   ✅ Created '\(appsDirectRing.name)' - \(appsDirectRing.shortcutDescription)")
-                print("      Display Mode: direct (shows apps immediately)")
-            } else {
-                print("   ⚠️ Created ring but failed to set direct mode")
-            }
             
             // Example 3: Files-focused ring with Ctrl+Shift+F
             let filesRing = try configManager.createConfiguration(
@@ -159,34 +130,9 @@ class FirstLaunchConfiguration {
                 keyCode: DefaultShortcut.ctrlShiftF.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftF.modifierFlags,
                 providers: [
-                    ("FavoriteFilesProvider", 1, nil),
-                    ("FinderLogic", 2, nil)
+                    ("FinderLogic", order: 1, displayMode: "direct", nil)
                 ]
             )
-            print("   ✅ Created '\(filesRing.name)' - \(filesRing.shortcutDescription)")
-            
-            // Example 4: Files & Actions ring with Ctrl+Shift+E
-            let filesActionsRing = try configManager.createConfiguration(
-                name: "Files & Actions",
-                shortcut: "Ctrl+Shift+E",  // For display
-                ringRadius: 80.0,
-                centerHoleRadius: 56.0,
-                iconSize: 32.0,
-                keyCode: DefaultShortcut.ctrlShiftE.keyCode,
-                modifierFlags: DefaultShortcut.ctrlShiftE.modifierFlags,
-                providers: [
-                    ("FavoriteFilesProvider", 1, nil),
-                    ("SystemActionsProvider", 2, nil)
-                ]
-            )
-            
-            var directSuccess2 = DatabaseManager.shared.updateProviderDisplayMode(
-                ringId: filesActionsRing.id,
-                providerType: "FavoriteFilesProvider",
-                displayMode: "direct"
-            )
-            
-            print("   ✅ Created '\(filesActionsRing.name)' - \(filesActionsRing.shortcutDescription)")
             
             // Example 5: Everything Direct - Apps + Finder both in direct mode (Ctrl+Shift+E)
             let everythingDirectRing = try configManager.createConfiguration(
@@ -198,32 +144,10 @@ class FirstLaunchConfiguration {
                 keyCode: 13,  // "W"
                 modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue,
                 providers: [
-                    ("CombinedAppsProvider", 1, nil),
-                    ("FinderLogic", 2, nil)
+                    ("CombinedAppsProvider", order: 1, displayMode: "direct", nil),
+                    ("FinderLogic", order: 2, displayMode: "direct", nil)
                 ]
             )
-            
-            // Set both providers to direct mode
-            let appsDirectSuccess = DatabaseManager.shared.updateProviderDisplayMode(
-                ringId: everythingDirectRing.id,
-                providerType: "CombinedAppsProvider",
-                displayMode: "direct"
-            )
-            
-            let finderDirectSuccess = DatabaseManager.shared.updateProviderDisplayMode(
-                ringId: everythingDirectRing.id,
-                providerType: "FinderLogic",
-                displayMode: "direct"
-            )
-            
-            if appsDirectSuccess && finderDirectSuccess {
-                print("   ✅ Created '\(everythingDirectRing.name)' - \(everythingDirectRing.shortcutDescription)")
-                print("      CombinedAppsProvider: direct (shows apps immediately)")
-                print("      finder-windows: direct (shows folders immediately)")
-            } else {
-                print("   ⚠️ Created ring but failed to set all providers to direct mode")
-                print("      Apps: \(appsDirectSuccess ? "✅" : "❌"), Finder: \(finderDirectSuccess ? "✅" : "❌")")
-            }
             
             // Reload configurations after all database updates
             // This ensures the in-memory configs reflect all displayMode changes
@@ -238,8 +162,6 @@ class FirstLaunchConfiguration {
         } catch {
             print("   ⚠️ Failed to create some example configurations: \(error)")
         }
-        
-        
     }
     
     /// Reset all configurations and recreate defaults

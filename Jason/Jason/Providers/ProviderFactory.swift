@@ -17,7 +17,7 @@ class ProviderFactory {
     weak var circularUIManager: CircularUIManager?
     
     /// Reference to AppSwitcherManager (needed by CombinedAppsProvider)
-    /// 🆕 CHANGED: Now references the shared singleton instead of a per-instance manager
+    /// Now references the shared singleton instead of a per-instance manager
     weak var appSwitcherManager: AppSwitcherManager?
     
     // MARK: - Initialization
@@ -26,7 +26,7 @@ class ProviderFactory {
         self.circularUIManager = circularUIManager
         self.appSwitcherManager = appSwitcherManager
         
-        // 🆕 ADDED: Log which AppSwitcherManager we're using
+        // Log which AppSwitcherManager we're using
         if let manager = appSwitcherManager {
             print("   [ProviderFactory] Using AppSwitcherManager: \(manager === AppSwitcherManager.shared ? "SHARED ✅" : "INSTANCE ⚠️")")
         }
@@ -91,7 +91,7 @@ class ProviderFactory {
         
         // Wire up dependencies
         provider.circularUIManager = circularUIManager
-        provider.appSwitcherManager = appSwitcherManager  // 🆕 This is now the shared instance
+        provider.appSwitcherManager = appSwitcherManager  //This is now the shared instance
         
         // TODO: Apply parentItemAngle from config when provider supports it
         // if let angle = config.parentItemAngle {

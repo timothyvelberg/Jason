@@ -145,7 +145,7 @@ class RingConfigurationManager: ObservableObject {
         iconSize: Double,
         keyCode: UInt16? = nil,            // NEW
         modifierFlags: UInt? = nil,        // NEW
-        providers: [(type: String, order: Int, angle: Double?)] = []
+        providers: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
     ) throws -> StoredRingConfiguration {
         let shortcutDisplay = keyCode != nil ? formatShortcut(keyCode: keyCode!, modifiers: modifierFlags ?? 0) : shortcut
         print("[RingConfigManager] Creating configuration '\(name)' with shortcut '\(shortcutDisplay)'")
@@ -184,14 +184,31 @@ class RingConfigurationManager: ObservableObject {
         var providerConfigs: [ProviderConfiguration] = []
         for (index, provider) in providers.enumerated() {
             do {
+                // Build provider config JSON if displayMode is specified
+                var configJSON: String? = nil
+                if let displayMode = provider.displayMode {
+                    let config = ["displayMode": displayMode]
+                    if let jsonData = try? JSONSerialization.data(withJSONObject: config),
+                       let jsonString = String(data: jsonData, encoding: .utf8) {
+                        configJSON = jsonString
+                    }
+                }
+                
                 guard let providerId = databaseManager.createProvider(
                     ringId: ringId,
                     providerType: provider.type,
                     providerOrder: provider.order,
-                    parentItemAngle: provider.angle.map { CGFloat($0) }
+                    parentItemAngle: provider.angle.map { CGFloat($0) },
+                    providerConfig: configJSON
                 ) else {
                     print("   Failed to add provider '\(provider.type)': database returned nil")
                     continue
+                }
+                
+                // Build config dictionary for the domain model
+                var configDict: [String: Any]? = nil
+                if let displayMode = provider.displayMode {
+                    configDict = ["displayMode": displayMode]
                 }
                 
                 providerConfigs.append(ProviderConfiguration(
@@ -199,10 +216,11 @@ class RingConfigurationManager: ObservableObject {
                     providerType: provider.type,
                     order: provider.order,
                     parentItemAngle: provider.angle,
-                    config: nil
+                    config: configDict
                 ))
                 
-                print("  Added provider \(index + 1)/\(providers.count): \(provider.type)")
+                let modeInfo = provider.displayMode.map { " (mode: \($0))" } ?? ""
+                print("   Added provider \(index + 1)/\(providers.count): \(provider.type)\(modeInfo)")
             }
         }
         
@@ -738,8 +756,8 @@ class RingConfigurationManager: ObservableObject {
      keyCode: 0,  // "A"
      modifierFlags: NSEvent.ModifierFlags([.command, .shift]).rawValue,
      providers: [
-         ("RunningAppsProvider", 1, 180.0),
-         ("FavoriteAppsProvider", 2, 180.0)
+         (type: "RunningAppsProvider", order: 1, displayMode: nil, angle: 180.0),
+         (type: "FavoriteAppsProvider", order: 2, displayMode: "direct", angle: 180.0)
      ]
  )
  
