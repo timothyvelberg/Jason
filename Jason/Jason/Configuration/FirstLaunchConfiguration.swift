@@ -76,9 +76,9 @@ class FirstLaunchConfiguration {
                 keyCode: DefaultShortcut.ctrlShiftD.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftD.modifierFlags,
                 providers: [
-                    ("CombinedAppsProvider", order: 1, displayMode: "parent", angle: 180.0),
-                    ("FavoriteFilesProvider", order: 2,displayMode: "parent", nil),
-                    ("FinderLogic", order: 3,displayMode: "parent", nil)
+                    (type: "CombinedAppsProvider", order: 1, displayMode: "parent", angle: nil),
+                    (type: "FavoriteFilesProvider", order: 2,displayMode: "parent", nil),
+                    (type: "FinderLogic", order: 3,displayMode: "parent", angle: nil)
                 ]
             )
             
@@ -116,7 +116,7 @@ class FirstLaunchConfiguration {
                 keyCode: DefaultShortcut.ctrlShiftQ.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftQ.modifierFlags,
                 providers: [
-                    ("CombinedAppsProvider", order: 1, displayMode: "direct", nil)
+                    (type: "CombinedAppsProvider", order: 1, displayMode: "direct", angle: nil)
                 ]
             )
             
@@ -130,7 +130,7 @@ class FirstLaunchConfiguration {
                 keyCode: DefaultShortcut.ctrlShiftF.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftF.modifierFlags,
                 providers: [
-                    ("FinderLogic", order: 1, displayMode: "direct", nil)
+                    (type: "FinderLogic", order: 1, displayMode: "direct", angle: nil)
                 ]
             )
             
@@ -144,8 +144,8 @@ class FirstLaunchConfiguration {
                 keyCode: 13,  // "W"
                 modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue,
                 providers: [
-                    ("CombinedAppsProvider", order: 1, displayMode: "direct", nil),
-                    ("FinderLogic", order: 2, displayMode: "direct", nil)
+                    (type: "CombinedAppsProvider", order: 1, displayMode: "direct", angle: nil),
+                    (type: "FinderLogic", order: 2, displayMode: "direct", nil)
                 ]
             )
             

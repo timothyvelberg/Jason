@@ -307,6 +307,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 icon: providerIcon,
                 children: appNodes,
                 preferredLayout: .partialSlice,
+                parentAngleSize: 180.0, // setting 180 degree item
                 slicePositioning: .center,
                 providerId: providerId,
                 onLeftClick: ModifierAwareInteraction(base: .expand),
