@@ -28,6 +28,16 @@ class FunctionManager: ObservableObject {
     /// 0.8 = each ring uses 80% of previous ring's angles (20% reduction per level)
     private let angleScalePerRing: Double = 0.8
     
+    // MARK: - Ring 0 Auto-Sizing Constants
+    
+    /// Optimal angle per item for Ring 0 (comfortable spacing)
+    /// When item count causes angles smaller than this, ring will grow to maintain comfort
+    private let optimalAnglePerItem: Double = 30.0
+    
+    /// Minimum angle per item before auto-sizing kicks in
+    /// Below this threshold, we calculate optimal ring size
+    private let minimumComfortableAngle: Double = 25.0
+    
     /// Maximum items that can be displayed (calculated from minimalAngle)
     private var maxItems: Int {
         return Int(360.0 / minimalAngle)
@@ -140,6 +150,74 @@ class FunctionManager: ObservableObject {
         let parentItemAngle: Double
     }
     
+    // MARK: - Ring 0 Auto-Sizing
+    
+    /// Calculate optimal Ring 0 dimensions based on item count
+    /// Uses mathematical scaling to maintain comfortable spacing as item count increases
+    /// - Parameters:
+    ///   - itemCount: Number of items to display in Ring 0
+    ///   - baseRadius: Base center hole radius from configuration
+    ///   - baseThickness: Base ring thickness from configuration
+    /// - Returns: Tuple of (adjusted center radius, adjusted ring thickness)
+    private func calculateOptimalRing0Size(
+        itemCount: Int,
+        baseRadius: CGFloat,
+        baseThickness: CGFloat
+    ) -> (centerRadius: CGFloat, thickness: CGFloat) {
+        
+        print("📏 [Ring 0 Auto-Size] CALLED with:")
+        print("   Item count: \(itemCount)")
+        print("   Base center radius: \(baseRadius)")
+        print("   Base thickness: \(baseThickness)")
+        
+        // Calculate angle per item if we use base dimensions
+        let anglePerItem = 360.0 / Double(itemCount)
+        
+        print("   Calculated angle per item: \(String(format: "%.2f°", anglePerItem))")
+        print("   minimumComfortableAngle threshold: \(minimumComfortableAngle)°")
+        
+        // If angle is comfortable, no adjustment needed
+        guard anglePerItem < minimumComfortableAngle else {
+            print("   ✅ Angle is comfortable - NO RESIZE NEEDED")
+            print("   Returning: centerRadius=\(baseRadius), thickness=\(baseThickness)")
+            return (baseRadius, baseThickness)
+        }
+        
+        print("   ⚠️ Angle TOO SMALL - TRIGGERING AUTO-RESIZE")
+        
+        // Calculate how much we need to grow to achieve optimal spacing
+        // We want to maintain optimalAnglePerItem worth of arc length
+        
+        // Current arc length per item at base radius
+        let currentArcLength = baseRadius * (anglePerItem * .pi / 180.0)
+        
+        // Desired arc length per item for optimal spacing
+        let desiredArcLength = baseRadius * (optimalAnglePerItem * .pi / 180.0)
+        
+        // Scale factor needed to achieve desired arc length
+        let scaleFactor = desiredArcLength / currentArcLength
+        
+        print("   Arc calculations:")
+        print("      Current arc length: \(String(format: "%.2f", currentArcLength))")
+        print("      Desired arc length: \(String(format: "%.2f", desiredArcLength))")
+        print("      Scale factor: \(String(format: "%.2f", scaleFactor))")
+        
+        // Grow the center hole radius proportionally
+        let adjustedRadius = baseRadius * scaleFactor
+        
+        // Also grow thickness to maintain visual balance
+        // Use square root of scale factor for less aggressive growth
+        let thicknessScaleFactor = sqrt(scaleFactor)
+        let adjustedThickness = baseThickness * thicknessScaleFactor
+        
+        print("   🎯 RESIZING:")
+        print("      Angle: \(String(format: "%.1f°", anglePerItem)) → target: \(String(format: "%.1f°", optimalAnglePerItem))")
+        print("      Center radius: \(String(format: "%.0f", baseRadius)) → \(String(format: "%.0f", adjustedRadius)) (+\(String(format: "%.0f", adjustedRadius - baseRadius))px)")
+        print("      Thickness: \(String(format: "%.0f", baseThickness)) → \(String(format: "%.0f", adjustedThickness)) (+\(String(format: "%.0f", adjustedThickness - baseThickness))px)")
+        
+        return (adjustedRadius, adjustedThickness)
+    }
+    
     // MARK: - Computed Properties for UI
     
     var ringConfigurations: [RingConfiguration] {
@@ -158,6 +236,8 @@ class FunctionManager: ObservableObject {
     }
     
     private func calculateRingConfigurations() -> [RingConfiguration] {
+        print("🔧 [calculateRingConfigurations] START - Processing \(rings.count) ring(s)")
+        
         var configs: [RingConfiguration] = []
         let centerHoleRadius = self.centerHoleRadius
         // Use instance properties instead of local variables
@@ -166,10 +246,13 @@ class FunctionManager: ObservableObject {
         let ringMargin: CGFloat = 2
         var currentRadius = centerHoleRadius
         
-//        print("🔧 [calculateRingConfigurations] START - Processing \(rings.count) rings")
+        print("   Base configuration:")
+        print("      centerHoleRadius: \(centerHoleRadius)")
+        print("      ringThickness: \(ringThickness)")
+        print("      iconSize: \(iconSize)")
         
         for (index, ringState) in rings.enumerated() {
-//            print("🔧 [Ring \(index)] Processing ring with \(ringState.nodes.count) nodes, collapsed: \(ringState.isCollapsed)")
+            print("🔧 [Ring \(index)] Processing ring with \(ringState.nodes.count) node(s), collapsed: \(ringState.isCollapsed)")
             
             // Enforce hard cap on number of items (truncate excess nodes)
             let nodes = Array(ringState.nodes.prefix(maxItems))
@@ -274,10 +357,36 @@ class FunctionManager: ObservableObject {
                 }
             }else if index == 0 {
                 // Ring 0 is always a full circle, shifted so first item is at top (0°)
-                thisRingThickness = ringThickness  // Use default from config
-                thisIconSize = iconSize  // Use default from config
-                
                 let itemCount = nodes.count
+                
+                print("🔵 [calculateRingConfigurations] Processing Ring 0:")
+                print("   Item count: \(itemCount)")
+                print("   Base centerHoleRadius: \(centerHoleRadius)")
+                print("   Base ringThickness: \(ringThickness)")
+                
+                // 🆕 Calculate optimal dimensions for Ring 0 based on item count
+                let (adjustedCenterRadius, adjustedThickness) = calculateOptimalRing0Size(
+                    itemCount: itemCount,
+                    baseRadius: centerHoleRadius,
+                    baseThickness: ringThickness
+                )
+                
+                print("   Returned from auto-size:")
+                print("      adjustedCenterRadius: \(adjustedCenterRadius)")
+                print("      adjustedThickness: \(adjustedThickness)")
+                
+                // Use adjusted dimensions
+                thisRingThickness = adjustedThickness
+                thisIconSize = iconSize  // Keep icon size consistent
+                
+                // Update currentRadius to use the adjusted center hole radius
+                // This becomes the inner edge (startRadius) of Ring 0
+                currentRadius = adjustedCenterRadius
+                
+                print("   Final Ring 0 config:")
+                print("      currentRadius (startRadius): \(currentRadius)")
+                print("      thisRingThickness: \(thisRingThickness)")
+                print("      thisIconSize: \(thisIconSize)")
                 
                 // Calculate per-item angles (with custom parentAngleSize support)
                 let perItemAngles = calculateRing0Angles(for: nodes)
@@ -392,6 +501,11 @@ class FunctionManager: ObservableObject {
                 iconSize: thisIconSize
             ))
             currentRadius += thisRingThickness + ringMargin
+        }
+        
+        print("🔧 [calculateRingConfigurations] COMPLETE - Generated \(configs.count) ring configuration(s)")
+        for (idx, config) in configs.enumerated() {
+            print("   Ring \(idx): startRadius=\(String(format: "%.0f", config.startRadius)), thickness=\(String(format: "%.0f", config.thickness)), nodes=\(config.nodes.count)")
         }
         
         return configs
