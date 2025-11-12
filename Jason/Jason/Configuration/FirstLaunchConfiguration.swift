@@ -87,7 +87,7 @@ class FirstLaunchConfiguration {
                 name: "Quick Apps (Direct)",
                 shortcut: "Ctrl+Shift+Q",  // For display
                 ringRadius: 80.0,
-                centerHoleRadius: 56.0,
+                centerHoleRadius: 80.0,
                 iconSize: 32.0,
                 keyCode: DefaultShortcut.ctrlShiftQ.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftQ.modifierFlags,
