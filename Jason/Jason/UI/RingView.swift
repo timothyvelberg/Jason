@@ -231,12 +231,20 @@ struct RingView: View {
             
             // Icons positioned around the ring (non-interactive, just visual)
             ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
+                let opacity = iconOpacities[node.id] ?? 0
+                let scale = iconScales[node.id] ?? animationStartScale
+                
+                // 🆕 Defensive logging for missing states
+                if opacity == 0 && iconOpacities[node.id] == nil {
+                    let _ = print("      ⚠️ RENDER: Node \(node.id) has no opacity entry (defaulting to 0)")
+                }
+                
                 Image(nsImage: node.icon)
                     .resizable()
                     .scaledToFit()
                     .frame(width: iconSize, height: iconSize)
-                    .scaleEffect(iconScales[node.id] ?? animationStartScale)  // Start at configured scale
-                    .opacity(iconOpacities[node.id] ?? 0)                     // Start at 0, animate to 1
+                    .scaleEffect(scale)
+                    .opacity(opacity)
                     .position(iconPosition(for: index))
                     .allowsHitTesting(false)  // Icons don't intercept clicks
             }
@@ -261,7 +269,7 @@ struct RingView: View {
                 }
             }
         )
-        .onChange(of: nodes.count) {
+        .onChange(of: nodes.map { $0.id }) { _, _ in
             print("🔄 [RingView] Content changed - count: \(nodes.count)")
             print("   📌 State: isFirstRender=\(isFirstRender), previousNodes.count=\(previousNodes.count)")
             
@@ -288,6 +296,31 @@ struct RingView: View {
             // Reset selection indicator opacity and completion flag
             selectionIndicatorOpacity = 0
             hasCompletedInitialSelectionFade = false
+            
+            // 🆕 SKIP ANIMATION if this is being called right after onAppear handled it
+            // Check if previousNodes exactly matches current nodes (onAppear just set it)
+            if previousNodes.count == nodes.count &&
+               Set(previousNodes.map { $0.id }) == Set(nodes.map { $0.id }) {
+                print("   ⏭️  SKIPPING: onChange fired right after onAppear - animation already handled")
+                
+                // Still animate slice if needed
+                if !sliceConfig.isFullCircle && sliceConfig.positioning == .center {
+                    animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                    animatedSliceEndAngle = Angle(degrees: sliceConfig.endAngle)
+                    
+                    // Fade in selection indicator
+                    let selectionDelay = 0.05
+                    DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
+                        withAnimation(.easeIn(duration: 0.2)) {
+                            selectionIndicatorOpacity = 1.0
+                        }
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
+                        hasCompletedInitialSelectionFade = true
+                    }
+                }
+                return
+            }
             
             // 🆕 DETERMINE UPDATE TYPE: First render vs Surgical update
             let isSurgicalUpdate: Bool
@@ -411,18 +444,22 @@ struct RingView: View {
             }
         }
         .onAppear {
-            // If nodes already has content when we appear, this might be a view recreation
-            // during a surgical update. Initialize previousNodes so the first onChange doesn't
-            // think it's a first render.
-            if nodes.count > 0 && previousNodes.isEmpty {
-                print("   🔧 Initializing previousNodes with current nodes (view recreation case)")
-                previousNodes = nodes
-                isFirstRender = false  // This is not a first render if nodes already exist
-            }
+            print("   🎬 [RingView] onAppear called - nodes.count=\(nodes.count), previousNodes.count=\(previousNodes.count)")
             
             // Reset selection indicator opacity and completion flag
             selectionIndicatorOpacity = 0
             hasCompletedInitialSelectionFade = false
+            
+            // 🆕 CRITICAL FIX: Always animate icons on first appearance
+            // Even if previousNodes gets initialized for tracking, we still need entrance animation
+            if nodes.count > 0 {
+                print("   🎬 Triggering initial icon entrance animation")
+                animateIconsIn()
+                
+                // Set previousNodes for future surgical updates
+                previousNodes = nodes
+                isFirstRender = false
+            }
 
             
             // Animate the background slice opening
@@ -929,6 +966,16 @@ struct RingView: View {
         let addedIds = newIds.subtracting(oldIds)
         let removedIds = oldIds.subtracting(newIds)
         let persistingIds = oldIds.intersection(newIds)
+        
+        print("      🔍 Surgical Animation Analysis:")
+        print("         Old nodes: \(oldNodes.count), New nodes: \(newNodes.count)")
+        print("         Added: \(addedIds.count), Removed: \(removedIds.count), Persisting: \(persistingIds.count)")
+        if !addedIds.isEmpty {
+            print("         ➕ Added IDs: \(Array(addedIds).joined(separator: ", "))")
+        }
+        if !removedIds.isEmpty {
+            print("         ➖ Removed IDs: \(Array(removedIds).joined(separator: ", "))")
+        }
 
         // Guard against empty old nodes (shouldn't happen, but just in case)
         if oldNodes.isEmpty && newNodes.count > 0 {
@@ -979,7 +1026,7 @@ struct RingView: View {
         
         // 3. ADDED ICONS: Fade in
         for id in addedIds {
-            print("      ➕ Fading in: \(id)")
+            print("      ➕ Fading in new icon: \(id)")
             
             // Start invisible
             iconOpacities[id] = 0
@@ -1006,6 +1053,39 @@ struct RingView: View {
                     }
                 }
             }
+        }
+        
+        // 🆕 4. SAFETY NET: Ensure ALL current nodes have animation states
+        // This catches any nodes that might have been missed (e.g., due to truncation edge cases)
+        var safetyNetTriggered = false
+        for node in newNodes {
+            if iconOpacities[node.id] == nil {
+                print("      ⚠️ SAFETY NET: Initializing missing animation state for: \(node.id)")
+                safetyNetTriggered = true
+                iconOpacities[node.id] = 0
+                iconScales[node.id] = animationStartScale
+                iconRotationOffsets[node.id] = 0
+                runningIndicatorOpacities[node.id] = 0
+                
+                // Immediately fade in (this shouldn't normally happen)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        iconOpacities[node.id] = 1.0
+                        iconScales[node.id] = 1.0
+                    }
+                    
+                    // Running indicator if needed
+                    if let metadata = node.metadata,
+                       let isRunning = metadata["isRunning"] as? Bool,
+                       isRunning {
+                        runningIndicatorOpacities[node.id] = 1.0
+                    }
+                }
+            }
+        }
+        
+        if !safetyNetTriggered {
+            print("      ✅ All \(newNodes.count) nodes have animation states")
         }
     }
 }

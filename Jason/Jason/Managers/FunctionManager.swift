@@ -20,7 +20,7 @@ class FunctionManager: ObservableObject {
     private let maxAngle: Double = 180
     
     /// Minimum angle per item - hard limit for spacing (Phase 3 trigger & hard cap) - for Ring 0
-    private let minimalAngle: Double = 20
+    private let minimalAngle: Double = 15  // 24 items max (360° / 15° = 24)
     
     /// Angle scaling per ring depth (0.0-1.0)
     /// 1.0 = no scaling (same angles for all rings)
@@ -958,9 +958,15 @@ class FunctionManager: ObservableObject {
         
         guard !currentNodes.isEmpty else { return }
         
+        // 🆕 Truncate to maxItems BEFORE creating ring state to prevent ghost items
+        let truncatedNodes = Array(currentNodes.prefix(maxItems))
+        if currentNodes.count > maxItems {
+            print("✂️ [rebuildRings] Truncated Ring 0 from \(currentNodes.count) to \(truncatedNodes.count) items")
+        }
+        
         // 🆕 Ring 0 has no single providerId (it's a mix of all providers)
         rings.append(RingState(
-            nodes: currentNodes,
+            nodes: truncatedNodes,
             providerId: nil,
             contentIdentifier: nil
         ))
@@ -1070,9 +1076,15 @@ class FunctionManager: ObservableObject {
         // Use displayedChildren which respects maxDisplayedChildren limit
         let displayedChildren = node.displayedChildren
         
-        print("   - displayedChildren count: \(displayedChildren.count)")
+        // 🆕 Truncate to maxItems to prevent ghost items in child rings
+        let truncatedChildren = Array(displayedChildren.prefix(maxItems))
+        if displayedChildren.count > maxItems {
+            print("   ✂️ Truncated children from \(displayedChildren.count) to \(truncatedChildren.count) items")
+        }
         
-        guard node.isBranch, !displayedChildren.isEmpty else {
+        print("   - displayedChildren count: \(truncatedChildren.count)")
+        
+        guard node.isBranch, !truncatedChildren.isEmpty else {
             print("❌ Cannot expand non-category or empty category: \(node.name)")
             return
         }
@@ -1092,7 +1104,7 @@ class FunctionManager: ObservableObject {
         
         // Add new ring with displayed children and context tracking
         rings.append(RingState(
-            nodes: displayedChildren,
+            nodes: truncatedChildren,
             isCollapsed: false,
             openedByClick: openedByClick,
             providerId: providerId,
@@ -1100,7 +1112,7 @@ class FunctionManager: ObservableObject {
         ))
         activeRingLevel = ringLevel + 1
         
-        print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(displayedChildren.count) nodes (providerId: \(providerId ?? "nil"), contentId: \(contentIdentifier ?? "nil"))")
+        print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(truncatedChildren.count) nodes (providerId: \(providerId ?? "nil"), contentId: \(contentIdentifier ?? "nil"))")
     }
 
     // MARK: - Direct Category Expansion
@@ -1199,6 +1211,12 @@ class FunctionManager: ObservableObject {
                 return
             }
             
+            // 🆕 Truncate to maxItems to prevent ghost items
+            let truncatedChildren = Array(childrenToDisplay.prefix(maxItems))
+            if childrenToDisplay.count > maxItems {
+                print("   ✂️ Truncated folder children from \(childrenToDisplay.count) to \(truncatedChildren.count) items")
+            }
+            
             // 👇 ADD BOUNDS CHECK HERE (inside Task, after async work)
             guard rings.indices.contains(ringLevel),
                   rings[ringLevel].nodes.indices.contains(index) else {
@@ -1228,7 +1246,7 @@ class FunctionManager: ObservableObject {
             let providerId = node.providerId
             let contentIdentifier = node.metadata?["folderURL"] as? String
             rings.append(RingState(
-                nodes: childrenToDisplay,
+                nodes: truncatedChildren,
                 isCollapsed: false,
                 openedByClick: true,
                 providerId: providerId,
@@ -1241,7 +1259,7 @@ class FunctionManager: ObservableObject {
             isLoadingFolder = false
             
             print("✅ Navigated into folder '\(node.name)' at ring \(ringLevel)")
-            print("   Created ring \(ringLevel + 1) with \(childrenToDisplay.count) nodes")
+            print("   Created ring \(ringLevel + 1) with \(truncatedChildren.count) nodes")
             print("   Active ring is now: \(activeRingLevel)")
         }
     }
@@ -1355,7 +1373,13 @@ class FunctionManager: ObservableObject {
                         }
                     }
                     
-                    rings[0].nodes = newRing0Nodes
+                    // 🆕 Truncate to maxItems to prevent ghost items
+                    let truncatedRing0Nodes = Array(newRing0Nodes.prefix(maxItems))
+                    if newRing0Nodes.count > maxItems {
+                        print("   ✂️ Truncated Ring 0 from \(newRing0Nodes.count) to \(truncatedRing0Nodes.count) items")
+                    }
+                    
+                    rings[0].nodes = truncatedRing0Nodes
                     
                     // Clear hover/selection state after updating nodes
                     rings[0].hoveredIndex = nil
@@ -1402,24 +1426,37 @@ class FunctionManager: ObservableObject {
                                     return
                                 }
                                 
-                                self.rings[level].nodes = loadedNodes
+                                // 🆕 Truncate to maxItems to prevent ghost items
+                                let truncatedNodes = Array(loadedNodes.prefix(self.maxItems))
+                                if loadedNodes.count > self.maxItems {
+                                    print("   ✂️ Truncated Ring \(level) from \(loadedNodes.count) to \(truncatedNodes.count) items")
+                                }
+                                
+                                self.rings[level].nodes = truncatedNodes
                                 
                                 // 🆕 CRITICAL: Clear hover/selection state after updating nodes
                                 self.rings[level].hoveredIndex = nil
                                 self.rings[level].selectedIndex = nil
                                 
-                                print("✅ Updated Ring \(level) with \(loadedNodes.count) dynamically loaded nodes")
+                                print("✅ Updated Ring \(level) with \(truncatedNodes.count) dynamically loaded nodes")
                             }
                         } else {
                             // For static children (apps) - use FRESH displayedChildren
                             freshNodes = freshParentNode.displayedChildren
-                            rings[level].nodes = freshNodes
+                            
+                            // 🆕 Truncate to maxItems to prevent ghost items
+                            let truncatedNodes = Array(freshNodes.prefix(maxItems))
+                            if freshNodes.count > maxItems {
+                                print("   ✂️ Truncated Ring \(level) from \(freshNodes.count) to \(truncatedNodes.count) items")
+                            }
+                            
+                            rings[level].nodes = truncatedNodes
                             
                             // 🆕 CRITICAL: Clear hover/selection state after updating nodes
                             rings[level].hoveredIndex = nil
                             rings[level].selectedIndex = nil
                             
-                            print("✅ Updated Ring \(level) with \(freshNodes.count) nodes")
+                            print("✅ Updated Ring \(level) with \(truncatedNodes.count) nodes")
                         }
                     } else {
                         print("⚠️ Cannot get fresh parent node for Ring \(level)")
