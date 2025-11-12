@@ -81,12 +81,23 @@ class FirstLaunchConfiguration {
                     (type: "FinderLogic", order: 3,displayMode: "parent", angle: nil)
                 ]
             )
+            print("   Created '\(defaultConfig.name)' - \(defaultConfig.shortcutDescription)")
             
-            print("   ✅ Created default configuration:")
-            print("      - ID: \(defaultConfig.id)")
-            print("      - Name: \(defaultConfig.name)")
-            print("      - Shortcut: \(defaultConfig.shortcutDescription)")
-            print("      - Providers: \(defaultConfig.providers.count)")
+            let appsDirectRing = try configManager.createConfiguration(
+                name: "Quick Apps (Direct)",
+                shortcut: "Ctrl+Shift+Q",  // For display
+                ringRadius: 80.0,
+                centerHoleRadius: 56.0,
+                iconSize: 32.0,
+                keyCode: DefaultShortcut.ctrlShiftQ.keyCode,
+                modifierFlags: DefaultShortcut.ctrlShiftQ.modifierFlags,
+                providers: [
+                    (type: "CombinedAppsProvider", order: 1, displayMode: "direct", angle: nil)
+                ]
+            )
+            
+            print("   Created '\(appsDirectRing.name)' - \(appsDirectRing.shortcutDescription)")
+            print("   ✅ Created default configurations")
             
         } catch {
             print("   ❌ Failed to create default configuration: \(error)")
@@ -105,22 +116,21 @@ class FirstLaunchConfiguration {
         print("🎨 [FirstLaunch] Creating example configurations...")
         
         do {
-            
-            // Example 2: Apps-only ring with Ctrl+Shift+Q (DIRECT MODE)
-            let appsDirectRing = try configManager.createConfiguration(
-                name: "Quick Apps (Direct)",
-                shortcut: "Ctrl+Shift+Q",  // For display
+            let folderRing = try configManager.createConfiguration(
+                name: "My Folders",
+                shortcut: "Ctrl+Shift+A",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
                 iconSize: 32.0,
-                keyCode: DefaultShortcut.ctrlShiftQ.keyCode,
-                modifierFlags: DefaultShortcut.ctrlShiftQ.modifierFlags,
+                keyCode: DefaultShortcut.ctrlShiftA.keyCode,
+                modifierFlags: DefaultShortcut.ctrlShiftA.modifierFlags,
                 providers: [
-                    (type: "CombinedAppsProvider", order: 1, displayMode: "direct", angle: nil)
+                    (type: "FinderLogic", order: 1, displayMode: "direct", angle: nil)
                 ]
             )
+            print("   ✅ Created '\(folderRing.name)' - \(folderRing.shortcutDescription)")
+
             
-            // Example 3: Files-focused ring with Ctrl+Shift+F
             let filesRing = try configManager.createConfiguration(
                 name: "My Files",
                 shortcut: "Ctrl+Shift+F",  // For display
@@ -130,11 +140,11 @@ class FirstLaunchConfiguration {
                 keyCode: DefaultShortcut.ctrlShiftF.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftF.modifierFlags,
                 providers: [
-                    (type: "FinderLogic", order: 1, displayMode: "direct", angle: nil)
+                    (type: "FavoriteFilesProvider", order: 1, displayMode: "direct", angle: nil)
                 ]
             )
-            
-            // Example 5: Everything Direct - Apps + Finder both in direct mode (Ctrl+Shift+E)
+            print("   ✅ Created '\(filesRing.name)' - \(filesRing.shortcutDescription)")
+  
             let everythingDirectRing = try configManager.createConfiguration(
                 name: "Everything Direct",
                 shortcut: "Ctrl+Shift+W",  // For display
@@ -148,17 +158,14 @@ class FirstLaunchConfiguration {
                     (type: "FinderLogic", order: 2, displayMode: "direct", nil)
                 ]
             )
+            print("   ✅ Created '\(everythingDirectRing.name)' - \(everythingDirectRing.shortcutDescription)")
+
             
             // Reload configurations after all database updates
             // This ensures the in-memory configs reflect all displayMode changes
             configManager.loadConfigurations()
             
-            print("   ✅ Created 5 example configurations")
-            print("   📊 Display Mode Comparison:")
-            print("      • Parent Mode (Ctrl+Shift+A): Ring 0 shows 'Applications' → Ring 1 shows apps")
-            print("      • Direct Mode (Ctrl+Shift+Q): Ring 0 shows apps immediately")
-            print("      • Everything Direct (Ctrl+Shift+W): Ring 0 shows apps + folders immediately")
-            
+            print("   example configurations")
         } catch {
             print("   ⚠️ Failed to create some example configurations: \(error)")
         }
