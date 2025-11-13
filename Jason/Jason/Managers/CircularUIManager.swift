@@ -295,6 +295,15 @@ class CircularUIManager: ObservableObject {
         case .navigateInto:
             print("📂 Navigating into folder: '\(node.name)'")
             functionManager.navigateIntoFolder(ringLevel: ringLevel, index: index)
+        case .launchRing(let configId):
+            print("🚀 [Left Click] Launching ring config \(configId)")
+            print("🚀 [Left Click] Launching ring config \(configId) from item '\(node.name)' (id: \(node.id))")
+            hide()  // Hide current ring first
+            
+            // Small delay to ensure clean transition
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                CircularUIInstanceManager.shared.show(configId: configId)
+            }
         case .drag(let provider):
             // Execute onClick if provided
             if let onClick = provider.onClick {
@@ -414,6 +423,15 @@ class CircularUIManager: ObservableObject {
             // Pause mouse tracking to prevent immediate collapse
             mouseTracker?.pauseAfterScroll()
             
+        case .launchRing(let configId):
+            print("🚀 [Right Click] Launching ring config \(configId)")
+            hide()  // Hide current ring first
+            
+            // Small delay to ensure clean transition
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                CircularUIInstanceManager.shared.show(configId: configId)
+            }
+            
         case .execute(let action):
             action()
             hide()
@@ -453,6 +471,14 @@ class CircularUIManager: ObservableObject {
             hide()
         case .executeKeepOpen(let action):
             action()
+        case .launchRing(let configId):
+            print("🚀 [Middle Click] Launching ring config \(configId)")
+            hide()  // Hide current ring first
+            
+            // Small delay to ensure clean transition
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                CircularUIInstanceManager.shared.show(configId: configId)
+            }
         default:
             break
         }

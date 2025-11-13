@@ -78,7 +78,8 @@ class FirstLaunchConfiguration {
                 providers: [
                     (type: "CombinedAppsProvider", order: 1, displayMode: "parent", angle: nil),
                     (type: "FavoriteFilesProvider", order: 2,displayMode: "parent", nil),
-                    (type: "FinderLogic", order: 3,displayMode: "parent", angle: nil)
+                    (type: "FinderLogic", order: 3,displayMode: "parent", angle: nil),
+                    (type: "SystemActionsProvider", order: 4, displayMode: "parent", angle: nil)
                 ]
             )
             print("   Created '\(defaultConfig.name)' - \(defaultConfig.shortcutDescription)")

@@ -64,10 +64,43 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
                     SystemActions.showDesktop()
                 }),
                 onRightClick: ModifierAwareInteraction(base:  .doNothing),
+
                 onMiddleClick: ModifierAwareInteraction(base:  .doNothing),
+
                 onBoundaryCross: ModifierAwareInteraction(base: .execute {
                     SystemActions.showDesktop()
                 })
+            ),
+            FunctionNode(
+                id: "browse-files-ring",
+                name: "Browse Files",
+                type: .action,
+                icon: NSImage(systemSymbolName: "folder.circle", accessibilityDescription: nil) ?? NSImage(),
+                preferredLayout: nil,
+                showLabel: true,
+                onLeftClick: ModifierAwareInteraction(base: .launchRing(configId: 4)),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing),  // Don't auto-launch on hover
+                onHover: {
+                       print("🔍 HOVER: Browse Files launcher (configId: 4)")
+                }
+            ),
+            
+            FunctionNode(
+                id: "launch-apps-ring",
+                name: "Quick Apps",
+                type: .action,
+                icon: NSImage(systemSymbolName: "app.dashed", accessibilityDescription: nil) ?? NSImage(),
+                preferredLayout: nil,
+                showLabel: true,
+                onLeftClick: ModifierAwareInteraction(base: .doNothing),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .launchRing(configId: 2)),
+                onHover: {
+                       print("🔍 HOVER: Browse Files launcher (configId: 2)")
+                }
             )
         ]
     }

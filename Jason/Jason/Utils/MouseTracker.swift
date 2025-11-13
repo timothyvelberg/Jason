@@ -262,6 +262,13 @@ class MouseTracker {
                                 lastRingLevel = activeRingLevel
                                 return
                                 
+                            case .launchRing(let configId):
+                                print("🎯 [BoundaryCross] Launching ring config \(configId)")
+                                DispatchQueue.main.async {
+                                    CircularUIInstanceManager.shared.show(configId: configId)
+                                }
+                                return
+                                
                             case .doNothing:
                                 return
 //                                print("⚠️ Beyond boundary hovering '\(node.name)' - no auto-expand (use right-click)")
@@ -347,9 +354,17 @@ class MouseTracker {
                     // Check if this node wants to auto-expand or auto-navigate
                     if hoveredIndex != currentSelectedIndex && functionManager.rings.count > activeRingLevel + 1 {
                         switch node.onBoundaryCross.base {
+                        
                         case .expand:
                             print("🔄 Switching to category '\(node.name)'")
                             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
+                        
+                        case .launchRing(let configId):
+                            print("🎯 [BoundaryCross-Category] Launching ring config \(configId)")
+                            DispatchQueue.main.async {
+                                CircularUIInstanceManager.shared.show(configId: configId)
+                            }
+                            
                         case .navigateInto:
                             print("📂 Switching to folder '\(node.name)'")
                             functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: hoveredIndex)
