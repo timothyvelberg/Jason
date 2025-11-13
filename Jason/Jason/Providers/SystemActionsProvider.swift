@@ -33,8 +33,7 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
     // MARK: - FunctionProvider Methods
     
     func provideFunctions() -> [FunctionNode] {
-        return [
-            // Mission Control
+        let items = [
             FunctionNode(
                 id: "mission-control",
                 name: "Mission Control",
@@ -101,6 +100,21 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
                 onHover: {
                        print("🔍 HOVER: Browse Files launcher (configId: 2)")
                 }
+            )
+        ]
+        return  [
+            FunctionNode(
+            id: "system-actions",
+            name: "System Actions",
+            type: .category,
+            icon: NSImage(systemSymbolName: "app.dashed", accessibilityDescription: nil) ?? NSImage(),
+            children: items,
+            preferredLayout: .partialSlice,
+            slicePositioning: .center,
+            onLeftClick: ModifierAwareInteraction(base: .doNothing),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .expand )
             )
         ]
     }
