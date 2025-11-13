@@ -68,6 +68,7 @@ struct MinimalView: View {
     @State private var showingFolderFavoritesSettings = false
     @State private var showingAppFavoritesSettings = false
     @State private var showingFileFavoritesSettings = false
+    @State private var showingRingManagement = false
     
     // Ring configuration selection for testing
     @State private var selectedConfigId: Int?
@@ -233,6 +234,11 @@ struct MinimalView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(firstInstance == nil)
+                
+                Button("Manage Rings") {
+                    showingRingManagement = true
+                }
+                .buttonStyle(.bordered)
             }
         }
         .padding(30)
@@ -256,6 +262,12 @@ struct MinimalView: View {
                let filesProvider = instance.favoriteFilesProvider {
                 FavoriteFilesSettingsView(filesProvider: filesProvider)
             }
+        }
+        .sheet(isPresented: $showingRingManagement, onDismiss: {
+            // Reload configurations to update the picker with new rings
+            loadConfigurations()
+        }) {
+            RingManagementView()
         }
     }
     

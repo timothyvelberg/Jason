@@ -64,6 +64,10 @@ class CircularUIInstanceManager: ObservableObject {
         // Create new instance with configuration
         let instance = CircularUIManager(configuration: config)
         instances[config.id] = instance
+        
+        // Setup the instance so it's ready to use immediately
+        instance.setup()
+        print("   ✅ Instance created and setup complete")
     }
     
     // MARK: - Instance Retrieval
