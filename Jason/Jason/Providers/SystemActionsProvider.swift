@@ -13,7 +13,7 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
     // MARK: - FunctionProvider Protocol
     
     var providerId: String {
-        return "system-functions"
+        return "system-actions"
     }
     
     var providerName: String {

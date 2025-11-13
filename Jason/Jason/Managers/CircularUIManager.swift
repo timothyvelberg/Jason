@@ -26,7 +26,7 @@ class CircularUIManager: ObservableObject {
     private var gestureManager: GestureManager?
     
     private var centerPoint: CGPoint = .zero
-    private var previousApp: NSRunningApplication?
+    var previousApp: NSRunningApplication?
     private var isIntentionallySwitching: Bool = false
     
     var isInAppSwitcherMode: Bool = false

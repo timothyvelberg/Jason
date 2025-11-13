@@ -55,6 +55,9 @@ class ProviderFactory {
         case "FinderLogic":
             provider = createFinderLogic(config: config)
             
+        case "WindowManagementProvider":
+            provider = createWindowManagementProvider(config: config)
+            
         default:
             print("⚠️ [ProviderFactory] Unknown provider type: \(config.providerType)")
             return nil
@@ -140,6 +143,18 @@ class ProviderFactory {
         return provider
     }
     
+    private func createWindowManagementProvider(config: ProviderConfiguration) -> WindowManagementProvider? {
+        let provider = WindowManagementProvider()
+        
+        // Wire up dependencies
+        provider.circularUIManager = circularUIManager
+        
+        // TODO: Apply parentItemAngle from config when provider supports it
+        // TODO: Apply additional config parameters if needed
+        
+        return provider
+    }
+    
     // MARK: - Provider Type Validation
     
     /// Check if a provider type is supported by the factory
@@ -150,7 +165,8 @@ class ProviderFactory {
             "CombinedAppsProvider",
             "FavoriteFilesProvider",
             "SystemActionsProvider",
-            "FinderLogic"
+            "FinderLogic",
+            "WindowManagementProvider"
         ]
         
         return supportedTypes.contains(type)
@@ -163,7 +179,8 @@ class ProviderFactory {
             "CombinedAppsProvider",
             "FavoriteFilesProvider",
             "SystemActionsProvider",
-            "FinderLogic"
+            "FinderLogic",
+            "WindowManagementProvider"
         ]
     }
 }

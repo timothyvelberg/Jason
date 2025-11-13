@@ -17,7 +17,8 @@ struct EditRingView: View {
     
     // Form fields
     @State private var name: String = ""
-    @State private var selectedShortcut: ShortcutOption = .ctrlShiftD
+    @State private var recordedKeyCode: UInt16?
+    @State private var recordedModifierFlags: UInt?
     @State private var ringRadius: String = "80"
     @State private var centerHoleRadius: String = "56"
     @State private var iconSize: String = "32"
@@ -32,6 +33,8 @@ struct EditRingView: View {
     @State private var finderLogicMode: ProviderDisplayMode = .parent
     @State private var includeSystemActions: Bool = false
     @State private var systemActionsMode: ProviderDisplayMode = .parent
+    @State private var includeWindowManagement: Bool = false
+    @State private var windowManagementMode: ProviderDisplayMode = .parent
     
     @State private var errorMessage: String?
     
@@ -68,25 +71,18 @@ struct EditRingView: View {
                             TextField("Ring Name", text: $name)
                                 .textFieldStyle(.roundedBorder)
                             
-                            HStack {
+                            VStack(alignment: .leading, spacing: 8) {
                                 Text("Keyboard Shortcut:")
-                                    .frame(width: 140, alignment: .leading)
+                                    .font(.body)
                                 
-                                Picker("", selection: $selectedShortcut) {
-                                    ForEach(ShortcutOption.allCases) { option in
-                                        Text(option.displayName).tag(option)
-                                    }
-                                }
-                                .pickerStyle(.menu)
-                                .frame(width: 180)
+                                KeyboardShortcutRecorder(
+                                    keyCode: $recordedKeyCode,
+                                    modifierFlags: $recordedModifierFlags
+                                )
                                 
-                                Text(selectedShortcut.displayName)
+                                Text("Click the button and press your desired key combination")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.blue.opacity(0.2))
-                                    .cornerRadius(4)
                             }
                             
                             Toggle("Active on Launch", isOn: $isActive)
@@ -166,6 +162,13 @@ struct EditRingView: View {
                                 isIncluded: $includeSystemActions,
                                 displayMode: $systemActionsMode
                             )
+                            
+                            ProviderRow(
+                                name: "Window Management",
+                                description: "Resize and position windows",
+                                isIncluded: $includeWindowManagement,
+                                displayMode: $windowManagementMode
+                            )
                         }
                         .padding(12)
                     }
@@ -213,11 +216,13 @@ struct EditRingView: View {
         !ringRadius.isEmpty &&
         !centerHoleRadius.isEmpty &&
         !iconSize.isEmpty &&
+        recordedKeyCode != nil &&
+        recordedModifierFlags != nil &&
         hasAtLeastOneProvider
     }
     
     private var hasAtLeastOneProvider: Bool {
-        includeCombinedApps || includeFavoriteFiles || includeFinderLogic || includeSystemActions
+        includeCombinedApps || includeFavoriteFiles || includeFinderLogic || includeSystemActions || includeWindowManagement
     }
     
     // MARK: - Actions
@@ -232,10 +237,9 @@ struct EditRingView: View {
         iconSize = String(Int(config.iconSize))
         isActive = config.isActive
         
-        // Match shortcut
-        selectedShortcut = ShortcutOption.allCases.first { option in
-            option.keyCode == config.keyCode && option.modifierFlags == config.modifierFlags
-        } ?? .ctrlShiftD
+        // Load keyboard shortcut
+        recordedKeyCode = config.keyCode
+        recordedModifierFlags = config.modifierFlags
         
         // Load providers
         for provider in config.providers {
@@ -252,6 +256,9 @@ struct EditRingView: View {
             case "SystemActionsProvider":
                 includeSystemActions = true
                 systemActionsMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
+            case "WindowManagementProvider":
+                includeWindowManagement = true
+                windowManagementMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
             default:
                 break
             }
@@ -268,6 +275,16 @@ struct EditRingView: View {
             errorMessage = "Invalid numeric values"
             return
         }
+        
+        // Validate shortcut is recorded
+        guard let keyCode = recordedKeyCode,
+              let modifierFlags = recordedModifierFlags else {
+            errorMessage = "Please record a keyboard shortcut"
+            return
+        }
+        
+        // Generate shortcut display string
+        let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
         
         // Build providers array
         var providers: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
@@ -293,6 +310,11 @@ struct EditRingView: View {
             order += 1
         }
         
+        if includeWindowManagement {
+            providers.append(("WindowManagementProvider", order, windowManagementMode.rawValue, nil))
+            order += 1
+        }
+        
         // Save to database
         let configManager = RingConfigurationManager.shared
         
@@ -301,12 +323,12 @@ struct EditRingView: View {
                 // Create new configuration
                 let newConfig = try configManager.createConfiguration(
                     name: name.trimmingCharacters(in: .whitespaces),
-                    shortcut: selectedShortcut.displayName,
+                    shortcut: shortcutDisplay,
                     ringRadius: radiusValue,
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
-                    keyCode: selectedShortcut.keyCode,
-                    modifierFlags: selectedShortcut.modifierFlags,
+                    keyCode: keyCode,
+                    modifierFlags: modifierFlags,
                     providers: providers
                 )
                 
@@ -325,12 +347,12 @@ struct EditRingView: View {
                 try configManager.updateConfiguration(
                     id: config.id,
                     name: name.trimmingCharacters(in: .whitespaces),
-                    shortcut: selectedShortcut.displayName,
+                    shortcut: shortcutDisplay,
                     ringRadius: radiusValue,
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
-                    keyCode: selectedShortcut.keyCode,
-                    modifierFlags: selectedShortcut.modifierFlags
+                    keyCode: keyCode,
+                    modifierFlags: modifierFlags
                 )
                 
                 // Step 2: Remove all existing providers
@@ -424,48 +446,56 @@ enum ProviderDisplayMode: String, CaseIterable {
     }
 }
 
-// MARK: - Shortcut Options
+// MARK: - Helper Methods for EditRingView
 
-enum ShortcutOption: String, CaseIterable, Identifiable {
-    case ctrlShiftD
-    case ctrlShiftA
-    case ctrlShiftF
-    case ctrlShiftE
-    case ctrlShiftQ
-    case ctrlShiftW
-    case ctrlShiftS
-    case ctrlShiftR
-    
-    var id: String { rawValue }
-    
-    var displayName: String {
-        switch self {
-        case .ctrlShiftD: return "Ctrl+Shift+D"
-        case .ctrlShiftA: return "Ctrl+Shift+A"
-        case .ctrlShiftF: return "Ctrl+Shift+F"
-        case .ctrlShiftE: return "Ctrl+Shift+E"
-        case .ctrlShiftQ: return "Ctrl+Shift+Q"
-        case .ctrlShiftW: return "Ctrl+Shift+W"
-        case .ctrlShiftS: return "Ctrl+Shift+S"
-        case .ctrlShiftR: return "Ctrl+Shift+R"
-        }
+extension EditRingView {
+    /// Format a shortcut for display
+    func formatShortcut(keyCode: UInt16, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        parts.append(keyCodeToString(keyCode))
+        
+        return parts.joined()
     }
     
-    var keyCode: UInt16 {
-        switch self {
-        case .ctrlShiftD: return 2   // D
-        case .ctrlShiftA: return 0   // A
-        case .ctrlShiftF: return 3   // F
-        case .ctrlShiftE: return 14  // E
-        case .ctrlShiftQ: return 12  // Q
-        case .ctrlShiftW: return 13  // W
-        case .ctrlShiftS: return 1   // S
-        case .ctrlShiftR: return 15  // R
+    /// Convert key code to string
+    func keyCodeToString(_ keyCode: UInt16) -> String {
+        switch keyCode {
+        case 0: return "A"
+        case 1: return "S"
+        case 2: return "D"
+        case 3: return "F"
+        case 4: return "H"
+        case 5: return "G"
+        case 6: return "Z"
+        case 7: return "X"
+        case 8: return "C"
+        case 9: return "V"
+        case 11: return "B"
+        case 12: return "Q"
+        case 13: return "W"
+        case 14: return "E"
+        case 15: return "R"
+        case 16: return "Y"
+        case 17: return "T"
+        case 31: return "O"
+        case 32: return "U"
+        case 34: return "I"
+        case 35: return "P"
+        case 37: return "L"
+        case 38: return "J"
+        case 40: return "K"
+        case 45: return "N"
+        case 46: return "M"
+        case 49: return "Space"
+        default: return "[\(keyCode)]"
         }
-    }
-    
-    var modifierFlags: UInt {
-        NSEvent.ModifierFlags([.control, .shift]).rawValue
     }
 }
 
