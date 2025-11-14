@@ -53,8 +53,11 @@ class HotkeyManager {
     
     // MARK: - Dynamic Shortcuts
     
-    /// Registered shortcuts: [configId: (keyCode, modifierFlags, callback)]
+    /// Registered keyboard shortcuts: [configId: (keyCode, modifierFlags, callback)]
     private var registeredShortcuts: [Int: (keyCode: UInt16, modifierFlags: UInt, callback: () -> Void)] = [:]
+    
+    /// Registered mouse buttons: [configId: (buttonNumber, modifierFlags, callback)]
+    private var registeredMouseButtons: [Int: (buttonNumber: Int32, modifierFlags: UInt, callback: () -> Void)] = [:]
     
     // MARK: - Event Monitors
     
@@ -64,6 +67,10 @@ class HotkeyManager {
     private var localFlagsMonitor: Any?
     private var globalKeyUpMonitor: Any?  // For hold key release
     private var localKeyUpMonitor: Any?   // For hold key release
+    
+    // Mouse button monitoring (CGEventTap required for buttons 3+)
+    private var mouseEventTap: CFMachPort?
+    private var mouseRunLoopSource: CFRunLoopSource?
     
     // MARK: - Initialization
     
@@ -133,6 +140,19 @@ class HotkeyManager {
         } else {
             print("   No shortcuts registered yet!")
         }
+        
+        // Log all registered mouse buttons
+        if !registeredMouseButtons.isEmpty {
+            print("   🖱️  Registered mouse buttons:")
+            for (configId, registration) in registeredMouseButtons {
+                let display = formatMouseButton(buttonNumber: registration.buttonNumber, modifiers: registration.modifierFlags)
+                print("      Config \(configId): \(display) (button=\(registration.buttonNumber), modifiers=\(registration.modifierFlags))")
+            }
+            // Start mouse monitoring if needed
+            if mouseEventTap == nil {
+                startMouseMonitoring()
+            }
+        }
     }
     
     /// Stop monitoring for hotkeys
@@ -166,6 +186,9 @@ class HotkeyManager {
             NSEvent.removeMonitor(monitor)
             localFlagsMonitor = nil
         }
+        
+        // Stop mouse monitoring
+        stopMouseMonitoring()
         
         print("[HotkeyManager] Monitoring stopped")
     }
@@ -245,6 +268,129 @@ class HotkeyManager {
         let count = registeredShortcuts.count
         registeredShortcuts.removeAll()
         print("[HotkeyManager] Unregistered all \(count) shortcut(s)")
+    }
+    
+    // MARK: - Mouse Button Registration
+    
+    /// Register a mouse button trigger for a ring configuration
+    /// - Parameters:
+    ///   - buttonNumber: The mouse button number (2=middle, 3=back, 4=forward)
+    ///   - modifierFlags: The modifier flags bitfield
+    ///   - configId: The ring configuration ID
+    ///   - callback: The callback to execute when button is pressed
+    func registerMouseButton(
+        buttonNumber: Int32,
+        modifierFlags: UInt,
+        forConfigId configId: Int,
+        callback: @escaping () -> Void
+    ) {
+        let buttonDisplay = formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags)
+        print("[HotkeyManager] Attempting to register mouse button for config \(configId): \(buttonDisplay)")
+        
+        // Check for conflicts with existing mouse buttons
+        for (existingId, existing) in registeredMouseButtons {
+            if existing.buttonNumber == buttonNumber && existing.modifierFlags == modifierFlags {
+                let existingDisplay = formatMouseButton(buttonNumber: existing.buttonNumber, modifiers: existing.modifierFlags)
+                print("   [HotkeyManager] Mouse button conflict!")
+                print("   Existing: Config \(existingId) with \(existingDisplay)")
+                print("   New: Config \(configId) with \(buttonDisplay)")
+                print("   Unregistering old mouse button...")
+                unregisterMouseButton(forConfigId: existingId)
+                break
+            }
+        }
+        
+        // Store registration
+        registeredMouseButtons[configId] = (buttonNumber, modifierFlags, callback)
+        
+        // Start mouse monitoring if this is the first mouse button
+        if registeredMouseButtons.count == 1 && mouseEventTap == nil {
+            startMouseMonitoring()
+        }
+    }
+    
+    /// Unregister a mouse button
+    func unregisterMouseButton(forConfigId configId: Int) {
+        if let _ = registeredMouseButtons.removeValue(forKey: configId) {
+            print("[HotkeyManager] Unregistered mouse button for config \(configId)")
+            
+            // Stop mouse monitoring if no more mouse buttons registered
+            if registeredMouseButtons.isEmpty {
+                stopMouseMonitoring()
+            }
+        }
+    }
+    
+    /// Unregister all mouse buttons
+    func unregisterAllMouseButtons() {
+        let count = registeredMouseButtons.count
+        registeredMouseButtons.removeAll()
+        print("[HotkeyManager] Unregistered all \(count) mouse button(s)")
+        
+        if count > 0 {
+            stopMouseMonitoring()
+        }
+    }
+    
+    // MARK: - Mouse Monitoring
+    
+    /// Start monitoring for mouse button events (CGEventTap required for buttons 3+)
+    private func startMouseMonitoring() {
+        guard mouseEventTap == nil else {
+            print("[HotkeyManager] Mouse monitoring already active")
+            return
+        }
+        
+        print("[HotkeyManager] Starting mouse button monitoring...")
+        
+        // Create event tap for other mouse button events (buttons 3+)
+        let eventMask = (1 << CGEventType.otherMouseDown.rawValue)
+        
+        guard let eventTap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: CGEventMask(eventMask),
+            callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
+                // Extract self from refcon
+                let mySelf = Unmanaged<HotkeyManager>.fromOpaque(refcon!).takeUnretainedValue()
+                mySelf.handleMouseEvent(event, type: type)
+                return Unmanaged.passRetained(event)
+            },
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
+        ) else {
+            print("❌ [HotkeyManager] Failed to create mouse event tap")
+            print("   NOTE: This requires Accessibility permissions!")
+            return
+        }
+        
+        mouseEventTap = eventTap
+        mouseRunLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
+        
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), mouseRunLoopSource, .commonModes)
+        CGEvent.tapEnable(tap: eventTap, enable: true)
+        
+        print("✅ [HotkeyManager] Mouse button monitoring started")
+        
+        // Log registered mouse buttons
+        if !registeredMouseButtons.isEmpty {
+            print("   🖱️  Registered mouse buttons:")
+            for (configId, registration) in registeredMouseButtons {
+                let display = formatMouseButton(buttonNumber: registration.buttonNumber, modifiers: registration.modifierFlags)
+                print("      Config \(configId): \(display) (button=\(registration.buttonNumber), modifiers=\(registration.modifierFlags))")
+            }
+        }
+    }
+    
+    /// Stop monitoring for mouse button events
+    private func stopMouseMonitoring() {
+        if let eventTap = mouseEventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), mouseRunLoopSource, .commonModes)
+            mouseEventTap = nil
+            mouseRunLoopSource = nil
+            print("[HotkeyManager] Mouse button monitoring stopped")
+        }
     }
     
     // MARK: - Private Handlers
@@ -356,6 +502,39 @@ class HotkeyManager {
         wasShiftPressed = isShiftPressed
     }
     
+    private func handleMouseEvent(_ event: CGEvent, type: CGEventType) {
+        let isUIVisible = isUIVisible?() ?? false
+        
+        // Only handle mouse buttons when UI is hidden
+        guard !isUIVisible else { return }
+        
+        // Get button number and current modifier flags
+        let buttonNumber = event.getIntegerValueField(.mouseEventButtonNumber)
+        
+        // Get current modifier flags from the event
+        let cgFlags = event.flags
+        var eventModifiers: UInt = 0
+        
+        if cgFlags.contains(.maskCommand) { eventModifiers |= NSEvent.ModifierFlags.command.rawValue }
+        if cgFlags.contains(.maskControl) { eventModifiers |= NSEvent.ModifierFlags.control.rawValue }
+        if cgFlags.contains(.maskAlternate) { eventModifiers |= NSEvent.ModifierFlags.option.rawValue }
+        if cgFlags.contains(.maskShift) { eventModifiers |= NSEvent.ModifierFlags.shift.rawValue }
+        
+        print("🖱️  [HotkeyManager] Mouse button \(buttonNumber) pressed, modifiers=\(eventModifiers)")
+        
+        // Check registered mouse buttons
+        for (configId, registration) in registeredMouseButtons {
+            if buttonNumber == Int64(registration.buttonNumber) && eventModifiers == registration.modifierFlags {
+                let display = formatMouseButton(buttonNumber: registration.buttonNumber, modifiers: registration.modifierFlags)
+                print("✅ [HotkeyManager] Mouse button MATCHED for config \(configId): \(display)")
+                registration.callback()
+                return
+            }
+        }
+        
+        print("[HotkeyManager] No matching mouse button found")
+    }
+    
     // MARK: - Helper Methods
     
     /// Format a shortcut for display (helper for logging)
@@ -388,6 +567,34 @@ class HotkeyManager {
         case 53: return "Esc"
         default: return "[\(keyCode)]"
         }
+    }
+    
+    /// Format a mouse button for display (helper for logging)
+    private func formatMouseButton(buttonNumber: Int32, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        // Convert button number to readable name
+        let buttonName: String
+        switch buttonNumber {
+        case 2:
+            buttonName = "Button 3 (Middle)"
+        case 3:
+            buttonName = "Button 4 (Back)"
+        case 4:
+            buttonName = "Button 5 (Forward)"
+        default:
+            buttonName = "Button \(buttonNumber + 1)"
+        }
+        
+        parts.append(buttonName)
+        
+        return parts.joined()
     }
 }
 

@@ -121,9 +121,11 @@ struct RingConfigurationEntry: Identifiable {
     let isActive: Bool
     let displayOrder: Int
     
-    // NEW: Raw shortcut data
-    let keyCode: UInt16?
-    let modifierFlags: UInt?
+    // Trigger data
+    let triggerType: String        // "keyboard" or "mouse"
+    let keyCode: UInt16?           // For keyboard triggers
+    let modifierFlags: UInt?       // For both keyboard and mouse triggers
+    let buttonNumber: Int32?       // For mouse triggers (2=middle, 3=back, 4=forward)
 }
 
 struct RingProviderEntry: Identifiable {

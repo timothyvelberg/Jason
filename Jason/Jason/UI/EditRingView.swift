@@ -17,8 +17,10 @@ struct EditRingView: View {
     
     // Form fields
     @State private var name: String = ""
+    @State private var triggerType: TriggerType = .keyboard
     @State private var recordedKeyCode: UInt16?
     @State private var recordedModifierFlags: UInt?
+    @State private var recordedButtonNumber: Int32?
     @State private var ringRadius: String = "80"
     @State private var centerHoleRadius: String = "56"
     @State private var iconSize: String = "32"
@@ -72,17 +74,36 @@ struct EditRingView: View {
                                 .textFieldStyle(.roundedBorder)
                             
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Keyboard Shortcut:")
+                                Text("Trigger Type:")
                                     .font(.body)
                                 
-                                KeyboardShortcutRecorder(
-                                    keyCode: $recordedKeyCode,
-                                    modifierFlags: $recordedModifierFlags
-                                )
+                                Picker("", selection: $triggerType) {
+                                    Text("Keyboard Shortcut").tag(TriggerType.keyboard)
+                                    Text("Mouse Button").tag(TriggerType.mouse)
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 280)
                                 
-                                Text("Click the button and press your desired key combination")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                // Show appropriate recorder based on trigger type
+                                if triggerType == .keyboard {
+                                    KeyboardShortcutRecorder(
+                                        keyCode: $recordedKeyCode,
+                                        modifierFlags: $recordedModifierFlags
+                                    )
+                                    
+                                    Text("Click the button and press your desired key combination")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    MouseButtonRecorder(
+                                        buttonNumber: $recordedButtonNumber,
+                                        modifierFlags: $recordedModifierFlags
+                                    )
+                                    
+                                    Text("Click the button and then click your mouse button (middle, back, or forward)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                             
                             Toggle("Active on Launch", isOn: $isActive)
@@ -212,13 +233,16 @@ struct EditRingView: View {
     // MARK: - Validation
     
     private var isFormValid: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !ringRadius.isEmpty &&
-        !centerHoleRadius.isEmpty &&
-        !iconSize.isEmpty &&
-        recordedKeyCode != nil &&
-        recordedModifierFlags != nil &&
-        hasAtLeastOneProvider
+        let hasValidTrigger = triggerType == .keyboard ?
+            (recordedKeyCode != nil && recordedModifierFlags != nil) :
+            (recordedButtonNumber != nil)
+        
+        return !name.trimmingCharacters(in: .whitespaces).isEmpty &&
+               !ringRadius.isEmpty &&
+               !centerHoleRadius.isEmpty &&
+               !iconSize.isEmpty &&
+               hasValidTrigger &&
+               hasAtLeastOneProvider
     }
     
     private var hasAtLeastOneProvider: Bool {
@@ -237,9 +261,16 @@ struct EditRingView: View {
         iconSize = String(Int(config.iconSize))
         isActive = config.isActive
         
-        // Load keyboard shortcut
-        recordedKeyCode = config.keyCode
-        recordedModifierFlags = config.modifierFlags
+        // Load trigger based on type
+        triggerType = config.triggerType == "mouse" ? .mouse : .keyboard
+        
+        if triggerType == .keyboard {
+            recordedKeyCode = config.keyCode
+            recordedModifierFlags = config.modifierFlags
+        } else {
+            recordedButtonNumber = config.buttonNumber
+            recordedModifierFlags = config.modifierFlags
+        }
         
         // Load providers
         for provider in config.providers {
@@ -276,15 +307,35 @@ struct EditRingView: View {
             return
         }
         
-        // Validate shortcut is recorded
-        guard let keyCode = recordedKeyCode,
-              let modifierFlags = recordedModifierFlags else {
-            errorMessage = "Please record a keyboard shortcut"
-            return
-        }
+        // Validate and extract trigger data based on type
+        let keyCode: UInt16?
+        let modifierFlags: UInt?
+        let buttonNumber: Int32?
+        let shortcutDisplay: String
         
-        // Generate shortcut display string
-        let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
+        if triggerType == .keyboard {
+            // Validate keyboard shortcut
+            guard let kc = recordedKeyCode,
+                  let mf = recordedModifierFlags else {
+                errorMessage = "Please record a keyboard shortcut"
+                return
+            }
+            keyCode = kc
+            modifierFlags = mf
+            buttonNumber = nil
+            shortcutDisplay = formatShortcut(keyCode: kc, modifiers: mf)
+            
+        } else {
+            // Validate mouse button
+            guard let bn = recordedButtonNumber else {
+                errorMessage = "Please record a mouse button"
+                return
+            }
+            keyCode = nil
+            modifierFlags = recordedModifierFlags
+            buttonNumber = bn
+            shortcutDisplay = formatMouseButton(buttonNumber: bn, modifiers: modifierFlags ?? 0)
+        }
         
         // Build providers array
         var providers: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
@@ -327,8 +378,10 @@ struct EditRingView: View {
                     ringRadius: radiusValue,
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
+                    triggerType: triggerType.rawValue,
                     keyCode: keyCode,
                     modifierFlags: modifierFlags,
+                    buttonNumber: buttonNumber,
                     providers: providers
                 )
                 
@@ -497,10 +550,241 @@ extension EditRingView {
         default: return "[\(keyCode)]"
         }
     }
+    
+    /// Format a mouse button for display
+    func formatMouseButton(buttonNumber: Int32, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        // Convert button number to readable name
+        let buttonName: String
+        switch buttonNumber {
+        case 2:
+            buttonName = "Button 3 (Middle)"
+        case 3:
+            buttonName = "Button 4 (Back)"
+        case 4:
+            buttonName = "Button 5 (Forward)"
+        default:
+            buttonName = "Button \(buttonNumber + 1)"
+        }
+        
+        parts.append(buttonName)
+        
+        return parts.joined()
+    }
 }
 
 // MARK: - Preview
 
 #Preview {
     EditRingView(configuration: nil, onSave: {})
+}
+
+// MARK: - Trigger Type
+
+enum TriggerType: String {
+    case keyboard
+    case mouse
+}
+
+// MARK: - Mouse Button Recorder
+
+struct MouseButtonRecorder: View {
+    @Binding var buttonNumber: Int32?
+    @Binding var modifierFlags: UInt?
+    @State private var isRecording = false
+    @State private var eventTap: CFMachPort?
+    @State private var runLoopSource: CFRunLoopSource?
+    @State private var handler: MouseButtonRecorderHandler?  // Keep handler alive
+    
+    var displayText: String {
+        if isRecording {
+            return "Click mouse button..."
+        } else if let buttonNumber = buttonNumber {
+            return formatDisplay(buttonNumber: buttonNumber, modifiers: modifierFlags ?? 0)
+        } else {
+            return "Click to record"
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: {
+                if isRecording {
+                    stopRecording()
+                } else {
+                    startRecording()
+                }
+            }) {
+                HStack {
+                    Image(systemName: isRecording ? "record.circle.fill" : "computermouse")
+                        .foregroundColor(isRecording ? .red : .blue)
+                    
+                    Text(displayText)
+                        .frame(minWidth: 120, alignment: .leading)
+                        .foregroundColor(isRecording ? .secondary : .primary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isRecording ? Color.red.opacity(0.1) : Color.gray.opacity(0.1))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isRecording ? Color.red : Color.gray.opacity(0.3), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            
+            if buttonNumber != nil {
+                Button(action: clearButton) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear mouse button")
+            }
+        }
+    }
+    
+    // MARK: - Recording
+    
+    private func startRecording() {
+        isRecording = true
+        
+        // Create event tap for mouse button events
+        let eventMask = (1 << CGEventType.otherMouseDown.rawValue)
+        
+        let callback: CGEventTapCallBack = { (proxy, type, event, refcon) in
+            // Extract self from refcon
+            let handler = Unmanaged<MouseButtonRecorderHandler>.fromOpaque(refcon!).takeUnretainedValue()
+            handler.handleMouseEvent(event: event, type: type)
+            return Unmanaged.passRetained(event)
+        }
+        
+        // Create and retain handler
+        let newHandler = MouseButtonRecorderHandler(
+            buttonNumber: $buttonNumber,
+            modifierFlags: $modifierFlags,
+            isRecording: $isRecording,
+            stopRecordingCallback: { [self] in
+                self.stopRecording()
+            }
+        )
+        handler = newHandler  // Store in @State to keep it alive
+        
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: CGEventMask(eventMask),
+            callback: callback,
+            userInfo: Unmanaged.passUnretained(newHandler).toOpaque()
+        ) else {
+            print("❌ [MouseRecorder] Failed to create event tap - check Accessibility permissions")
+            isRecording = false
+            return
+        }
+        
+        eventTap = tap
+        runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+        
+        print("🖱️ [MouseRecorder] Recording started")
+    }
+    
+    private func stopRecording() {
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            if let source = runLoopSource {
+                CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+            }
+            eventTap = nil
+            runLoopSource = nil
+        }
+        handler = nil  // Release handler
+        isRecording = false
+        print("🖱️ [MouseRecorder] Recording stopped")
+    }
+    
+    private func clearButton() {
+        buttonNumber = nil
+        modifierFlags = nil
+        print("🖱️ [MouseRecorder] Mouse button cleared")
+    }
+    
+    // MARK: - Formatting
+    
+    private func formatDisplay(buttonNumber: Int32, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        let buttonName: String
+        switch buttonNumber {
+        case 2: buttonName = "Button 3 (Middle)"
+        case 3: buttonName = "Button 4 (Back)"
+        case 4: buttonName = "Button 5 (Forward)"
+        default: buttonName = "Button \(buttonNumber + 1)"
+        }
+        
+        parts.append(buttonName)
+        
+        return parts.joined()
+    }
+}
+
+// MARK: - Mouse Button Recorder Handler
+
+class MouseButtonRecorderHandler {
+    var buttonNumber: Binding<Int32?>
+    var modifierFlags: Binding<UInt?>
+    var isRecording: Binding<Bool>
+    var stopRecordingCallback: (() -> Void)?
+    
+    init(buttonNumber: Binding<Int32?>, modifierFlags: Binding<UInt?>, isRecording: Binding<Bool>, stopRecordingCallback: (() -> Void)? = nil) {
+        self.buttonNumber = buttonNumber
+        self.modifierFlags = modifierFlags
+        self.isRecording = isRecording
+        self.stopRecordingCallback = stopRecordingCallback
+    }
+    
+    func handleMouseEvent(event: CGEvent, type: CGEventType) {
+        guard isRecording.wrappedValue else { return }
+        
+        // Get button number and current modifier flags
+        let btn = event.getIntegerValueField(.mouseEventButtonNumber)
+        
+        // Get current modifier flags
+        let cgFlags = event.flags
+        var mods: UInt = 0
+        
+        if cgFlags.contains(.maskCommand) { mods |= NSEvent.ModifierFlags.command.rawValue }
+        if cgFlags.contains(.maskControl) { mods |= NSEvent.ModifierFlags.control.rawValue }
+        if cgFlags.contains(.maskAlternate) { mods |= NSEvent.ModifierFlags.option.rawValue }
+        if cgFlags.contains(.maskShift) { mods |= NSEvent.ModifierFlags.shift.rawValue }
+        
+        print("🖱️ [MouseRecorder] Captured button \(btn), modifiers: \(mods)")
+        
+        // Save the captured values
+        DispatchQueue.main.async { [weak self] in
+            self?.buttonNumber.wrappedValue = Int32(btn)
+            self?.modifierFlags.wrappedValue = mods
+            self?.isRecording.wrappedValue = false
+            self?.stopRecordingCallback?()
+        }
+    }
 }

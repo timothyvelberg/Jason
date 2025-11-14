@@ -189,33 +189,60 @@ class CircularUIInstanceManager: ObservableObject {
         print("   ✅ Sync complete: \(instances.count) active instance(s)")
     }
     
-    // MARK: - Keyboard Shortcut Management
-    
-    /// Register keyboard shortcuts for all active instances
-    func registerShortcuts() {
-        print("⌨️ [InstanceManager] Registering shortcuts for all instances...")
+    // MARK: - Input Trigger Management
+
+    /// Register keyboard shortcuts and mouse buttons for all active instances
+    // MARK: - Input Trigger Management
+
+    /// Register keyboard shortcuts and mouse buttons for all active instances
+    func registerInputTriggers() {
+        print("⌨️ [InstanceManager] Registering input triggers for all instances...")
         
         // Unregister existing first
         hotkeyManager.unregisterAllShortcuts()
+        hotkeyManager.unregisterAllMouseButtons()
         
         let activeConfigs = configurationManager.getActiveConfigurations()
         
         for config in activeConfigs {
-            // Skip configs without shortcuts
-            guard let keyCode = config.keyCode,
-                  let modifierFlags = config.modifierFlags else {
-                print("   ⏭️ Skipping '\(config.name)' - no shortcut configured")
-                continue
+            var hasKeyboardShortcut = false
+            var hasMouseButton = false
+            
+            // Register keyboard shortcut if configured
+            if config.triggerType == "keyboard",
+               let keyCode = config.keyCode,
+               let modifierFlags = config.modifierFlags {
+                print("[HotkeyManager] Attempting to register shortcut for config \(config.id):")
+                hotkeyManager.registerShortcut(
+                    keyCode: keyCode,
+                    modifierFlags: modifierFlags,
+                    forConfigId: config.id
+                ) { [weak self] in
+                    print("🎯 [InstanceManager] Keyboard shortcut triggered for '\(config.name)' (ID: \(config.id))")
+                    self?.show(configId: config.id)
+                }
+                hasKeyboardShortcut = true
             }
             
-            hotkeyManager.registerShortcut(
-                keyCode: keyCode,
-                modifierFlags: modifierFlags,
-                forConfigId: config.id
-            ) { [weak self] in
-                // When shortcut is pressed, show this ring
-                print("🎯 [InstanceManager] Shortcut triggered for '\(config.name)' (ID: \(config.id))")
-                self?.show(configId: config.id)
+            // Register mouse button if configured
+            if config.triggerType == "mouse",
+               let buttonNumber = config.buttonNumber {
+                let modifierFlags = config.modifierFlags ?? 0
+                print("[HotkeyManager] Attempting to register mouse button for config \(config.id):")
+                hotkeyManager.registerMouseButton(
+                    buttonNumber: buttonNumber,
+                    modifierFlags: modifierFlags,
+                    forConfigId: config.id
+                ) { [weak self] in
+                    print("🎯 [InstanceManager] Mouse button triggered for '\(config.name)' (ID: \(config.id))")
+                    self?.show(configId: config.id)
+                }
+                hasMouseButton = true
+            }
+            
+            // Only skip if NEITHER is configured
+            if !hasKeyboardShortcut && !hasMouseButton {
+                print("   ⏭️ Skipping '\(config.name)' - no triggers configured")
             }
         }
         

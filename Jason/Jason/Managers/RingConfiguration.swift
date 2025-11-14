@@ -32,21 +32,32 @@ struct StoredRingConfiguration: Identifiable, Equatable {
     let isActive: Bool
     let providers: [ProviderConfiguration]
     
-    // NEW: Raw shortcut data
-    let keyCode: UInt16?           // Key code for the shortcut
-    let modifierFlags: UInt?       // Modifier flags bitfield
+    // Trigger data
+    let triggerType: String        // "keyboard" or "mouse"
+    let keyCode: UInt16?           // For keyboard triggers
+    let modifierFlags: UInt?       // For both keyboard and mouse triggers
+    let buttonNumber: Int32?       // For mouse triggers (2=middle, 3=back, 4=forward)
     
     // MARK: - Shortcut Properties
     
-    /// Check if this configuration has a valid shortcut
+    /// Check if this configuration has a valid trigger (keyboard or mouse)
     var hasShortcut: Bool {
-        return keyCode != nil && modifierFlags != nil
+        if triggerType == "keyboard" {
+            return keyCode != nil && modifierFlags != nil
+        } else if triggerType == "mouse" {
+            return buttonNumber != nil
+        }
+        return false
     }
     
     /// Get a human-readable shortcut description
     var shortcutDescription: String {
-        guard hasShortcut else { return "No shortcut" }
-        return formatShortcut(keyCode: keyCode!, modifiers: modifierFlags!)
+        if triggerType == "keyboard", let keyCode = keyCode, let modifiers = modifierFlags {
+            return formatShortcut(keyCode: keyCode, modifiers: modifiers)
+        } else if triggerType == "mouse", let buttonNumber = buttonNumber {
+            return formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags ?? 0)
+        }
+        return "No trigger"
     }
     
     // MARK: - Computed Properties
@@ -140,6 +151,34 @@ struct StoredRingConfiguration: Identifiable, Equatable {
         }
     }
     
+    /// Format a mouse button for display
+    private func formatMouseButton(buttonNumber: Int32, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        // Convert button number to readable name
+        let buttonName: String
+        switch buttonNumber {
+        case 2:
+            buttonName = "Button 3 (Middle)"
+        case 3:
+            buttonName = "Button 4 (Back)"
+        case 4:
+            buttonName = "Button 5 (Forward)"
+        default:
+            buttonName = "Button \(buttonNumber + 1)"
+        }
+        
+        parts.append(buttonName)
+        
+        return parts.joined()
+    }
+    
     // MARK: - Display Helpers
     
     /// Human-readable description for debugging
@@ -168,8 +207,10 @@ struct StoredRingConfiguration: Identifiable, Equatable {
                lhs.centerHoleRadius == rhs.centerHoleRadius &&
                lhs.iconSize == rhs.iconSize &&
                lhs.isActive == rhs.isActive &&
+               lhs.triggerType == rhs.triggerType &&
                lhs.keyCode == rhs.keyCode &&
                lhs.modifierFlags == rhs.modifierFlags &&
+               lhs.buttonNumber == rhs.buttonNumber &&
                lhs.providers == rhs.providers
     }
 }

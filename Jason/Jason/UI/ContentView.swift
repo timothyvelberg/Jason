@@ -44,7 +44,7 @@ struct ContentView: View {
         instanceManager.createInstances(for: activeConfigs)
         
         // 4. Register shortcuts (NEW - this is missing!)
-        CircularUIInstanceManager.shared.registerShortcuts()
+        CircularUIInstanceManager.shared.registerInputTriggers()
 
         // 5. Start monitoring (NEW - this is missing!)
         CircularUIInstanceManager.shared.startHotkeyMonitoring()

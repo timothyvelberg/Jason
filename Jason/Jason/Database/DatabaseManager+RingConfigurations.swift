@@ -20,8 +20,10 @@ extension DatabaseManager {
         ringRadius: CGFloat,
         centerHoleRadius: CGFloat,
         iconSize: CGFloat,
+        triggerType: String = "keyboard",  // "keyboard" or "mouse"
         keyCode: UInt16? = nil,
-        modifierFlags: UInt? = nil,   
+        modifierFlags: UInt? = nil,
+        buttonNumber: Int32? = nil,        // For mouse triggers (2, 3, 4, etc.)
         displayOrder: Int = 0
     ) -> Int? {
         guard let db = db else { return nil }
@@ -29,20 +31,30 @@ extension DatabaseManager {
         var ringId: Int?
         
         queue.sync {
-            // Validate shortcut is unique among active rings (if keyCode/modifierFlags provided)
-            if let keyCode = keyCode, let modifierFlags = modifierFlags {
-                if _isShortcutInUse(keyCode: keyCode, modifierFlags: modifierFlags) {
-                    let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
-                    print("⚠️ [DatabaseManager] Shortcut '\(shortcutDisplay)' is already in use by an active ring")
-                    return
+            // Validate trigger is not already in use
+            if _isTriggerInUse(
+                triggerType: triggerType,
+                keyCode: keyCode,
+                modifierFlags: modifierFlags ?? 0,
+                buttonNumber: buttonNumber
+            ) {
+                let triggerDisplay: String
+                if triggerType == "keyboard", let keyCode = keyCode {
+                    triggerDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags ?? 0)
+                } else if triggerType == "mouse", let buttonNumber = buttonNumber {
+                    triggerDisplay = formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags ?? 0)
+                } else {
+                    triggerDisplay = "Unknown"
                 }
+                print("⚠️ [DatabaseManager] Trigger '\(triggerDisplay)' is already in use by an active ring")
+                return
             }
             
             let now = Int(Date().timeIntervalSince1970)
             
             let sql = """
-            INSERT INTO ring_configurations (name, shortcut, ring_radius, center_hole_radius, icon_size, key_code, modifier_flags, created_at, is_active, display_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?);
+            INSERT INTO ring_configurations (name, shortcut, ring_radius, center_hole_radius, icon_size, trigger_type, key_code, modifier_flags, button_number, created_at, is_active, display_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?);
             """
             var statement: OpaquePointer?
             
@@ -52,28 +64,45 @@ extension DatabaseManager {
                 sqlite3_bind_double(statement, 3, Double(ringRadius))
                 sqlite3_bind_double(statement, 4, Double(centerHoleRadius))
                 sqlite3_bind_double(statement, 5, Double(iconSize))
+                sqlite3_bind_text(statement, 6, (triggerType as NSString).utf8String, -1, nil)
                 
                 // Bind keyCode (NULL if not provided)
                 if let keyCode = keyCode {
-                    sqlite3_bind_int(statement, 6, Int32(keyCode))
-                } else {
-                    sqlite3_bind_null(statement, 6)
-                }
-                
-                // Bind modifierFlags (NULL if not provided)
-                if let modifierFlags = modifierFlags {
-                    sqlite3_bind_int(statement, 7, Int32(modifierFlags))
+                    sqlite3_bind_int(statement, 7, Int32(keyCode))
                 } else {
                     sqlite3_bind_null(statement, 7)
                 }
                 
-                sqlite3_bind_int64(statement, 8, Int64(now))
-                sqlite3_bind_int(statement, 9, Int32(displayOrder))
+                // Bind modifierFlags (NULL if not provided)
+                if let modifierFlags = modifierFlags {
+                    sqlite3_bind_int(statement, 8, Int32(modifierFlags))
+                } else {
+                    sqlite3_bind_null(statement, 8)
+                }
+                
+                // Bind buttonNumber (NULL if not provided)
+                if let buttonNumber = buttonNumber {
+                    sqlite3_bind_int(statement, 9, buttonNumber)
+                } else {
+                    sqlite3_bind_null(statement, 9)
+                }
+                
+                sqlite3_bind_int64(statement, 10, Int64(now))
+                sqlite3_bind_int(statement, 11, Int32(displayOrder))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     ringId = Int(sqlite3_last_insert_rowid(db))
-                    let shortcutDisplay = keyCode != nil ? formatShortcut(keyCode: keyCode!, modifiers: modifierFlags ?? 0) : "No shortcut"
-                    print("🔵 [DatabaseManager] Created ring configuration: '\(name)' (id: \(ringId!), shortcut: \(shortcutDisplay))")
+                    
+                    let triggerDisplay: String
+                    if triggerType == "keyboard", let keyCode = keyCode {
+                        triggerDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags ?? 0)
+                    } else if triggerType == "mouse", let buttonNumber = buttonNumber {
+                        triggerDisplay = formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags ?? 0)
+                    } else {
+                        triggerDisplay = "No trigger"
+                    }
+                    
+                    print("🔵 [DatabaseManager] Created ring configuration: '\(name)' (id: \(ringId!), trigger: \(triggerDisplay))")
                 } else {
                     if let error = sqlite3_errmsg(db) {
                         print("❌ [DatabaseManager] Failed to insert ring configuration '\(name)': \(String(cString: error))")
@@ -98,7 +127,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, key_code, modifier_flags
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number
             FROM ring_configurations
             ORDER BY display_order, name;
             """
@@ -116,22 +145,40 @@ extension DatabaseManager {
                     let isActive = sqlite3_column_int(statement, 7) == 1
                     let displayOrder = Int(sqlite3_column_int(statement, 8))
                     
-                    // Read keyCode (handle NULL)
-                    let keyCode: UInt16? = {
+                    // Read triggerType (default to "keyboard" for legacy rows)
+                    let triggerType: String = {
                         let colType = sqlite3_column_type(statement, 9)
                         if colType == SQLITE_NULL {
-                            return nil
+                            return "keyboard"
                         }
-                        return UInt16(sqlite3_column_int(statement, 9))
+                        return String(cString: sqlite3_column_text(statement, 9))
                     }()
                     
-                    // Read modifierFlags (handle NULL)
-                    let modifierFlags: UInt? = {
+                    // Read keyCode (handle NULL)
+                    let keyCode: UInt16? = {
                         let colType = sqlite3_column_type(statement, 10)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return UInt(sqlite3_column_int(statement, 10))
+                        return UInt16(sqlite3_column_int(statement, 10))
+                    }()
+                    
+                    // Read modifierFlags (handle NULL)
+                    let modifierFlags: UInt? = {
+                        let colType = sqlite3_column_type(statement, 11)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return UInt(sqlite3_column_int(statement, 11))
+                    }()
+                    
+                    // Read buttonNumber (handle NULL)
+                    let buttonNumber: Int32? = {
+                        let colType = sqlite3_column_type(statement, 12)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return sqlite3_column_int(statement, 12)
                     }()
                     
                     results.append(RingConfigurationEntry(
@@ -144,8 +191,10 @@ extension DatabaseManager {
                         createdAt: createdAt,
                         isActive: isActive,
                         displayOrder: displayOrder,
+                        triggerType: triggerType,
                         keyCode: keyCode,
-                        modifierFlags: modifierFlags
+                        modifierFlags: modifierFlags,
+                        buttonNumber: buttonNumber
                     ))
                 }
             } else {
@@ -167,7 +216,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, key_code, modifier_flags
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number
             FROM ring_configurations
             WHERE is_active = 1
             ORDER BY display_order, name;
@@ -186,22 +235,40 @@ extension DatabaseManager {
                     let isActive = sqlite3_column_int(statement, 7) == 1
                     let displayOrder = Int(sqlite3_column_int(statement, 8))
                     
-                    // Read keyCode (handle NULL)
-                    let keyCode: UInt16? = {
+                    // Read triggerType (default to "keyboard" for legacy rows)
+                    let triggerType: String = {
                         let colType = sqlite3_column_type(statement, 9)
                         if colType == SQLITE_NULL {
-                            return nil
+                            return "keyboard"
                         }
-                        return UInt16(sqlite3_column_int(statement, 9))
+                        return String(cString: sqlite3_column_text(statement, 9))
                     }()
                     
-                    // Read modifierFlags (handle NULL)
-                    let modifierFlags: UInt? = {
+                    // Read keyCode (handle NULL)
+                    let keyCode: UInt16? = {
                         let colType = sqlite3_column_type(statement, 10)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return UInt(sqlite3_column_int(statement, 10))
+                        return UInt16(sqlite3_column_int(statement, 10))
+                    }()
+                    
+                    // Read modifierFlags (handle NULL)
+                    let modifierFlags: UInt? = {
+                        let colType = sqlite3_column_type(statement, 11)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return UInt(sqlite3_column_int(statement, 11))
+                    }()
+                    
+                    // Read buttonNumber (handle NULL)
+                    let buttonNumber: Int32? = {
+                        let colType = sqlite3_column_type(statement, 12)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return sqlite3_column_int(statement, 12)
                     }()
                     
                     results.append(RingConfigurationEntry(
@@ -214,8 +281,10 @@ extension DatabaseManager {
                         createdAt: createdAt,
                         isActive: isActive,
                         displayOrder: displayOrder,
+                        triggerType: triggerType,
                         keyCode: keyCode,
-                        modifierFlags: modifierFlags
+                        modifierFlags: modifierFlags,
+                        buttonNumber: buttonNumber
                     ))
                 }
             } else {
@@ -237,7 +306,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, key_code, modifier_flags
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number
             FROM ring_configurations
             WHERE id = ?;
             """
@@ -257,22 +326,40 @@ extension DatabaseManager {
                     let isActive = sqlite3_column_int(statement, 7) == 1
                     let displayOrder = Int(sqlite3_column_int(statement, 8))
                     
-                    // Read keyCode (handle NULL)
-                    let keyCode: UInt16? = {
+                    // Read triggerType (default to "keyboard" for legacy rows)
+                    let triggerType: String = {
                         let colType = sqlite3_column_type(statement, 9)
                         if colType == SQLITE_NULL {
-                            return nil
+                            return "keyboard"
                         }
-                        return UInt16(sqlite3_column_int(statement, 9))
+                        return String(cString: sqlite3_column_text(statement, 9))
                     }()
                     
-                    // Read modifierFlags (handle NULL)
-                    let modifierFlags: UInt? = {
+                    // Read keyCode (handle NULL)
+                    let keyCode: UInt16? = {
                         let colType = sqlite3_column_type(statement, 10)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return UInt(sqlite3_column_int(statement, 10))
+                        return UInt16(sqlite3_column_int(statement, 10))
+                    }()
+                    
+                    // Read modifierFlags (handle NULL)
+                    let modifierFlags: UInt? = {
+                        let colType = sqlite3_column_type(statement, 11)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return UInt(sqlite3_column_int(statement, 11))
+                    }()
+                    
+                    // Read buttonNumber (handle NULL)
+                    let buttonNumber: Int32? = {
+                        let colType = sqlite3_column_type(statement, 12)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return sqlite3_column_int(statement, 12)
                     }()
                     
                     result = RingConfigurationEntry(
@@ -285,8 +372,10 @@ extension DatabaseManager {
                         createdAt: createdAt,
                         isActive: isActive,
                         displayOrder: displayOrder,
+                        triggerType: triggerType,
                         keyCode: keyCode,
-                        modifierFlags: modifierFlags
+                        modifierFlags: modifierFlags,
+                        buttonNumber: buttonNumber
                     )
                 }
             } else {
@@ -833,24 +922,55 @@ extension DatabaseManager {
     
     // MARK: - Validation Helpers
     
-    /// Check if a shortcut (keyCode + modifierFlags) is already in use by an active ring (UNSAFE - must be called within queue.sync)
-    private func _isShortcutInUse(keyCode: UInt16, modifierFlags: UInt) -> Bool {
+    /// Check if a trigger (keyboard or mouse) is already in use by an active ring (UNSAFE - must be called within queue.sync)
+    private func _isTriggerInUse(
+        triggerType: String,
+        keyCode: UInt16?,
+        modifierFlags: UInt,
+        buttonNumber: Int32?
+    ) -> Bool {
         guard let db = db else { return false }
         
-        let sql = "SELECT id FROM ring_configurations WHERE key_code = ? AND modifier_flags = ? AND is_active = 1;"
-        var statement: OpaquePointer?
-        var inUse = false
-        
-        if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_int(statement, 1, Int32(keyCode))
-            sqlite3_bind_int(statement, 2, Int32(modifierFlags))
-            if sqlite3_step(statement) == SQLITE_ROW {
-                inUse = true
+        if triggerType == "keyboard" {
+            // Check keyboard shortcut conflicts
+            guard let keyCode = keyCode else { return false }
+            
+            let sql = "SELECT id FROM ring_configurations WHERE trigger_type = 'keyboard' AND key_code = ? AND modifier_flags = ? AND is_active = 1;"
+            var statement: OpaquePointer?
+            var inUse = false
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_int(statement, 1, Int32(keyCode))
+                sqlite3_bind_int(statement, 2, Int32(modifierFlags))
+                if sqlite3_step(statement) == SQLITE_ROW {
+                    inUse = true
+                }
             }
+            sqlite3_finalize(statement)
+            
+            return inUse
+            
+        } else if triggerType == "mouse" {
+            // Check mouse button conflicts
+            guard let buttonNumber = buttonNumber else { return false }
+            
+            let sql = "SELECT id FROM ring_configurations WHERE trigger_type = 'mouse' AND button_number = ? AND modifier_flags = ? AND is_active = 1;"
+            var statement: OpaquePointer?
+            var inUse = false
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_int(statement, 1, buttonNumber)
+                sqlite3_bind_int(statement, 2, Int32(modifierFlags))
+                if sqlite3_step(statement) == SQLITE_ROW {
+                    inUse = true
+                }
+            }
+            sqlite3_finalize(statement)
+            
+            return inUse
         }
-        sqlite3_finalize(statement)
         
-        return inUse
+        return false
     }
     
     /// Check if a provider order is already in use for a ring (UNSAFE - must be called within queue.sync)
@@ -875,7 +995,7 @@ extension DatabaseManager {
     
     // MARK: - Helper Methods
     
-    /// Format a shortcut for display (helper for logging)
+    /// Format a keyboard shortcut for display (helper for logging)
     private func formatShortcut(keyCode: UInt16, modifiers: UInt) -> String {
         let flags = NSEvent.ModifierFlags(rawValue: modifiers)
         var parts: [String] = []
@@ -886,6 +1006,34 @@ extension DatabaseManager {
         if flags.contains(.command) { parts.append("⌘") }
         
         parts.append(keyCodeToString(keyCode))
+        
+        return parts.joined()
+    }
+    
+    /// Format a mouse button for display (helper for logging)
+    private func formatMouseButton(buttonNumber: Int32, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        // Convert button number to readable name
+        let buttonName: String
+        switch buttonNumber {
+        case 2:
+            buttonName = "Button 3 (Middle)"
+        case 3:
+            buttonName = "Button 4 (Back)"
+        case 4:
+            buttonName = "Button 5 (Forward)"
+        default:
+            buttonName = "Button \(buttonNumber + 1)"
+        }
+        
+        parts.append(buttonName)
         
         return parts.joined()
     }

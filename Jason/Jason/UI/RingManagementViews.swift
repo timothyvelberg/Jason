@@ -132,7 +132,7 @@ struct RingManagementView: View {
         CircularUIInstanceManager.shared.stopHotkeyMonitoring()
         
         // Re-register shortcuts to pick up any new hotkeys
-        CircularUIInstanceManager.shared.registerShortcuts()
+        CircularUIInstanceManager.shared.registerInputTriggers()
         
         // Restart monitoring with fresh closures
         CircularUIInstanceManager.shared.startHotkeyMonitoring()

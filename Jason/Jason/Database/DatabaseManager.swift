@@ -31,6 +31,7 @@ class DatabaseManager {
             if sqlite3_open(dbPath, &db) == SQLITE_OK {
                 print("✅ [DatabaseManager] Database opened successfully")
                 try setupDatabase()
+                try runMigrations()
             } else {
                 print("❌ [DatabaseManager] Failed to open database")
                 if let error = sqlite3_errmsg(db) {
@@ -171,7 +172,7 @@ class DatabaseManager {
         );
         """
         
-        // Create ring_configurations table (UPDATED with key_code and modifier_flags)
+        // Create ring_configurations table (UPDATED with trigger support for keyboard + mouse)
         let ringConfigurationsSQL = """
         CREATE TABLE IF NOT EXISTS ring_configurations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -180,8 +181,10 @@ class DatabaseManager {
             ring_radius REAL NOT NULL,
             center_hole_radius REAL NOT NULL DEFAULT 56.0,
             icon_size REAL NOT NULL,
+            trigger_type TEXT DEFAULT 'keyboard',
             key_code INTEGER,
             modifier_flags INTEGER,
+            button_number INTEGER,
             created_at INTEGER DEFAULT (strftime('%s', 'now')),
             is_active INTEGER DEFAULT 1,
             display_order INTEGER DEFAULT 0
@@ -238,6 +241,74 @@ class DatabaseManager {
         }
         
         print("✅ [DatabaseManager] Database schema created successfully")
+    }
+    
+    // MARK: - Migrations
+    
+    private func runMigrations() throws {
+        guard let db = db else {
+            throw DatabaseError.notInitialized
+        }
+        
+        print("🔄 [DatabaseManager] Running database migrations...")
+        
+        // Migration 1: Add trigger_type and button_number columns to ring_configurations
+        // Check if trigger_type column exists
+        let pragmaSQL = "PRAGMA table_info(ring_configurations);"
+        var statement: OpaquePointer?
+        var hasTriggerType = false
+        var hasButtonNumber = false
+        
+        if sqlite3_prepare_v2(db, pragmaSQL, -1, &statement, nil) == SQLITE_OK {
+            while sqlite3_step(statement) == SQLITE_ROW {
+                if let columnName = sqlite3_column_text(statement, 1) {
+                    let name = String(cString: columnName)
+                    if name == "trigger_type" {
+                        hasTriggerType = true
+                    }
+                    if name == "button_number" {
+                        hasButtonNumber = true
+                    }
+                }
+            }
+        }
+        sqlite3_finalize(statement)
+        
+        // Add trigger_type column if missing
+        if !hasTriggerType {
+            print("🔄 [DatabaseManager] Adding trigger_type column to ring_configurations...")
+            let addTriggerTypeSQL = "ALTER TABLE ring_configurations ADD COLUMN trigger_type TEXT DEFAULT 'keyboard';"
+            if sqlite3_exec(db, addTriggerTypeSQL, nil, nil, nil) == SQLITE_OK {
+                print("✅ [DatabaseManager] Added trigger_type column")
+                
+                // Update existing rows to explicitly set trigger_type = 'keyboard'
+                let updateSQL = "UPDATE ring_configurations SET trigger_type = 'keyboard' WHERE trigger_type IS NULL;"
+                if sqlite3_exec(db, updateSQL, nil, nil, nil) == SQLITE_OK {
+                    print("✅ [DatabaseManager] Updated existing rows to keyboard trigger type")
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to add trigger_type column: \(String(cString: error))")
+                }
+                throw DatabaseError.schemaCreationFailed
+            }
+        }
+        
+        // Add button_number column if missing
+        if !hasButtonNumber {
+            print("🔄 [DatabaseManager] Adding button_number column to ring_configurations...")
+            let addButtonNumberSQL = "ALTER TABLE ring_configurations ADD COLUMN button_number INTEGER;"
+            if sqlite3_exec(db, addButtonNumberSQL, nil, nil, nil) == SQLITE_OK {
+                print("✅ [DatabaseManager] Added button_number column")
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to add button_number column: \(String(cString: error))")
+                }
+                throw DatabaseError.schemaCreationFailed
+            }
+        }
+        
+        print("✅ [DatabaseManager] Migrations completed successfully")
     }
 }
 

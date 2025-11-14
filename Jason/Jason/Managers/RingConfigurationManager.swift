@@ -131,8 +131,10 @@ class RingConfigurationManager: ObservableObject {
     ///   - ringRadius: Radius (thickness) of the ring band in points
     ///   - centerHoleRadius: Radius of the center hole in points
     ///   - iconSize: Size of icons in the ring
-    ///   - keyCode: Raw key code for shortcut (NEW)
-    ///   - modifierFlags: Raw modifier flags for shortcut (NEW)
+    ///   - triggerType: Type of trigger - "keyboard" or "mouse" (default: "keyboard")
+    ///   - keyCode: Raw key code for keyboard shortcut
+    ///   - modifierFlags: Raw modifier flags for trigger
+    ///   - buttonNumber: Mouse button number for mouse trigger (2=middle, 3=back, 4=forward)
     ///   - providers: Array of provider specifications (type, order, angle)
     /// - Returns: The newly created configuration
     /// - Throws: StoredRingConfigurationError if validation fails or database error occurs
@@ -143,12 +145,23 @@ class RingConfigurationManager: ObservableObject {
         ringRadius: Double,
         centerHoleRadius: Double = 56.0,
         iconSize: Double,
-        keyCode: UInt16? = nil,            // NEW
-        modifierFlags: UInt? = nil,        // NEW
+        triggerType: String = "keyboard",  // "keyboard" or "mouse"
+        keyCode: UInt16? = nil,
+        modifierFlags: UInt? = nil,
+        buttonNumber: Int32? = nil,        // For mouse triggers
         providers: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
     ) throws -> StoredRingConfiguration {
-        let shortcutDisplay = keyCode != nil ? formatShortcut(keyCode: keyCode!, modifiers: modifierFlags ?? 0) : shortcut
-        print("[RingConfigManager] Creating configuration '\(name)' with shortcut '\(shortcutDisplay)'")
+        // Generate display string based on trigger type
+        let shortcutDisplay: String
+        if triggerType == "keyboard", let keyCode = keyCode {
+            shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags ?? 0)
+        } else if triggerType == "mouse", let buttonNumber = buttonNumber {
+            shortcutDisplay = formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags ?? 0)
+        } else {
+            shortcutDisplay = shortcut
+        }
+        
+        print("[RingConfigManager] Creating configuration '\(name)' with trigger '\(shortcutDisplay)'")
         
         // Validate inputs
         try validateConfigurationInputs(
@@ -158,22 +171,34 @@ class RingConfigurationManager: ObservableObject {
             iconSize: iconSize
         )
         
-        // Validate shortcut uniqueness (if keyCode/modifierFlags provided)
-        if let keyCode = keyCode, let modifierFlags = modifierFlags {
-            guard validateShortcut(keyCode: keyCode, modifierFlags: modifierFlags, excludingRing: nil) else {
-                throw StoredRingConfigurationError.duplicateShortcut(shortcutDisplay)
+        // Validate trigger based on type
+        if triggerType == "keyboard" {
+            // Validate keyboard shortcut uniqueness
+            if let keyCode = keyCode, let modifierFlags = modifierFlags {
+                guard validateShortcut(keyCode: keyCode, modifierFlags: modifierFlags, excludingRing: nil) else {
+                    throw StoredRingConfigurationError.duplicateShortcut(shortcutDisplay)
+                }
+            }
+        } else if triggerType == "mouse" {
+            // Validate mouse button uniqueness
+            if let buttonNumber = buttonNumber {
+                guard validateMouseButton(buttonNumber, modifierFlags: modifierFlags ?? 0, excludingRing: nil) else {
+                    throw StoredRingConfigurationError.duplicateShortcut(shortcutDisplay)
+                }
             }
         }
         
         // Create in database
         guard let ringId = databaseManager.createRingConfiguration(
             name: name,
-            shortcut: shortcut,
+            shortcut: shortcutDisplay,
             ringRadius: CGFloat(ringRadius),
             centerHoleRadius: CGFloat(centerHoleRadius),
             iconSize: CGFloat(iconSize),
-            keyCode: keyCode,              // NEW
-            modifierFlags: modifierFlags   // NEW
+            triggerType: triggerType,
+            keyCode: keyCode,
+            modifierFlags: modifierFlags,
+            buttonNumber: buttonNumber
         ) else {
             throw StoredRingConfigurationError.databaseError("Failed to create ring configuration")
         }
@@ -228,14 +253,16 @@ class RingConfigurationManager: ObservableObject {
         let newConfig = StoredRingConfiguration(
             id: ringId,
             name: name,
-            shortcut: shortcut,
+            shortcut: shortcutDisplay,
             ringRadius: ringRadius,
             centerHoleRadius: centerHoleRadius,
             iconSize: iconSize,
             isActive: true,
             providers: providerConfigs,
-            keyCode: keyCode,              // NEW
-            modifierFlags: modifierFlags   // NEW
+            triggerType: triggerType,
+            keyCode: keyCode,
+            modifierFlags: modifierFlags,
+            buttonNumber: buttonNumber
         )
         
         // Update in-memory cache
@@ -271,7 +298,7 @@ class RingConfigurationManager: ObservableObject {
         print("[RingConfigManager] Updating configuration \(id)")
         
         // Verify configuration exists
-        guard let existingConfig = getConfiguration(id: id) else {
+        guard let _ = getConfiguration(id: id) else {
             throw StoredRingConfigurationError.configurationNotFound(id)
         }
         
@@ -547,8 +574,10 @@ class RingConfigurationManager: ObservableObject {
                 iconSize: existingConfig.iconSize,
                 isActive: isActive,
                 providers: existingConfig.providers,
+                triggerType: existingConfig.triggerType,
                 keyCode: existingConfig.keyCode,
-                modifierFlags: existingConfig.modifierFlags
+                modifierFlags: existingConfig.modifierFlags,
+                buttonNumber: existingConfig.buttonNumber
             )
             configurations[index] = updatedConfig
         }
@@ -602,6 +631,35 @@ class RingConfigurationManager: ObservableObject {
             // Check for duplicate
             if config.shortcut == shortcut {
                 print("[RingConfigManager] Shortcut '\(shortcut)' already used by '\(config.name)'")
+                return false
+            }
+        }
+        
+        return true
+    }
+    
+    /// Validate that a mouse button is unique among active rings
+    /// - Parameters:
+    ///   - buttonNumber: The button number to validate (2=middle, 3=back, 4=forward)
+    ///   - modifierFlags: The modifier flags
+    ///   - excludingRing: Optional ring ID to exclude from check (for updates)
+    /// - Returns: true if mouse button is unique (or ring is excluded), false if duplicate exists
+    func validateMouseButton(_ buttonNumber: Int32, modifierFlags: UInt, excludingRing: Int?) -> Bool {
+        let activeRings = getActiveConfigurations()
+        
+        for config in activeRings {
+            // Skip the excluded ring
+            if let excludingRing = excludingRing, config.id == excludingRing {
+                continue
+            }
+            
+            // Check for duplicate (must match both button and modifiers)
+            if config.triggerType == "mouse",
+               let configButton = config.buttonNumber,
+               configButton == buttonNumber,
+               config.modifierFlags == modifierFlags {
+                let display = formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags)
+                print("[RingConfigManager] Mouse button '\(display)' already used by '\(config.name)'")
                 return false
             }
         }
@@ -671,8 +729,10 @@ class RingConfigurationManager: ObservableObject {
             iconSize: Double(dbConfig.iconSize),
             isActive: dbConfig.isActive,
             providers: providers,
-            keyCode: dbConfig.keyCode,         // NEW
-            modifierFlags: dbConfig.modifierFlags  // NEW
+            triggerType: dbConfig.triggerType,
+            keyCode: dbConfig.keyCode,
+            modifierFlags: dbConfig.modifierFlags,
+            buttonNumber: dbConfig.buttonNumber
         )
     }
     
@@ -734,6 +794,34 @@ class RingConfigurationManager: ObservableObject {
         case 53: return "Esc"
         default: return "[\(keyCode)]"
         }
+    }
+    
+    /// Format a mouse button for display (helper)
+    private func formatMouseButton(buttonNumber: Int32, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        // Convert button number to readable name
+        let buttonName: String
+        switch buttonNumber {
+        case 2:
+            buttonName = "Button 3 (Middle)"
+        case 3:
+            buttonName = "Button 4 (Back)"
+        case 4:
+            buttonName = "Button 5 (Forward)"
+        default:
+            buttonName = "Button \(buttonNumber + 1)"
+        }
+        
+        parts.append(buttonName)
+        
+        return parts.joined()
     }
 }
 
