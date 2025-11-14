@@ -39,31 +39,57 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
     
     func provideFunctions() -> [FunctionNode] {
         let items = [
-            // 12 o'clock (Top) - Top 50%
+            
+            // Center - Fullscreen
             FunctionNode(
-                id: "window-top-half",
-                name: "Top Half",
+                id: "window-fullscreen",
+                name: "Fullscreen",
                 type: .action,
                 icon: NSImage(systemSymbolName: "arrow.up", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                     if let manager = self?.circularUIManager {
-                        WindowManager.positionTopHalf(targetApp: manager.previousApp)
+                        WindowManager.fullscreen(targetApp: manager.previousApp)
                     } else {
-                        WindowManager.positionTopHalf()
+                        WindowManager.fullscreen()
                     }
                 }),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
                 onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
                     if let manager = self?.circularUIManager {
-                        WindowManager.positionTopHalf(targetApp: manager.previousApp)
+                        WindowManager.fullscreen(targetApp: manager.previousApp)
                     } else {
-                        WindowManager.positionTopHalf()
+                        WindowManager.fullscreen()
                     }
                 })
             ),
+//            // 12 o'clock (Top) - Top 50%
+//            FunctionNode(
+//                id: "window-top-half",
+//                name: "Top Half",
+//                type: .action,
+//                icon: NSImage(systemSymbolName: "arrow.up", accessibilityDescription: nil) ?? NSImage(),
+//                preferredLayout: nil,
+//                showLabel: true,
+//                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+//                    if let manager = self?.circularUIManager {
+//                        WindowManager.positionTopHalf(targetApp: manager.previousApp)
+//                    } else {
+//                        WindowManager.positionTopHalf()
+//                    }
+//                }),
+//                onRightClick: ModifierAwareInteraction(base: .doNothing),
+//                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+//                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
+//                    if let manager = self?.circularUIManager {
+//                        WindowManager.positionTopHalf(targetApp: manager.previousApp)
+//                    } else {
+//                        WindowManager.positionTopHalf()
+//                    }
+//                })
+//            ),
             
             // 1 o'clock - Top-right quarter
             FunctionNode(
@@ -143,31 +169,57 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 })
             ),
             
-            // 6 o'clock (Bottom) - Bottom 50%
+            // Hide
             FunctionNode(
-                id: "window-bottom-half",
-                name: "Bottom Half",
+                id: "window-hide",
+                name: "Hide",
                 type: .action,
                 icon: NSImage(systemSymbolName: "arrow.down", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                     if let manager = self?.circularUIManager {
-                        WindowManager.positionBottomHalf(targetApp: manager.previousApp)
+                        WindowManager.hideWindow(targetApp: manager.previousApp)
                     } else {
-                        WindowManager.positionBottomHalf()
+                        WindowManager.hideWindow()
                     }
                 }),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
                 onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
                     if let manager = self?.circularUIManager {
-                        WindowManager.positionBottomHalf(targetApp: manager.previousApp)
+                        WindowManager.hideWindow(targetApp: manager.previousApp)
                     } else {
-                        WindowManager.positionBottomHalf()
+                        WindowManager.hideWindow()
                     }
                 })
             ),
+            
+//            // 6 o'clock (Bottom) - Bottom 50%
+//            FunctionNode(
+//                id: "window-bottom-half",
+//                name: "Bottom Half",
+//                type: .action,
+//                icon: NSImage(systemSymbolName: "arrow.down", accessibilityDescription: nil) ?? NSImage(),
+//                preferredLayout: nil,
+//                showLabel: true,
+//                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+//                    if let manager = self?.circularUIManager {
+//                        WindowManager.positionBottomHalf(targetApp: manager.previousApp)
+//                    } else {
+//                        WindowManager.positionBottomHalf()
+//                    }
+//                }),
+//                onRightClick: ModifierAwareInteraction(base: .doNothing),
+//                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+//                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
+//                    if let manager = self?.circularUIManager {
+//                        WindowManager.positionBottomHalf(targetApp: manager.previousApp)
+//                    } else {
+//                        WindowManager.positionBottomHalf()
+//                    }
+//                })
+//            ),
             
             // 7:30 - Bottom-left quarter
             FunctionNode(
@@ -245,85 +297,35 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                         WindowManager.positionTopLeft()
                     }
                 })
-            ),
-            
-            // Center - Fullscreen
-            FunctionNode(
-                id: "window-fullscreen",
-                name: "Fullscreen",
-                type: .action,
-                icon: NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: nil) ?? NSImage(),
-                preferredLayout: nil,
-                showLabel: true,
-                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.fullscreen(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.fullscreen()
-                    }
-                }),
-                onRightClick: ModifierAwareInteraction(base: .doNothing),
-                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.fullscreen(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.fullscreen()
-                    }
-                })
-            ),
-            
-            // Send to other monitor
-            FunctionNode(
-                id: "window-send-to-other-monitor",
-                name: "Other Monitor",
-                type: .action,
-                icon: NSImage(systemSymbolName: "arrow.left.arrow.right", accessibilityDescription: nil) ?? NSImage(),
-                preferredLayout: nil,
-                showLabel: true,
-                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.sendToOtherMonitor(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.sendToOtherMonitor()
-                    }
-                }),
-                onRightClick: ModifierAwareInteraction(base: .doNothing),
-                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.sendToOtherMonitor(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.sendToOtherMonitor()
-                    }
-                })
-            ),
-            
-            // Hide
-            FunctionNode(
-                id: "window-hide",
-                name: "Hide",
-                type: .action,
-                icon: NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil) ?? NSImage(),
-                preferredLayout: nil,
-                showLabel: true,
-                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.hideWindow(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.hideWindow()
-                    }
-                }),
-                onRightClick: ModifierAwareInteraction(base: .doNothing),
-                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.hideWindow(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.hideWindow()
-                    }
-                })
             )
+        
+//            
+//            // Send to other monitor
+//            FunctionNode(
+//                id: "window-send-to-other-monitor",
+//                name: "Other Monitor",
+//                type: .action,
+//                icon: NSImage(systemSymbolName: "arrow.left.arrow.right", accessibilityDescription: nil) ?? NSImage(),
+//                preferredLayout: nil,
+//                showLabel: true,
+//                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+//                    if let manager = self?.circularUIManager {
+//                        WindowManager.sendToOtherMonitor(targetApp: manager.previousApp)
+//                    } else {
+//                        WindowManager.sendToOtherMonitor()
+//                    }
+//                }),
+//                onRightClick: ModifierAwareInteraction(base: .doNothing),
+//                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+//                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
+//                    if let manager = self?.circularUIManager {
+//                        WindowManager.sendToOtherMonitor(targetApp: manager.previousApp)
+//                    } else {
+//                        WindowManager.sendToOtherMonitor()
+//                    }
+//                })
+//            ),
+            
         ]
         
         return [
