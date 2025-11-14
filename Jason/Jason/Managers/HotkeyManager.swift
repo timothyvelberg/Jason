@@ -254,7 +254,7 @@ class HotkeyManager {
         
         // Log every key event for debugging
         let eventModifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
-        print("[HotkeyManager] Key event: keyCode=\(event.keyCode), modifiers=\(eventModifiers.rawValue), UI visible=\(isUIVisible)")
+//        print("[HotkeyManager] Key event: keyCode=\(event.keyCode), modifiers=\(eventModifiers.rawValue), UI visible=\(isUIVisible)")
         
         // Hold key pressed (if configured)
         if let holdKeyCode = holdKeyCode, event.keyCode == holdKeyCode && !isHoldKeyCurrentlyPressed {

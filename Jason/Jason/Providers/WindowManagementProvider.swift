@@ -39,33 +39,33 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
     
     func provideFunctions() -> [FunctionNode] {
         let items = [
-            // 12 o'clock (Top) - Fullscreen
+            // 12 o'clock (Top) - Top 50%
             FunctionNode(
-                id: "window-fullscreen",
-                name: "Fullscreen",
+                id: "window-top-half",
+                name: "Top Half",
                 type: .action,
                 icon: NSImage(systemSymbolName: "arrow.up", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                     if let manager = self?.circularUIManager {
-                        WindowManager.fullscreen(targetApp: manager.previousApp)
+                        WindowManager.positionTopHalf(targetApp: manager.previousApp)
                     } else {
-                        WindowManager.fullscreen()
+                        WindowManager.positionTopHalf()
                     }
                 }),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
                 onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
                     if let manager = self?.circularUIManager {
-                        WindowManager.fullscreen(targetApp: manager.previousApp)
+                        WindowManager.positionTopHalf(targetApp: manager.previousApp)
                     } else {
-                        WindowManager.fullscreen()
+                        WindowManager.positionTopHalf()
                     }
                 })
             ),
             
-            // 1:30 (Top-Right) - Top-right quarter
+            // 1 o'clock - Top-right quarter
             FunctionNode(
                 id: "window-top-right",
                 name: "Top Right",
@@ -117,7 +117,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 })
             ),
             
-            // 4:30 (Bottom-Right) - Bottom-right quarter
+            // 4:30 - Bottom-right quarter
             FunctionNode(
                 id: "window-bottom-right",
                 name: "Bottom Right",
@@ -143,33 +143,33 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 })
             ),
             
-            // 6 o'clock (Bottom) - Hide/Minimize
+            // 6 o'clock (Bottom) - Bottom 50%
             FunctionNode(
-                id: "window-hide",
-                name: "Hide Window",
+                id: "window-bottom-half",
+                name: "Bottom Half",
                 type: .action,
                 icon: NSImage(systemSymbolName: "arrow.down", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                     if let manager = self?.circularUIManager {
-                        WindowManager.hideWindow(targetApp: manager.previousApp)
+                        WindowManager.positionBottomHalf(targetApp: manager.previousApp)
                     } else {
-                        WindowManager.hideWindow()
+                        WindowManager.positionBottomHalf()
                     }
                 }),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
                 onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
                     if let manager = self?.circularUIManager {
-                        WindowManager.hideWindow(targetApp: manager.previousApp)
+                        WindowManager.positionBottomHalf(targetApp: manager.previousApp)
                     } else {
-                        WindowManager.hideWindow()
+                        WindowManager.positionBottomHalf()
                     }
                 })
             ),
             
-            // 7:30 (Bottom-Left) - Bottom-left quarter
+            // 7:30 - Bottom-left quarter
             FunctionNode(
                 id: "window-bottom-left",
                 name: "Bottom Left",
@@ -221,7 +221,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 })
             ),
             
-            // 10:30 (Top-Left) - Top-left quarter
+            // 10:30 - Top-left quarter
             FunctionNode(
                 id: "window-top-left",
                 name: "Top Left",
@@ -243,6 +243,84 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                         WindowManager.positionTopLeft(targetApp: manager.previousApp)
                     } else {
                         WindowManager.positionTopLeft()
+                    }
+                })
+            ),
+            
+            // Center - Fullscreen
+            FunctionNode(
+                id: "window-fullscreen",
+                name: "Fullscreen",
+                type: .action,
+                icon: NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: nil) ?? NSImage(),
+                preferredLayout: nil,
+                showLabel: true,
+                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                    if let manager = self?.circularUIManager {
+                        WindowManager.fullscreen(targetApp: manager.previousApp)
+                    } else {
+                        WindowManager.fullscreen()
+                    }
+                }),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
+                    if let manager = self?.circularUIManager {
+                        WindowManager.fullscreen(targetApp: manager.previousApp)
+                    } else {
+                        WindowManager.fullscreen()
+                    }
+                })
+            ),
+            
+            // Send to other monitor
+            FunctionNode(
+                id: "window-send-to-other-monitor",
+                name: "Other Monitor",
+                type: .action,
+                icon: NSImage(systemSymbolName: "arrow.left.arrow.right", accessibilityDescription: nil) ?? NSImage(),
+                preferredLayout: nil,
+                showLabel: true,
+                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                    if let manager = self?.circularUIManager {
+                        WindowManager.sendToOtherMonitor(targetApp: manager.previousApp)
+                    } else {
+                        WindowManager.sendToOtherMonitor()
+                    }
+                }),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
+                    if let manager = self?.circularUIManager {
+                        WindowManager.sendToOtherMonitor(targetApp: manager.previousApp)
+                    } else {
+                        WindowManager.sendToOtherMonitor()
+                    }
+                })
+            ),
+            
+            // Hide
+            FunctionNode(
+                id: "window-hide",
+                name: "Hide",
+                type: .action,
+                icon: NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil) ?? NSImage(),
+                preferredLayout: nil,
+                showLabel: true,
+                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                    if let manager = self?.circularUIManager {
+                        WindowManager.hideWindow(targetApp: manager.previousApp)
+                    } else {
+                        WindowManager.hideWindow()
+                    }
+                }),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
+                    if let manager = self?.circularUIManager {
+                        WindowManager.hideWindow(targetApp: manager.previousApp)
+                    } else {
+                        WindowManager.hideWindow()
                     }
                 })
             )
@@ -308,6 +386,58 @@ class WindowManager {
     
     // MARK: - Screen Utilities
     
+    private static func getScreenForWindow(_ window: AXUIElement) -> NSScreen? {
+        // Get the window's current position
+        var positionValue: AnyObject?
+        let positionResult = AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionValue)
+        
+        guard positionResult == .success,
+              let axValue = positionValue,
+              AXValueGetType(axValue as! AXValue) == .cgPoint else {
+            print("⚠️ [WindowManager] Could not get window position, using main screen")
+            return NSScreen.main
+        }
+        
+        var position = CGPoint.zero
+        AXValueGetValue(axValue as! AXValue, .cgPoint, &position)
+        
+        print("🔍 [WindowManager] Window position: \(position)")
+        
+        // Find which screen contains this point
+        // Check against the full frame (not visibleFrame) since window position is in screen coordinates
+        for screen in NSScreen.screens {
+            print("   Checking screen with frame: \(screen.frame), visibleFrame: \(screen.visibleFrame)")
+            if screen.frame.contains(position) {
+                print("✅ [WindowManager] Window is on screen with frame: \(screen.frame)")
+                print("   Screen visibleFrame: \(screen.visibleFrame)")
+                return screen
+            }
+        }
+        
+        // If exact point matching fails, find the closest screen
+        print("⚠️ [WindowManager] Point not in any screen frame, finding closest screen")
+        var closestScreen: NSScreen?
+        var closestDistance: CGFloat = .infinity
+        
+        for screen in NSScreen.screens {
+            let screenCenter = CGPoint(x: screen.frame.midX, y: screen.frame.midY)
+            let distance = hypot(position.x - screenCenter.x, position.y - screenCenter.y)
+            if distance < closestDistance {
+                closestDistance = distance
+                closestScreen = screen
+            }
+        }
+        
+        if let closest = closestScreen {
+            print("✅ [WindowManager] Using closest screen with frame: \(closest.frame)")
+            return closest
+        }
+        
+        // Fallback to main screen if not found
+        print("⚠️ [WindowManager] Could not determine screen, using main")
+        return NSScreen.main
+    }
+    
     private static func getScreenFrame() -> CGRect {
         guard let screen = NSScreen.main else {
             return CGRect.zero
@@ -327,8 +457,13 @@ class WindowManager {
             return
         }
         
-        let screen = getScreenFrame()
-        setWindowFrame(window, frame: screen)
+        guard let screen = getScreenForWindow(window) else {
+            print("❌ [WindowManager] Could not determine screen")
+            return
+        }
+        
+        let frame = screen.visibleFrame
+        setWindowFrame(window, frame: frame)
         print("🪟 [WindowManager] Set window to fullscreen")
     }
     
@@ -342,12 +477,17 @@ class WindowManager {
             return
         }
         
-        let screen = getScreenFrame()
+        guard let screen = getScreenForWindow(window) else {
+            print("❌ [WindowManager] Could not determine screen")
+            return
+        }
+        
+        let screenFrame = screen.visibleFrame
         let frame = CGRect(
-            x: screen.origin.x,
-            y: screen.origin.y,
-            width: screen.width / 2,
-            height: screen.height
+            x: screenFrame.origin.x,
+            y: screenFrame.origin.y,
+            width: screenFrame.width / 2,
+            height: screenFrame.height
         )
         setWindowFrame(window, frame: frame)
         print("🪟 [WindowManager] Positioned window to left half")
@@ -363,15 +503,72 @@ class WindowManager {
             return
         }
         
-        let screen = getScreenFrame()
+        guard let screen = getScreenForWindow(window) else {
+            print("❌ [WindowManager] Could not determine screen")
+            return
+        }
+        
+        let screenFrame = screen.visibleFrame
         let frame = CGRect(
-            x: screen.origin.x + screen.width / 2,
-            y: screen.origin.y,
-            width: screen.width / 2,
-            height: screen.height
+            x: screenFrame.origin.x + screenFrame.width / 2,
+            y: screenFrame.origin.y,
+            width: screenFrame.width / 2,
+            height: screenFrame.height
         )
         setWindowFrame(window, frame: frame)
         print("🪟 [WindowManager] Positioned window to right half")
+    }
+    
+    static func positionTopHalf(targetApp: NSRunningApplication? = nil) {
+        guard checkAccessibilityPermissions() else {
+            return
+        }
+        
+        guard let window = getFrontmostWindow(targetApp: targetApp) else {
+            print("❌ [WindowManager] No frontmost window found")
+            return
+        }
+        
+        guard let screen = getScreenForWindow(window) else {
+            print("❌ [WindowManager] Could not determine screen")
+            return
+        }
+        
+        let screenFrame = screen.visibleFrame
+        let frame = CGRect(
+            x: screenFrame.origin.x,
+            y: screenFrame.origin.y,
+            width: screenFrame.width,
+            height: screenFrame.height / 2
+        )
+        setWindowFrame(window, frame: frame)
+        print("🪟 [WindowManager] Positioned window to top half")
+    }
+    
+    static func positionBottomHalf(targetApp: NSRunningApplication? = nil) {
+        guard checkAccessibilityPermissions() else {
+            return
+        }
+        
+        guard let window = getFrontmostWindow(targetApp: targetApp) else {
+            print("❌ [WindowManager] No frontmost window found")
+            return
+        }
+        
+        guard let screen = getScreenForWindow(window) else {
+            print("❌ [WindowManager] Could not determine screen")
+            return
+        }
+        
+        let screenFrame = screen.visibleFrame
+        let frame = CGRect(
+            x: screenFrame.origin.x,
+            y: screenFrame.origin.y + screenFrame.height / 2,
+            width: screenFrame.width,
+            height: screenFrame.height / 2
+        )
+        setWindowFrame(window, frame: frame)
+        print("🪟 [WindowManager] Positioned window to bottom half")
     }
     
     static func positionTopLeft(targetApp: NSRunningApplication? = nil) {
@@ -384,12 +581,17 @@ class WindowManager {
             return
         }
         
-        let screen = getScreenFrame()
+        guard let screen = getScreenForWindow(window) else {
+            print("❌ [WindowManager] Could not determine screen")
+            return
+        }
+        
+        let screenFrame = screen.visibleFrame
         let frame = CGRect(
-            x: screen.origin.x,
-            y: screen.origin.y,
-            width: screen.width / 2,
-            height: screen.height / 2
+            x: screenFrame.origin.x,
+            y: screenFrame.origin.y,
+            width: screenFrame.width / 2,
+            height: screenFrame.height / 2
         )
         setWindowFrame(window, frame: frame)
         print("🪟 [WindowManager] Positioned window to top-left quarter")
@@ -405,12 +607,17 @@ class WindowManager {
             return
         }
         
-        let screen = getScreenFrame()
+        guard let screen = getScreenForWindow(window) else {
+            print("❌ [WindowManager] Could not determine screen")
+            return
+        }
+        
+        let screenFrame = screen.visibleFrame
         let frame = CGRect(
-            x: screen.origin.x + screen.width / 2,
-            y: screen.origin.y,
-            width: screen.width / 2,
-            height: screen.height / 2
+            x: screenFrame.origin.x + screenFrame.width / 2,
+            y: screenFrame.origin.y,
+            width: screenFrame.width / 2,
+            height: screenFrame.height / 2
         )
         setWindowFrame(window, frame: frame)
         print("🪟 [WindowManager] Positioned window to top-right quarter")
@@ -426,12 +633,17 @@ class WindowManager {
             return
         }
         
-        let screen = getScreenFrame()
+        guard let screen = getScreenForWindow(window) else {
+            print("❌ [WindowManager] Could not determine screen")
+            return
+        }
+        
+        let screenFrame = screen.visibleFrame
         let frame = CGRect(
-            x: screen.origin.x,
-            y: screen.origin.y + screen.height / 2,
-            width: screen.width / 2,
-            height: screen.height / 2
+            x: screenFrame.origin.x,
+            y: screenFrame.origin.y + screenFrame.height / 2,
+            width: screenFrame.width / 2,
+            height: screenFrame.height / 2
         )
         setWindowFrame(window, frame: frame)
         print("🪟 [WindowManager] Positioned window to bottom-left quarter")
@@ -447,12 +659,17 @@ class WindowManager {
             return
         }
         
-        let screen = getScreenFrame()
+        guard let screen = getScreenForWindow(window) else {
+            print("❌ [WindowManager] Could not determine screen")
+            return
+        }
+        
+        let screenFrame = screen.visibleFrame
         let frame = CGRect(
-            x: screen.origin.x + screen.width / 2,
-            y: screen.origin.y + screen.height / 2,
-            width: screen.width / 2,
-            height: screen.height / 2
+            x: screenFrame.origin.x + screenFrame.width / 2,
+            y: screenFrame.origin.y + screenFrame.height / 2,
+            width: screenFrame.width / 2,
+            height: screenFrame.height / 2
         )
         setWindowFrame(window, frame: frame)
         print("🪟 [WindowManager] Positioned window to bottom-right quarter")
@@ -470,6 +687,75 @@ class WindowManager {
         print("🔍 [WindowManager] Hiding app: \(app.localizedName ?? "Unknown")")
         app.hide()
         print("🪟 [WindowManager] Hid application")
+    }
+    
+    static func sendToOtherMonitor(targetApp: NSRunningApplication? = nil) {
+        guard checkAccessibilityPermissions() else {
+            return
+        }
+        
+        guard let window = getFrontmostWindow(targetApp: targetApp) else {
+            print("❌ [WindowManager] No frontmost window found")
+            return
+        }
+        
+        guard let currentScreen = getScreenForWindow(window) else {
+            print("❌ [WindowManager] Could not determine current screen")
+            return
+        }
+        
+        // Get all screens
+        let screens = NSScreen.screens
+        guard screens.count > 1 else {
+            print("⚠️ [WindowManager] Only one screen available")
+            return
+        }
+        
+        // Find the next screen (cycle through screens)
+        guard let currentIndex = screens.firstIndex(where: { $0 == currentScreen }) else {
+            print("❌ [WindowManager] Could not find current screen in screen list")
+            return
+        }
+        
+        let nextIndex = (currentIndex + 1) % screens.count
+        let targetScreen = screens[nextIndex]
+        
+        print("🔄 [WindowManager] Moving window from screen \(currentIndex) to screen \(nextIndex)")
+        
+        // Get window's current frame
+        var currentPositionValue: AnyObject?
+        var currentSizeValue: AnyObject?
+        AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &currentPositionValue)
+        AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &currentSizeValue)
+        
+        var currentPosition = CGPoint.zero
+        var currentSize = CGSize.zero
+        
+        if let posValue = currentPositionValue {
+            AXValueGetValue(posValue as! AXValue, .cgPoint, &currentPosition)
+        }
+        if let sizeValue = currentSizeValue {
+            AXValueGetValue(sizeValue as! AXValue, .cgSize, &currentSize)
+        }
+        
+        // Calculate relative position within current screen
+        let currentScreenFrame = currentScreen.visibleFrame
+        let relativeX = (currentPosition.x - currentScreenFrame.origin.x) / currentScreenFrame.width
+        let relativeY = (currentPosition.y - currentScreenFrame.origin.y) / currentScreenFrame.height
+        let relativeWidth = currentSize.width / currentScreenFrame.width
+        let relativeHeight = currentSize.height / currentScreenFrame.height
+        
+        // Apply relative position to target screen
+        let targetScreenFrame = targetScreen.visibleFrame
+        let newFrame = CGRect(
+            x: targetScreenFrame.origin.x + (relativeX * targetScreenFrame.width),
+            y: targetScreenFrame.origin.y + (relativeY * targetScreenFrame.height),
+            width: relativeWidth * targetScreenFrame.width,
+            height: relativeHeight * targetScreenFrame.height
+        )
+        
+        setWindowFrame(window, frame: newFrame)
+        print("🪟 [WindowManager] Moved window to other monitor")
     }
     
     // MARK: - Accessibility API
@@ -511,18 +797,11 @@ class WindowManager {
     }
     
     private static func setWindowFrame(_ window: AXUIElement, frame: CGRect) {
-        // Set position
-        var position = CGPoint(x: frame.origin.x, y: frame.origin.y)
-        let positionValue = AXValueCreate(.cgPoint, &position)!
-        let positionResult = AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, positionValue)
+        print("🎯 [WindowManager] Setting window frame to: \(frame)")
+        print("   Origin: (\(frame.origin.x), \(frame.origin.y))")
+        print("   Size: (\(frame.width) x \(frame.height))")
         
-        if positionResult != .success {
-            print("❌ [WindowManager] Failed to set position (error code: \(positionResult.rawValue))")
-        } else {
-            print("✅ [WindowManager] Set position to (\(frame.origin.x), \(frame.origin.y))")
-        }
-        
-        // Set size
+        // Set size FIRST (some window managers adjust position based on size)
         var size = CGSize(width: frame.size.width, height: frame.size.height)
         let sizeValue = AXValueCreate(.cgSize, &size)!
         let sizeResult = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
@@ -531,6 +810,17 @@ class WindowManager {
             print("❌ [WindowManager] Failed to set size (error code: \(sizeResult.rawValue))")
         } else {
             print("✅ [WindowManager] Set size to (\(frame.size.width), \(frame.size.height))")
+        }
+        
+        // Set position AFTER size
+        var position = CGPoint(x: frame.origin.x, y: frame.origin.y)
+        let positionValue = AXValueCreate(.cgPoint, &position)!
+        let positionResult = AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, positionValue)
+        
+        if positionResult != .success {
+            print("❌ [WindowManager] Failed to set position (error code: \(positionResult.rawValue))")
+        } else {
+            print("✅ [WindowManager] Set position to (\(frame.origin.x), \(frame.origin.y))")
         }
     }
 }
