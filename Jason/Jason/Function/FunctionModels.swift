@@ -88,7 +88,7 @@ enum InteractionBehavior {
     case executeKeepOpen(() -> Void)    // Execute action, keep UI open
     case expand                         // Show children/contextActions
     case navigateInto                   // Navigate into folder, collapse previous ring
-    case launchRing(configId: Int)      // 🆕 FIXED: Launch another ring config
+    case launchRing(configId: Int)      // Launch another ring config
     case drag(DragProvider)             // Enable drag-and-drop
     case doNothing                      // No interaction
     

@@ -45,7 +45,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 id: "window-fullscreen",
                 name: "Fullscreen",
                 type: .action,
-                icon: NSImage(systemSymbolName: "arrow.up", accessibilityDescription: nil) ?? NSImage(),
+                icon: NSImage(systemSymbolName: "chevron.up", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
@@ -96,7 +96,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 id: "window-top-right",
                 name: "Top Right",
                 type: .action,
-                icon: NSImage(systemSymbolName: "arrow.up.right", accessibilityDescription: nil) ?? NSImage(),
+                icon: NSImage(systemSymbolName: "chevron.up.forward.2", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
@@ -122,7 +122,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 id: "window-right-half",
                 name: "Right Half",
                 type: .action,
-                icon: NSImage(systemSymbolName: "arrow.right", accessibilityDescription: nil) ?? NSImage(),
+                icon: NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
@@ -148,7 +148,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 id: "window-bottom-right",
                 name: "Bottom Right",
                 type: .action,
-                icon: NSImage(systemSymbolName: "arrow.down.right", accessibilityDescription: nil) ?? NSImage(),
+                icon: NSImage(systemSymbolName: "chevron.down.right.2", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
@@ -174,7 +174,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 id: "window-hide",
                 name: "Hide",
                 type: .action,
-                icon: NSImage(systemSymbolName: "arrow.down", accessibilityDescription: nil) ?? NSImage(),
+                icon: NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
