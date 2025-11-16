@@ -149,6 +149,8 @@ class RingConfigurationManager: ObservableObject {
         keyCode: UInt16? = nil,
         modifierFlags: UInt? = nil,
         buttonNumber: Int32? = nil,        // For mouse triggers
+        isHoldMode: Bool = false,          // true = hold to show, false = tap to toggle
+        autoExecuteOnRelease: Bool = true, // true = auto-execute on release (only when isHoldMode = true)
         providers: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
     ) throws -> StoredRingConfiguration {
         // Generate display string based on trigger type
@@ -198,7 +200,9 @@ class RingConfigurationManager: ObservableObject {
             triggerType: triggerType,
             keyCode: keyCode,
             modifierFlags: modifierFlags,
-            buttonNumber: buttonNumber
+            buttonNumber: buttonNumber,
+            isHoldMode: isHoldMode,
+            autoExecuteOnRelease: autoExecuteOnRelease
         ) else {
             throw StoredRingConfigurationError.databaseError("Failed to create ring configuration")
         }
@@ -262,7 +266,9 @@ class RingConfigurationManager: ObservableObject {
             triggerType: triggerType,
             keyCode: keyCode,
             modifierFlags: modifierFlags,
-            buttonNumber: buttonNumber
+            buttonNumber: buttonNumber,
+            isHoldMode: isHoldMode,
+            autoExecuteOnRelease: autoExecuteOnRelease
         )
         
         // Update in-memory cache
@@ -577,7 +583,9 @@ class RingConfigurationManager: ObservableObject {
                 triggerType: existingConfig.triggerType,
                 keyCode: existingConfig.keyCode,
                 modifierFlags: existingConfig.modifierFlags,
-                buttonNumber: existingConfig.buttonNumber
+                buttonNumber: existingConfig.buttonNumber,
+                isHoldMode: existingConfig.isHoldMode,
+                autoExecuteOnRelease: existingConfig.autoExecuteOnRelease
             )
             configurations[index] = updatedConfig
         }
@@ -732,7 +740,9 @@ class RingConfigurationManager: ObservableObject {
             triggerType: dbConfig.triggerType,
             keyCode: dbConfig.keyCode,
             modifierFlags: dbConfig.modifierFlags,
-            buttonNumber: dbConfig.buttonNumber
+            buttonNumber: dbConfig.buttonNumber,
+            isHoldMode: dbConfig.isHoldMode,
+            autoExecuteOnRelease: dbConfig.autoExecuteOnRelease
         )
     }
     

@@ -552,6 +552,64 @@ class CircularUIManager: ObservableObject {
     
     // MARK: - App Switcher Mode Handlers
     
+    /// Execute the hovered item when releasing hold mode (if auto-execute is enabled)
+    func executeHoveredItemIfInHoldMode() {
+        // Only execute in hold mode AND if auto-execute is enabled
+        guard isInHoldMode else {
+            print("⏭️ [HoldMode] Not in hold mode - skipping auto-execute")
+            return
+        }
+        
+        // Check if auto-execute is enabled for this configuration
+        guard configuration.autoExecuteOnRelease else {
+            print("⏭️ [HoldMode] Auto-execute disabled for this ring - skipping")
+            return
+        }
+        
+        guard let functionManager = functionManager else {
+            print("❌ [HoldMode] No FunctionManager")
+            return
+        }
+        
+        // Get the active ring
+        let activeRingLevel = functionManager.activeRingLevel
+        guard activeRingLevel < functionManager.rings.count else {
+            print("❌ [HoldMode] Invalid ring level: \(activeRingLevel)")
+            return
+        }
+        
+        let ring = functionManager.rings[activeRingLevel]
+        
+        // Check if there's a hovered item
+        guard let hoveredIndex = ring.hoveredIndex else {
+            print("⏭️ [HoldMode] No item currently hovered - skipping auto-execute")
+            return
+        }
+        
+        guard hoveredIndex < ring.nodes.count else {
+            print("❌ [HoldMode] Invalid hovered index: \(hoveredIndex)")
+            return
+        }
+        
+        let selectedNode = ring.nodes[hoveredIndex]
+        
+        print("✅ [HoldMode] Hold released - auto-executing: \(selectedNode.name)")
+        
+        // Execute the item's left click action (resolve with no modifiers since key/button was just released)
+        let behavior = selectedNode.onLeftClick.resolve(with: [])
+        
+        switch behavior {
+        case .execute(let action):
+            action()
+            // Note: hide() will be called after this method returns
+        case .executeKeepOpen(let action):
+            action()
+            // Note: hide() will be called after this method returns (we don't honor keepOpen in hold mode)
+        default:
+            print("⚠️ [HoldMode] Selected node doesn't have execute action")
+        }
+    }
+    
     func handleCtrlReleaseInAppSwitcher() {
         guard isInAppSwitcherMode else { return }
         
@@ -669,6 +727,11 @@ class CircularUIManager: ObservableObject {
     // MARK: - Hide Method
 
     func hide() {
+        // 🆕 Auto-execute hovered item if in hold mode and enabled
+        if isInHoldMode {
+            executeHoveredItemIfInHoldMode()
+        }
+        
         mouseTracker?.stopTrackingMouse()
         gestureManager?.stopMonitoring()
         

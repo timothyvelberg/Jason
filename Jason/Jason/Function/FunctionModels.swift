@@ -19,7 +19,7 @@ enum FunctionNodeType {
     case action
     
     /// Organizational UI wrapper (e.g., "Applications", "Folders" category)
-    /// - MUST have children or contextActions 
+    /// - MUST have children or contextActions
     /// - Not a real filesystem entity
     /// - Custom context actions (provider-specific)
     case category
@@ -154,7 +154,8 @@ class FunctionNode: Identifiable, ObservableObject {
     let maxDisplayedChildren: Int?
     
     let preferredLayout: LayoutStyle?
-    let itemAngleSize: CGFloat?
+    let itemAngleSize: CGFloat?          // My own angle size when rendered as an item
+    let childItemAngleSize: CGFloat?     // Default angle for my children (if they don't specify itemAngleSize)
     let parentAngleSize: CGFloat?
     
     let previewURL: URL?
@@ -195,6 +196,7 @@ class FunctionNode: Identifiable, ObservableObject {
         preferredLayout: LayoutStyle? = nil,
         parentAngleSize: CGFloat? = nil,
         itemAngleSize: CGFloat? = nil,
+        childItemAngleSize: CGFloat? = nil,
         
         previewURL: URL? = nil,
         showLabel: Bool = false,
@@ -232,6 +234,7 @@ class FunctionNode: Identifiable, ObservableObject {
         self.preferredLayout = preferredLayout
         self.parentAngleSize = parentAngleSize
         self.itemAngleSize = itemAngleSize
+        self.childItemAngleSize = childItemAngleSize
         
         self.previewURL = previewURL
         self.showLabel = showLabel
@@ -393,15 +396,26 @@ struct PieSliceConfig {
         itemCount: Int,
         centeredAt parentAngle: Double,
         defaultItemAngle: Double = 30.0,
-        positioning: SlicePositioning = .startClockwise
+        positioning: SlicePositioning = .startClockwise,
+        perItemAngles: [Double]? = nil  // 🆕 Support variable angles
     ) -> PieSliceConfig {
-        let totalAngle = min(Double(itemCount) * defaultItemAngle, 360.0)
-        
+        // Calculate total angle from perItemAngles if provided, otherwise use default
+        let totalAngle: Double
         let itemAngle: Double
-        if itemCount == 1 {
-            itemAngle = defaultItemAngle
+        
+        if let perItemAngles = perItemAngles {
+            // Use variable angles
+            totalAngle = min(perItemAngles.reduce(0, +), 360.0)
+            itemAngle = totalAngle / Double(itemCount)  // Average for fallback
         } else {
-            itemAngle = totalAngle / Double(itemCount)
+            // Use uniform angles
+            totalAngle = min(Double(itemCount) * defaultItemAngle, 360.0)
+            
+            if itemCount == 1 {
+                itemAngle = defaultItemAngle
+            } else {
+                itemAngle = totalAngle / Double(itemCount)
+            }
         }
         
         let startAngle: Double
@@ -429,7 +443,7 @@ struct PieSliceConfig {
             startAngle: startAngle,
             endAngle: endAngle,
             itemAngle: itemAngle,
-            perItemAngles: nil,
+            perItemAngles: perItemAngles,  // 🆕 Pass through variable angles
             positioning: positioning
         )
     }

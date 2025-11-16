@@ -21,6 +21,8 @@ struct EditRingView: View {
     @State private var recordedKeyCode: UInt16?
     @State private var recordedModifierFlags: UInt?
     @State private var recordedButtonNumber: Int32?
+    @State private var isHoldMode: Bool = false
+    @State private var autoExecuteOnRelease: Bool = true
     @State private var ringRadius: String = "80"
     @State private var centerHoleRadius: String = "56"
     @State private var iconSize: String = "32"
@@ -103,6 +105,20 @@ struct EditRingView: View {
                                     Text("Click the button and then click your mouse button (middle, back, or forward)")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
+                                }
+                                
+                                // Hold mode toggle
+                                Divider()
+                                    .padding(.vertical, 4)
+                                
+                                Toggle("Hold to show (release to hide)", isOn: $isHoldMode)
+                                    .help("When enabled, UI appears while key/button is held and disappears when released. When disabled, UI toggles on each press.")
+                                
+                                // Auto-execute toggle (only show when hold mode is enabled)
+                                if isHoldMode {
+                                    Toggle("Auto-execute on release", isOn: $autoExecuteOnRelease)
+                                        .padding(.leading, 20)  // Indent to show it's related to hold mode
+                                        .help("When enabled, releasing the hold key executes the hovered item without clicking. Perfect for app switching.")
                                 }
                             }
                             
@@ -263,6 +279,8 @@ struct EditRingView: View {
         
         // Load trigger based on type
         triggerType = config.triggerType == "mouse" ? .mouse : .keyboard
+        isHoldMode = config.isHoldMode
+        autoExecuteOnRelease = config.autoExecuteOnRelease
         
         if triggerType == .keyboard {
             recordedKeyCode = config.keyCode
@@ -382,6 +400,8 @@ struct EditRingView: View {
                     keyCode: keyCode,
                     modifierFlags: modifierFlags,
                     buttonNumber: buttonNumber,
+                    isHoldMode: isHoldMode,
+                    autoExecuteOnRelease: autoExecuteOnRelease,
                     providers: providers
                 )
                 

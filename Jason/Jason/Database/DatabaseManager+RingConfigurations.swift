@@ -24,6 +24,8 @@ extension DatabaseManager {
         keyCode: UInt16? = nil,
         modifierFlags: UInt? = nil,
         buttonNumber: Int32? = nil,        // For mouse triggers (2, 3, 4, etc.)
+        isHoldMode: Bool = false,          // true = hold to show, false = tap to toggle
+        autoExecuteOnRelease: Bool = true, // true = auto-execute on release (only when isHoldMode = true)
         displayOrder: Int = 0
     ) -> Int? {
         guard let db = db else { return nil }
@@ -53,8 +55,8 @@ extension DatabaseManager {
             let now = Int(Date().timeIntervalSince1970)
             
             let sql = """
-            INSERT INTO ring_configurations (name, shortcut, ring_radius, center_hole_radius, icon_size, trigger_type, key_code, modifier_flags, button_number, created_at, is_active, display_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?);
+            INSERT INTO ring_configurations (name, shortcut, ring_radius, center_hole_radius, icon_size, trigger_type, key_code, modifier_flags, button_number, is_hold_mode, auto_execute_on_release, created_at, is_active, display_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?);
             """
             var statement: OpaquePointer?
             
@@ -87,8 +89,14 @@ extension DatabaseManager {
                     sqlite3_bind_null(statement, 9)
                 }
                 
-                sqlite3_bind_int64(statement, 10, Int64(now))
-                sqlite3_bind_int(statement, 11, Int32(displayOrder))
+                // Bind isHoldMode
+                sqlite3_bind_int(statement, 10, isHoldMode ? 1 : 0)
+                
+                // Bind autoExecuteOnRelease
+                sqlite3_bind_int(statement, 11, autoExecuteOnRelease ? 1 : 0)
+                
+                sqlite3_bind_int64(statement, 12, Int64(now))
+                sqlite3_bind_int(statement, 13, Int32(displayOrder))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     ringId = Int(sqlite3_last_insert_rowid(db))
@@ -102,7 +110,8 @@ extension DatabaseManager {
                         triggerDisplay = "No trigger"
                     }
                     
-                    print("🔵 [DatabaseManager] Created ring configuration: '\(name)' (id: \(ringId!), trigger: \(triggerDisplay))")
+                    let modeDisplay = isHoldMode ? "hold" : "tap"
+                    print("🔵 [DatabaseManager] Created ring configuration: '\(name)' (id: \(ringId!), trigger: \(triggerDisplay), mode: \(modeDisplay))")
                 } else {
                     if let error = sqlite3_errmsg(db) {
                         print("❌ [DatabaseManager] Failed to insert ring configuration '\(name)': \(String(cString: error))")
@@ -127,7 +136,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, is_hold_mode, auto_execute_on_release
             FROM ring_configurations
             ORDER BY display_order, name;
             """
@@ -181,6 +190,24 @@ extension DatabaseManager {
                         return sqlite3_column_int(statement, 12)
                     }()
                     
+                    // Read isHoldMode (default to false for legacy rows)
+                    let isHoldMode: Bool = {
+                        let colType = sqlite3_column_type(statement, 13)
+                        if colType == SQLITE_NULL {
+                            return false
+                        }
+                        return sqlite3_column_int(statement, 13) == 1
+                    }()
+                    
+                    // Read autoExecuteOnRelease (default to true for legacy rows)
+                    let autoExecuteOnRelease: Bool = {
+                        let colType = sqlite3_column_type(statement, 14)
+                        if colType == SQLITE_NULL {
+                            return true
+                        }
+                        return sqlite3_column_int(statement, 14) == 1
+                    }()
+                    
                     results.append(RingConfigurationEntry(
                         id: id,
                         name: name,
@@ -194,7 +221,9 @@ extension DatabaseManager {
                         triggerType: triggerType,
                         keyCode: keyCode,
                         modifierFlags: modifierFlags,
-                        buttonNumber: buttonNumber
+                        buttonNumber: buttonNumber,
+                        isHoldMode: isHoldMode,
+                        autoExecuteOnRelease: autoExecuteOnRelease
                     ))
                 }
             } else {
@@ -216,7 +245,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, is_hold_mode, auto_execute_on_release
             FROM ring_configurations
             WHERE is_active = 1
             ORDER BY display_order, name;
@@ -271,6 +300,24 @@ extension DatabaseManager {
                         return sqlite3_column_int(statement, 12)
                     }()
                     
+                    // Read isHoldMode (default to false for legacy rows)
+                    let isHoldMode: Bool = {
+                        let colType = sqlite3_column_type(statement, 13)
+                        if colType == SQLITE_NULL {
+                            return false
+                        }
+                        return sqlite3_column_int(statement, 13) == 1
+                    }()
+                    
+                    // Read autoExecuteOnRelease (default to true for legacy rows)
+                    let autoExecuteOnRelease: Bool = {
+                        let colType = sqlite3_column_type(statement, 14)
+                        if colType == SQLITE_NULL {
+                            return true
+                        }
+                        return sqlite3_column_int(statement, 14) == 1
+                    }()
+                    
                     results.append(RingConfigurationEntry(
                         id: id,
                         name: name,
@@ -284,7 +331,9 @@ extension DatabaseManager {
                         triggerType: triggerType,
                         keyCode: keyCode,
                         modifierFlags: modifierFlags,
-                        buttonNumber: buttonNumber
+                        buttonNumber: buttonNumber,
+                        isHoldMode: isHoldMode,
+                        autoExecuteOnRelease: autoExecuteOnRelease
                     ))
                 }
             } else {
@@ -306,7 +355,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, is_hold_mode, auto_execute_on_release
             FROM ring_configurations
             WHERE id = ?;
             """
@@ -362,6 +411,24 @@ extension DatabaseManager {
                         return sqlite3_column_int(statement, 12)
                     }()
                     
+                    // Read isHoldMode (default to false for legacy rows)
+                    let isHoldMode: Bool = {
+                        let colType = sqlite3_column_type(statement, 13)
+                        if colType == SQLITE_NULL {
+                            return false
+                        }
+                        return sqlite3_column_int(statement, 13) == 1
+                    }()
+                    
+                    // Read autoExecuteOnRelease (default to true for legacy rows)
+                    let autoExecuteOnRelease: Bool = {
+                        let colType = sqlite3_column_type(statement, 14)
+                        if colType == SQLITE_NULL {
+                            return true
+                        }
+                        return sqlite3_column_int(statement, 14) == 1
+                    }()
+                    
                     result = RingConfigurationEntry(
                         id: id,
                         name: name,
@@ -375,7 +442,9 @@ extension DatabaseManager {
                         triggerType: triggerType,
                         keyCode: keyCode,
                         modifierFlags: modifierFlags,
-                        buttonNumber: buttonNumber
+                        buttonNumber: buttonNumber,
+                        isHoldMode: isHoldMode,
+                        autoExecuteOnRelease: autoExecuteOnRelease
                     )
                 }
             } else {

@@ -202,7 +202,11 @@ class CircularUIInstanceManager: ObservableObject {
         hotkeyManager.unregisterAllShortcuts()
         hotkeyManager.unregisterAllMouseButtons()
         
+        // Reset hold key (only one hold key supported at a time)
+        hotkeyManager.setHoldKey(nil)
+        
         let activeConfigs = configurationManager.getActiveConfigurations()
+        var holdKeyConfigured = false
         
         for config in activeConfigs {
             var hasKeyboardShortcut = false
@@ -212,32 +216,73 @@ class CircularUIInstanceManager: ObservableObject {
             if config.triggerType == "keyboard",
                let keyCode = config.keyCode,
                let modifierFlags = config.modifierFlags {
-                print("[HotkeyManager] Attempting to register shortcut for config \(config.id):")
-                hotkeyManager.registerShortcut(
-                    keyCode: keyCode,
-                    modifierFlags: modifierFlags,
-                    forConfigId: config.id
-                ) { [weak self] in
-                    print("🎯 [InstanceManager] Keyboard shortcut triggered for '\(config.name)' (ID: \(config.id))")
-                    self?.show(configId: config.id)
+                
+                // Check if this is a hold-mode shortcut
+                if config.isHoldMode {
+                    // HOLD MODE: Show while key is held, hide on release
+                    if !holdKeyConfigured {
+                        print("[InstanceManager] Registering HOLD mode for '\(config.name)' (ID: \(config.id))")
+                        
+                        // Set the hold key in HotkeyManager
+                        hotkeyManager.setHoldKey(keyCode)
+                        
+                        // Wire up hold key callbacks
+                        hotkeyManager.onHoldKeyPressed = { [weak self] in
+                            print("🔽 [InstanceManager] Hold key PRESSED for '\(config.name)'")
+                            self?.showInHoldMode(configId: config.id)
+                        }
+                        
+                        hotkeyManager.onHoldKeyReleased = { [weak self] in
+                            print("🔼 [InstanceManager] Hold key RELEASED for '\(config.name)'")
+                            self?.hideFromHoldMode(configId: config.id)
+                        }
+                        
+                        holdKeyConfigured = true
+                        hasKeyboardShortcut = true
+                        
+                        let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
+                        print("   ✅ Hold key configured: \(shortcutDisplay)")
+                    } else {
+                        // Only one hold key supported at a time
+                        print("   ⚠️ Skipping '\(config.name)' - hold key already configured for another ring")
+                        print("      Note: Only one hold-mode shortcut can be active at a time")
+                    }
+                } else {
+                    // TAP MODE: Toggle on each press (existing behavior)
+                    print("[InstanceManager] Registering TAP mode for '\(config.name)' (ID: \(config.id))")
+                    hotkeyManager.registerShortcut(
+                        keyCode: keyCode,
+                        modifierFlags: modifierFlags,
+                        forConfigId: config.id
+                    ) { [weak self] in
+                        print("🎯 [InstanceManager] Keyboard shortcut triggered for '\(config.name)' (ID: \(config.id))")
+                        self?.show(configId: config.id)
+                    }
+                    hasKeyboardShortcut = true
                 }
-                hasKeyboardShortcut = true
             }
             
             // Register mouse button if configured
             if config.triggerType == "mouse",
                let buttonNumber = config.buttonNumber {
                 let modifierFlags = config.modifierFlags ?? 0
-                print("[HotkeyManager] Attempting to register mouse button for config \(config.id):")
-                hotkeyManager.registerMouseButton(
-                    buttonNumber: buttonNumber,
-                    modifierFlags: modifierFlags,
-                    forConfigId: config.id
-                ) { [weak self] in
-                    print("🎯 [InstanceManager] Mouse button triggered for '\(config.name)' (ID: \(config.id))")
-                    self?.show(configId: config.id)
+                
+                if config.isHoldMode {
+                    // Mouse button hold mode not yet supported
+                    print("   ⚠️ Skipping '\(config.name)' - mouse button hold mode not yet implemented")
+                } else {
+                    // TAP MODE for mouse buttons
+                    print("[InstanceManager] Registering mouse button TAP mode for '\(config.name)' (ID: \(config.id))")
+                    hotkeyManager.registerMouseButton(
+                        buttonNumber: buttonNumber,
+                        modifierFlags: modifierFlags,
+                        forConfigId: config.id
+                    ) { [weak self] in
+                        print("🎯 [InstanceManager] Mouse button triggered for '\(config.name)' (ID: \(config.id))")
+                        self?.show(configId: config.id)
+                    }
+                    hasMouseButton = true
                 }
-                hasMouseButton = true
             }
             
             // Only skip if NEITHER is configured
@@ -368,5 +413,121 @@ extension CircularUIInstanceManager {
     /// - Returns: True if this instance is currently active, false otherwise
     func isInstanceActive(_ configId: Int) -> Bool {
         return activeInstanceId == configId
+    }
+    
+    // MARK: - Hold Mode Support
+    
+    /// Show an instance in hold mode (sets isInHoldMode flag)
+    /// - Parameter configId: The configuration ID
+    private func showInHoldMode(configId: Int) {
+        guard let instance = getInstance(forConfigId: configId) else {
+            print("❌ [InstanceManager] Cannot show in hold mode - no instance for config \(configId)")
+            return
+        }
+        
+        // Set hold mode flag BEFORE showing
+        instance.isInHoldMode = true
+        
+        // Hide currently active instance if different
+        if let currentActiveId = activeInstanceId, currentActiveId != configId {
+            print("🔄 [InstanceManager] Hiding previous instance (config \(currentActiveId)) for hold mode")
+            if let previousInstance = getInstance(forConfigId: currentActiveId) {
+                previousInstance.hide()
+            }
+        }
+        
+        // Update active instance tracking
+        activeInstanceId = configId
+        print("✅ [InstanceManager] Setting active instance to config \(configId) (HOLD MODE)")
+        
+        // Show the new instance
+        instance.show()
+    }
+    
+    /// Hide an instance from hold mode (only if it's currently in hold mode)
+    /// - Parameter configId: The configuration ID
+    private func hideFromHoldMode(configId: Int) {
+        guard let instance = getInstance(forConfigId: configId) else {
+            print("❌ [InstanceManager] Cannot hide from hold mode - no instance for config \(configId)")
+            return
+        }
+        
+        // Only hide if instance is actually in hold mode
+        guard instance.isInHoldMode else {
+            print("⚠️ [InstanceManager] Instance \(configId) not in hold mode - skipping hide")
+            return
+        }
+        
+        print("🔄 [InstanceManager] Hiding instance from hold mode (config \(configId))")
+        
+        // Hide the instance
+        instance.hide()
+        
+        // Clear active instance tracking
+        if activeInstanceId == configId {
+            activeInstanceId = nil
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Format a keyboard shortcut for display
+    /// - Parameters:
+    ///   - keyCode: The key code
+    ///   - modifiers: The modifier flags
+    /// - Returns: A formatted string like "⌃⇧K"
+    private func formatShortcut(keyCode: UInt16, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        // Add key name
+        let keyName = keyCodeToString(keyCode)
+        parts.append(keyName)
+        
+        return parts.joined()
+    }
+    
+    /// Convert key code to readable string
+    /// - Parameter keyCode: The key code
+    /// - Returns: A readable key name
+    private func keyCodeToString(_ keyCode: UInt16) -> String {
+        switch keyCode {
+        case 0: return "A"
+        case 1: return "S"
+        case 2: return "D"
+        case 3: return "F"
+        case 4: return "H"
+        case 5: return "G"
+        case 40: return "K"
+        case 49: return "Space"
+        case 50: return "`"
+        case 53: return "Esc"
+        // Function keys
+        case 122: return "F1"
+        case 120: return "F2"
+        case 99: return "F3"
+        case 118: return "F4"
+        case 96: return "F5"
+        case 97: return "F6"
+        case 98: return "F7"
+        case 100: return "F8"
+        case 101: return "F9"
+        case 109: return "F10"
+        case 103: return "F11"
+        case 111: return "F12"
+        case 105: return "F13"
+        case 107: return "F14"
+        case 113: return "F15"
+        case 106: return "F16"
+        case 64: return "F17"
+        case 79: return "F18"
+        case 80: return "F19"
+        default: return "[\(keyCode)]"
+        }
     }
 }

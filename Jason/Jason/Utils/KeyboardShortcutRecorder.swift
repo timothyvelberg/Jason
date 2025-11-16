@@ -13,6 +13,7 @@ struct KeyboardShortcutRecorder: View {
     @Binding var modifierFlags: UInt?
     @State private var isRecording = false
     @State private var localMonitor: Any?
+    @State private var showConflictWarning = false
     
     var displayText: String {
         if isRecording {
@@ -54,6 +55,13 @@ struct KeyboardShortcutRecorder: View {
             }
             .buttonStyle(.plain)
             
+            // Warning icon for potentially conflicting shortcuts
+            if showConflictWarning {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                    .help("Warning: This shortcut may conflict with typing or other apps")
+            }
+            
             if keyCode != nil {
                 Button(action: clearShortcut) {
                     Image(systemName: "xmark.circle.fill")
@@ -81,14 +89,18 @@ struct KeyboardShortcutRecorder: View {
             let capturedKeyCode = event.keyCode
             let capturedModifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
             
-            // Require at least one modifier key
-            guard !capturedModifiers.isEmpty else {
+            // Block Escape key from being recorded (it's reserved for hiding UI)
+            guard capturedKeyCode != 53 else {
+                print("⚠️ [ShortcutRecorder] Escape key cannot be used as a shortcut (reserved for hiding UI)")
                 return nil // Consume event but don't save
             }
             
-            // Save the shortcut
+            // Save the shortcut (modifiers are optional now!)
             self.keyCode = capturedKeyCode
             self.modifierFlags = capturedModifiers.rawValue
+            
+            // Check if this shortcut might conflict with normal typing
+            self.showConflictWarning = isPotentiallyConflicting(keyCode: capturedKeyCode, modifiers: capturedModifiers)
             
             // Stop recording
             DispatchQueue.main.async {
@@ -113,7 +125,38 @@ struct KeyboardShortcutRecorder: View {
     private func clearShortcut() {
         keyCode = nil
         modifierFlags = nil
+        showConflictWarning = false
         print("🎹 [ShortcutRecorder] Shortcut cleared")
+    }
+    
+    // MARK: - Conflict Detection
+    
+    /// Check if a shortcut might conflict with normal typing or common usage
+    private func isPotentiallyConflicting(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
+        // Function keys (F1-F19) are safe even without modifiers
+        let functionKeys: Set<UInt16> = [
+            122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111,  // F1-F12
+            105, 107, 113, 106, 64, 79, 80                           // F13-F19
+        ]
+        if functionKeys.contains(keyCode) {
+            return false  // Function keys are safe
+        }
+        
+        // Keys that are safe when used alone (non-alphanumeric)
+        let safeStandaloneKeys: Set<UInt16> = [
+            49,   // Space
+            48,   // Tab
+            123, 124, 125, 126  // Arrow keys
+        ]
+        
+        // If no modifiers are pressed
+        if modifiers.isEmpty {
+            // Only safe standalone keys are okay without modifiers
+            return !safeStandaloneKeys.contains(keyCode)
+        }
+        
+        // With modifiers, most keys are safe
+        return false
     }
     
     // MARK: - Formatting

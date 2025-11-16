@@ -37,6 +37,8 @@ struct StoredRingConfiguration: Identifiable, Equatable {
     let keyCode: UInt16?           // For keyboard triggers
     let modifierFlags: UInt?       // For both keyboard and mouse triggers
     let buttonNumber: Int32?       // For mouse triggers (2=middle, 3=back, 4=forward)
+    let isHoldMode: Bool           // true = hold to show, false = tap to toggle
+    let autoExecuteOnRelease: Bool // true = auto-execute on release (only when isHoldMode = true)
     
     // MARK: - Shortcut Properties
     
@@ -211,6 +213,8 @@ struct StoredRingConfiguration: Identifiable, Equatable {
                lhs.keyCode == rhs.keyCode &&
                lhs.modifierFlags == rhs.modifierFlags &&
                lhs.buttonNumber == rhs.buttonNumber &&
+               lhs.isHoldMode == rhs.isHoldMode &&
+               lhs.autoExecuteOnRelease == rhs.autoExecuteOnRelease &&
                lhs.providers == rhs.providers
     }
 }

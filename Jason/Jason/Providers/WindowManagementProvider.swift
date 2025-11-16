@@ -47,6 +47,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 type: .action,
                 icon: NSImage(systemSymbolName: "chevron.up", accessibilityDescription: nil) ?? NSImage(),
                 preferredLayout: nil,
+                itemAngleSize: 90.0,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                     if let manager = self?.circularUIManager {

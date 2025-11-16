@@ -299,44 +299,52 @@ class FunctionManager: ObservableObject {
                     let itemCount = nodes.count
                     let preferredLayout = parentInfo.node.preferredLayout ?? .partialSlice
                     
-                    // Check if node has custom itemAngleSize override
-                    let (shouldConvertToFull, anglePerItem, totalAngle): (Bool, Double, Double)
-                    if let customAngle = parentInfo.node.itemAngleSize {
-                        // Override: use custom angle size
-                        let total = Double(itemCount) * customAngle
-                        if total >= 360.0 {
-                            // Exceeds full circle - convert and distribute
-                            let distributed = 360.0 / Double(itemCount)
-                            print("📐 Custom Override: \(itemCount) items × \(customAngle)° = \(total)° → Full Circle at \(distributed)° each")
-                            (shouldConvertToFull, anglePerItem, totalAngle) = (true, distributed, 360.0)
-                        } else {
-                            // Use custom angle as-is
-                            print("📐 Custom Override: \(itemCount) items × \(customAngle)° = \(total)°")
-                            (shouldConvertToFull, anglePerItem, totalAngle) = (false, customAngle, total)
-                        }
+                    // 🆕 Calculate per-item angles based on children's itemAngleSize and parent's childItemAngleSize
+                    let perItemAngles = calculateChildRingAngles(
+                        for: nodes,
+                        parentNode: parentInfo.node,
+                        ringIndex: index
+                    )
+                    
+                    // Calculate total angle and determine if we need full circle
+                    let totalAngle = perItemAngles.reduce(0, +)
+                    let shouldConvertToFull = totalAngle >= 360.0
+                    
+                    // For display purposes, use average angle
+                    let averageAngle = totalAngle / Double(itemCount)
+                    
+                    if shouldConvertToFull {
+                        print("📐 Ring \(index): Total angle \(String(format: "%.1f", totalAngle))° ≥ 360° → Converting to Full Circle")
                     } else {
-                        // Use phase-based configuration system
-                        (shouldConvertToFull, anglePerItem, totalAngle) = calculateSliceConfiguration(itemCount: itemCount, ringIndex: index)
+                        print("📐 Ring \(index): Partial slice with \(String(format: "%.1f", totalAngle))° total")
                     }
                     
                     let positioning = parentInfo.node.slicePositioning ?? .startClockwise
                     
                     if preferredLayout == .fullCircle || shouldConvertToFull {
-                        // Full circle layout
+                        // Full circle layout with variable angles
                         let startAngle: Double
                         switch positioning {
                         case .center:
-                            let centerIndex = Double(itemCount) / 2.0 - 0.5
+                            // Calculate center position accounting for variable angles
+                            let halfTotalAngle = totalAngle / 2.0
                             let parentAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
-                            startAngle = parentAngle - (centerIndex * anglePerItem) - (anglePerItem / 2)
+                            startAngle = parentAngle - halfTotalAngle
                         case .startCounterClockwise:
                             startAngle = parentInfo.rightEdge
                         case .startClockwise:
                             startAngle = parentInfo.leftEdge
                         }
-                        sliceConfig = .fullCircle(itemCount: itemCount, anglePerItem: anglePerItem, startingAt: startAngle, positioning: positioning)
+                        
+                        sliceConfig = .fullCircle(
+                            itemCount: itemCount,
+                            anglePerItem: averageAngle,  // Fallback for uniform case
+                            startingAt: startAngle,
+                            positioning: positioning,
+                            perItemAngles: perItemAngles  // 🆕 Pass variable angles
+                        )
                     } else {
-                        // Partial slice layout
+                        // Partial slice layout with variable angles
                         let startingAngle: Double
                         switch positioning {
                         case .center:
@@ -350,8 +358,9 @@ class FunctionManager: ObservableObject {
                         sliceConfig = .partialSlice(
                             itemCount: itemCount,
                             centeredAt: startingAngle,
-                            defaultItemAngle: anglePerItem,
-                            positioning: positioning
+                            defaultItemAngle: averageAngle,  // Fallback for uniform case
+                            positioning: positioning,
+                            perItemAngles: perItemAngles  // 🆕 Pass variable angles
                         )
                     }
                 }
@@ -683,6 +692,78 @@ class FunctionManager: ObservableObject {
         }
         
         print("📐 [Ring 0 Angles] Calculated: \(angles.map { String(format: "%.1f°", $0) }.joined(separator: ", "))")
+        
+        return angles
+    }
+    
+    /// Calculate angles for child ring items based on their itemAngleSize and parent's childItemAngleSize
+    private func calculateChildRingAngles(
+        for nodes: [FunctionNode],
+        parentNode: FunctionNode,
+        ringIndex: Int
+    ) -> [Double] {
+        // Get parent's default angle for children (if specified)
+        let parentDefaultAngle = parentNode.childItemAngleSize.map { Double($0) }
+        
+        // Check if any nodes have custom itemAngleSize
+        let customSizes = nodes.map { $0.itemAngleSize }
+        let hasCustomSizes = customSizes.contains(where: { $0 != nil })
+        
+        // If no custom sizes and no parent default, use uniform distribution
+        guard hasCustomSizes || parentDefaultAngle != nil else {
+            let uniformAngle = 360.0 / Double(nodes.count)
+            return Array(repeating: uniformAngle, count: nodes.count)
+        }
+        
+        // Calculate angles with custom sizes and/or parent default
+        var totalCustomAngle: Double = 0
+        var customCount = 0
+        
+        for node in nodes {
+            if let customSize = node.itemAngleSize {
+                // Node has explicit itemAngleSize
+                totalCustomAngle += Double(customSize)
+                customCount += 1
+            } else if let parentDefault = parentDefaultAngle {
+                // Node inherits parent's childItemAngleSize
+                totalCustomAngle += parentDefault
+                customCount += 1
+            }
+        }
+        
+        // Validate: custom sizes must not exceed 360°
+        if totalCustomAngle > 360 {
+            print("⚠️ [Ring \(ringIndex) Angles] Custom sizes total \(totalCustomAngle)° exceeds 360°. Falling back to equal distribution.")
+            let uniformAngle = 360.0 / Double(nodes.count)
+            return Array(repeating: uniformAngle, count: nodes.count)
+        }
+        
+        // Calculate remaining space for auto-sized items (those without itemAngleSize or parent default)
+        let remainingAngle = 360.0 - totalCustomAngle
+        let autoSizedCount = nodes.count - customCount
+        let autoAngle = autoSizedCount > 0 ? remainingAngle / Double(autoSizedCount) : 0
+        
+        // Warn if auto-sized items are very small
+        if autoAngle > 0 && autoAngle < 15 {
+            print("⚠️ [Ring \(ringIndex) Angles] Auto-sized items are only \(String(format: "%.1f", autoAngle))° each. May be hard to select.")
+        }
+        
+        // Build final angle array
+        var angles: [Double] = []
+        for node in nodes {
+            if let customSize = node.itemAngleSize {
+                // Node has explicit itemAngleSize - use it
+                angles.append(Double(customSize))
+            } else if let parentDefault = parentDefaultAngle {
+                // Node inherits parent's childItemAngleSize
+                angles.append(parentDefault)
+            } else {
+                // Node gets auto-calculated angle from remaining space
+                angles.append(autoAngle)
+            }
+        }
+        
+        print("📐 [Ring \(ringIndex) Angles] Calculated: \(angles.map { String(format: "%.1f°", $0) }.joined(separator: ", "))")
         
         return angles
     }

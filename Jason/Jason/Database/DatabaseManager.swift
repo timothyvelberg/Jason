@@ -172,7 +172,7 @@ class DatabaseManager {
         );
         """
         
-        // Create ring_configurations table (UPDATED with trigger support for keyboard + mouse)
+        // Create ring_configurations table (UPDATED with trigger support for keyboard + mouse + hold mode + auto-execute)
         let ringConfigurationsSQL = """
         CREATE TABLE IF NOT EXISTS ring_configurations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -185,6 +185,8 @@ class DatabaseManager {
             key_code INTEGER,
             modifier_flags INTEGER,
             button_number INTEGER,
+            is_hold_mode INTEGER DEFAULT 0,
+            auto_execute_on_release INTEGER DEFAULT 1,
             created_at INTEGER DEFAULT (strftime('%s', 'now')),
             is_active INTEGER DEFAULT 1,
             display_order INTEGER DEFAULT 0
@@ -258,6 +260,8 @@ class DatabaseManager {
         var statement: OpaquePointer?
         var hasTriggerType = false
         var hasButtonNumber = false
+        var hasIsHoldMode = false
+        var hasAutoExecuteOnRelease = false
         
         if sqlite3_prepare_v2(db, pragmaSQL, -1, &statement, nil) == SQLITE_OK {
             while sqlite3_step(statement) == SQLITE_ROW {
@@ -268,6 +272,12 @@ class DatabaseManager {
                     }
                     if name == "button_number" {
                         hasButtonNumber = true
+                    }
+                    if name == "is_hold_mode" {
+                        hasIsHoldMode = true
+                    }
+                    if name == "auto_execute_on_release" {
+                        hasAutoExecuteOnRelease = true
                     }
                 }
             }
@@ -303,6 +313,46 @@ class DatabaseManager {
             } else {
                 if let error = sqlite3_errmsg(db) {
                     print("❌ [DatabaseManager] Failed to add button_number column: \(String(cString: error))")
+                }
+                throw DatabaseError.schemaCreationFailed
+            }
+        }
+        
+        // Add is_hold_mode column if missing
+        if !hasIsHoldMode {
+            print("🔄 [DatabaseManager] Adding is_hold_mode column to ring_configurations...")
+            let addIsHoldModeSQL = "ALTER TABLE ring_configurations ADD COLUMN is_hold_mode INTEGER DEFAULT 0;"
+            if sqlite3_exec(db, addIsHoldModeSQL, nil, nil, nil) == SQLITE_OK {
+                print("✅ [DatabaseManager] Added is_hold_mode column")
+                
+                // Update existing rows to explicitly set is_hold_mode = 0 (tap mode)
+                let updateSQL = "UPDATE ring_configurations SET is_hold_mode = 0 WHERE is_hold_mode IS NULL;"
+                if sqlite3_exec(db, updateSQL, nil, nil, nil) == SQLITE_OK {
+                    print("✅ [DatabaseManager] Updated existing rows to tap mode (is_hold_mode = 0)")
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to add is_hold_mode column: \(String(cString: error))")
+                }
+                throw DatabaseError.schemaCreationFailed
+            }
+        }
+        
+        // Add auto_execute_on_release column if missing
+        if !hasAutoExecuteOnRelease {
+            print("🔄 [DatabaseManager] Adding auto_execute_on_release column to ring_configurations...")
+            let addAutoExecuteSQL = "ALTER TABLE ring_configurations ADD COLUMN auto_execute_on_release INTEGER DEFAULT 1;"
+            if sqlite3_exec(db, addAutoExecuteSQL, nil, nil, nil) == SQLITE_OK {
+                print("✅ [DatabaseManager] Added auto_execute_on_release column")
+                
+                // Update existing rows to explicitly set auto_execute_on_release = 1 (enabled by default)
+                let updateSQL = "UPDATE ring_configurations SET auto_execute_on_release = 1 WHERE auto_execute_on_release IS NULL;"
+                if sqlite3_exec(db, updateSQL, nil, nil, nil) == SQLITE_OK {
+                    print("✅ [DatabaseManager] Updated existing rows to auto-execute enabled (auto_execute_on_release = 1)")
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to add auto_execute_on_release column: \(String(cString: error))")
                 }
                 throw DatabaseError.schemaCreationFailed
             }
