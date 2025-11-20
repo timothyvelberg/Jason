@@ -234,11 +234,6 @@ struct RingView: View {
                 let opacity = iconOpacities[node.id] ?? 0
                 let scale = iconScales[node.id] ?? animationStartScale
                 
-                // 🆕 Defensive logging for missing states
-                if opacity == 0 && iconOpacities[node.id] == nil {
-                    let _ = print("      ⚠️ RENDER: Node \(node.id) has no opacity entry (defaulting to 0)")
-                }
-                
                 Image(nsImage: node.icon)
                     .resizable()
                     .scaledToFit()

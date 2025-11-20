@@ -1,0 +1,315 @@
+//
+//  MultitouchGestureDetector.swift
+//  Jason
+//
+//  Detects swipe gestures using the private MultitouchSupport framework
+//
+
+import Foundation
+
+/// Protocol for receiving swipe gesture notifications
+protocol MultitouchGestureDelegate: AnyObject {
+    func didDetectSwipe(direction: MultitouchGestureDetector.SwipeDirection, fingerCount: Int)
+}
+
+/// Detects multitouch gestures (particularly swipes) using raw trackpad data
+class MultitouchGestureDetector {
+    
+    // MARK: - Types
+    
+    struct Touch {
+        let identifier: Int
+        let x: Float
+        let y: Float
+        let timestamp: Double
+        
+        func distance(to other: Touch) -> Float {
+            let dx = x - other.x
+            let dy = y - other.y
+            return sqrt(dx * dx + dy * dy)
+        }
+    }
+    
+    enum SwipeDirection {
+        case up, down, left, right
+        
+        var string: String {
+            switch self {
+            case .up: return "up"
+            case .down: return "down"
+            case .left: return "left"
+            case .right: return "right"
+            }
+        }
+    }
+    
+    // MARK: - Configuration
+    
+    /// Minimum distance to consider a swipe (normalized coordinates 0-1)
+    private let minSwipeDistance: Float = 0.15
+    
+    /// Maximum time for a swipe gesture (seconds)
+    private let maxSwipeDuration: Double = 0.5
+    
+    /// Minimum velocity to be considered a swipe (distance/second)
+    private let minSwipeVelocity: Float = 0.3
+    
+    // MARK: - State Tracking
+    
+    /// Tracks active touches by their identifier
+    private var activeTouches: [Int: Touch] = [:]
+    
+    /// Tracks the starting position of each touch
+    private var touchStartPositions: [Int: Touch] = [:]
+    
+    /// Number of fingers currently touching
+    private var currentFingerCount: Int = 0
+    
+    /// Timestamp when the gesture started
+    private var gestureStartTime: Double = 0
+    
+    /// Whether we're currently tracking a potential swipe
+    private var isTrackingGesture: Bool = false
+    
+    /// Last reported finger count to detect changes
+    private var lastFingerCount: Int = 0
+    
+    // MARK: - Callbacks
+    
+    /// Delegate for swipe gesture notifications
+    weak var delegate: MultitouchGestureDelegate?
+    
+    /// Called when a swipe gesture is detected
+    var onSwipeDetected: ((SwipeDirection, Int) -> Void)?
+    
+    // MARK: - Device Management
+    
+    private var devices: [MTDeviceRef] = []
+    private var isMonitoring: Bool = false
+    
+    // MARK: - Initialization
+    
+    init() {
+        print("🎯 [MultitouchGestureDetector] Initialized")
+    }
+    
+    deinit {
+        stopMonitoring()
+        print("🎯 [MultitouchGestureDetector] Deallocated")
+    }
+    
+    // MARK: - Public Interface
+    
+    /// Start monitoring for multitouch gestures
+    func startMonitoring() {
+        guard !isMonitoring else {
+            print("⚠️ [MultitouchGestureDetector] Already monitoring")
+            return
+        }
+        
+        print("🚀 [MultitouchGestureDetector] Starting multitouch monitoring...")
+        
+        // Get list of multitouch devices
+        guard let deviceList = MTDeviceCreateList() else {
+            print("❌ [MultitouchGestureDetector] Failed to get device list")
+            return
+        }
+        
+        let deviceArray = deviceList.takeRetainedValue()
+        let count = CFArrayGetCount(deviceArray)
+        print("   Found \(count) multitouch device(s)")
+        
+        // Register callback for each device
+        for i in 0..<count {
+            // Get device pointer from CFArray
+            let devicePtr = CFArrayGetValueAtIndex(deviceArray, i)
+            let device = unsafeBitCast(devicePtr, to: MTDeviceRef.self)
+            
+            // Check if it's the built-in trackpad
+            let isBuiltIn = MTDeviceIsBuiltIn(device)
+            let deviceType = isBuiltIn ? "built-in" : "external"
+            print("   Device \(i): \(deviceType)")
+            
+            // Register callback for ALL devices (built-in and external)
+            print("   🔧 Registering callback for \(deviceType) device...")
+            MTRegisterContactFrameCallback(device, touchCallback)
+            
+            // Start receiving events
+            MTDeviceStart(device, 0)
+            
+            devices.append(device)
+            print("   ✅ Registered \(deviceType) trackpad")
+        }
+        
+        if devices.isEmpty {
+            print("❌ [MultitouchGestureDetector] No suitable devices found")
+        } else {
+            isMonitoring = true
+            print("✅ [MultitouchGestureDetector] Monitoring started successfully")
+        }
+    }
+    
+    /// Stop monitoring for multitouch gestures
+    func stopMonitoring() {
+        guard isMonitoring else { return }
+        
+        print("🛑 [MultitouchGestureDetector] Stopping multitouch monitoring...")
+        
+        for device in devices {
+            MTDeviceStop(device)
+        }
+        
+        devices.removeAll()
+        isMonitoring = false
+        
+        print("✅ [MultitouchGestureDetector] Monitoring stopped")
+    }
+    
+    // MARK: - Touch Processing
+    
+    /// Process touch frame data
+    fileprivate func processTouches(_ touches: UnsafeMutablePointer<MTTouch>?, count: Int, timestamp: Double) {
+        guard let touches = touches, count > 0 else {
+            return
+        }
+        
+        // Use the count from the callback - it's reliable
+        // The framework reports accurate finger count but only fills first touch structure
+        let activeCount = count
+        
+        // Get position from first touch (the only one with valid data)
+        let firstTouch = touches[0]
+        
+        // Only process if first touch has valid state
+        guard firstTouch.state >= 1 && firstTouch.state <= 7 else {
+            return
+        }
+        
+        // Build touch data for the primary touch
+        var currentTouches: [Int: Touch] = [:]
+        if firstTouch.state == MTTouchStateTouching.rawValue ||
+           firstTouch.state == MTTouchStateMakeTouch.rawValue ||
+           firstTouch.state == MTTouchStateBreakTouch.rawValue {
+            
+            let touchData = Touch(
+                identifier: Int(firstTouch.identifier),
+                x: firstTouch.normalizedX,
+                y: firstTouch.normalizedY,
+                timestamp: timestamp
+            )
+            currentTouches[Int(firstTouch.identifier)] = touchData
+        }
+        
+        // Update finger count
+        let previousCount = currentFingerCount
+        currentFingerCount = activeCount
+        
+        // Detect gesture start (fingers just touched down)
+        if !isTrackingGesture && currentFingerCount >= 3 && previousCount < 3 {
+            print("👆 [Gesture] Started tracking - \(currentFingerCount) fingers")
+            isTrackingGesture = true
+            gestureStartTime = timestamp
+            // Store the primary touch start position directly from firstTouch
+            touchStartPositions = currentTouches
+            primaryStartPosition = (firstTouch.normalizedX, firstTouch.normalizedY)
+        }
+        
+        // Track gesture progression - store latest position
+        if isTrackingGesture && currentFingerCount >= 3 {
+            activeTouches = currentTouches
+            primaryCurrentPosition = (firstTouch.normalizedX, firstTouch.normalizedY)
+        }
+        
+        // Detect gesture end (fingers lifted)
+        if isTrackingGesture && currentFingerCount < 3 {
+            print("👆 [Gesture] Ended - analyzing movement")
+            analyzeGesture(endTime: timestamp)
+            
+            // Reset state
+            isTrackingGesture = false
+            touchStartPositions.removeAll()
+            activeTouches.removeAll()
+        }
+        
+        lastFingerCount = currentFingerCount
+    }
+    
+    // Track primary touch position
+    private var primaryStartPosition: (x: Float, y: Float) = (0, 0)
+    private var primaryCurrentPosition: (x: Float, y: Float) = (0, 0)
+    
+    /// Analyze the gesture to determine if it's a swipe
+    private func analyzeGesture(endTime: Double) {
+        let duration = endTime - gestureStartTime
+        guard duration <= maxSwipeDuration else {
+            return
+        }
+        
+        // Calculate movement of primary touch
+        let dx = primaryCurrentPosition.x - primaryStartPosition.x
+        let dy = primaryCurrentPosition.y - primaryStartPosition.y
+        let distance = sqrt(dx * dx + dy * dy)
+        
+        guard distance >= minSwipeDistance else {
+            return
+        }
+        
+        // Calculate velocity
+        let velocity = distance / Float(duration)
+        
+        guard velocity >= minSwipeVelocity else {
+            return
+        }
+        
+        // Determine direction (Y is inverted on trackpad)
+        let direction: SwipeDirection
+        if abs(dy) > abs(dx) {
+            direction = dy < 0 ? .up : .down  // Negative dy = swipe up
+        } else {
+            direction = dx > 0 ? .right : .left
+        }
+        
+        print("✅ [Gesture] SWIPE DETECTED: \(direction.string) with 3 fingers (distance: \(String(format: "%.2f", distance)), velocity: \(String(format: "%.2f", velocity)), duration: \(String(format: "%.2f", duration))s)")
+        
+        // Dispatch callbacks to main thread for UI updates
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Notify delegate
+            self.delegate?.didDetectSwipe(direction: direction, fingerCount: 3)
+            
+            // Fire callback
+            self.onSwipeDetected?(direction, 3)
+        }
+    }
+}
+
+// MARK: - C Callback
+
+/// C callback function that bridges to Swift
+private func touchCallback(
+    device: MTDeviceRef?,
+    touches: UnsafeMutablePointer<MTTouch>?,
+    numTouches: Int32,
+    timestamp: Double,
+    frame: Int32,
+    refcon: UnsafeMutableRawPointer?
+) {
+    // Use the shared instance to process touches
+    MultitouchGestureDetector.sharedInstance?.processTouches(touches, count: Int(numTouches), timestamp: timestamp)
+}
+
+// MARK: - Singleton for C Callback Access
+
+extension MultitouchGestureDetector {
+    fileprivate static var sharedInstance: MultitouchGestureDetector?
+    
+    static func setShared(_ detector: MultitouchGestureDetector?) {
+        sharedInstance = detector
+        if detector != nil {
+            print("✅ [MultitouchGestureDetector] Shared instance SET for C callback")
+        } else {
+            print("❌ [MultitouchGestureDetector] Shared instance CLEARED")
+        }
+    }
+}

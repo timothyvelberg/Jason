@@ -137,7 +137,7 @@ class OverlayWindow: NSWindow {
         
         // Ignore trackpad momentum scrolling (inertial scrolling after lifting fingers)
         if isTrackpad && !event.momentumPhase.isEmpty {
-            print("⏩ Ignoring trackpad momentum scroll")
+//            print("⏩ Ignoring trackpad momentum scroll")
             return
         }
         

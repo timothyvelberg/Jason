@@ -201,6 +201,7 @@ class CircularUIInstanceManager: ObservableObject {
         // Unregister existing first
         hotkeyManager.unregisterAllShortcuts()
         hotkeyManager.unregisterAllMouseButtons()
+        hotkeyManager.unregisterAllSwipes()
         
         // Reset hold key (only one hold key supported at a time)
         hotkeyManager.setHoldKey(nil)
@@ -285,7 +286,31 @@ class CircularUIInstanceManager: ObservableObject {
                 }
             }
             
-            // Only skip if NEITHER is configured
+            // Register swipe gesture if configured
+            if config.triggerType == "swipe",
+               let swipeDirection = config.swipeDirection {
+                let modifierFlags = config.modifierFlags ?? 0
+                
+                if config.isHoldMode {
+                    // Swipe hold mode not yet supported
+                    print("   ⚠️ Skipping '\(config.name)' - swipe hold mode not yet implemented")
+                } else {
+                    // TAP MODE for swipe gestures
+                    print("[InstanceManager] Registering swipe gesture TAP mode for '\(config.name)' (ID: \(config.id))")
+                    hotkeyManager.registerSwipe(
+                        direction: swipeDirection,
+                        modifierFlags: modifierFlags,
+                        forConfigId: config.id
+                    ) { [weak self] in
+                        print("🎯 [InstanceManager] Swipe gesture triggered for '\(config.name)' (ID: \(config.id))")
+                        self?.show(configId: config.id)
+                    }
+                    // Mark as having a trigger (using hasMouseButton variable for simplicity)
+                    hasMouseButton = true
+                }
+            }
+            
+            // Only skip if NO triggers are configured
             if !hasKeyboardShortcut && !hasMouseButton {
                 print("   ⏭️ Skipping '\(config.name)' - no triggers configured")
             }

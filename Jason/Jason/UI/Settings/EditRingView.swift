@@ -21,6 +21,8 @@ struct EditRingView: View {
     @State private var recordedKeyCode: UInt16?
     @State private var recordedModifierFlags: UInt?
     @State private var recordedButtonNumber: Int32?
+    @State private var swipeDirection: SwipeDirection = .up
+    @State private var swipeModifierFlags: UInt = 0
     @State private var isHoldMode: Bool = false
     @State private var autoExecuteOnRelease: Bool = true
     @State private var ringRadius: String = "80"
@@ -80,11 +82,12 @@ struct EditRingView: View {
                                     .font(.body)
                                 
                                 Picker("", selection: $triggerType) {
-                                    Text("Keyboard Shortcut").tag(TriggerType.keyboard)
-                                    Text("Mouse Button").tag(TriggerType.mouse)
+                                    Text("Keyboard").tag(TriggerType.keyboard)
+                                    Text("Mouse").tag(TriggerType.mouse)
+                                    Text("Swipe").tag(TriggerType.swipe)
                                 }
                                 .pickerStyle(.segmented)
-                                .frame(width: 280)
+                                .frame(width: 400)
                                 
                                 // Show appropriate recorder based on trigger type
                                 if triggerType == .keyboard {
@@ -96,13 +99,23 @@ struct EditRingView: View {
                                     Text("Click the button and press your desired key combination")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
-                                } else {
+                                } else if triggerType == .mouse {
                                     MouseButtonRecorder(
                                         buttonNumber: $recordedButtonNumber,
                                         modifierFlags: $recordedModifierFlags
                                     )
                                     
                                     Text("Click the button and then click your mouse button (middle, back, or forward)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    // Swipe gesture picker
+                                    SwipeGesturePicker(
+                                        direction: $swipeDirection,
+                                        modifierFlags: $swipeModifierFlags
+                                    )
+                                    
+                                    Text("Select swipe direction and optional modifier keys")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -249,9 +262,15 @@ struct EditRingView: View {
     // MARK: - Validation
     
     private var isFormValid: Bool {
-        let hasValidTrigger = triggerType == .keyboard ?
-            (recordedKeyCode != nil && recordedModifierFlags != nil) :
-            (recordedButtonNumber != nil)
+        let hasValidTrigger: Bool
+        if triggerType == .keyboard {
+            hasValidTrigger = recordedKeyCode != nil && recordedModifierFlags != nil
+        } else if triggerType == .mouse {
+            hasValidTrigger = recordedButtonNumber != nil
+        } else {
+            // Swipe always valid (has default direction, modifiers optional)
+            hasValidTrigger = true
+        }
         
         return !name.trimmingCharacters(in: .whitespaces).isEmpty &&
                !ringRadius.isEmpty &&
@@ -278,17 +297,24 @@ struct EditRingView: View {
         isActive = config.isActive
         
         // Load trigger based on type
-        triggerType = config.triggerType == "mouse" ? .mouse : .keyboard
-        isHoldMode = config.isHoldMode
-        autoExecuteOnRelease = config.autoExecuteOnRelease
-        
-        if triggerType == .keyboard {
+        if config.triggerType == "keyboard" {
+            triggerType = .keyboard
             recordedKeyCode = config.keyCode
             recordedModifierFlags = config.modifierFlags
-        } else {
+        } else if config.triggerType == "mouse" {
+            triggerType = .mouse
             recordedButtonNumber = config.buttonNumber
             recordedModifierFlags = config.modifierFlags
+        } else if config.triggerType == "swipe" {
+            triggerType = .swipe
+            if let dir = config.swipeDirection {
+                swipeDirection = SwipeDirection(rawValue: dir) ?? .up
+            }
+            swipeModifierFlags = config.modifierFlags ?? 0
         }
+        
+        isHoldMode = config.isHoldMode
+        autoExecuteOnRelease = config.autoExecuteOnRelease
         
         // Load providers
         for provider in config.providers {
@@ -314,6 +340,29 @@ struct EditRingView: View {
         }
     }
     
+    
+    private func formatSwipeGesture(direction: String, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        let directionSymbol: String
+        switch direction.lowercased() {
+        case "up": directionSymbol = "↑ Swipe Up"
+        case "down": directionSymbol = "↓ Swipe Down"
+        case "left": directionSymbol = "← Swipe Left"
+        case "right": directionSymbol = "→ Swipe Right"
+        default: directionSymbol = "Swipe \(direction)"
+        }
+        
+        parts.append(directionSymbol)
+        
+        return parts.joined()
+    }
     private func saveRing() {
         errorMessage = nil
         
@@ -331,6 +380,8 @@ struct EditRingView: View {
         let buttonNumber: Int32?
         let shortcutDisplay: String
         
+        let swipeDir: String?
+        
         if triggerType == .keyboard {
             // Validate keyboard shortcut
             guard let kc = recordedKeyCode,
@@ -341,9 +392,10 @@ struct EditRingView: View {
             keyCode = kc
             modifierFlags = mf
             buttonNumber = nil
+            swipeDir = nil
             shortcutDisplay = formatShortcut(keyCode: kc, modifiers: mf)
             
-        } else {
+        } else if triggerType == .mouse {
             // Validate mouse button
             guard let bn = recordedButtonNumber else {
                 errorMessage = "Please record a mouse button"
@@ -352,7 +404,15 @@ struct EditRingView: View {
             keyCode = nil
             modifierFlags = recordedModifierFlags
             buttonNumber = bn
+            swipeDir = nil
             shortcutDisplay = formatMouseButton(buttonNumber: bn, modifiers: modifierFlags ?? 0)
+        } else {
+            // Swipe gesture
+            keyCode = nil
+            modifierFlags = swipeModifierFlags
+            buttonNumber = nil
+            swipeDir = swipeDirection.rawValue
+            shortcutDisplay = formatSwipeGesture(direction: swipeDirection.rawValue, modifiers: swipeModifierFlags)
         }
         
         // Build providers array
@@ -400,6 +460,7 @@ struct EditRingView: View {
                     keyCode: keyCode,
                     modifierFlags: modifierFlags,
                     buttonNumber: buttonNumber,
+                    swipeDirection: swipeDir,
                     isHoldMode: isHoldMode,
                     autoExecuteOnRelease: autoExecuteOnRelease,
                     providers: providers
@@ -611,6 +672,119 @@ extension EditRingView {
 enum TriggerType: String {
     case keyboard
     case mouse
+    case swipe
+}
+
+enum SwipeDirection: String, CaseIterable {
+    case up
+    case down
+    case left
+    case right
+    
+    var displayName: String {
+        switch self {
+        case .up: return "↑ Swipe Up"
+        case .down: return "↓ Swipe Down"
+        case .left: return "← Swipe Left"
+        case .right: return "→ Swipe Right"
+        }
+    }
+}
+
+
+// MARK: - Swipe Gesture Picker
+
+struct SwipeGesturePicker: View {
+    @Binding var direction: SwipeDirection
+    @Binding var modifierFlags: UInt
+    
+    @State private var useCommand = false
+    @State private var useControl = false
+    @State private var useOption = false
+    @State private var useShift = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Direction picker
+            HStack {
+                Text("Direction:")
+                    .frame(width: 80, alignment: .leading)
+                
+                Picker("", selection: $direction) {
+                    ForEach(SwipeDirection.allCases, id: \.self) { dir in
+                        Text(dir.displayName).tag(dir)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 200)
+            }
+            
+            // Modifier keys
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Modifiers (optional):")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                HStack(spacing: 12) {
+                    Toggle("⌘ Command", isOn: $useCommand)
+                    Toggle("⌃ Control", isOn: $useControl)
+                }
+                HStack(spacing: 12) {
+                    Toggle("⌥ Option", isOn: $useOption)
+                    Toggle("⇧ Shift", isOn: $useShift)
+                }
+            }
+            .padding(.leading, 20)
+            
+            // Display current gesture
+            HStack {
+                Text("Gesture:")
+                    .frame(width: 80, alignment: .leading)
+                Text(formatDisplay())
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(6)
+            }
+        }
+        .padding(12)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(8)
+        .onChange(of: useCommand) { _, _ in updateModifierFlags() }
+        .onChange(of: useControl) { _, _ in updateModifierFlags() }
+        .onChange(of: useOption) { _, _ in updateModifierFlags() }
+        .onChange(of: useShift) { _, _ in updateModifierFlags() }
+        .onAppear {
+            // Initialize modifier toggles from binding
+            let flags = NSEvent.ModifierFlags(rawValue: modifierFlags)
+            useCommand = flags.contains(.command)
+            useControl = flags.contains(.control)
+            useOption = flags.contains(.option)
+            useShift = flags.contains(.shift)
+        }
+    }
+    
+    private func updateModifierFlags() {
+        var flags: UInt = 0
+        if useCommand { flags |= NSEvent.ModifierFlags.command.rawValue }
+        if useControl { flags |= NSEvent.ModifierFlags.control.rawValue }
+        if useOption { flags |= NSEvent.ModifierFlags.option.rawValue }
+        if useShift { flags |= NSEvent.ModifierFlags.shift.rawValue }
+        modifierFlags = flags
+    }
+    
+    private func formatDisplay() -> String {
+        var parts: [String] = []
+        
+        if useControl { parts.append("⌃") }
+        if useOption { parts.append("⌥") }
+        if useShift { parts.append("⇧") }
+        if useCommand { parts.append("⌘") }
+        
+        parts.append(direction.displayName)
+        
+        return parts.joined()
+    }
 }
 
 // MARK: - Mouse Button Recorder
@@ -766,6 +940,10 @@ struct MouseButtonRecorder: View {
         return parts.joined()
     }
 }
+
+
+// MARK: - Swipe Gesture Picker
+
 
 // MARK: - Mouse Button Recorder Handler
 

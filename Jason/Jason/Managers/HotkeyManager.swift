@@ -59,6 +59,9 @@ class HotkeyManager {
     /// Registered mouse buttons: [configId: (buttonNumber, modifierFlags, callback)]
     private var registeredMouseButtons: [Int: (buttonNumber: Int32, modifierFlags: UInt, callback: () -> Void)] = [:]
     
+    /// Registered swipe gestures: [configId: (direction, modifierFlags, callback)]
+    private var registeredSwipes: [Int: (direction: String, modifierFlags: UInt, callback: () -> Void)] = [:]
+    
     // MARK: - Event Monitors
     
     private var globalKeyMonitor: Any?
@@ -67,6 +70,12 @@ class HotkeyManager {
     private var localFlagsMonitor: Any?
     private var globalKeyUpMonitor: Any?  // For hold key release
     private var localKeyUpMonitor: Any?   // For hold key release
+    
+    // Swipe gesture monitoring
+    private var globalSwipeMonitor: Any?
+    
+    // Multitouch gesture detection (using private MultitouchSupport framework)
+    private var multitouchDetector: MultitouchGestureDetector?
     
     // Mouse button monitoring (CGEventTap required for buttons 3+)
     private var mouseEventTap: CFMachPort?
@@ -125,6 +134,40 @@ class HotkeyManager {
             return event
         }
         
+        // Listen for global swipe events
+        print("🔧 [HotkeyManager] Setting up swipe monitor...")
+        globalSwipeMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.swipe]) { [weak self] event in
+            print("🔍 [HotkeyManager] .swipe EVENT RECEIVED!")
+            self?.handleSwipeEvent(event)
+        }
+        
+        if globalSwipeMonitor != nil {
+            print("✅ [HotkeyManager] Global swipe monitor CREATED successfully")
+        } else {
+            print("❌ [HotkeyManager] Global swipe monitor FAILED to create")
+        }
+        
+        // DIAGNOSTIC: Also try listening for other gesture-related events
+        print("🔧 [HotkeyManager] Setting up diagnostic gesture monitors...")
+        let _ = NSEvent.addGlobalMonitorForEvents(matching: [.gesture]) { event in
+            print("📍 [DIAGNOSTIC] .gesture event: type=\(event.type.rawValue)")
+        }
+        let _ = NSEvent.addGlobalMonitorForEvents(matching: [.beginGesture]) { event in
+            print("📍 [DIAGNOSTIC] .beginGesture event")
+        }
+        let _ = NSEvent.addGlobalMonitorForEvents(matching: [.endGesture]) { event in
+            print("📍 [DIAGNOSTIC] .endGesture event")
+        }
+        let _ = NSEvent.addGlobalMonitorForEvents(matching: [.magnify]) { event in
+            print("📍 [DIAGNOSTIC] .magnify event: magnification=\(event.magnification)")
+        }
+        let _ = NSEvent.addGlobalMonitorForEvents(matching: [.rotate]) { event in
+            print("📍 [DIAGNOSTIC] .rotate event: rotation=\(event.rotation)")
+        }
+        let _ = NSEvent.addGlobalMonitorForEvents(matching: [.smartMagnify]) { event in
+            print("📍 [DIAGNOSTIC] .smartMagnify event")
+        }
+        
         print("[HotkeyManager] Monitoring started")
         if holdKeyCode != nil {
             print("   Hold key configured → Hold to show, release to hide")
@@ -152,6 +195,19 @@ class HotkeyManager {
             if mouseEventTap == nil {
                 startMouseMonitoring()
             }
+        }
+        
+        // Log all registered swipes
+        if !registeredSwipes.isEmpty {
+            print("   👆 Registered swipe gestures:")
+            for (configId, registration) in registeredSwipes {
+                let display = formatSwipeGesture(direction: registration.direction, modifiers: registration.modifierFlags)
+                print("      Config \(configId): \(display) (direction=\(registration.direction), modifiers=\(registration.modifierFlags))")
+            }
+            
+            // Start multitouch monitoring for swipe gestures
+            print("   🎯 Starting MultitouchSupport framework monitoring...")
+            startMultitouchMonitoring()
         }
     }
     
@@ -186,6 +242,14 @@ class HotkeyManager {
             NSEvent.removeMonitor(monitor)
             localFlagsMonitor = nil
         }
+        
+        if let monitor = globalSwipeMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalSwipeMonitor = nil
+        }
+        
+        // Stop multitouch monitoring
+        stopMultitouchMonitoring()
         
         // Stop mouse monitoring
         stopMouseMonitoring()
@@ -330,6 +394,123 @@ class HotkeyManager {
         if count > 0 {
             stopMouseMonitoring()
         }
+    }
+    
+    
+    // MARK: - Swipe Gesture Registration
+    
+    /// Register a swipe gesture trigger for a ring configuration
+    /// - Parameters:
+    ///   - direction: The swipe direction ("up", "down", "left", "right")
+    ///   - modifierFlags: The modifier flags bitfield
+    ///   - configId: The ring configuration ID
+    ///   - callback: The callback to execute when swipe is detected
+    func registerSwipe(
+        direction: String,
+        modifierFlags: UInt,
+        forConfigId configId: Int,
+        callback: @escaping () -> Void
+    ) {
+        let swipeDisplay = formatSwipeGesture(direction: direction, modifiers: modifierFlags)
+        print("[HotkeyManager] Attempting to register swipe for config \(configId): \(swipeDisplay)")
+        
+        // Check for conflicts with existing swipes
+        for (existingId, existing) in registeredSwipes {
+            if existing.direction == direction && existing.modifierFlags == modifierFlags {
+                let existingDisplay = formatSwipeGesture(direction: existing.direction, modifiers: existing.modifierFlags)
+                print("   [HotkeyManager] Swipe gesture conflict!")
+                print("   Existing: Config \(existingId) with \(existingDisplay)")
+                print("   New: Config \(configId) with \(swipeDisplay)")
+                print("   Unregistering old swipe...")
+                unregisterSwipe(forConfigId: existingId)
+                break
+            }
+        }
+        
+        // Store registration
+        registeredSwipes[configId] = (direction, modifierFlags, callback)
+    }
+    
+    /// Unregister a swipe gesture
+    func unregisterSwipe(forConfigId configId: Int) {
+        if let _ = registeredSwipes.removeValue(forKey: configId) {
+            print("[HotkeyManager] Unregistered swipe for config \(configId)")
+        }
+    }
+    
+    /// Unregister all swipe gestures
+    func unregisterAllSwipes() {
+        let count = registeredSwipes.count
+        registeredSwipes.removeAll()
+        print("[HotkeyManager] Unregistered all \(count) swipe gesture(s)")
+    }
+    
+    // MARK: - Multitouch Monitoring
+    
+    private func startMultitouchMonitoring() {
+        guard multitouchDetector == nil else {
+            print("   ⚠️ Multitouch detector already exists")
+            return
+        }
+        
+        let detector = MultitouchGestureDetector()
+        
+        // Set up swipe callback
+        detector.onSwipeDetected = { [weak self] direction, fingerCount in
+            self?.handleMultitouchSwipe(direction: direction, fingerCount: fingerCount)
+        }
+        
+        // Set as shared instance for C callback
+        MultitouchGestureDetector.setShared(detector)
+        
+        // Start monitoring
+        detector.startMonitoring()
+        
+        multitouchDetector = detector
+    }
+    
+    private func stopMultitouchMonitoring() {
+        if let detector = multitouchDetector {
+            detector.stopMonitoring()
+            MultitouchGestureDetector.setShared(nil)
+            multitouchDetector = nil
+            print("🛑 [HotkeyManager] Multitouch monitoring stopped")
+        }
+    }
+    
+    private func handleMultitouchSwipe(direction: MultitouchGestureDetector.SwipeDirection, fingerCount: Int) {
+        let isUIVisible = isUIVisible?() ?? false
+        
+        // Only handle swipes when UI is hidden
+        guard !isUIVisible else {
+            print("   ⏭️ Ignoring swipe - UI is visible")
+            return
+        }
+        
+        // Get current modifier flags
+        let cgFlags = CGEventSource.flagsState(.combinedSessionState)
+        var eventModifiers: UInt = 0
+        
+        if cgFlags.contains(.maskCommand) { eventModifiers |= NSEvent.ModifierFlags.command.rawValue }
+        if cgFlags.contains(.maskControl) { eventModifiers |= NSEvent.ModifierFlags.control.rawValue }
+        if cgFlags.contains(.maskAlternate) { eventModifiers |= NSEvent.ModifierFlags.option.rawValue }
+        if cgFlags.contains(.maskShift) { eventModifiers |= NSEvent.ModifierFlags.shift.rawValue }
+        
+        let directionString = direction.string
+        
+        print("👆 [HotkeyManager] Multitouch swipe detected: direction=\(directionString), fingers=\(fingerCount), modifiers=\(eventModifiers)")
+        
+        // Check registered swipes
+        for (configId, registration) in registeredSwipes {
+            if registration.direction == directionString && registration.modifierFlags == eventModifiers {
+                let display = formatSwipeGesture(direction: registration.direction, modifiers: registration.modifierFlags)
+                print("✅ [HotkeyManager] Swipe gesture MATCHED for config \(configId): \(display)")
+                registration.callback()
+                return
+            }
+        }
+        
+        print("   ⚠️ No matching swipe gesture found for \(directionString) with modifiers \(eventModifiers)")
     }
     
     // MARK: - Mouse Monitoring
@@ -569,6 +750,62 @@ class HotkeyManager {
         }
     }
     
+    
+    private func handleSwipeEvent(_ event: NSEvent) {
+        print("🎯 [HotkeyManager] handleSwipeEvent CALLED!")
+        print("   Event type: \(event.type.rawValue)")
+        print("   Event subtype: \(event.subtype.rawValue)")
+        print("   deltaX: \(event.deltaX), deltaY: \(event.deltaY)")
+        
+        let isUIVisible = isUIVisible?() ?? false
+        print("   isUIVisible: \(isUIVisible)")
+        
+        // Only handle swipes when UI is hidden
+        guard !isUIVisible else {
+            print("   ⚠️ Ignoring swipe - UI is visible")
+            return
+        }
+        
+        // Determine swipe direction from deltaX and deltaY
+        let deltaX = event.deltaX
+        let deltaY = event.deltaY
+        
+        print("   📏 Delta values: X=\(deltaX), Y=\(deltaY)")
+        
+        let direction: String
+        if abs(deltaX) > abs(deltaY) {
+            // Horizontal swipe
+            direction = deltaX > 0 ? "right" : "left"
+            print("   → Detected HORIZONTAL swipe: \(direction)")
+        } else {
+            // Vertical swipe
+            direction = deltaY > 0 ? "down" : "up"
+            print("   → Detected VERTICAL swipe: \(direction)")
+        }
+        
+        // Get current modifier flags
+        let cgFlags = CGEventSource.flagsState(.combinedSessionState)
+        var eventModifiers: UInt = 0
+        
+        if cgFlags.contains(.maskCommand) { eventModifiers |= NSEvent.ModifierFlags.command.rawValue }
+        if cgFlags.contains(.maskControl) { eventModifiers |= NSEvent.ModifierFlags.control.rawValue }
+        if cgFlags.contains(.maskAlternate) { eventModifiers |= NSEvent.ModifierFlags.option.rawValue }
+        if cgFlags.contains(.maskShift) { eventModifiers |= NSEvent.ModifierFlags.shift.rawValue }
+        
+        print("👆 [HotkeyManager] Swipe gesture detected: direction=\(direction), modifiers=\(eventModifiers)")
+        
+        // Check registered swipes
+        for (configId, registration) in registeredSwipes {
+            if registration.direction == direction && registration.modifierFlags == eventModifiers {
+                let display = formatSwipeGesture(direction: registration.direction, modifiers: registration.modifierFlags)
+                print("✅ [HotkeyManager] Swipe gesture MATCHED for config \(configId): \(display)")
+                registration.callback()
+                return
+            }
+        }
+        
+        print("[HotkeyManager] No matching swipe gesture found")
+    }
     /// Format a mouse button for display (helper for logging)
     private func formatMouseButton(buttonNumber: Int32, modifiers: UInt) -> String {
         let flags = NSEvent.ModifierFlags(rawValue: modifiers)
@@ -596,7 +833,39 @@ class HotkeyManager {
         
         return parts.joined()
     }
+    
+    /// Format a swipe gesture for display (helper for logging)
+    private func formatSwipeGesture(direction: String, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        // Convert direction to arrow emoji
+        let directionSymbol: String
+        switch direction.lowercased() {
+        case "up":
+            directionSymbol = "↑ Swipe Up"
+        case "down":
+            directionSymbol = "↓ Swipe Down"
+        case "left":
+            directionSymbol = "← Swipe Left"
+        case "right":
+            directionSymbol = "→ Swipe Right"
+        default:
+            directionSymbol = "Swipe \(direction)"
+        }
+        
+        parts.append(directionSymbol)
+        
+        return parts.joined()
+    }
 }
+
+// MARK: - Hotkey Configuration
 
 // MARK: - Hotkey Configuration
 

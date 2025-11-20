@@ -145,10 +145,11 @@ class RingConfigurationManager: ObservableObject {
         ringRadius: Double,
         centerHoleRadius: Double = 56.0,
         iconSize: Double,
-        triggerType: String = "keyboard",  // "keyboard" or "mouse"
+        triggerType: String = "keyboard",  // "keyboard", "mouse", or "swipe"
         keyCode: UInt16? = nil,
         modifierFlags: UInt? = nil,
         buttonNumber: Int32? = nil,        // For mouse triggers
+        swipeDirection: String? = nil,     // For swipe triggers ("up", "down", "left", "right")
         isHoldMode: Bool = false,          // true = hold to show, false = tap to toggle
         autoExecuteOnRelease: Bool = true, // true = auto-execute on release (only when isHoldMode = true)
         providers: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
@@ -159,6 +160,8 @@ class RingConfigurationManager: ObservableObject {
             shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags ?? 0)
         } else if triggerType == "mouse", let buttonNumber = buttonNumber {
             shortcutDisplay = formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags ?? 0)
+        } else if triggerType == "swipe", let swipeDirection = swipeDirection {
+            shortcutDisplay = formatSwipeGesture(direction: swipeDirection, modifiers: modifierFlags ?? 0)
         } else {
             shortcutDisplay = shortcut
         }
@@ -188,6 +191,13 @@ class RingConfigurationManager: ObservableObject {
                     throw StoredRingConfigurationError.duplicateShortcut(shortcutDisplay)
                 }
             }
+        } else if triggerType == "swipe" {
+            // Validate swipe gesture uniqueness
+            if let swipeDirection = swipeDirection {
+                guard validateSwipeGesture(swipeDirection, modifierFlags: modifierFlags ?? 0, excludingRing: nil) else {
+                    throw StoredRingConfigurationError.duplicateShortcut(shortcutDisplay)
+                }
+            }
         }
         
         // Create in database
@@ -201,6 +211,7 @@ class RingConfigurationManager: ObservableObject {
             keyCode: keyCode,
             modifierFlags: modifierFlags,
             buttonNumber: buttonNumber,
+            swipeDirection: swipeDirection,
             isHoldMode: isHoldMode,
             autoExecuteOnRelease: autoExecuteOnRelease
         ) else {
@@ -267,6 +278,7 @@ class RingConfigurationManager: ObservableObject {
             keyCode: keyCode,
             modifierFlags: modifierFlags,
             buttonNumber: buttonNumber,
+            swipeDirection: swipeDirection,
             isHoldMode: isHoldMode,
             autoExecuteOnRelease: autoExecuteOnRelease
         )
@@ -559,10 +571,20 @@ class RingConfigurationManager: ObservableObject {
             throw StoredRingConfigurationError.configurationNotFound(id)
         }
         
-        // If activating, validate shortcut uniqueness (if shortcut exists)
+        // If activating, validate trigger uniqueness (if trigger exists)
         if isActive && !existingConfig.isActive && existingConfig.hasShortcut {
-            guard validateShortcut(keyCode: existingConfig.keyCode!, modifierFlags: existingConfig.modifierFlags!, excludingRing: id) else {
-                throw StoredRingConfigurationError.duplicateShortcut(existingConfig.shortcutDescription)
+            if existingConfig.triggerType == "keyboard" {
+                guard validateShortcut(keyCode: existingConfig.keyCode!, modifierFlags: existingConfig.modifierFlags!, excludingRing: id) else {
+                    throw StoredRingConfigurationError.duplicateShortcut(existingConfig.shortcutDescription)
+                }
+            } else if existingConfig.triggerType == "mouse" {
+                guard validateMouseButton(existingConfig.buttonNumber!, modifierFlags: existingConfig.modifierFlags!, excludingRing: id) else {
+                    throw StoredRingConfigurationError.duplicateShortcut(existingConfig.shortcutDescription)
+                }
+            } else if existingConfig.triggerType == "swipe" {
+                guard validateSwipeGesture(existingConfig.swipeDirection!, modifierFlags: existingConfig.modifierFlags!, excludingRing: id) else {
+                    throw StoredRingConfigurationError.duplicateShortcut(existingConfig.shortcutDescription)
+                }
             }
         }
         
@@ -584,6 +606,7 @@ class RingConfigurationManager: ObservableObject {
                 keyCode: existingConfig.keyCode,
                 modifierFlags: existingConfig.modifierFlags,
                 buttonNumber: existingConfig.buttonNumber,
+                swipeDirection: existingConfig.swipeDirection,
                 isHoldMode: existingConfig.isHoldMode,
                 autoExecuteOnRelease: existingConfig.autoExecuteOnRelease
             )
@@ -675,7 +698,36 @@ class RingConfigurationManager: ObservableObject {
         return true
     }
     
-    /// Validate that a provider order is unique within a ring
+    /// Validate that a swipe gesture is unique among active rings
+    /// - Parameters:
+    ///   - swipeDirection: The swipe direction to validate ("up", "down", "left", "right")
+    ///   - modifierFlags: The modifier flags
+    ///   - excludingRing: Optional ring ID to exclude from check (for updates)
+    /// - Returns: true if swipe gesture is unique (or ring is excluded), false if duplicate exists
+    func validateSwipeGesture(_ swipeDirection: String, modifierFlags: UInt, excludingRing: Int?) -> Bool {
+        let activeRings = getActiveConfigurations()
+        
+        for config in activeRings {
+            // Skip the excluded ring
+            if let excludingRing = excludingRing, config.id == excludingRing {
+                continue
+            }
+            
+            // Check for duplicate (must match both direction and modifiers)
+            if config.triggerType == "swipe",
+               let configDirection = config.swipeDirection,
+               configDirection == swipeDirection,
+               config.modifierFlags == modifierFlags {
+                let display = formatSwipeGesture(direction: swipeDirection, modifiers: modifierFlags)
+                print("[RingConfigManager] Swipe gesture '\(display)' already used by '\(config.name)'")
+                return false
+            }
+        }
+        
+        return true
+    }
+    
+        /// Validate that a provider order is unique within a ring
     /// - Parameters:
     ///   - order: The order value to validate
     ///   - ringId: ID of the ring to check
@@ -741,6 +793,7 @@ class RingConfigurationManager: ObservableObject {
             keyCode: dbConfig.keyCode,
             modifierFlags: dbConfig.modifierFlags,
             buttonNumber: dbConfig.buttonNumber,
+            swipeDirection: dbConfig.swipeDirection,
             isHoldMode: dbConfig.isHoldMode,
             autoExecuteOnRelease: dbConfig.autoExecuteOnRelease
         )
@@ -833,7 +886,39 @@ class RingConfigurationManager: ObservableObject {
         
         return parts.joined()
     }
+    
+    /// Format a swipe gesture for display (helper)
+    private func formatSwipeGesture(direction: String, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        // Convert direction to arrow emoji
+        let directionSymbol: String
+        switch direction.lowercased() {
+        case "up":
+            directionSymbol = "↑ Swipe Up"
+        case "down":
+            directionSymbol = "↓ Swipe Down"
+        case "left":
+            directionSymbol = "← Swipe Left"
+        case "right":
+            directionSymbol = "→ Swipe Right"
+        default:
+            directionSymbol = "Swipe \(direction)"
+        }
+        
+        parts.append(directionSymbol)
+        
+        return parts.joined()
+    }
 }
+
+// MARK: - Example Usage
 
 // MARK: - Example Usage (Documentation)
 
