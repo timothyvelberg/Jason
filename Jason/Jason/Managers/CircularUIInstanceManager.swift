@@ -286,23 +286,25 @@ class CircularUIInstanceManager: ObservableObject {
                 }
             }
             
-            // Register swipe gesture if configured
-            if config.triggerType == "swipe",
-               let swipeDirection = config.swipeDirection {
+            // Register trackpad gesture if configured
+            if config.triggerType == "trackpad",
+               let swipeDirection = config.swipeDirection,
+               let fingerCount = config.fingerCount {
                 let modifierFlags = config.modifierFlags ?? 0
                 
                 if config.isHoldMode {
-                    // Swipe hold mode not yet supported
-                    print("   ⚠️ Skipping '\(config.name)' - swipe hold mode not yet implemented")
+                    // Trackpad hold mode not yet supported
+                    print("   ⚠️ Skipping '\(config.name)' - trackpad hold mode not yet implemented")
                 } else {
-                    // TAP MODE for swipe gestures
-                    print("[InstanceManager] Registering swipe gesture TAP mode for '\(config.name)' (ID: \(config.id))")
+                    // TAP MODE for trackpad gestures
+                    print("[InstanceManager] Registering trackpad gesture TAP mode for '\(config.name)' (ID: \(config.id))")
                     hotkeyManager.registerSwipe(
                         direction: swipeDirection,
+                        fingerCount: fingerCount,
                         modifierFlags: modifierFlags,
                         forConfigId: config.id
                     ) { [weak self] in
-                        print("🎯 [InstanceManager] Swipe gesture triggered for '\(config.name)' (ID: \(config.id))")
+                        print("🎯 [InstanceManager] Trackpad gesture triggered for '\(config.name)' (ID: \(config.id))")
                         self?.show(configId: config.id)
                     }
                     // Mark as having a trigger (using hasMouseButton variable for simplicity)

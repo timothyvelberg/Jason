@@ -20,11 +20,12 @@ extension DatabaseManager {
         ringRadius: CGFloat,
         centerHoleRadius: CGFloat,
         iconSize: CGFloat,
-        triggerType: String = "keyboard",  // "keyboard", "mouse", or "swipe"
+        triggerType: String = "keyboard",  // "keyboard", "mouse", or "trackpad"
         keyCode: UInt16? = nil,
         modifierFlags: UInt? = nil,
         buttonNumber: Int32? = nil,        // For mouse triggers (2, 3, 4, etc.)
-        swipeDirection: String? = nil,     // For swipe triggers ("up", "down", "left", "right")
+        swipeDirection: String? = nil,     // For trackpad triggers ("up", "down", "left", "right")
+        fingerCount: Int? = nil,           // For trackpad triggers (3 or 4 fingers)
         isHoldMode: Bool = false,          // true = hold to show, false = tap to toggle
         autoExecuteOnRelease: Bool = true, // true = auto-execute on release (only when isHoldMode = true)
         displayOrder: Int = 0
@@ -40,15 +41,16 @@ extension DatabaseManager {
                 keyCode: keyCode,
                 modifierFlags: modifierFlags ?? 0,
                 buttonNumber: buttonNumber,
-                swipeDirection: swipeDirection
+                swipeDirection: swipeDirection,
+                fingerCount: fingerCount
             ) {
                 let triggerDisplay: String
                 if triggerType == "keyboard", let keyCode = keyCode {
                     triggerDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags ?? 0)
                 } else if triggerType == "mouse", let buttonNumber = buttonNumber {
                     triggerDisplay = formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags ?? 0)
-                } else if triggerType == "swipe", let swipeDirection = swipeDirection {
-                    triggerDisplay = formatSwipeGesture(direction: swipeDirection, modifiers: modifierFlags ?? 0)
+                } else if triggerType == "trackpad", let swipeDirection = swipeDirection {
+                    triggerDisplay = formatTrackpadGesture(direction: swipeDirection, fingerCount: fingerCount, modifiers: modifierFlags ?? 0)
                 } else {
                     triggerDisplay = "Unknown"
                 }
@@ -59,8 +61,8 @@ extension DatabaseManager {
             let now = Int(Date().timeIntervalSince1970)
             
             let sql = """
-            INSERT INTO ring_configurations (name, shortcut, ring_radius, center_hole_radius, icon_size, trigger_type, key_code, modifier_flags, button_number, swipe_direction, is_hold_mode, auto_execute_on_release, created_at, is_active, display_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?);
+            INSERT INTO ring_configurations (name, shortcut, ring_radius, center_hole_radius, icon_size, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release, created_at, is_active, display_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?);
             """
             var statement: OpaquePointer?
             
@@ -100,14 +102,21 @@ extension DatabaseManager {
                     sqlite3_bind_null(statement, 10)
                 }
                 
+                // Bind fingerCount (NULL if not provided)
+                if let fingerCount = fingerCount {
+                    sqlite3_bind_int(statement, 11, Int32(fingerCount))
+                } else {
+                    sqlite3_bind_null(statement, 11)
+                }
+                
                 // Bind isHoldMode
-                sqlite3_bind_int(statement, 11, isHoldMode ? 1 : 0)
+                sqlite3_bind_int(statement, 12, isHoldMode ? 1 : 0)
                 
                 // Bind autoExecuteOnRelease
-                sqlite3_bind_int(statement, 12, autoExecuteOnRelease ? 1 : 0)
+                sqlite3_bind_int(statement, 13, autoExecuteOnRelease ? 1 : 0)
                 
-                sqlite3_bind_int64(statement, 13, Int64(now))
-                sqlite3_bind_int(statement, 14, Int32(displayOrder))
+                sqlite3_bind_int64(statement, 14, Int64(now))
+                sqlite3_bind_int(statement, 15, Int32(displayOrder))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     ringId = Int(sqlite3_last_insert_rowid(db))
@@ -117,8 +126,8 @@ extension DatabaseManager {
                         triggerDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags ?? 0)
                     } else if triggerType == "mouse", let buttonNumber = buttonNumber {
                         triggerDisplay = formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags ?? 0)
-                    } else if triggerType == "swipe", let swipeDirection = swipeDirection {
-                        triggerDisplay = formatSwipeGesture(direction: swipeDirection, modifiers: modifierFlags ?? 0)
+                    } else if triggerType == "trackpad", let swipeDirection = swipeDirection {
+                        triggerDisplay = formatTrackpadGesture(direction: swipeDirection, fingerCount: fingerCount, modifiers: modifierFlags ?? 0)
                     } else {
                         triggerDisplay = "No trigger"
                     }
@@ -149,7 +158,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, swipe_direction, is_hold_mode, auto_execute_on_release
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release
             FROM ring_configurations
             ORDER BY display_order, name;
             """
@@ -212,22 +221,31 @@ extension DatabaseManager {
                         return String(cString: sqlite3_column_text(statement, 13))
                     }()
                     
+                    // Read fingerCount (handle NULL)
+                    let fingerCount: Int? = {
+                        let colType = sqlite3_column_type(statement, 14)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return Int(sqlite3_column_int(statement, 14))
+                    }()
+                    
                     // Read isHoldMode (default to false for legacy rows)
                     let isHoldMode: Bool = {
-                        let colType = sqlite3_column_type(statement, 14)
+                        let colType = sqlite3_column_type(statement, 15)
                         if colType == SQLITE_NULL {
                             return false
                         }
-                        return sqlite3_column_int(statement, 14) == 1
+                        return sqlite3_column_int(statement, 15) == 1
                     }()
                     
                     // Read autoExecuteOnRelease (default to true for legacy rows)
                     let autoExecuteOnRelease: Bool = {
-                        let colType = sqlite3_column_type(statement, 15)
+                        let colType = sqlite3_column_type(statement, 16)
                         if colType == SQLITE_NULL {
                             return true
                         }
-                        return sqlite3_column_int(statement, 15) == 1
+                        return sqlite3_column_int(statement, 16) == 1
                     }()
                     
                     results.append(RingConfigurationEntry(
@@ -245,6 +263,7 @@ extension DatabaseManager {
                         modifierFlags: modifierFlags,
                         buttonNumber: buttonNumber,
                         swipeDirection: swipeDirection,
+                        fingerCount: fingerCount,
                         isHoldMode: isHoldMode,
                         autoExecuteOnRelease: autoExecuteOnRelease
                     ))
@@ -268,7 +287,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, swipe_direction, is_hold_mode, auto_execute_on_release
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release
             FROM ring_configurations
             WHERE is_active = 1
             ORDER BY display_order, name;
@@ -332,22 +351,31 @@ extension DatabaseManager {
                         return String(cString: sqlite3_column_text(statement, 13))
                     }()
                     
+                    // Read fingerCount (handle NULL)
+                    let fingerCount: Int? = {
+                        let colType = sqlite3_column_type(statement, 14)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return Int(sqlite3_column_int(statement, 14))
+                    }()
+                    
                     // Read isHoldMode (default to false for legacy rows)
                     let isHoldMode: Bool = {
-                        let colType = sqlite3_column_type(statement, 14)
+                        let colType = sqlite3_column_type(statement, 15)
                         if colType == SQLITE_NULL {
                             return false
                         }
-                        return sqlite3_column_int(statement, 14) == 1
+                        return sqlite3_column_int(statement, 15) == 1
                     }()
                     
                     // Read autoExecuteOnRelease (default to true for legacy rows)
                     let autoExecuteOnRelease: Bool = {
-                        let colType = sqlite3_column_type(statement, 15)
+                        let colType = sqlite3_column_type(statement, 16)
                         if colType == SQLITE_NULL {
                             return true
                         }
-                        return sqlite3_column_int(statement, 15) == 1
+                        return sqlite3_column_int(statement, 16) == 1
                     }()
                     
                     results.append(RingConfigurationEntry(
@@ -365,6 +393,7 @@ extension DatabaseManager {
                         modifierFlags: modifierFlags,
                         buttonNumber: buttonNumber,
                         swipeDirection: swipeDirection,
+                        fingerCount: fingerCount,
                         isHoldMode: isHoldMode,
                         autoExecuteOnRelease: autoExecuteOnRelease
                     ))
@@ -388,7 +417,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, swipe_direction, is_hold_mode, auto_execute_on_release
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release
             FROM ring_configurations
             WHERE id = ?;
             """
@@ -453,22 +482,31 @@ extension DatabaseManager {
                         return String(cString: sqlite3_column_text(statement, 13))
                     }()
                     
+                    // Read fingerCount (handle NULL)
+                    let fingerCount: Int? = {
+                        let colType = sqlite3_column_type(statement, 14)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return Int(sqlite3_column_int(statement, 14))
+                    }()
+                    
                     // Read isHoldMode (default to false for legacy rows)
                     let isHoldMode: Bool = {
-                        let colType = sqlite3_column_type(statement, 14)
+                        let colType = sqlite3_column_type(statement, 15)
                         if colType == SQLITE_NULL {
                             return false
                         }
-                        return sqlite3_column_int(statement, 14) == 1
+                        return sqlite3_column_int(statement, 15) == 1
                     }()
                     
                     // Read autoExecuteOnRelease (default to true for legacy rows)
                     let autoExecuteOnRelease: Bool = {
-                        let colType = sqlite3_column_type(statement, 15)
+                        let colType = sqlite3_column_type(statement, 16)
                         if colType == SQLITE_NULL {
                             return true
                         }
-                        return sqlite3_column_int(statement, 15) == 1
+                        return sqlite3_column_int(statement, 16) == 1
                     }()
                     
                     result = RingConfigurationEntry(
@@ -486,6 +524,7 @@ extension DatabaseManager {
                         modifierFlags: modifierFlags,
                         buttonNumber: buttonNumber,
                         swipeDirection: swipeDirection,
+                        fingerCount: fingerCount,
                         isHoldMode: isHoldMode,
                         autoExecuteOnRelease: autoExecuteOnRelease
                     )
@@ -509,8 +548,14 @@ extension DatabaseManager {
         ringRadius: CGFloat? = nil,
         centerHoleRadius: CGFloat? = nil,
         iconSize: CGFloat? = nil,
-        keyCode: UInt16? = nil,        // NEW
-        modifierFlags: UInt? = nil,    // NEW
+        triggerType: String? = nil,    // NEW
+        keyCode: UInt16? = nil,
+        modifierFlags: UInt? = nil,
+        buttonNumber: Int32? = nil,    // NEW
+        swipeDirection: String? = nil, // NEW - CRITICAL FIX!
+        fingerCount: Int? = nil,
+        isHoldMode: Bool? = nil,       // NEW
+        autoExecuteOnRelease: Bool? = nil, // NEW
         displayOrder: Int? = nil
     ) {
         guard let db = db else { return }
@@ -546,8 +591,14 @@ extension DatabaseManager {
             if ringRadius != nil { updates.append("ring_radius = ?") }
             if centerHoleRadius != nil { updates.append("center_hole_radius = ?") }
             if iconSize != nil { updates.append("icon_size = ?") }
+            if triggerType != nil { updates.append("trigger_type = ?") }
             if keyCode != nil { updates.append("key_code = ?") }
             if modifierFlags != nil { updates.append("modifier_flags = ?") }
+            if buttonNumber != nil { updates.append("button_number = ?") }
+            if swipeDirection != nil { updates.append("swipe_direction = ?") }
+            if fingerCount != nil { updates.append("finger_count = ?") }
+            if isHoldMode != nil { updates.append("is_hold_mode = ?") }
+            if autoExecuteOnRelease != nil { updates.append("auto_execute_on_release = ?") }
             if displayOrder != nil { updates.append("display_order = ?") }
             
             guard !updates.isEmpty else {
@@ -581,12 +632,36 @@ extension DatabaseManager {
                     sqlite3_bind_double(statement, paramIndex, Double(iconSize))
                     paramIndex += 1
                 }
+                if let triggerType = triggerType {
+                    sqlite3_bind_text(statement, paramIndex, (triggerType as NSString).utf8String, -1, nil)
+                    paramIndex += 1
+                }
                 if let keyCode = keyCode {
                     sqlite3_bind_int(statement, paramIndex, Int32(keyCode))
                     paramIndex += 1
                 }
                 if let modifierFlags = modifierFlags {
                     sqlite3_bind_int(statement, paramIndex, Int32(modifierFlags))
+                    paramIndex += 1
+                }
+                if let buttonNumber = buttonNumber {
+                    sqlite3_bind_int(statement, paramIndex, buttonNumber)
+                    paramIndex += 1
+                }
+                if let swipeDirection = swipeDirection {
+                    sqlite3_bind_text(statement, paramIndex, (swipeDirection as NSString).utf8String, -1, nil)
+                    paramIndex += 1
+                }
+                if let fingerCount = fingerCount {
+                    sqlite3_bind_int(statement, paramIndex, Int32(fingerCount))
+                    paramIndex += 1
+                }
+                if let isHoldMode = isHoldMode {
+                    sqlite3_bind_int(statement, paramIndex, isHoldMode ? 1 : 0)
+                    paramIndex += 1
+                }
+                if let autoExecuteOnRelease = autoExecuteOnRelease {
+                    sqlite3_bind_int(statement, paramIndex, autoExecuteOnRelease ? 1 : 0)
                     paramIndex += 1
                 }
                 if let displayOrder = displayOrder {
@@ -1040,7 +1115,8 @@ extension DatabaseManager {
         keyCode: UInt16?,
         modifierFlags: UInt,
         buttonNumber: Int32?,
-        swipeDirection: String?
+        swipeDirection: String?,
+        fingerCount: Int?
     ) -> Bool {
         guard let db = db else { return false }
         
@@ -1082,11 +1158,31 @@ extension DatabaseManager {
             
             return inUse
             
+        } else if triggerType == "trackpad" {
+            // Check trackpad gesture conflicts (direction + finger_count + modifiers)
+            guard let swipeDirection = swipeDirection else { return false }
+            guard let fingerCount = fingerCount else { return false }
+            
+            let sql = "SELECT id FROM ring_configurations WHERE trigger_type = 'trackpad' AND swipe_direction = ? AND finger_count = ? AND modifier_flags = ? AND is_active = 1;"
+            var statement: OpaquePointer?
+            var inUse = false
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_text(statement, 1, (swipeDirection as NSString).utf8String, -1, nil)
+                sqlite3_bind_int(statement, 2, Int32(fingerCount))
+                sqlite3_bind_int(statement, 3, Int32(modifierFlags))
+                if sqlite3_step(statement) == SQLITE_ROW {
+                    inUse = true
+                }
+            }
+            sqlite3_finalize(statement)
+            
+            return inUse
         } else if triggerType == "swipe" {
-            // Check swipe gesture conflicts
+            // Legacy "swipe" support (treat as 3-finger trackpad gesture)
             guard let swipeDirection = swipeDirection else { return false }
             
-            let sql = "SELECT id FROM ring_configurations WHERE trigger_type = 'swipe' AND swipe_direction = ? AND modifier_flags = ? AND is_active = 1;"
+            let sql = "SELECT id FROM ring_configurations WHERE trigger_type IN ('swipe', 'trackpad') AND swipe_direction = ? AND (finger_count = 3 OR finger_count IS NULL) AND modifier_flags = ? AND is_active = 1;"
             var statement: OpaquePointer?
             var inUse = false
             
@@ -1171,7 +1267,8 @@ extension DatabaseManager {
     }
     
     /// Format a swipe gesture for display (helper for logging)
-    private func formatSwipeGesture(direction: String, modifiers: UInt) -> String {
+    /// Format a trackpad gesture for display (helper for logging)
+    private func formatTrackpadGesture(direction: String, fingerCount: Int?, modifiers: UInt) -> String {
         let flags = NSEvent.ModifierFlags(rawValue: modifiers)
         var parts: [String] = []
         
@@ -1180,19 +1277,20 @@ extension DatabaseManager {
         if flags.contains(.shift) { parts.append("⇧") }
         if flags.contains(.command) { parts.append("⌘") }
         
-        // Convert direction to arrow emoji
+        // Convert direction to arrow emoji with finger count
         let directionSymbol: String
+        let fingerText = fingerCount.map { "\($0)-Finger " } ?? ""
         switch direction.lowercased() {
         case "up":
-            directionSymbol = "↑ Swipe Up"
+            directionSymbol = "↑ \(fingerText)Swipe Up"
         case "down":
-            directionSymbol = "↓ Swipe Down"
+            directionSymbol = "↓ \(fingerText)Swipe Down"
         case "left":
-            directionSymbol = "← Swipe Left"
+            directionSymbol = "← \(fingerText)Swipe Left"
         case "right":
-            directionSymbol = "→ Swipe Right"
+            directionSymbol = "→ \(fingerText)Swipe Right"
         default:
-            directionSymbol = "Swipe \(direction)"
+            directionSymbol = "\(fingerText)Swipe \(direction)"
         }
         
         parts.append(directionSymbol)

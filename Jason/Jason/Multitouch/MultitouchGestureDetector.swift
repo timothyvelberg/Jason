@@ -68,6 +68,9 @@ class MultitouchGestureDetector {
     /// Timestamp when the gesture started
     private var gestureStartTime: Double = 0
     
+    /// Number of fingers when the gesture started
+    private var gestureFingerCount: Int = 0
+    
     /// Whether we're currently tracking a potential swipe
     private var isTrackingGesture: Bool = false
     
@@ -209,6 +212,7 @@ class MultitouchGestureDetector {
             print("👆 [Gesture] Started tracking - \(currentFingerCount) fingers")
             isTrackingGesture = true
             gestureStartTime = timestamp
+            gestureFingerCount = currentFingerCount  // LOCK IN THE FINGER COUNT
             // Store the primary touch start position directly from firstTouch
             touchStartPositions = currentTouches
             primaryStartPosition = (firstTouch.normalizedX, firstTouch.normalizedY)
@@ -227,6 +231,7 @@ class MultitouchGestureDetector {
             
             // Reset state
             isTrackingGesture = false
+            gestureFingerCount = 0
             touchStartPositions.removeAll()
             activeTouches.removeAll()
         }
@@ -269,17 +274,17 @@ class MultitouchGestureDetector {
             direction = dx > 0 ? .right : .left
         }
         
-        print("✅ [Gesture] SWIPE DETECTED: \(direction.string) with 3 fingers (distance: \(String(format: "%.2f", distance)), velocity: \(String(format: "%.2f", velocity)), duration: \(String(format: "%.2f", duration))s)")
+        print("✅ [Gesture] SWIPE DETECTED: \(direction.string) with \(gestureFingerCount) fingers (distance: \(String(format: "%.2f", distance)), velocity: \(String(format: "%.2f", velocity)), duration: \(String(format: "%.2f", duration))s)")
         
         // Dispatch callbacks to main thread for UI updates
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
             // Notify delegate
-            self.delegate?.didDetectSwipe(direction: direction, fingerCount: 3)
+            self.delegate?.didDetectSwipe(direction: direction, fingerCount: self.gestureFingerCount)
             
             // Fire callback
-            self.onSwipeDetected?(direction, 3)
+            self.onSwipeDetected?(direction, self.gestureFingerCount)
         }
     }
 }

@@ -122,11 +122,12 @@ struct RingConfigurationEntry: Identifiable {
     let displayOrder: Int
     
     // Trigger data
-    let triggerType: String        // "keyboard", "mouse", or "swipe"
+    let triggerType: String        // "keyboard", "mouse", or "trackpad"
     let keyCode: UInt16?           // For keyboard triggers
-    let modifierFlags: UInt?       // For keyboard, mouse, and swipe triggers
+    let modifierFlags: UInt?       // For keyboard, mouse, and trackpad triggers
     let buttonNumber: Int32?       // For mouse triggers (2=middle, 3=back, 4=forward)
-    let swipeDirection: String?    // For swipe triggers ("up", "down", "left", "right")
+    let swipeDirection: String?    // For trackpad triggers ("up", "down", "left", "right")
+    let fingerCount: Int?          // For trackpad triggers (3 or 4 fingers)
     let isHoldMode: Bool           // true = hold to show, false = tap to toggle
     let autoExecuteOnRelease: Bool // true = auto-execute on release (only when isHoldMode = true)
 }

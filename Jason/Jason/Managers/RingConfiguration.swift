@@ -33,24 +33,25 @@ struct StoredRingConfiguration: Identifiable, Equatable {
     let providers: [ProviderConfiguration]
     
     // Trigger data
-    let triggerType: String        // "keyboard", "mouse", or "swipe"
+    let triggerType: String        // "keyboard", "mouse", or "trackpad"
     let keyCode: UInt16?           // For keyboard triggers
-    let modifierFlags: UInt?       // For keyboard, mouse, and swipe triggers
+    let modifierFlags: UInt?       // For keyboard, mouse, and trackpad triggers
     let buttonNumber: Int32?       // For mouse triggers (2=middle, 3=back, 4=forward)
-    let swipeDirection: String?    // For swipe triggers ("up", "down", "left", "right")
+    let swipeDirection: String?    // For trackpad triggers ("up", "down", "left", "right")
+    let fingerCount: Int?          // For trackpad triggers (3 or 4 fingers)
     let isHoldMode: Bool           // true = hold to show, false = tap to toggle
     let autoExecuteOnRelease: Bool // true = auto-execute on release (only when isHoldMode = true)
     
     // MARK: - Shortcut Properties
     
-    /// Check if this configuration has a valid trigger (keyboard, mouse, or swipe)
+    /// Check if this configuration has a valid trigger (keyboard, mouse, or trackpad)
     var hasShortcut: Bool {
         if triggerType == "keyboard" {
             return keyCode != nil && modifierFlags != nil
         } else if triggerType == "mouse" {
             return buttonNumber != nil
-        } else if triggerType == "swipe" {
-            return swipeDirection != nil
+        } else if triggerType == "trackpad" {
+            return swipeDirection != nil && fingerCount != nil
         }
         return false
     }
@@ -61,8 +62,8 @@ struct StoredRingConfiguration: Identifiable, Equatable {
             return formatShortcut(keyCode: keyCode, modifiers: modifiers)
         } else if triggerType == "mouse", let buttonNumber = buttonNumber {
             return formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags ?? 0)
-        } else if triggerType == "swipe", let swipeDirection = swipeDirection {
-            return formatSwipeGesture(direction: swipeDirection, modifiers: modifierFlags ?? 0)
+        } else if triggerType == "trackpad", let swipeDirection = swipeDirection {
+            return formatTrackpadGesture(direction: swipeDirection, fingerCount: fingerCount, modifiers: modifierFlags ?? 0)
         }
         return "No trigger"
     }
@@ -186,8 +187,8 @@ struct StoredRingConfiguration: Identifiable, Equatable {
         return parts.joined()
     }
     
-    /// Format a swipe gesture for display
-    private func formatSwipeGesture(direction: String, modifiers: UInt) -> String {
+    /// Format a trackpad gesture for display
+    private func formatTrackpadGesture(direction: String, fingerCount: Int?, modifiers: UInt) -> String {
         let flags = NSEvent.ModifierFlags(rawValue: modifiers)
         var parts: [String] = []
         
@@ -196,19 +197,20 @@ struct StoredRingConfiguration: Identifiable, Equatable {
         if flags.contains(.shift) { parts.append("⇧") }
         if flags.contains(.command) { parts.append("⌘") }
         
-        // Convert direction to arrow emoji
+        // Convert direction to arrow emoji with finger count
         let directionSymbol: String
+        let fingerText = fingerCount.map { "\($0)-Finger " } ?? ""
         switch direction.lowercased() {
         case "up":
-            directionSymbol = "↑ Swipe Up"
+            directionSymbol = "↑ \(fingerText)Swipe Up"
         case "down":
-            directionSymbol = "↓ Swipe Down"
+            directionSymbol = "↓ \(fingerText)Swipe Down"
         case "left":
-            directionSymbol = "← Swipe Left"
+            directionSymbol = "← \(fingerText)Swipe Left"
         case "right":
-            directionSymbol = "→ Swipe Right"
+            directionSymbol = "→ \(fingerText)Swipe Right"
         default:
-            directionSymbol = "Swipe \(direction)"
+            directionSymbol = "\(fingerText)Swipe \(direction)"
         }
         
         parts.append(directionSymbol)
@@ -249,6 +251,7 @@ struct StoredRingConfiguration: Identifiable, Equatable {
                lhs.modifierFlags == rhs.modifierFlags &&
                lhs.buttonNumber == rhs.buttonNumber &&
                lhs.swipeDirection == rhs.swipeDirection &&
+               lhs.fingerCount == rhs.fingerCount &&
                lhs.isHoldMode == rhs.isHoldMode &&
                lhs.autoExecuteOnRelease == rhs.autoExecuteOnRelease &&
                lhs.providers == rhs.providers

@@ -145,11 +145,12 @@ class RingConfigurationManager: ObservableObject {
         ringRadius: Double,
         centerHoleRadius: Double = 56.0,
         iconSize: Double,
-        triggerType: String = "keyboard",  // "keyboard", "mouse", or "swipe"
+        triggerType: String = "keyboard",  // "keyboard", "mouse", or "trackpad"
         keyCode: UInt16? = nil,
         modifierFlags: UInt? = nil,
         buttonNumber: Int32? = nil,        // For mouse triggers
-        swipeDirection: String? = nil,     // For swipe triggers ("up", "down", "left", "right")
+        swipeDirection: String? = nil,     // For trackpad triggers ("up", "down", "left", "right")
+        fingerCount: Int? = nil,           // For trackpad triggers (3 or 4 fingers)
         isHoldMode: Bool = false,          // true = hold to show, false = tap to toggle
         autoExecuteOnRelease: Bool = true, // true = auto-execute on release (only when isHoldMode = true)
         providers: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
@@ -160,8 +161,8 @@ class RingConfigurationManager: ObservableObject {
             shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags ?? 0)
         } else if triggerType == "mouse", let buttonNumber = buttonNumber {
             shortcutDisplay = formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags ?? 0)
-        } else if triggerType == "swipe", let swipeDirection = swipeDirection {
-            shortcutDisplay = formatSwipeGesture(direction: swipeDirection, modifiers: modifierFlags ?? 0)
+        } else if triggerType == "trackpad", let swipeDirection = swipeDirection {
+            shortcutDisplay = formatTrackpadGesture(direction: swipeDirection, fingerCount: fingerCount, modifiers: modifierFlags ?? 0)
         } else {
             shortcutDisplay = shortcut
         }
@@ -191,10 +192,10 @@ class RingConfigurationManager: ObservableObject {
                     throw StoredRingConfigurationError.duplicateShortcut(shortcutDisplay)
                 }
             }
-        } else if triggerType == "swipe" {
-            // Validate swipe gesture uniqueness
-            if let swipeDirection = swipeDirection {
-                guard validateSwipeGesture(swipeDirection, modifierFlags: modifierFlags ?? 0, excludingRing: nil) else {
+        } else if triggerType == "trackpad" {
+            // Validate trackpad gesture uniqueness
+            if let swipeDirection = swipeDirection, let fingerCount = fingerCount {
+                guard validateTrackpadGesture(swipeDirection, fingerCount: fingerCount, modifierFlags: modifierFlags ?? 0, excludingRing: nil) else {
                     throw StoredRingConfigurationError.duplicateShortcut(shortcutDisplay)
                 }
             }
@@ -212,6 +213,7 @@ class RingConfigurationManager: ObservableObject {
             modifierFlags: modifierFlags,
             buttonNumber: buttonNumber,
             swipeDirection: swipeDirection,
+            fingerCount: fingerCount,
             isHoldMode: isHoldMode,
             autoExecuteOnRelease: autoExecuteOnRelease
         ) else {
@@ -279,6 +281,7 @@ class RingConfigurationManager: ObservableObject {
             modifierFlags: modifierFlags,
             buttonNumber: buttonNumber,
             swipeDirection: swipeDirection,
+            fingerCount: fingerCount,
             isHoldMode: isHoldMode,
             autoExecuteOnRelease: autoExecuteOnRelease
         )
@@ -300,18 +303,30 @@ class RingConfigurationManager: ObservableObject {
     ///   - ringRadius: New ring radius/thickness (nil to keep current)
     ///   - centerHoleRadius: New center hole radius (nil to keep current)
     ///   - iconSize: New icon size (nil to keep current)
+    ///   - triggerType: New trigger type (nil to keep current) - NEW
     ///   - keyCode: New key code (nil to keep current) - NEW
     ///   - modifierFlags: New modifier flags (nil to keep current) - NEW
+    ///   - buttonNumber: New button number (nil to keep current) - NEW
+    ///   - swipeDirection: New swipe direction (nil to keep current) - NEW
+    ///   - fingerCount: New finger count (nil to keep current) - NEW
+    ///   - isHoldMode: New hold mode setting (nil to keep current) - NEW
+    ///   - autoExecuteOnRelease: New auto-execute setting (nil to keep current) - NEW
     /// - Throws: StoredRingConfigurationError if validation fails or configuration not found
     func updateConfiguration(
         id: Int,
         name: String? = nil,
-        shortcut: String? = nil,       // DEPRECATED
+        shortcut: String? = nil,           // DEPRECATED
         ringRadius: Double? = nil,
         centerHoleRadius: Double? = nil,
         iconSize: Double? = nil,
-        keyCode: UInt16? = nil,        // NEW
-        modifierFlags: UInt? = nil     // NEW
+        triggerType: String? = nil,        // NEW
+        keyCode: UInt16? = nil,            // NEW
+        modifierFlags: UInt? = nil,        // NEW
+        buttonNumber: Int32? = nil,        // NEW
+        swipeDirection: String? = nil,     // NEW - CRITICAL FIX!
+        fingerCount: Int? = nil,           // NEW
+        isHoldMode: Bool? = nil,           // NEW
+        autoExecuteOnRelease: Bool? = nil  // NEW
     ) throws {
         print("[RingConfigManager] Updating configuration \(id)")
         
@@ -347,8 +362,14 @@ class RingConfigurationManager: ObservableObject {
             ringRadius: ringRadius.map { CGFloat($0) },
             centerHoleRadius: centerHoleRadius.map { CGFloat($0) },
             iconSize: iconSize.map { CGFloat($0) },
-            keyCode: keyCode,              // NEW
-            modifierFlags: modifierFlags   // NEW
+            triggerType: triggerType,
+            keyCode: keyCode,
+            modifierFlags: modifierFlags,
+            buttonNumber: buttonNumber,
+            swipeDirection: swipeDirection,
+            fingerCount: fingerCount,
+            isHoldMode: isHoldMode,
+            autoExecuteOnRelease: autoExecuteOnRelease
         )
         
         // Reload from database to ensure consistency
@@ -581,8 +602,8 @@ class RingConfigurationManager: ObservableObject {
                 guard validateMouseButton(existingConfig.buttonNumber!, modifierFlags: existingConfig.modifierFlags!, excludingRing: id) else {
                     throw StoredRingConfigurationError.duplicateShortcut(existingConfig.shortcutDescription)
                 }
-            } else if existingConfig.triggerType == "swipe" {
-                guard validateSwipeGesture(existingConfig.swipeDirection!, modifierFlags: existingConfig.modifierFlags!, excludingRing: id) else {
+            } else if existingConfig.triggerType == "trackpad" {
+                guard validateTrackpadGesture(existingConfig.swipeDirection!, fingerCount: existingConfig.fingerCount!, modifierFlags: existingConfig.modifierFlags!, excludingRing: id) else {
                     throw StoredRingConfigurationError.duplicateShortcut(existingConfig.shortcutDescription)
                 }
             }
@@ -607,6 +628,7 @@ class RingConfigurationManager: ObservableObject {
                 modifierFlags: existingConfig.modifierFlags,
                 buttonNumber: existingConfig.buttonNumber,
                 swipeDirection: existingConfig.swipeDirection,
+                fingerCount: existingConfig.fingerCount,
                 isHoldMode: existingConfig.isHoldMode,
                 autoExecuteOnRelease: existingConfig.autoExecuteOnRelease
             )
@@ -704,7 +726,7 @@ class RingConfigurationManager: ObservableObject {
     ///   - modifierFlags: The modifier flags
     ///   - excludingRing: Optional ring ID to exclude from check (for updates)
     /// - Returns: true if swipe gesture is unique (or ring is excluded), false if duplicate exists
-    func validateSwipeGesture(_ swipeDirection: String, modifierFlags: UInt, excludingRing: Int?) -> Bool {
+    func validateTrackpadGesture(_ swipeDirection: String, fingerCount: Int, modifierFlags: UInt, excludingRing: Int?) -> Bool {
         let activeRings = getActiveConfigurations()
         
         for config in activeRings {
@@ -713,13 +735,15 @@ class RingConfigurationManager: ObservableObject {
                 continue
             }
             
-            // Check for duplicate (must match both direction and modifiers)
-            if config.triggerType == "swipe",
+            // Check for duplicate (must match direction, finger count, and modifiers)
+            if config.triggerType == "trackpad",
                let configDirection = config.swipeDirection,
+               let configFingerCount = config.fingerCount,
                configDirection == swipeDirection,
+               configFingerCount == fingerCount,
                config.modifierFlags == modifierFlags {
-                let display = formatSwipeGesture(direction: swipeDirection, modifiers: modifierFlags)
-                print("[RingConfigManager] Swipe gesture '\(display)' already used by '\(config.name)'")
+                let display = formatTrackpadGesture(direction: swipeDirection, fingerCount: fingerCount, modifiers: modifierFlags)
+                print("[RingConfigManager] Trackpad gesture '\(display)' already used by '\(config.name)'")
                 return false
             }
         }
@@ -794,6 +818,7 @@ class RingConfigurationManager: ObservableObject {
             modifierFlags: dbConfig.modifierFlags,
             buttonNumber: dbConfig.buttonNumber,
             swipeDirection: dbConfig.swipeDirection,
+            fingerCount: dbConfig.fingerCount,
             isHoldMode: dbConfig.isHoldMode,
             autoExecuteOnRelease: dbConfig.autoExecuteOnRelease
         )
@@ -887,8 +912,8 @@ class RingConfigurationManager: ObservableObject {
         return parts.joined()
     }
     
-    /// Format a swipe gesture for display (helper)
-    private func formatSwipeGesture(direction: String, modifiers: UInt) -> String {
+    /// Format a trackpad gesture for display (helper)
+    private func formatTrackpadGesture(direction: String, fingerCount: Int?, modifiers: UInt) -> String {
         let flags = NSEvent.ModifierFlags(rawValue: modifiers)
         var parts: [String] = []
         
@@ -897,19 +922,20 @@ class RingConfigurationManager: ObservableObject {
         if flags.contains(.shift) { parts.append("⇧") }
         if flags.contains(.command) { parts.append("⌘") }
         
-        // Convert direction to arrow emoji
+        // Convert direction to arrow emoji with finger count
         let directionSymbol: String
+        let fingerText = fingerCount.map { "\($0)-Finger " } ?? ""
         switch direction.lowercased() {
         case "up":
-            directionSymbol = "↑ Swipe Up"
+            directionSymbol = "↑ \(fingerText)Swipe Up"
         case "down":
-            directionSymbol = "↓ Swipe Down"
+            directionSymbol = "↓ \(fingerText)Swipe Down"
         case "left":
-            directionSymbol = "← Swipe Left"
+            directionSymbol = "← \(fingerText)Swipe Left"
         case "right":
-            directionSymbol = "→ Swipe Right"
+            directionSymbol = "→ \(fingerText)Swipe Right"
         default:
-            directionSymbol = "Swipe \(direction)"
+            directionSymbol = "\(fingerText)Swipe \(direction)"
         }
         
         parts.append(directionSymbol)

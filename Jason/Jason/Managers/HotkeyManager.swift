@@ -59,8 +59,8 @@ class HotkeyManager {
     /// Registered mouse buttons: [configId: (buttonNumber, modifierFlags, callback)]
     private var registeredMouseButtons: [Int: (buttonNumber: Int32, modifierFlags: UInt, callback: () -> Void)] = [:]
     
-    /// Registered swipe gestures: [configId: (direction, modifierFlags, callback)]
-    private var registeredSwipes: [Int: (direction: String, modifierFlags: UInt, callback: () -> Void)] = [:]
+    /// Registered trackpad gestures: [configId: (direction, fingerCount, modifierFlags, callback)]
+    private var registeredSwipes: [Int: (direction: String, fingerCount: Int, modifierFlags: UInt, callback: () -> Void)] = [:]
     
     // MARK: - Event Monitors
     
@@ -197,15 +197,15 @@ class HotkeyManager {
             }
         }
         
-        // Log all registered swipes
+        // Log all registered trackpad gestures
         if !registeredSwipes.isEmpty {
-            print("   👆 Registered swipe gestures:")
+            print("   👆 Registered trackpad gestures:")
             for (configId, registration) in registeredSwipes {
-                let display = formatSwipeGesture(direction: registration.direction, modifiers: registration.modifierFlags)
-                print("      Config \(configId): \(display) (direction=\(registration.direction), modifiers=\(registration.modifierFlags))")
+                let display = formatTrackpadGesture(direction: registration.direction, fingerCount: registration.fingerCount, modifiers: registration.modifierFlags)
+                print("      Config \(configId): \(display) (direction=\(registration.direction), fingers=\(registration.fingerCount), modifiers=\(registration.modifierFlags))")
             }
             
-            // Start multitouch monitoring for swipe gestures
+            // Start multitouch monitoring for trackpad gestures
             print("   🎯 Starting MultitouchSupport framework monitoring...")
             startMultitouchMonitoring()
         }
@@ -407,28 +407,31 @@ class HotkeyManager {
     ///   - callback: The callback to execute when swipe is detected
     func registerSwipe(
         direction: String,
+        fingerCount: Int,
         modifierFlags: UInt,
         forConfigId configId: Int,
         callback: @escaping () -> Void
     ) {
-        let swipeDisplay = formatSwipeGesture(direction: direction, modifiers: modifierFlags)
-        print("[HotkeyManager] Attempting to register swipe for config \(configId): \(swipeDisplay)")
+        let swipeDisplay = formatTrackpadGesture(direction: direction, fingerCount: fingerCount, modifiers: modifierFlags)
+        print("[HotkeyManager] Attempting to register trackpad gesture for config \(configId): \(swipeDisplay)")
         
-        // Check for conflicts with existing swipes
+        // Check for conflicts with existing gestures
         for (existingId, existing) in registeredSwipes {
-            if existing.direction == direction && existing.modifierFlags == modifierFlags {
-                let existingDisplay = formatSwipeGesture(direction: existing.direction, modifiers: existing.modifierFlags)
-                print("   [HotkeyManager] Swipe gesture conflict!")
+            if existing.direction == direction &&
+               existing.fingerCount == fingerCount &&
+               existing.modifierFlags == modifierFlags {
+                let existingDisplay = formatTrackpadGesture(direction: existing.direction, fingerCount: existing.fingerCount, modifiers: existing.modifierFlags)
+                print("   [HotkeyManager] Trackpad gesture conflict!")
                 print("   Existing: Config \(existingId) with \(existingDisplay)")
                 print("   New: Config \(configId) with \(swipeDisplay)")
-                print("   Unregistering old swipe...")
+                print("   Unregistering old gesture...")
                 unregisterSwipe(forConfigId: existingId)
                 break
             }
         }
         
         // Store registration
-        registeredSwipes[configId] = (direction, modifierFlags, callback)
+        registeredSwipes[configId] = (direction, fingerCount, modifierFlags, callback)
     }
     
     /// Unregister a swipe gesture
@@ -500,17 +503,19 @@ class HotkeyManager {
         
         print("👆 [HotkeyManager] Multitouch swipe detected: direction=\(directionString), fingers=\(fingerCount), modifiers=\(eventModifiers)")
         
-        // Check registered swipes
+        // Check registered trackpad gestures - must match direction, fingerCount, AND modifiers
         for (configId, registration) in registeredSwipes {
-            if registration.direction == directionString && registration.modifierFlags == eventModifiers {
-                let display = formatSwipeGesture(direction: registration.direction, modifiers: registration.modifierFlags)
-                print("✅ [HotkeyManager] Swipe gesture MATCHED for config \(configId): \(display)")
+            if registration.direction == directionString &&
+               registration.fingerCount == fingerCount &&
+               registration.modifierFlags == eventModifiers {
+                let display = formatTrackpadGesture(direction: registration.direction, fingerCount: registration.fingerCount, modifiers: registration.modifierFlags)
+                print("✅ [HotkeyManager] Trackpad gesture MATCHED for config \(configId): \(display)")
                 registration.callback()
                 return
             }
         }
         
-        print("   ⚠️ No matching swipe gesture found for \(directionString) with modifiers \(eventModifiers)")
+        print("   ⚠️ No matching trackpad gesture found for \(directionString) with \(fingerCount) fingers and modifiers \(eventModifiers)")
     }
     
     // MARK: - Mouse Monitoring
@@ -792,19 +797,12 @@ class HotkeyManager {
         if cgFlags.contains(.maskAlternate) { eventModifiers |= NSEvent.ModifierFlags.option.rawValue }
         if cgFlags.contains(.maskShift) { eventModifiers |= NSEvent.ModifierFlags.shift.rawValue }
         
-        print("👆 [HotkeyManager] Swipe gesture detected: direction=\(direction), modifiers=\(eventModifiers)")
+        print("👆 [HotkeyManager] Swipe gesture detected (NSEvent - no finger count): direction=\(direction), modifiers=\(eventModifiers)")
         
-        // Check registered swipes
-        for (configId, registration) in registeredSwipes {
-            if registration.direction == direction && registration.modifierFlags == eventModifiers {
-                let display = formatSwipeGesture(direction: registration.direction, modifiers: registration.modifierFlags)
-                print("✅ [HotkeyManager] Swipe gesture MATCHED for config \(configId): \(display)")
-                registration.callback()
-                return
-            }
-        }
-        
-        print("[HotkeyManager] No matching swipe gesture found")
+        // Note: NSEvent.swipe doesn't provide finger count, so we can't match against it
+        // This handler is kept for debugging but MultitouchGestureDetector is the primary mechanism
+        print("   ⚠️ NSEvent swipe handler called - finger count unknown, cannot match registered gestures")
+        print("   ℹ️ Registered gestures require finger count from MultitouchGestureDetector")
     }
     /// Format a mouse button for display (helper for logging)
     private func formatMouseButton(buttonNumber: Int32, modifiers: UInt) -> String {
@@ -834,8 +832,8 @@ class HotkeyManager {
         return parts.joined()
     }
     
-    /// Format a swipe gesture for display (helper for logging)
-    private func formatSwipeGesture(direction: String, modifiers: UInt) -> String {
+    /// Format a trackpad gesture for display (helper for logging)
+    private func formatTrackpadGesture(direction: String, fingerCount: Int, modifiers: UInt) -> String {
         let flags = NSEvent.ModifierFlags(rawValue: modifiers)
         var parts: [String] = []
         
@@ -844,19 +842,19 @@ class HotkeyManager {
         if flags.contains(.shift) { parts.append("⇧") }
         if flags.contains(.command) { parts.append("⌘") }
         
-        // Convert direction to arrow emoji
+        // Convert direction to arrow emoji with finger count
         let directionSymbol: String
         switch direction.lowercased() {
         case "up":
-            directionSymbol = "↑ Swipe Up"
+            directionSymbol = "↑ \(fingerCount)-Finger Swipe Up"
         case "down":
-            directionSymbol = "↓ Swipe Down"
+            directionSymbol = "↓ \(fingerCount)-Finger Swipe Down"
         case "left":
-            directionSymbol = "← Swipe Left"
+            directionSymbol = "← \(fingerCount)-Finger Swipe Left"
         case "right":
-            directionSymbol = "→ Swipe Right"
+            directionSymbol = "→ \(fingerCount)-Finger Swipe Right"
         default:
-            directionSymbol = "Swipe \(direction)"
+            directionSymbol = "\(fingerCount)-Finger Swipe \(direction)"
         }
         
         parts.append(directionSymbol)

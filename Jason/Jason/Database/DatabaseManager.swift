@@ -172,7 +172,7 @@ class DatabaseManager {
         );
         """
         
-        // Create ring_configurations table (UPDATED with trigger support for keyboard + mouse + swipe + hold mode + auto-execute)
+        // Create ring_configurations table (UPDATED with trigger support for keyboard + mouse + trackpad + hold mode + auto-execute)
         let ringConfigurationsSQL = """
         CREATE TABLE IF NOT EXISTS ring_configurations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -186,6 +186,7 @@ class DatabaseManager {
             modifier_flags INTEGER,
             button_number INTEGER,
             swipe_direction TEXT,
+            finger_count INTEGER,
             is_hold_mode INTEGER DEFAULT 0,
             auto_execute_on_release INTEGER DEFAULT 1,
             created_at INTEGER DEFAULT (strftime('%s', 'now')),
@@ -263,6 +264,7 @@ class DatabaseManager {
         var hasButtonNumber = false
         var hasIsHoldMode = false
         var hasAutoExecuteOnRelease = false
+        var hasFingerCount = false
         
         if sqlite3_prepare_v2(db, pragmaSQL, -1, &statement, nil) == SQLITE_OK {
             while sqlite3_step(statement) == SQLITE_ROW {
@@ -279,6 +281,9 @@ class DatabaseManager {
                     }
                     if name == "auto_execute_on_release" {
                         hasAutoExecuteOnRelease = true
+                    }
+                    if name == "finger_count" {
+                        hasFingerCount = true
                     }
                 }
             }
@@ -354,6 +359,34 @@ class DatabaseManager {
             } else {
                 if let error = sqlite3_errmsg(db) {
                     print("❌ [DatabaseManager] Failed to add auto_execute_on_release column: \(String(cString: error))")
+                }
+                throw DatabaseError.schemaCreationFailed
+            }
+        }
+        
+        // Add finger_count column if missing
+        if !hasFingerCount {
+            print("🔄 [DatabaseManager] Adding finger_count column to ring_configurations...")
+            let addFingerCountSQL = "ALTER TABLE ring_configurations ADD COLUMN finger_count INTEGER;"
+            if sqlite3_exec(db, addFingerCountSQL, nil, nil, nil) == SQLITE_OK {
+                print("✅ [DatabaseManager] Added finger_count column")
+                
+                // Migrate existing "swipe" triggers to "trackpad" with finger_count = 3
+                let migrateSwipeSQL = """
+                UPDATE ring_configurations 
+                SET trigger_type = 'trackpad', finger_count = 3 
+                WHERE trigger_type = 'swipe';
+                """
+                if sqlite3_exec(db, migrateSwipeSQL, nil, nil, nil) == SQLITE_OK {
+                    print("✅ [DatabaseManager] Migrated 'swipe' triggers to 'trackpad' with finger_count = 3")
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("⚠️ [DatabaseManager] Warning: Could not migrate swipe triggers: \(String(cString: error))")
+                    }
+                }
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to add finger_count column: \(String(cString: error))")
                 }
                 throw DatabaseError.schemaCreationFailed
             }

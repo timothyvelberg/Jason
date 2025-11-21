@@ -22,6 +22,7 @@ struct EditRingView: View {
     @State private var recordedModifierFlags: UInt?
     @State private var recordedButtonNumber: Int32?
     @State private var swipeDirection: SwipeDirection = .up
+    @State private var fingerCount: Int = 3
     @State private var swipeModifierFlags: UInt = 0
     @State private var isHoldMode: Bool = false
     @State private var autoExecuteOnRelease: Bool = true
@@ -84,7 +85,7 @@ struct EditRingView: View {
                                 Picker("", selection: $triggerType) {
                                     Text("Keyboard").tag(TriggerType.keyboard)
                                     Text("Mouse").tag(TriggerType.mouse)
-                                    Text("Swipe").tag(TriggerType.swipe)
+                                    Text("Trackpad").tag(TriggerType.trackpad)
                                 }
                                 .pickerStyle(.segmented)
                                 .frame(width: 400)
@@ -109,13 +110,14 @@ struct EditRingView: View {
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 } else {
-                                    // Swipe gesture picker
-                                    SwipeGesturePicker(
+                                    // Trackpad gesture picker
+                                    TrackpadGesturePicker(
                                         direction: $swipeDirection,
+                                        fingerCount: $fingerCount,
                                         modifierFlags: $swipeModifierFlags
                                     )
                                     
-                                    Text("Select swipe direction and optional modifier keys")
+                                    Text("Select finger count, swipe direction, and optional modifier keys")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -268,7 +270,7 @@ struct EditRingView: View {
         } else if triggerType == .mouse {
             hasValidTrigger = recordedButtonNumber != nil
         } else {
-            // Swipe always valid (has default direction, modifiers optional)
+            // Trackpad always valid (has default direction and finger count, modifiers optional)
             hasValidTrigger = true
         }
         
@@ -305,11 +307,13 @@ struct EditRingView: View {
             triggerType = .mouse
             recordedButtonNumber = config.buttonNumber
             recordedModifierFlags = config.modifierFlags
-        } else if config.triggerType == "swipe" {
-            triggerType = .swipe
+        } else if config.triggerType == "trackpad" || config.triggerType == "swipe" {
+            // Support both "trackpad" (new) and "swipe" (legacy)
+            triggerType = .trackpad
             if let dir = config.swipeDirection {
                 swipeDirection = SwipeDirection(rawValue: dir) ?? .up
             }
+            fingerCount = config.fingerCount ?? 3  // Default to 3 for legacy data
             swipeModifierFlags = config.modifierFlags ?? 0
         }
         
@@ -341,7 +345,7 @@ struct EditRingView: View {
     }
     
     
-    private func formatSwipeGesture(direction: String, modifiers: UInt) -> String {
+    private func formatTrackpadGesture(direction: String, fingerCount: Int, modifiers: UInt) -> String {
         let flags = NSEvent.ModifierFlags(rawValue: modifiers)
         var parts: [String] = []
         
@@ -352,11 +356,11 @@ struct EditRingView: View {
         
         let directionSymbol: String
         switch direction.lowercased() {
-        case "up": directionSymbol = "↑ Swipe Up"
-        case "down": directionSymbol = "↓ Swipe Down"
-        case "left": directionSymbol = "← Swipe Left"
-        case "right": directionSymbol = "→ Swipe Right"
-        default: directionSymbol = "Swipe \(direction)"
+        case "up": directionSymbol = "↑ \(fingerCount)-Finger Swipe Up"
+        case "down": directionSymbol = "↓ \(fingerCount)-Finger Swipe Down"
+        case "left": directionSymbol = "← \(fingerCount)-Finger Swipe Left"
+        case "right": directionSymbol = "→ \(fingerCount)-Finger Swipe Right"
+        default: directionSymbol = "\(fingerCount)-Finger Swipe \(direction)"
         }
         
         parts.append(directionSymbol)
@@ -407,12 +411,12 @@ struct EditRingView: View {
             swipeDir = nil
             shortcutDisplay = formatMouseButton(buttonNumber: bn, modifiers: modifierFlags ?? 0)
         } else {
-            // Swipe gesture
+            // Trackpad gesture
             keyCode = nil
             modifierFlags = swipeModifierFlags
             buttonNumber = nil
             swipeDir = swipeDirection.rawValue
-            shortcutDisplay = formatSwipeGesture(direction: swipeDirection.rawValue, modifiers: swipeModifierFlags)
+            shortcutDisplay = formatTrackpadGesture(direction: swipeDirection.rawValue, fingerCount: fingerCount, modifiers: swipeModifierFlags)
         }
         
         // Build providers array
@@ -461,6 +465,7 @@ struct EditRingView: View {
                     modifierFlags: modifierFlags,
                     buttonNumber: buttonNumber,
                     swipeDirection: swipeDir,
+                    fingerCount: triggerType == .trackpad ? fingerCount : nil,
                     isHoldMode: isHoldMode,
                     autoExecuteOnRelease: autoExecuteOnRelease,
                     providers: providers
@@ -477,7 +482,7 @@ struct EditRingView: View {
                     return
                 }
                 
-                // Step 1: Update basic configuration
+                // Step 1: Update configuration with ALL trigger parameters
                 try configManager.updateConfiguration(
                     id: config.id,
                     name: name.trimmingCharacters(in: .whitespaces),
@@ -485,8 +490,14 @@ struct EditRingView: View {
                     ringRadius: radiusValue,
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
+                    triggerType: triggerType.rawValue,
                     keyCode: keyCode,
-                    modifierFlags: modifierFlags
+                    modifierFlags: modifierFlags,
+                    buttonNumber: buttonNumber,
+                    swipeDirection: swipeDir,
+                    fingerCount: triggerType == .trackpad ? fingerCount : nil,
+                    isHoldMode: isHoldMode,
+                    autoExecuteOnRelease: autoExecuteOnRelease
                 )
                 
                 // Step 2: Remove all existing providers
@@ -672,7 +683,7 @@ extension EditRingView {
 enum TriggerType: String {
     case keyboard
     case mouse
-    case swipe
+    case trackpad
 }
 
 enum SwipeDirection: String, CaseIterable {
@@ -692,10 +703,11 @@ enum SwipeDirection: String, CaseIterable {
 }
 
 
-// MARK: - Swipe Gesture Picker
+// MARK: - Trackpad Gesture Picker
 
-struct SwipeGesturePicker: View {
+struct TrackpadGesturePicker: View {
     @Binding var direction: SwipeDirection
+    @Binding var fingerCount: Int
     @Binding var modifierFlags: UInt
     
     @State private var useCommand = false
@@ -705,6 +717,19 @@ struct SwipeGesturePicker: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Finger count picker
+            HStack {
+                Text("Fingers:")
+                    .frame(width: 80, alignment: .leading)
+                
+                Picker("", selection: $fingerCount) {
+                    Text("3 Fingers").tag(3)
+                    Text("4 Fingers").tag(4)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+            }
+            
             // Direction picker
             HStack {
                 Text("Direction:")
@@ -781,7 +806,9 @@ struct SwipeGesturePicker: View {
         if useShift { parts.append("⇧") }
         if useCommand { parts.append("⌘") }
         
-        parts.append(direction.displayName)
+        // Add finger count and direction
+        let fingerText = "\(fingerCount)-Finger"
+        parts.append("\(fingerText) \(direction.displayName)")
         
         return parts.joined()
     }
