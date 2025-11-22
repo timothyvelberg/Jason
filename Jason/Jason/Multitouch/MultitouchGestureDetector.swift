@@ -46,13 +46,13 @@ class MultitouchGestureDetector {
     // MARK: - Configuration
     
     /// Minimum distance to consider a swipe (normalized coordinates 0-1)
-    private let minSwipeDistance: Float = 0.15
+    private let minSwipeDistance: Float = 0.02
     
     /// Maximum time for a swipe gesture (seconds)
-    private let maxSwipeDuration: Double = 0.5
+    private let maxSwipeDuration: Double = 0.8
     
     /// Minimum velocity to be considered a swipe (distance/second)
-    private let minSwipeVelocity: Float = 0.3
+    private let minSwipeVelocity: Float = 0.02
     
     // MARK: - State Tracking
     
@@ -274,17 +274,20 @@ class MultitouchGestureDetector {
             direction = dx > 0 ? .right : .left
         }
         
-        print("✅ [Gesture] SWIPE DETECTED: \(direction.string) with \(gestureFingerCount) fingers (distance: \(String(format: "%.2f", distance)), velocity: \(String(format: "%.2f", velocity)), duration: \(String(format: "%.2f", duration))s)")
-        
+        // Capture finger count BEFORE async dispatch (it gets reset to 0 immediately after this method returns)
+        let capturedFingerCount = gestureFingerCount
+
+        print("✅ [Gesture] SWIPE DETECTED: \(direction.string) with \(capturedFingerCount) fingers (distance: \(String(format: "%.2f", distance)), velocity: \(String(format: "%.2f", velocity)), duration: \(String(format: "%.2f", duration))s)")
+
         // Dispatch callbacks to main thread for UI updates
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
-            // Notify delegate
-            self.delegate?.didDetectSwipe(direction: direction, fingerCount: self.gestureFingerCount)
+            // Notify delegate - use captured value
+            self.delegate?.didDetectSwipe(direction: direction, fingerCount: capturedFingerCount)
             
-            // Fire callback
-            self.onSwipeDetected?(direction, self.gestureFingerCount)
+            // Fire callback - use captured value
+            self.onSwipeDetected?(direction, capturedFingerCount)
         }
     }
 }
