@@ -209,6 +209,8 @@ struct StoredRingConfiguration: Identifiable, Equatable {
             directionSymbol = "← \(fingerText)Swipe Left"
         case "right":
             directionSymbol = "→ \(fingerText)Swipe Right"
+        case "tap":
+            directionSymbol = "👆 \(fingerText)Tap"
         default:
             directionSymbol = "\(fingerText)Swipe \(direction)"
         }

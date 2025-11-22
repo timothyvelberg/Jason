@@ -360,6 +360,7 @@ struct EditRingView: View {
         case "down": directionSymbol = "↓ \(fingerCount)-Finger Swipe Down"
         case "left": directionSymbol = "← \(fingerCount)-Finger Swipe Left"
         case "right": directionSymbol = "→ \(fingerCount)-Finger Swipe Right"
+        case "tap": directionSymbol = "👆 \(fingerCount)-Finger Tap"
         default: directionSymbol = "\(fingerCount)-Finger Swipe \(direction)"
         }
         
@@ -691,6 +692,7 @@ enum SwipeDirection: String, CaseIterable {
     case down
     case left
     case right
+    case tap
     
     var displayName: String {
         switch self {
@@ -698,6 +700,7 @@ enum SwipeDirection: String, CaseIterable {
         case .down: return "↓ Swipe Down"
         case .left: return "← Swipe Left"
         case .right: return "→ Swipe Right"
+        case .tap: return "👆 Tap"
         }
     }
 }

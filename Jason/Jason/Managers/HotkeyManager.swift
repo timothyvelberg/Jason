@@ -853,6 +853,8 @@ class HotkeyManager {
             directionSymbol = "← \(fingerCount)-Finger Swipe Left"
         case "right":
             directionSymbol = "→ \(fingerCount)-Finger Swipe Right"
+        case "tap":
+            directionSymbol = "👆 \(fingerCount)-Finger Tap"
         default:
             directionSymbol = "\(fingerCount)-Finger Swipe \(direction)"
         }

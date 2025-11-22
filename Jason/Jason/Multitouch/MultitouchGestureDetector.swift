@@ -31,7 +31,7 @@ class MultitouchGestureDetector {
     }
     
     enum SwipeDirection {
-        case up, down, left, right
+        case up, down, left, right, tap
         
         var string: String {
             switch self {
@@ -39,6 +39,7 @@ class MultitouchGestureDetector {
             case .down: return "down"
             case .left: return "left"
             case .right: return "right"
+            case .tap: return "tap"
             }
         }
     }
@@ -46,13 +47,20 @@ class MultitouchGestureDetector {
     // MARK: - Configuration
     
     /// Minimum distance to consider a swipe (normalized coordinates 0-1)
-    private let minSwipeDistance: Float = 0.02
+    private let minSwipeDistance: Float = 0.15
     
     /// Maximum time for a swipe gesture (seconds)
-    private let maxSwipeDuration: Double = 0.8
+    private let maxSwipeDuration: Double = 0.5
     
     /// Minimum velocity to be considered a swipe (distance/second)
-    private let minSwipeVelocity: Float = 0.02
+    private let minSwipeVelocity: Float = 0.3
+    
+    // Tap detection thresholds
+    /// Maximum distance for a tap (if movement is less than this, it's a tap not a swipe)
+    private let maxTapDistance: Float = 0.03
+    
+    /// Maximum duration for a tap (seconds)
+    private let maxTapDuration: Double = 0.3
     
     // MARK: - State Tracking
     
@@ -243,17 +251,39 @@ class MultitouchGestureDetector {
     private var primaryStartPosition: (x: Float, y: Float) = (0, 0)
     private var primaryCurrentPosition: (x: Float, y: Float) = (0, 0)
     
-    /// Analyze the gesture to determine if it's a swipe
+    /// Analyze the gesture to determine if it's a tap or swipe
     private func analyzeGesture(endTime: Double) {
         let duration = endTime - gestureStartTime
-        guard duration <= maxSwipeDuration else {
-            return
-        }
         
         // Calculate movement of primary touch
         let dx = primaryCurrentPosition.x - primaryStartPosition.x
         let dy = primaryCurrentPosition.y - primaryStartPosition.y
         let distance = sqrt(dx * dx + dy * dy)
+        
+        // Capture finger count BEFORE async dispatch (it gets reset to 0 immediately after this method returns)
+        let capturedFingerCount = gestureFingerCount
+        
+        // CHECK FOR TAP: Short duration + minimal movement
+        if duration <= maxTapDuration && distance < maxTapDistance {
+            print("✅ [Gesture] TAP DETECTED with \(capturedFingerCount) fingers (distance: \(String(format: "%.2f", distance)), duration: \(String(format: "%.2f", duration))s)")
+            
+            // Dispatch callbacks to main thread for UI updates
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                
+                // Notify delegate - use captured value
+                self.delegate?.didDetectSwipe(direction: .tap, fingerCount: capturedFingerCount)
+                
+                // Fire callback - use captured value
+                self.onSwipeDetected?(.tap, capturedFingerCount)
+            }
+            return
+        }
+        
+        // CHECK FOR SWIPE: Sufficient distance and velocity
+        guard duration <= maxSwipeDuration else {
+            return
+        }
         
         guard distance >= minSwipeDistance else {
             return
@@ -274,11 +304,8 @@ class MultitouchGestureDetector {
             direction = dx > 0 ? .right : .left
         }
         
-        // Capture finger count BEFORE async dispatch (it gets reset to 0 immediately after this method returns)
-        let capturedFingerCount = gestureFingerCount
-
         print("✅ [Gesture] SWIPE DETECTED: \(direction.string) with \(capturedFingerCount) fingers (distance: \(String(format: "%.2f", distance)), velocity: \(String(format: "%.2f", velocity)), duration: \(String(format: "%.2f", duration))s)")
-
+        
         // Dispatch callbacks to main thread for UI updates
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
