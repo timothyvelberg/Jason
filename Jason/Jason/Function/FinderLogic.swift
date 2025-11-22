@@ -526,10 +526,7 @@ class FinderLogic: FunctionProvider {
             onRightClick: ModifierAwareInteraction(base: .expand),
             onBoundaryCross: ModifierAwareInteraction(base: .expand)
         )
-    }
-
-    // MARK: - Replace the createFavoriteFolderEntry method with this:
-    
+    }    
     // Updated createFavoriteFolderEntry method for FinderLogic.swift
 
     private func createFavoriteFolderEntry(folderEntry: FolderEntry, settings: FavoriteFolderSettings) -> FunctionNode {
@@ -839,7 +836,7 @@ class FinderLogic: FunctionProvider {
         let finderWindows = getOpenFinderWindows()
         print("🔍 [FinderLogic] Found \(finderWindows.count) open Finder window(s)")
         
-        var windowNodes = finderWindows.compactMap { windowInfo in
+        var windowNodes = finderWindows.compactMap { windowInfo in  
             createFinderWindowNode(for: windowInfo)
         }
         
