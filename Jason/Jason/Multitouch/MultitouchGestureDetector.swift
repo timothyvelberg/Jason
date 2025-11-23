@@ -62,11 +62,6 @@ class MultitouchGestureDetector {
     /// Maximum duration for a tap (seconds)
     private let maxTapDuration: Double = 0.6
     
-    /// Maximum time spread between first and last finger touching (seconds)
-    /// All fingers must touch within this window to be considered a valid gesture
-    /// TUNING: Increase if legitimate gestures are rejected, decrease if accidental triggers occur
-    private let maxFingerSpreadTime: Double = 3.0
-    
     // MARK: - State Tracking
     
     /// Tracks active touches by their identifier
@@ -90,9 +85,14 @@ class MultitouchGestureDetector {
     /// Last reported finger count to detect changes
     private var lastFingerCount: Int = 0
     
-    // 🆕 Finger timing tracking
-    /// Timestamp when the first finger touched (to validate gesture timing)
-    private var firstFingerTimestamp: Double? = nil
+    // 🆕 Zero-finger tracking for gesture validation
+    /// Timestamp when we last had 0 fingers on trackpad
+    /// Used to validate "fresh tap" gestures (0→3 within threshold)
+    private var lastZeroTimestamp: Double? = nil
+    
+    /// Time window for valid 0→3 gesture (seconds)
+    /// If 3 fingers detected within this time after 0 fingers, accept gesture
+    private let zeroToThreeThreshold: Double = 0.5
     
     // MARK: - Callbacks
     
@@ -189,13 +189,39 @@ class MultitouchGestureDetector {
     
     /// Process touch frame data
     fileprivate func processTouches(_ touches: UnsafeMutablePointer<MTTouch>?, count: Int, timestamp: Double) {
-        guard let touches = touches, count > 0 else {
-            return
+        // Use the count from the callback - it's reliable
+        // The framework reports accurate finger count (including 0) but only fills first touch structure
+        let activeCount = count
+        
+        // Update finger count FIRST so we can handle 0-finger case
+        let previousCount = currentFingerCount
+        currentFingerCount = activeCount
+        
+        // 🆕 Track timestamp when at 0 fingers
+        // Update continuously while at 0 so we always have a fresh reference point
+        // This handles app startup, idle periods, and transitions from touch to 0
+        if currentFingerCount == 0 {
+            lastZeroTimestamp = timestamp
+            if previousCount > 0 {
+                print("👆 [Timing] Hit 0 fingers at \(timestamp) - ready for fresh gesture")
+            }
+            // Reset tracking state when all fingers lifted
+            if isTrackingGesture {
+                print("👆 [Gesture] Ended - analyzing movement")
+                analyzeGesture(endTime: timestamp)
+                isTrackingGesture = false
+                gestureFingerCount = 0
+                touchStartPositions.removeAll()
+                activeTouches.removeAll()
+            }
+            lastFingerCount = currentFingerCount
+            return  // No touches to process
         }
         
-        // Use the count from the callback - it's reliable
-        // The framework reports accurate finger count but only fills first touch structure
-        let activeCount = count
+        // Beyond this point, we have active touches
+        guard let touches = touches else {
+            return
+        }
         
         // Get position from first touch (the only one with valid data)
         let firstTouch = touches[0]
@@ -220,52 +246,29 @@ class MultitouchGestureDetector {
             currentTouches[Int(firstTouch.identifier)] = touchData
         }
         
-        // Update finger count
-        let previousCount = currentFingerCount
-        currentFingerCount = activeCount
-        
-        // 🆕 Track when fingers first touch (to validate gesture timing later)
-        // Set timestamp when finger count increases AND we don't already have a timestamp
-        // This handles both fresh starts (0→N) and recovery from flaky detection (resets during placement)
-        if currentFingerCount > previousCount && firstFingerTimestamp == nil {
-            firstFingerTimestamp = timestamp
-            print("👆 [Timing] First touch detected (\(currentFingerCount) finger(s)) at \(timestamp)")
-        }
-        
-        // 🆕 Reset timing on ANY finger count DECREASE
-        // This captures "lift and fresh tap" patterns where user lifts resting fingers
-        // then places all fingers fresh - even if trackpad doesn't detect exact 0-finger moment
-        if currentFingerCount < previousCount {
-            firstFingerTimestamp = nil
-            print("👆 [Timing] Finger count decreased (\(previousCount)→\(currentFingerCount)) - reset timestamp")
-        }
-        
         // Detect gesture start (fingers just touched down)
-        // Handle both 3-finger and 4-finger gestures with timing validation
+        // Handle both 3-finger and 4-finger gestures with "came from 0" validation
         if !isTrackingGesture && currentFingerCount >= 3 && previousCount < currentFingerCount {
-            // 🆕 VALIDATE TIMING: Check if all fingers touched within acceptable time window
+            // 🆕 VALIDATE: Check if we recently came from 0 fingers (fresh gesture)
             var shouldAccept = false
             
-            if let firstTime = firstFingerTimestamp {
-                let fingerSpread = timestamp - firstTime
+            if let zeroTime = lastZeroTimestamp {
+                let timeSinceZero = timestamp - zeroTime
                 
-                if fingerSpread <= maxFingerSpreadTime {
-                    // Fingers touched close enough together - accept
+                if timeSinceZero <= zeroToThreeThreshold {
+                    // Recently came from 0 - accept as fresh gesture
                     shouldAccept = true
-                    print("✅ [Timing] Accepted \(currentFingerCount)-finger gesture: finger spread \(String(format: "%.3f", fingerSpread))s ≤ \(maxFingerSpreadTime)s threshold")
+                    print("✅ [Timing] Accepted \(currentFingerCount)-finger gesture: \(String(format: "%.3f", timeSinceZero))s since 0 fingers ≤ \(zeroToThreeThreshold)s threshold")
                 } else {
-                    // Fingers touched too far apart - reject
-                    let fingerDesc = currentFingerCount == 3 ? "third" : "fourth"
-                    print("⚠️ [Timing] Rejected \(currentFingerCount)-finger gesture: finger spread \(String(format: "%.3f", fingerSpread))s > \(maxFingerSpreadTime)s threshold")
-                    print("   Likely accidental \(fingerDesc) finger added to \(previousCount)-finger gesture")
-                    
-                    // Don't start tracking - wait for finger count to decrease
+                    // Too long since 0 - likely adding fingers to existing touch
+                    print("⚠️ [Timing] Rejected \(currentFingerCount)-finger gesture: \(String(format: "%.3f", timeSinceZero))s since 0 fingers > \(zeroToThreeThreshold)s threshold")
+                    print("   Likely adding fingers to existing 1-2 finger touch (not a fresh gesture)")
                     return
                 }
             } else {
-                // No timestamp - this shouldn't happen, but if it does, reject
-                print("⚠️ [Timing] Rejected \(currentFingerCount)-finger gesture: no first touch timestamp")
-                return
+                // No timestamp yet (first gesture after app launch) - accept it
+                print("✅ [Timing] Accepted \(currentFingerCount)-finger gesture: first gesture after launch (no prior 0-finger reference)")
+                shouldAccept = true
             }
             
             // Only proceed if validation passed
