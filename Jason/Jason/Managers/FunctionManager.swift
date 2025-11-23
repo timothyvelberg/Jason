@@ -95,9 +95,15 @@ class FunctionManager: ObservableObject {
     
     @Published var rings: [RingState] = [] {
         didSet {
-            // Invalidate cache when rings change
-            lastRingsHash = 0
-            cachedConfigurations = []
+            // Only invalidate cache if structural changes occurred
+            // (not just sliceConfig preservation updates)
+            if structuralChangeDetected(from: oldValue, to: rings) {
+                print("🔄 [Cache] Structural change detected - invalidating cache")
+                lastRingsHash = 0
+                cachedConfigurations = []
+            } else {
+                print("✅ [Cache] No structural change - preserving cache (likely sliceConfig update)")
+            }
         }
     }
     @Published var activeRingLevel: Int = 0
@@ -120,6 +126,53 @@ class FunctionManager: ObservableObject {
     
     private var cachedConfigurations: [RingConfiguration] = []
     private var lastRingsHash: Int = 0
+    
+    /// Detect if a structural change occurred between two ring arrays
+    /// Returns true only for changes that require recalculation (not sliceConfig updates)
+    private func structuralChangeDetected(from oldRings: [RingState], to newRings: [RingState]) -> Bool {
+        // Ring count changed
+        if oldRings.count != newRings.count {
+            return true
+        }
+        
+        // Check each ring for structural changes
+        for (index, newRing) in newRings.enumerated() {
+            guard index < oldRings.count else { return true }
+            let oldRing = oldRings[index]
+            
+            // Node count changed
+            if oldRing.nodes.count != newRing.nodes.count {
+                return true
+            }
+            
+            // Hovered index changed
+            if oldRing.hoveredIndex != newRing.hoveredIndex {
+                return true
+            }
+            
+            // Selected index changed
+            if oldRing.selectedIndex != newRing.selectedIndex {
+                return true
+            }
+            
+            // Collapsed state changed
+            if oldRing.isCollapsed != newRing.isCollapsed {
+                return true
+            }
+            
+            // Provider/content identifier changed
+            if oldRing.providerId != newRing.providerId ||
+               oldRing.contentIdentifier != newRing.contentIdentifier {
+                return true
+            }
+            
+            // Note: We deliberately do NOT check sliceConfig
+            // Those are preservation updates, not structural changes
+        }
+        
+        // No structural changes detected
+        return false
+    }
     
     // MARK: - Initialization
     
