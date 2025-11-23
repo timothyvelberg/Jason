@@ -60,7 +60,13 @@ class MultitouchGestureDetector {
     private let maxTapDistance: Float = 0.03
     
     /// Maximum duration for a tap (seconds)
-    private let maxTapDuration: Double = 0.3
+    private let maxTapDuration: Double = 0.6
+    
+    // 🆕 Finger timing validation
+    /// Maximum time spread between first and last finger touching (seconds)
+    /// All fingers must touch within this window to be considered a valid gesture
+    /// TUNING: Increase if legitimate gestures are rejected, decrease if accidental triggers occur
+    private let maxFingerSpreadTime: Double = 3.0
     
     // MARK: - State Tracking
     
@@ -84,6 +90,10 @@ class MultitouchGestureDetector {
     
     /// Last reported finger count to detect changes
     private var lastFingerCount: Int = 0
+    
+    // 🆕 Finger timing tracking
+    /// Timestamp when the first finger touched (to validate gesture timing)
+    private var firstFingerTimestamp: Double? = nil
     
     // MARK: - Callbacks
     
@@ -215,15 +225,66 @@ class MultitouchGestureDetector {
         let previousCount = currentFingerCount
         currentFingerCount = activeCount
         
+        // 🆕 Track when ANY fingers first touch (to validate gesture timing later)
+        // Only set timestamp when going from 0 to any number
+        if currentFingerCount > 0 && previousCount == 0 {
+            firstFingerTimestamp = timestamp
+            print("👆 [Timing] First touch detected (\(currentFingerCount) finger(s)) at \(timestamp)")
+        }
+        
+        // 🆕 Reset timing ONLY when ALL fingers lifted (back to 0)
+        // Do NOT reset on individual finger lifts - that causes issues
+        if currentFingerCount == 0 {
+            firstFingerTimestamp = nil
+            print("👆 [Timing] All fingers lifted - reset timestamp")
+        }
+        
         // Detect gesture start (fingers just touched down)
-        if !isTrackingGesture && currentFingerCount >= 3 && previousCount < 3 {
-            print("👆 [Gesture] Started tracking - \(currentFingerCount) fingers")
-            isTrackingGesture = true
-            gestureStartTime = timestamp
-            gestureFingerCount = currentFingerCount  // LOCK IN THE FINGER COUNT
-            // Store the primary touch start position directly from firstTouch
-            touchStartPositions = currentTouches
-            primaryStartPosition = (firstTouch.normalizedX, firstTouch.normalizedY)
+        // Handle both 3-finger and 4-finger gestures with timing validation
+        if !isTrackingGesture && currentFingerCount >= 3 && previousCount < currentFingerCount {
+            // 🆕 VALIDATE TIMING: Check if all fingers touched within acceptable time window
+            var shouldAccept = false
+            
+            if let firstTime = firstFingerTimestamp {
+                let fingerSpread = timestamp - firstTime
+                
+                if fingerSpread <= maxFingerSpreadTime {
+                    // Fingers touched close enough together - accept
+                    shouldAccept = true
+                    print("✅ [Timing] Accepted \(currentFingerCount)-finger gesture: finger spread \(String(format: "%.3f", fingerSpread))s ≤ \(maxFingerSpreadTime)s threshold")
+                } else {
+                    // Fingers touched too far apart - reject
+                    let fingerDesc = currentFingerCount == 3 ? "third" : "fourth"
+                    print("⚠️ [Timing] Rejected \(currentFingerCount)-finger gesture: finger spread \(String(format: "%.3f", fingerSpread))s > \(maxFingerSpreadTime)s threshold")
+                    print("   Likely accidental \(fingerDesc) finger added to \(previousCount)-finger gesture")
+                    
+                    // Reset timestamp to current time for next attempt
+                    // This allows immediate retry without lifting all fingers
+                    firstFingerTimestamp = timestamp
+                    print("   🔄 Reset timestamp to current touch")
+                    
+                    // Don't start tracking
+                    return
+                }
+            } else {
+                // No timestamp - this shouldn't happen, but if it does, reject
+                print("⚠️ [Timing] Rejected \(currentFingerCount)-finger gesture: no first touch timestamp")
+                
+                // Set timestamp to current time so next attempt works
+                firstFingerTimestamp = timestamp
+                return
+            }
+            
+            // Only proceed if validation passed
+            if shouldAccept {
+                print("👆 [Gesture] Started tracking - \(currentFingerCount) fingers")
+                isTrackingGesture = true
+                gestureStartTime = timestamp
+                gestureFingerCount = currentFingerCount  // LOCK IN THE FINGER COUNT
+                // Store the primary touch start position directly from firstTouch
+                touchStartPositions = currentTouches
+                primaryStartPosition = (firstTouch.normalizedX, firstTouch.normalizedY)
+            }
         }
         
         // Track gesture progression - store latest position
@@ -242,6 +303,11 @@ class MultitouchGestureDetector {
             gestureFingerCount = 0
             touchStartPositions.removeAll()
             activeTouches.removeAll()
+            
+            // 🆕 IMPORTANT: Reset timestamp after gesture ends
+            // This gives a fresh start for the next gesture attempt
+            firstFingerTimestamp = timestamp
+            print("   🔄 Reset timestamp after gesture ended")
         }
         
         lastFingerCount = currentFingerCount
