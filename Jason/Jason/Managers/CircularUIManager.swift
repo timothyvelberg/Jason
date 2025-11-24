@@ -716,7 +716,6 @@ class CircularUIManager: ObservableObject {
         mouseTracker?.startTrackingMouse()
         gestureManager?.startMonitoring()
         
-        print("✅ Showing circular UI at position: \(mousePosition)")
         if let providerId = providerId {
             print("   Expanded to category: \(providerId)")
         }

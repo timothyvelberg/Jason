@@ -126,7 +126,6 @@ class GestureManager {
         setupLocalMonitors()
         
         isMonitoring = true
-        print("✅ GestureManager started monitoring (with drag support)")
     }
     
     func stopMonitoring() {

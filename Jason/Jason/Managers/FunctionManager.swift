@@ -306,7 +306,6 @@ class FunctionManager: ObservableObject {
     }
     
     private func calculateRingConfigurations() -> [RingConfiguration] {
-        print("🔧 [calculateRingConfigurations] START - Processing \(rings.count) ring(s)")
         
         var configs: [RingConfiguration] = []
         let centerHoleRadius = self.centerHoleRadius
@@ -1471,7 +1470,6 @@ class FunctionManager: ObservableObject {
         }
         
         rebuildRings()
-        print("✅ Loaded \(rootNodes.count) total root nodes from \(providers.count) provider(s)")
     }
     
     // MARK: - Surgical Ring Updates
