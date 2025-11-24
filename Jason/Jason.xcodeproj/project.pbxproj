@@ -20,7 +20,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				Multitouch/MultitouchSupport.h,
 			);
 			target = 1C0298012E3B9914002661DB /* Jason */;
 		};

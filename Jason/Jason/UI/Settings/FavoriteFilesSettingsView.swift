@@ -14,7 +14,7 @@ struct FavoriteFilesSettingsView: View {
     
     @State private var staticFiles: [FavoriteFileEntry] = []
     @State private var dynamicFiles: [FavoriteDynamicFileEntry] = []
-    @State private var showingFilePicker = false
+    
     @State private var showingDynamicFileCreator = false
     @State private var editingStaticFile: FavoriteFileEntry?
     @State private var editingDynamicFile: FavoriteDynamicFileEntry?
@@ -122,7 +122,7 @@ struct FavoriteFilesSettingsView: View {
             
             // Footer with Add buttons
             HStack {
-                Button(action: { showingFilePicker = true }) {
+                Button(action: { showFilePicker() }) {
                     Label("Add File", systemImage: "doc.badge.plus")
                         .font(.headline)
                 }
@@ -150,12 +150,6 @@ struct FavoriteFilesSettingsView: View {
         .frame(width: 700, height: 550)
         .onAppear {
             loadFavoriteFiles()
-        }
-        .sheet(isPresented: $showingFilePicker) {
-            FilePickerView(onFileSelected: { path in
-                addStaticFile(path: path)
-                showingFilePicker = false
-            })
         }
         .sheet(isPresented: $showingDynamicFileCreator) {
             AddDynamicFileView(
@@ -215,6 +209,18 @@ struct FavoriteFilesSettingsView: View {
         staticFiles = DatabaseManager.shared.getFavoriteFiles()
         dynamicFiles = DatabaseManager.shared.getFavoriteDynamicFiles()
         print("📋 Loaded \(staticFiles.count) static files and \(dynamicFiles.count) dynamic files")
+    }
+    
+    private func showFilePicker() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.message = "Select a file to add to favorites"
+        
+        if panel.runModal() == .OK, let url = panel.url {
+            addStaticFile(path: url.path)
+        }
     }
     
     private func addStaticFile(path: String) {
@@ -594,56 +600,6 @@ struct FavoriteDynamicFileRow: View {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
-
-// MARK: - File Picker View
-
-struct FilePickerView: View {
-    let onFileSelected: (String) -> Void
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("Select a File")
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            Divider()
-            
-            VStack(spacing: 16) {
-                Image(systemName: "doc.badge.plus")
-                    .font(.system(size: 64))
-                    .foregroundColor(.blue)
-                
-                Text("Click below to choose a file to add to your favorites")
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
-            Divider()
-            
-            Button(action: { showFilePicker() }) {
-                Label("Choose File", systemImage: "folder")
-                    .font(.headline)
-            }
-            .buttonStyle(.borderedProminent)
-            .padding()
-        }
-        .frame(width: 400, height: 300)
-    }
-    
-    private func showFilePicker() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.message = "Select a file to add to favorites"
-        
-        if panel.runModal() == .OK, let url = panel.url {
-            onFileSelected(url.path)
-        }
-    }
-}
-
 // MARK: - Add Dynamic File View
 
 struct AddDynamicFileView: View {

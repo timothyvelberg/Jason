@@ -25,8 +25,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var contentWindow: NSWindow?
     
-    
-    
     func applicationDidFinishLaunching(_ notification: Notification) {
         
         // Run ALL database operations sequentially on main thread
@@ -54,16 +52,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
-            
-//            // Run cleanup even later (30 minutes after launch)
-//            DispatchQueue.main.asyncAfter(deadline: .now() + 1800) {
-//                DatabaseManager.shared.cleanupInactiveHeavyFolders(inactiveDays: 30)
-//                DatabaseManager.shared.cleanupOldAccessRecords(keepDays: 90)
-//                DatabaseManager.shared.cleanupOldEnhancedCache()
-//                print("🧹 SmartCache: Cleanup completed")
-//            }
         }
-        
         
         // Create the status bar item (menu bar icon)
         setupMenuBar()
@@ -90,39 +79,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create ContentView - it will create its own AppSwitcherManager and CircularUIManager
         let contentView = ContentView()
         
-        // Create window
+        // Create window with size appropriate for settings interface
         contentWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 600),
-            styleMask: [.titled, .closable, .miniaturizable],
+            contentRect: NSRect(x: 0, y: 0, width: 1024, height: 800),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         
-        contentWindow?.title = "Jason"
+        contentWindow?.title = "Jason Settings"
         contentWindow?.contentView = NSHostingView(rootView: contentView)
         contentWindow?.isReleasedWhenClosed = false
-        contentWindow?.level = .floating
+        
+        // Set minimum size constraints
+        contentWindow?.minSize = NSSize(width: 1024, height: 640)
+        
+        // Center on screen instead of anchoring to menu bar (better for settings)
+        contentWindow?.center()
+        
+        // Normal level (not floating) for settings window
+        contentWindow?.level = .normal
     }
     
     @objc func toggleContentWindow() {
         guard let window = contentWindow else { return }
         
         if window.isVisible {
-            print("🙈 Hiding content window")
+            print("🙈 Hiding settings window")
             window.orderOut(nil)
         } else {
-            print("👁️ Showing content window")
+            print("👁️ Showing settings window")
             
-            // Position window near menu bar icon
-            if let button = statusItem?.button {
-                let buttonFrame = button.window?.convertToScreen(button.frame) ?? .zero
-                
-                // Position below the menu bar icon
-                let windowX = buttonFrame.origin.x - (window.frame.width / 2) + (buttonFrame.width / 2)
-                let windowY = buttonFrame.origin.y - window.frame.height - 5
-                
-                window.setFrameOrigin(NSPoint(x: windowX, y: windowY))
-            }
+            // Center window on screen
+            window.center()
             
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
