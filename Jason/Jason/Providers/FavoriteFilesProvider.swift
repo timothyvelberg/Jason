@@ -97,6 +97,10 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         for dynamic in dynamicFiles {
             // Execute the query to find the matching file
             if let resolvedPath = resolveDynamicFile(dynamic) {
+                // Get the actual file name from resolved path
+                let resolvedURL = URL(fileURLWithPath: resolvedPath)
+                let fileName = resolvedURL.lastPathComponent
+                
                 // Get icon
                 let icon: NSImage
                 if let iconData = dynamic.iconData, let customIcon = NSImage(data: iconData) {
@@ -107,7 +111,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 
                 entries.append(FileEntry(
                     id: "dynamic-file-\(dynamic.id ?? 0)",
-                    displayName: dynamic.displayName,
+                    displayName: fileName,
                     filePath: resolvedPath,
                     icon: icon,
                     isStatic: false,
@@ -377,9 +381,24 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 "isDynamic": entry.isDynamic,
                 "sortOrder": entry.sortOrder
             ],
-            onLeftClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .execute { [weak self] in
-                self?.openFile(path: entry.filePath, entry: entry)
-            }),
+            onLeftClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .drag(DragProvider(
+                fileURLs: [URL(fileURLWithPath: entry.filePath)],
+                dragImage: entry.icon,
+                allowedOperations: [.move, .copy],
+                onClick: { [weak self] in
+                    self?.openFile(path: entry.filePath, entry: entry)
+                },
+                onDragStarted: {
+                    print("📦 Started dragging: \(entry.displayName)")
+                },
+                onDragCompleted: { success in
+                    if success {
+                        print("✅ Successfully dragged: \(entry.displayName)")
+                    } else {
+                        print("❌ Drag cancelled: \(entry.displayName)")
+                    }
+                }
+            ))),
             onRightClick: ModifierAwareInteraction(base: contextActions.isEmpty ? .doNothing : .expand),
             onMiddleClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .executeKeepOpen { [weak self] in
                 self?.openFile(path: entry.filePath, entry: entry)

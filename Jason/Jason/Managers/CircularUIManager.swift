@@ -330,8 +330,27 @@ class CircularUIManager: ObservableObject {
         let behavior = node.onLeftClick.resolve(with: event.modifierFlags)
         
         if case .drag(var provider) = behavior {
+            // 🛑 STOP MOUSE TRACKING DURING DRAG
+            // This prevents the ring UI from updating while user is dragging
+            mouseTracker?.stopTrackingMouse()
+            gestureManager?.stopMonitoring()
+            print("⏸️ Mouse tracking paused for drag operation")
+            
             // Store modifier flags at drag start
             provider.modifierFlags = event.modifierFlags
+            
+            // Wrap the original onDragCompleted to hide UI after drag
+            let originalCompletion = provider.onDragCompleted
+            provider.onDragCompleted = { [weak self] success in
+                // Call original completion handler first
+                originalCompletion?(success)
+                
+                // Hide the UI after drag completes (success or cancelled)
+                DispatchQueue.main.async {
+                    print("🏁 Drag completed - hiding UI")
+                    self?.hide()
+                }
+            }
             
             self.currentDragProvider = provider
             self.dragStartPoint = event.position
