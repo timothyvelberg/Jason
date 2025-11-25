@@ -516,3 +516,38 @@ extension FunctionNode {
         return onDrag.isDraggable
     }
 }
+
+extension FunctionNode {
+    /// Create a copy of this node with a different providerId
+    /// Used by display mode transformations to ensure extracted children
+    /// retain proper provider attribution for surgical ring updates
+    func withProviderId(_ newProviderId: String) -> FunctionNode {
+        return FunctionNode(
+            id: id,
+            name: name,
+            type: type,
+            icon: icon,
+            children: children,
+            contextActions: contextActions,
+            maxDisplayedChildren: maxDisplayedChildren,
+            preferredLayout: preferredLayout,
+            parentAngleSize: parentAngleSize,
+            itemAngleSize: itemAngleSize,
+            childItemAngleSize: childItemAngleSize,
+            previewURL: previewURL,
+            showLabel: showLabel,
+            childRingThickness: childRingThickness,
+            childIconSize: childIconSize,
+            slicePositioning: slicePositioning,
+            partialSliceThreshold: partialSliceThreshold,
+            metadata: metadata,
+            providerId: newProviderId,
+            onLeftClick: onLeftClick,
+            onRightClick: onRightClick,
+            onMiddleClick: onMiddleClick,
+            onBoundaryCross: onBoundaryCross,
+            onHover: onHover,
+            onHoverExit: onHoverExit
+        )
+    }
+}

@@ -1076,7 +1076,15 @@ class FunctionManager: ObservableObject {
             if let children = node.children, !children.isEmpty {
                 // Return children directly, discarding category wrapper
                 print("🔄 [DisplayMode] Extracting \(children.count) children from category '\(node.name)' (provider: \(providerId))")
-                return children
+                
+                // 🆕 Stamp children with providerId so Ring 0 updates can correctly
+                // filter/preserve nodes by provider during surgical updates
+                return children.map { child in
+                    if child.providerId != providerId {
+                        return child.withProviderId(providerId)
+                    }
+                    return child
+                }
             } else {
                 // Empty category - log warning and pass through
                 print("⚠️ [DisplayMode] Category '\(node.name)' has no children in direct mode (provider: \(providerId))")
@@ -1538,6 +1546,7 @@ class FunctionManager: ObservableObject {
                             // Keep existing nodes from unchanged providers
                             let existingNodes = rings[0].nodes.filter { $0.providerId == orderedProviderId }
                             newRing0Nodes.append(contentsOf: existingNodes)
+                            print("   🔍 Provider '\(orderedProviderId)': found \(existingNodes.count) existing nodes")
                         }
                     }
                     
