@@ -117,6 +117,8 @@ struct RingConfigurationEntry: Identifiable {
     let ringRadius: CGFloat
     let centerHoleRadius: CGFloat
     let iconSize: CGFloat
+    let startAngle: CGFloat
+
     let createdAt: Int
     let isActive: Bool
     let displayOrder: Int

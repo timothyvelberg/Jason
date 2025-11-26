@@ -157,7 +157,7 @@ struct TriggerFormatting {
         case "right":
             directionSymbol = "→ \(fingerText)Swipe Right"
         case "tap":
-            directionSymbol = "👆 \(fingerText)Tap"
+            directionSymbol = "\(fingerText)Tap"
         default:
             directionSymbol = "\(fingerText)Swipe \(direction)"
         }

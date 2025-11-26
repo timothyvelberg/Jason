@@ -51,6 +51,8 @@ class FunctionManager: ObservableObject {
     
     /// Default icon size in points - can be overridden by configuration
     private let defaultIconSize: CGFloat
+
+    private let startAngle: CGFloat
     
     /// Collapsed ring thickness (for breadcrumb trail)
     private let collapsedRingThickness: CGFloat = 32
@@ -183,11 +185,13 @@ class FunctionManager: ObservableObject {
     init(
         ringThickness: CGFloat,
         centerHoleRadius: CGFloat,
-        iconSize: CGFloat)
+        iconSize: CGFloat,
+        startAngle: CGFloat = 0.0)
     {
         self.defaultRingThickness = ringThickness
         self.centerHoleRadius = centerHoleRadius
         self.defaultIconSize = iconSize
+        self.startAngle = startAngle
         
         // Initialize providers and favoriteAppsProvider
         self.providers = []
@@ -480,7 +484,7 @@ class FunctionManager: ObservableObject {
                 
                 // Use first item's angle for offset calculation
                 let firstItemAngle = perItemAngles.first ?? (360.0 / Double(itemCount))
-                let offset = -(firstItemAngle / 2)
+                let offset = Double(startAngle) - (firstItemAngle / 2)
                 
                 // For backwards compatibility, still set itemAngle (used as fallback)
                 let averageItemAngle = 360.0 / Double(itemCount)

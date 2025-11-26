@@ -172,7 +172,7 @@ class DatabaseManager {
         );
         """
         
-        // Create ring_configurations table (UPDATED with trigger support for keyboard + mouse + trackpad + hold mode + auto-execute)
+        // Create ring_configurations table
         let ringConfigurationsSQL = """
         CREATE TABLE IF NOT EXISTS ring_configurations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,6 +181,7 @@ class DatabaseManager {
             ring_radius REAL NOT NULL,
             center_hole_radius REAL NOT NULL DEFAULT 56.0,
             icon_size REAL NOT NULL,
+            start_angle REAL DEFAULT 0.0,
             trigger_type TEXT DEFAULT 'keyboard',
             key_code INTEGER,
             modifier_flags INTEGER,

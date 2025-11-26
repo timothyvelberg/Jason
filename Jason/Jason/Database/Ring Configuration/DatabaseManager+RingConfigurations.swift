@@ -20,6 +20,7 @@ extension DatabaseManager {
         ringRadius: CGFloat,
         centerHoleRadius: CGFloat,
         iconSize: CGFloat,
+        startAngle: CGFloat = 0.0,
         triggerType: String = "keyboard",  // "keyboard", "mouse", or "trackpad"
         keyCode: UInt16? = nil,
         modifierFlags: UInt? = nil,
@@ -61,9 +62,10 @@ extension DatabaseManager {
             let now = Int(Date().timeIntervalSince1970)
             
             let sql = """
-            INSERT INTO ring_configurations (name, shortcut, ring_radius, center_hole_radius, icon_size, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release, created_at, is_active, display_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?);
+            INSERT INTO ring_configurations (name, shortcut, ring_radius, center_hole_radius, icon_size, start_angle, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release, created_at, is_active, display_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?);
             """
+            
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
@@ -72,51 +74,52 @@ extension DatabaseManager {
                 sqlite3_bind_double(statement, 3, Double(ringRadius))
                 sqlite3_bind_double(statement, 4, Double(centerHoleRadius))
                 sqlite3_bind_double(statement, 5, Double(iconSize))
-                sqlite3_bind_text(statement, 6, (triggerType as NSString).utf8String, -1, nil)
+                sqlite3_bind_double(statement, 6, Double(startAngle))
+                sqlite3_bind_text(statement, 7, (triggerType as NSString).utf8String, -1, nil)
                 
                 // Bind keyCode (NULL if not provided)
                 if let keyCode = keyCode {
-                    sqlite3_bind_int(statement, 7, Int32(keyCode))
-                } else {
-                    sqlite3_bind_null(statement, 7)
-                }
-                
-                // Bind modifierFlags (NULL if not provided)
-                if let modifierFlags = modifierFlags {
-                    sqlite3_bind_int(statement, 8, Int32(modifierFlags))
+                    sqlite3_bind_int(statement, 8, Int32(keyCode))
                 } else {
                     sqlite3_bind_null(statement, 8)
                 }
                 
-                // Bind buttonNumber (NULL if not provided)
-                if let buttonNumber = buttonNumber {
-                    sqlite3_bind_int(statement, 9, buttonNumber)
+                // Bind modifierFlags (NULL if not provided)
+                if let modifierFlags = modifierFlags {
+                    sqlite3_bind_int(statement, 9, Int32(modifierFlags))
                 } else {
                     sqlite3_bind_null(statement, 9)
                 }
                 
-                // Bind swipeDirection (NULL if not provided)
-                if let swipeDirection = swipeDirection {
-                    sqlite3_bind_text(statement, 10, (swipeDirection as NSString).utf8String, -1, nil)
+                // Bind buttonNumber (NULL if not provided)
+                if let buttonNumber = buttonNumber {
+                    sqlite3_bind_int(statement, 10, buttonNumber)
                 } else {
                     sqlite3_bind_null(statement, 10)
                 }
                 
-                // Bind fingerCount (NULL if not provided)
-                if let fingerCount = fingerCount {
-                    sqlite3_bind_int(statement, 11, Int32(fingerCount))
+                // Bind swipeDirection (NULL if not provided)
+                if let swipeDirection = swipeDirection {
+                    sqlite3_bind_text(statement, 11, (swipeDirection as NSString).utf8String, -1, nil)
                 } else {
                     sqlite3_bind_null(statement, 11)
                 }
                 
+                // Bind fingerCount (NULL if not provided)
+                if let fingerCount = fingerCount {
+                    sqlite3_bind_int(statement, 12, Int32(fingerCount))
+                } else {
+                    sqlite3_bind_null(statement, 12)
+                }
+                
                 // Bind isHoldMode
-                sqlite3_bind_int(statement, 12, isHoldMode ? 1 : 0)
+                sqlite3_bind_int(statement, 13, isHoldMode ? 1 : 0)
                 
                 // Bind autoExecuteOnRelease
-                sqlite3_bind_int(statement, 13, autoExecuteOnRelease ? 1 : 0)
+                sqlite3_bind_int(statement, 14, autoExecuteOnRelease ? 1 : 0)
                 
-                sqlite3_bind_int64(statement, 14, Int64(now))
-                sqlite3_bind_int(statement, 15, Int32(displayOrder))
+                sqlite3_bind_int64(statement, 15, Int64(now))
+                sqlite3_bind_int(statement, 16, Int32(displayOrder))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     ringId = Int(sqlite3_last_insert_rowid(db))
@@ -157,11 +160,13 @@ extension DatabaseManager {
         var results: [RingConfigurationEntry] = []
         
         queue.sync {
+            
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, start_angle, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release
             FROM ring_configurations
             ORDER BY display_order, name;
             """
+            
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
@@ -172,80 +177,81 @@ extension DatabaseManager {
                     let ringRadius = CGFloat(sqlite3_column_double(statement, 3))
                     let centerHoleRadius = CGFloat(sqlite3_column_double(statement, 4))
                     let iconSize = CGFloat(sqlite3_column_double(statement, 5))
-                    let createdAt = Int(sqlite3_column_int64(statement, 6))
-                    let isActive = sqlite3_column_int(statement, 7) == 1
-                    let displayOrder = Int(sqlite3_column_int(statement, 8))
+                    let startAngle = CGFloat(sqlite3_column_double(statement, 6))
+                    let createdAt = Int(sqlite3_column_int64(statement, 7))
+                    let isActive = sqlite3_column_int(statement, 8) == 1
+                    let displayOrder = Int(sqlite3_column_int(statement, 9))
                     
                     // Read triggerType (default to "keyboard" for legacy rows)
                     let triggerType: String = {
-                        let colType = sqlite3_column_type(statement, 9)
+                        let colType = sqlite3_column_type(statement, 10)
                         if colType == SQLITE_NULL {
                             return "keyboard"
                         }
-                        return String(cString: sqlite3_column_text(statement, 9))
+                        return String(cString: sqlite3_column_text(statement, 10))
                     }()
                     
                     // Read keyCode (handle NULL)
                     let keyCode: UInt16? = {
-                        let colType = sqlite3_column_type(statement, 10)
-                        if colType == SQLITE_NULL {
-                            return nil
-                        }
-                        return UInt16(sqlite3_column_int(statement, 10))
-                    }()
-                    
-                    // Read modifierFlags (handle NULL)
-                    let modifierFlags: UInt? = {
                         let colType = sqlite3_column_type(statement, 11)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return UInt(sqlite3_column_int(statement, 11))
+                        return UInt16(sqlite3_column_int(statement, 11))
                     }()
                     
-                    // Read buttonNumber (handle NULL)
-                    let buttonNumber: Int32? = {
+                    // Read modifierFlags (handle NULL)
+                    let modifierFlags: UInt? = {
                         let colType = sqlite3_column_type(statement, 12)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return sqlite3_column_int(statement, 12)
+                        return UInt(sqlite3_column_int(statement, 12))
                     }()
                     
-                    // Read swipeDirection (handle NULL)
-                    let swipeDirection: String? = {
+                    // Read buttonNumber (handle NULL)
+                    let buttonNumber: Int32? = {
                         let colType = sqlite3_column_type(statement, 13)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return String(cString: sqlite3_column_text(statement, 13))
+                        return sqlite3_column_int(statement, 13)
                     }()
                     
-                    // Read fingerCount (handle NULL)
-                    let fingerCount: Int? = {
+                    // Read swipeDirection (handle NULL)
+                    let swipeDirection: String? = {
                         let colType = sqlite3_column_type(statement, 14)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return Int(sqlite3_column_int(statement, 14))
+                        return String(cString: sqlite3_column_text(statement, 14))
+                    }()
+                    
+                    // Read fingerCount (handle NULL)
+                    let fingerCount: Int? = {
+                        let colType = sqlite3_column_type(statement, 15)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return Int(sqlite3_column_int(statement, 15))
                     }()
                     
                     // Read isHoldMode (default to false for legacy rows)
                     let isHoldMode: Bool = {
-                        let colType = sqlite3_column_type(statement, 15)
+                        let colType = sqlite3_column_type(statement, 16)
                         if colType == SQLITE_NULL {
                             return false
                         }
-                        return sqlite3_column_int(statement, 15) == 1
+                        return sqlite3_column_int(statement, 16) == 1
                     }()
                     
                     // Read autoExecuteOnRelease (default to true for legacy rows)
                     let autoExecuteOnRelease: Bool = {
-                        let colType = sqlite3_column_type(statement, 16)
+                        let colType = sqlite3_column_type(statement, 17)
                         if colType == SQLITE_NULL {
                             return true
                         }
-                        return sqlite3_column_int(statement, 16) == 1
+                        return sqlite3_column_int(statement, 17) == 1
                     }()
                     
                     results.append(RingConfigurationEntry(
@@ -255,6 +261,7 @@ extension DatabaseManager {
                         ringRadius: ringRadius,
                         centerHoleRadius: centerHoleRadius,
                         iconSize: iconSize,
+                        startAngle: startAngle,
                         createdAt: createdAt,
                         isActive: isActive,
                         displayOrder: displayOrder,
@@ -287,7 +294,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, start_angle, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release
             FROM ring_configurations
             WHERE is_active = 1
             ORDER BY display_order, name;
@@ -302,26 +309,27 @@ extension DatabaseManager {
                     let ringRadius = CGFloat(sqlite3_column_double(statement, 3))
                     let centerHoleRadius = CGFloat(sqlite3_column_double(statement, 4))
                     let iconSize = CGFloat(sqlite3_column_double(statement, 5))
-                    let createdAt = Int(sqlite3_column_int64(statement, 6))
-                    let isActive = sqlite3_column_int(statement, 7) == 1
-                    let displayOrder = Int(sqlite3_column_int(statement, 8))
+                    let startAngle = CGFloat(sqlite3_column_double(statement, 6))
+                    let createdAt = Int(sqlite3_column_int64(statement, 7))
+                    let isActive = sqlite3_column_int(statement, 8) == 1
+                    let displayOrder = Int(sqlite3_column_int(statement, 9))
                     
                     // Read triggerType (default to "keyboard" for legacy rows)
                     let triggerType: String = {
-                        let colType = sqlite3_column_type(statement, 9)
+                        let colType = sqlite3_column_type(statement, 10)
                         if colType == SQLITE_NULL {
                             return "keyboard"
                         }
-                        return String(cString: sqlite3_column_text(statement, 9))
+                        return String(cString: sqlite3_column_text(statement, 10))
                     }()
                     
                     // Read keyCode (handle NULL)
                     let keyCode: UInt16? = {
-                        let colType = sqlite3_column_type(statement, 10)
+                        let colType = sqlite3_column_type(statement, 11)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return UInt16(sqlite3_column_int(statement, 10))
+                        return UInt16(sqlite3_column_int(statement, 11))
                     }()
                     
                     // Read modifierFlags (handle NULL)
@@ -330,52 +338,52 @@ extension DatabaseManager {
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return UInt(sqlite3_column_int(statement, 11))
+                        return UInt(sqlite3_column_int(statement, 12))
                     }()
                     
                     // Read buttonNumber (handle NULL)
                     let buttonNumber: Int32? = {
-                        let colType = sqlite3_column_type(statement, 12)
-                        if colType == SQLITE_NULL {
-                            return nil
-                        }
-                        return sqlite3_column_int(statement, 12)
-                    }()
-                    
-                    // Read swipeDirection (handle NULL)
-                    let swipeDirection: String? = {
                         let colType = sqlite3_column_type(statement, 13)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return String(cString: sqlite3_column_text(statement, 13))
+                        return sqlite3_column_int(statement, 13)
                     }()
                     
-                    // Read fingerCount (handle NULL)
-                    let fingerCount: Int? = {
+                    // Read swipeDirection (handle NULL)
+                    let swipeDirection: String? = {
                         let colType = sqlite3_column_type(statement, 14)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return Int(sqlite3_column_int(statement, 14))
+                        return String(cString: sqlite3_column_text(statement, 14))
+                    }()
+                    
+                    // Read fingerCount (handle NULL)
+                    let fingerCount: Int? = {
+                        let colType = sqlite3_column_type(statement, 15)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return Int(sqlite3_column_int(statement, 15))
                     }()
                     
                     // Read isHoldMode (default to false for legacy rows)
                     let isHoldMode: Bool = {
-                        let colType = sqlite3_column_type(statement, 15)
+                        let colType = sqlite3_column_type(statement, 16)
                         if colType == SQLITE_NULL {
                             return false
                         }
-                        return sqlite3_column_int(statement, 15) == 1
+                        return sqlite3_column_int(statement, 16) == 1
                     }()
                     
                     // Read autoExecuteOnRelease (default to true for legacy rows)
                     let autoExecuteOnRelease: Bool = {
-                        let colType = sqlite3_column_type(statement, 16)
+                        let colType = sqlite3_column_type(statement, 17)
                         if colType == SQLITE_NULL {
                             return true
                         }
-                        return sqlite3_column_int(statement, 16) == 1
+                        return sqlite3_column_int(statement, 17) == 1
                     }()
                     
                     results.append(RingConfigurationEntry(
@@ -385,6 +393,7 @@ extension DatabaseManager {
                         ringRadius: ringRadius,
                         centerHoleRadius: centerHoleRadius,
                         iconSize: iconSize,
+                        startAngle: startAngle,
                         createdAt: createdAt,
                         isActive: isActive,
                         displayOrder: displayOrder,
@@ -417,7 +426,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release
+            SELECT id, name, shortcut, ring_radius, center_hole_radius, icon_size, start_angle, created_at, is_active, display_order, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release
             FROM ring_configurations
             WHERE id = ?;
             """
@@ -433,80 +442,81 @@ extension DatabaseManager {
                     let ringRadius = CGFloat(sqlite3_column_double(statement, 3))
                     let centerHoleRadius = CGFloat(sqlite3_column_double(statement, 4))
                     let iconSize = CGFloat(sqlite3_column_double(statement, 5))
-                    let createdAt = Int(sqlite3_column_int64(statement, 6))
-                    let isActive = sqlite3_column_int(statement, 7) == 1
-                    let displayOrder = Int(sqlite3_column_int(statement, 8))
+                    let startAngle = CGFloat(sqlite3_column_double(statement, 6))
+                    let createdAt = Int(sqlite3_column_int64(statement, 7))
+                    let isActive = sqlite3_column_int(statement, 8) == 1
+                    let displayOrder = Int(sqlite3_column_int(statement, 9))
                     
                     // Read triggerType (default to "keyboard" for legacy rows)
                     let triggerType: String = {
-                        let colType = sqlite3_column_type(statement, 9)
+                        let colType = sqlite3_column_type(statement, 10)
                         if colType == SQLITE_NULL {
                             return "keyboard"
                         }
-                        return String(cString: sqlite3_column_text(statement, 9))
+                        return String(cString: sqlite3_column_text(statement, 10))
                     }()
                     
                     // Read keyCode (handle NULL)
                     let keyCode: UInt16? = {
-                        let colType = sqlite3_column_type(statement, 10)
-                        if colType == SQLITE_NULL {
-                            return nil
-                        }
-                        return UInt16(sqlite3_column_int(statement, 10))
-                    }()
-                    
-                    // Read modifierFlags (handle NULL)
-                    let modifierFlags: UInt? = {
                         let colType = sqlite3_column_type(statement, 11)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return UInt(sqlite3_column_int(statement, 11))
+                        return UInt16(sqlite3_column_int(statement, 11))
+                    }()
+                    
+                    // Read modifierFlags (handle NULL)
+                    let modifierFlags: UInt? = {
+                        let colType = sqlite3_column_type(statement, 12)  // <-- fixed
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return UInt(sqlite3_column_int(statement, 12))
                     }()
                     
                     // Read buttonNumber (handle NULL)
                     let buttonNumber: Int32? = {
-                        let colType = sqlite3_column_type(statement, 12)
-                        if colType == SQLITE_NULL {
-                            return nil
-                        }
-                        return sqlite3_column_int(statement, 12)
-                    }()
-                    
-                    // Read swipeDirection (handle NULL)
-                    let swipeDirection: String? = {
                         let colType = sqlite3_column_type(statement, 13)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return String(cString: sqlite3_column_text(statement, 13))
+                        return sqlite3_column_int(statement, 13)
                     }()
                     
-                    // Read fingerCount (handle NULL)
-                    let fingerCount: Int? = {
+                    // Read swipeDirection (handle NULL)
+                    let swipeDirection: String? = {
                         let colType = sqlite3_column_type(statement, 14)
                         if colType == SQLITE_NULL {
                             return nil
                         }
-                        return Int(sqlite3_column_int(statement, 14))
+                        return String(cString: sqlite3_column_text(statement, 14))
+                    }()
+                    
+                    // Read fingerCount (handle NULL)
+                    let fingerCount: Int? = {
+                        let colType = sqlite3_column_type(statement, 15)
+                        if colType == SQLITE_NULL {
+                            return nil
+                        }
+                        return Int(sqlite3_column_int(statement, 15))
                     }()
                     
                     // Read isHoldMode (default to false for legacy rows)
                     let isHoldMode: Bool = {
-                        let colType = sqlite3_column_type(statement, 15)
+                        let colType = sqlite3_column_type(statement, 16)
                         if colType == SQLITE_NULL {
                             return false
                         }
-                        return sqlite3_column_int(statement, 15) == 1
+                        return sqlite3_column_int(statement, 16) == 1
                     }()
                     
                     // Read autoExecuteOnRelease (default to true for legacy rows)
                     let autoExecuteOnRelease: Bool = {
-                        let colType = sqlite3_column_type(statement, 16)
+                        let colType = sqlite3_column_type(statement, 17)
                         if colType == SQLITE_NULL {
                             return true
                         }
-                        return sqlite3_column_int(statement, 16) == 1
+                        return sqlite3_column_int(statement, 17) == 1
                     }()
                     
                     result = RingConfigurationEntry(
@@ -516,6 +526,7 @@ extension DatabaseManager {
                         ringRadius: ringRadius,
                         centerHoleRadius: centerHoleRadius,
                         iconSize: iconSize,
+                        startAngle: startAngle,
                         createdAt: createdAt,
                         isActive: isActive,
                         displayOrder: displayOrder,
@@ -548,6 +559,7 @@ extension DatabaseManager {
         ringRadius: CGFloat? = nil,
         centerHoleRadius: CGFloat? = nil,
         iconSize: CGFloat? = nil,
+        startAngle: CGFloat? = nil,
         triggerType: String? = nil,    // NEW
         keyCode: UInt16? = nil,
         modifierFlags: UInt? = nil,
@@ -591,6 +603,7 @@ extension DatabaseManager {
             if ringRadius != nil { updates.append("ring_radius = ?") }
             if centerHoleRadius != nil { updates.append("center_hole_radius = ?") }
             if iconSize != nil { updates.append("icon_size = ?") }
+            if startAngle != nil { updates.append("start_angle = ?") }
             if triggerType != nil { updates.append("trigger_type = ?") }
             if keyCode != nil { updates.append("key_code = ?") }
             if modifierFlags != nil { updates.append("modifier_flags = ?") }
@@ -630,6 +643,10 @@ extension DatabaseManager {
                 }
                 if let iconSize = iconSize {
                     sqlite3_bind_double(statement, paramIndex, Double(iconSize))
+                    paramIndex += 1
+                }
+                if let startAngle = startAngle {
+                    sqlite3_bind_double(statement, paramIndex, Double(startAngle))
                     paramIndex += 1
                 }
                 if let triggerType = triggerType {

@@ -268,6 +268,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                     type: .action,
                     icon: NSImage(systemSymbolName: "star.slash", accessibilityDescription: nil) ?? NSImage(),
                     preferredLayout: .partialSlice,
+                    providerId: providerId,
                     onLeftClick: ModifierAwareInteraction(base: .doNothing),
                     onRightClick: ModifierAwareInteraction(base: .doNothing),
                     onMiddleClick: ModifierAwareInteraction(base: .doNothing),

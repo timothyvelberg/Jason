@@ -199,7 +199,7 @@ class HotkeyManager {
         
         // Log all registered trackpad gestures
         if !registeredSwipes.isEmpty {
-            print("   👆 Registered trackpad gestures:")
+            print("Registered trackpad gestures:")
             for (configId, registration) in registeredSwipes {
                 let display = formatTrackpadGesture(direction: registration.direction, fingerCount: registration.fingerCount, modifiers: registration.modifierFlags)
                 print("      Config \(configId): \(display) (direction=\(registration.direction), fingers=\(registration.fingerCount), modifiers=\(registration.modifierFlags))")
@@ -501,7 +501,7 @@ class HotkeyManager {
         
         let directionString = direction.string
         
-        print("👆 [HotkeyManager] Multitouch swipe detected: direction=\(directionString), fingers=\(fingerCount), modifiers=\(eventModifiers)")
+        print("[HotkeyManager] Multitouch swipe detected: direction=\(directionString), fingers=\(fingerCount), modifiers=\(eventModifiers)")
         
         // Check registered trackpad gestures - must match direction, fingerCount, AND modifiers
         for (configId, registration) in registeredSwipes {

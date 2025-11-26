@@ -29,6 +29,7 @@ struct StoredRingConfiguration: Identifiable, Equatable {
     let ringRadius: Double
     let centerHoleRadius: Double
     let iconSize: Double
+    let startAngle: Double
     let isActive: Bool
     let providers: [ProviderConfiguration]
     
@@ -210,7 +211,7 @@ struct StoredRingConfiguration: Identifiable, Equatable {
         case "right":
             directionSymbol = "→ \(fingerText)Swipe Right"
         case "tap":
-            directionSymbol = "👆 \(fingerText)Tap"
+            directionSymbol = "\(fingerText)Tap"
         default:
             directionSymbol = "\(fingerText)Swipe \(direction)"
         }
@@ -247,6 +248,7 @@ struct StoredRingConfiguration: Identifiable, Equatable {
                lhs.ringRadius == rhs.ringRadius &&
                lhs.centerHoleRadius == rhs.centerHoleRadius &&
                lhs.iconSize == rhs.iconSize &&
+               lhs.startAngle == rhs.startAngle && 
                lhs.isActive == rhs.isActive &&
                lhs.triggerType == rhs.triggerType &&
                lhs.keyCode == rhs.keyCode &&

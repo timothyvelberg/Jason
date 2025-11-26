@@ -29,6 +29,7 @@ struct EditRingView: View {
     @State private var ringRadius: String = "80"
     @State private var centerHoleRadius: String = "56"
     @State private var iconSize: String = "32"
+    @State private var startAngle: Double = 0.0
     @State private var isActive: Bool = true
     
     // Provider selection
@@ -176,6 +177,17 @@ struct EditRingView: View {
                                 Text("px")
                                     .foregroundColor(.secondary)
                             }
+                            HStack {
+                                Text("Start Position:")
+                                    .frame(width: 140, alignment: .leading)
+                                Picker("", selection: $startAngle) {
+                                    Text("12 o'clock (Top)").tag(0.0)
+                                    Text("3 o'clock (Right)").tag(90.0)
+                                    Text("6 o'clock (Bottom)").tag(180.0)
+                                    Text("9 o'clock (Left)").tag(270.0)
+                                }
+                                .frame(width: 180)
+                            }
                         }
                         .padding(12)
                     }
@@ -296,6 +308,7 @@ struct EditRingView: View {
         ringRadius = String(Int(config.ringRadius))
         centerHoleRadius = String(Int(config.centerHoleRadius))
         iconSize = String(Int(config.iconSize))
+        startAngle = config.startAngle
         isActive = config.isActive
         
         // Load trigger based on type
@@ -360,7 +373,7 @@ struct EditRingView: View {
         case "down": directionSymbol = "↓ \(fingerCount)-Finger Swipe Down"
         case "left": directionSymbol = "← \(fingerCount)-Finger Swipe Left"
         case "right": directionSymbol = "→ \(fingerCount)-Finger Swipe Right"
-        case "tap": directionSymbol = "👆 \(fingerCount)-Finger Tap"
+        case "tap": directionSymbol = "\(fingerCount)-Finger Tap"
         default: directionSymbol = "\(fingerCount)-Finger Swipe \(direction)"
         }
         
@@ -461,6 +474,7 @@ struct EditRingView: View {
                     ringRadius: radiusValue,
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
+                    startAngle: startAngle,
                     triggerType: triggerType.rawValue,
                     keyCode: keyCode,
                     modifierFlags: modifierFlags,
@@ -491,6 +505,7 @@ struct EditRingView: View {
                     ringRadius: radiusValue,
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
+                    startAngle: startAngle,
                     triggerType: triggerType.rawValue,
                     keyCode: keyCode,
                     modifierFlags: modifierFlags,
@@ -696,11 +711,11 @@ enum SwipeDirection: String, CaseIterable {
     
     var displayName: String {
         switch self {
-        case .up: return "↑ Swipe Up"
-        case .down: return "↓ Swipe Down"
-        case .left: return "← Swipe Left"
-        case .right: return "→ Swipe Right"
-        case .tap: return "👆 Tap"
+        case .up: return "Swipe Up"
+        case .down: return "Swipe Down"
+        case .left: return "Swipe Left"
+        case .right: return "Swipe Right"
+        case .tap: return "Tap"
         }
     }
 }

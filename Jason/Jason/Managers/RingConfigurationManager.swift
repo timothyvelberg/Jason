@@ -145,6 +145,7 @@ class RingConfigurationManager: ObservableObject {
         ringRadius: Double,
         centerHoleRadius: Double = 56.0,
         iconSize: Double,
+        startAngle: Double = 0.0,
         triggerType: String = "keyboard",  // "keyboard", "mouse", or "trackpad"
         keyCode: UInt16? = nil,
         modifierFlags: UInt? = nil,
@@ -208,6 +209,7 @@ class RingConfigurationManager: ObservableObject {
             ringRadius: CGFloat(ringRadius),
             centerHoleRadius: CGFloat(centerHoleRadius),
             iconSize: CGFloat(iconSize),
+            startAngle: CGFloat(startAngle),
             triggerType: triggerType,
             keyCode: keyCode,
             modifierFlags: modifierFlags,
@@ -274,6 +276,7 @@ class RingConfigurationManager: ObservableObject {
             ringRadius: ringRadius,
             centerHoleRadius: centerHoleRadius,
             iconSize: iconSize,
+            startAngle: startAngle,
             isActive: true,
             providers: providerConfigs,
             triggerType: triggerType,
@@ -319,14 +322,15 @@ class RingConfigurationManager: ObservableObject {
         ringRadius: Double? = nil,
         centerHoleRadius: Double? = nil,
         iconSize: Double? = nil,
-        triggerType: String? = nil,        // NEW
-        keyCode: UInt16? = nil,            // NEW
-        modifierFlags: UInt? = nil,        // NEW
-        buttonNumber: Int32? = nil,        // NEW
-        swipeDirection: String? = nil,     // NEW - CRITICAL FIX!
-        fingerCount: Int? = nil,           // NEW
-        isHoldMode: Bool? = nil,           // NEW
-        autoExecuteOnRelease: Bool? = nil  // NEW
+        startAngle: Double? = nil,
+        triggerType: String? = nil,
+        keyCode: UInt16? = nil,
+        modifierFlags: UInt? = nil,
+        buttonNumber: Int32? = nil,
+        swipeDirection: String? = nil,
+        fingerCount: Int? = nil,
+        isHoldMode: Bool? = nil,
+        autoExecuteOnRelease: Bool? = nil
     ) throws {
         print("[RingConfigManager] Updating configuration \(id)")
         
@@ -362,6 +366,7 @@ class RingConfigurationManager: ObservableObject {
             ringRadius: ringRadius.map { CGFloat($0) },
             centerHoleRadius: centerHoleRadius.map { CGFloat($0) },
             iconSize: iconSize.map { CGFloat($0) },
+            startAngle: startAngle.map { CGFloat($0) },
             triggerType: triggerType,
             keyCode: keyCode,
             modifierFlags: modifierFlags,
@@ -621,6 +626,7 @@ class RingConfigurationManager: ObservableObject {
                 ringRadius: existingConfig.ringRadius,
                 centerHoleRadius: existingConfig.centerHoleRadius,
                 iconSize: existingConfig.iconSize,
+                startAngle: existingConfig.startAngle,
                 isActive: isActive,
                 providers: existingConfig.providers,
                 triggerType: existingConfig.triggerType,
@@ -811,6 +817,7 @@ class RingConfigurationManager: ObservableObject {
             ringRadius: Double(dbConfig.ringRadius),
             centerHoleRadius: Double(dbConfig.centerHoleRadius),
             iconSize: Double(dbConfig.iconSize),
+            startAngle: Double(dbConfig.startAngle),
             isActive: dbConfig.isActive,
             providers: providers,
             triggerType: dbConfig.triggerType,
