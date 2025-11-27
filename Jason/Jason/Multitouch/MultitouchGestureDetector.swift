@@ -13,7 +13,11 @@ protocol MultitouchGestureDelegate: AnyObject {
 }
 
 /// Detects multitouch gestures (particularly swipes) using raw trackpad data
-class MultitouchGestureDetector {
+class MultitouchGestureDetector: LiveDataStream {
+    
+    // MARK: - LiveDataStream Protocol
+    
+    var streamId: String { "multitouch-gestures" }
     
     // MARK: - Types
     
@@ -105,7 +109,7 @@ class MultitouchGestureDetector {
     // MARK: - Device Management
     
     private var devices: [MTDeviceRef] = []
-    private var isMonitoring: Bool = false
+    private(set) var isMonitoring: Bool = false
     
     // MARK: - Initialization
     
@@ -183,6 +187,24 @@ class MultitouchGestureDetector {
         isMonitoring = false
         
         print("✅ [MultitouchGestureDetector] Monitoring stopped")
+    }
+    
+    /// Clear device references without stopping (use after sleep/wake when devices are stale)
+    private func clearStaleDevices() {
+        print("🧹 [MultitouchGestureDetector] Clearing stale device references...")
+        devices.removeAll()
+        isMonitoring = false
+    }
+    
+    /// Restart monitoring - handles stale devices after sleep/wake
+    func restartMonitoring() {
+        print("🔄 [\(streamId)] Restarting monitoring...")
+        
+        // After sleep, device references are stale - don't try to stop them
+        // Just clear the array and start fresh
+        clearStaleDevices()
+        
+        startMonitoring()
     }
     
     // MARK: - Touch Processing

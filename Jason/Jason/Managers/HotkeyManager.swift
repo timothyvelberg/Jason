@@ -466,6 +466,9 @@ class HotkeyManager {
         // Set as shared instance for C callback
         MultitouchGestureDetector.setShared(detector)
         
+        // Register with LiveDataCoordinator for sleep/wake handling
+        LiveDataCoordinator.shared.register(detector)
+        
         // Start monitoring
         detector.startMonitoring()
         
@@ -474,6 +477,9 @@ class HotkeyManager {
     
     private func stopMultitouchMonitoring() {
         if let detector = multitouchDetector {
+            // Unregister from LiveDataCoordinator
+            LiveDataCoordinator.shared.unregister(detector)
+            
             detector.stopMonitoring()
             MultitouchGestureDetector.setShared(nil)
             multitouchDetector = nil

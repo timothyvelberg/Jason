@@ -10,8 +10,27 @@ import Foundation
 import AppKit
 
 /// Manages file system watching for favorite heavy folders to keep cache synchronized
-class FolderWatcherManager {
+class FolderWatcherManager: LiveDataStream {
     static let shared = FolderWatcherManager()
+    
+    // MARK: - LiveDataStream Protocol
+    
+    var streamId: String { "folder-watcher" }
+    
+    var isMonitoring: Bool {
+        // We're monitoring if we have any active watchers
+        return !watchers.isEmpty
+    }
+    
+    func startMonitoring() {
+        startWatchingFavorites()
+    }
+    
+    func stopMonitoring() {
+        stopAll()
+    }
+    
+    // MARK: - Properties
     
     // Track active watchers by folder path
     private var watchers: [String: FolderWatcher] = [:]

@@ -36,10 +36,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DatabaseManager.shared.createEnhancedCacheTables()
             print("⚡ EnhancedCache: System initialized!")
             
-            // Start folder watching after a delay
+            // Start LiveDataCoordinator after a delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                FolderWatcherManager.shared.startWatchingFavorites()
-                print("👀 FSEvents: Folder watching started!")
+                // Register streams with coordinator
+                LiveDataCoordinator.shared.register(FolderWatcherManager.shared)
+                
+                // Start all live data monitoring (includes sleep/wake handling)
+                LiveDataCoordinator.shared.startAll()
+                print("🎛️ LiveDataCoordinator: Started with sleep/wake handling!")
                 
                 let stats = DatabaseManager.shared.getEnhancedCacheStats()
                 print("📊 Cache stats: \(stats.folders) folders, \(stats.items) items, \(stats.thumbnails) thumbnails")
