@@ -522,11 +522,12 @@ class FinderLogic: FunctionProvider {
             children: favoriteChildren,
             preferredLayout: .partialSlice,
             slicePositioning: .center,
+            providerId: providerId,
             onLeftClick: ModifierAwareInteraction(base: .expand),
             onRightClick: ModifierAwareInteraction(base: .expand),
             onBoundaryCross: ModifierAwareInteraction(base: .expand)
         )
-    }    
+    }
     // Updated createFavoriteFolderEntry method for FinderLogic.swift
 
     private func createFavoriteFolderEntry(folderEntry: FolderEntry, settings: FavoriteFolderSettings) -> FunctionNode {
@@ -836,7 +837,7 @@ class FinderLogic: FunctionProvider {
         let finderWindows = getOpenFinderWindows()
         print("🔍 [FinderLogic] Found \(finderWindows.count) open Finder window(s)")
         
-        var windowNodes = finderWindows.compactMap { windowInfo in  
+        var windowNodes = finderWindows.compactMap { windowInfo in
             createFinderWindowNode(for: windowInfo)
         }
         
