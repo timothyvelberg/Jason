@@ -37,7 +37,7 @@ struct EditRingView: View {
     @State private var combinedAppsMode: ProviderDisplayMode = .parent
     @State private var includeFavoriteFiles: Bool = false
     @State private var favoriteFilesMode: ProviderDisplayMode = .parent
-    @State private var includeFinderLogic: Bool = false
+    @State private var includeFavoriteFolderProvider: Bool = false
     @State private var finderLogicMode: ProviderDisplayMode = .parent
     @State private var includeSystemActions: Bool = false
     @State private var systemActionsMode: ProviderDisplayMode = .parent
@@ -216,7 +216,7 @@ struct EditRingView: View {
                             ProviderRow(
                                 name: "Finder Logic",
                                 description: "Browse folders and recent locations",
-                                isIncluded: $includeFinderLogic,
+                                isIncluded: $includeFavoriteFolderProvider,
                                 displayMode: $finderLogicMode
                             )
                             
@@ -295,7 +295,7 @@ struct EditRingView: View {
     }
     
     private var hasAtLeastOneProvider: Bool {
-        includeCombinedApps || includeFavoriteFiles || includeFinderLogic || includeSystemActions || includeWindowManagement
+        includeCombinedApps || includeFavoriteFiles || includeFavoriteFolderProvider || includeSystemActions || includeWindowManagement
     }
     
     // MARK: - Actions
@@ -342,8 +342,8 @@ struct EditRingView: View {
             case "FavoriteFilesProvider":
                 includeFavoriteFiles = true
                 favoriteFilesMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
-            case "FinderLogic":
-                includeFinderLogic = true
+            case "FavoriteFolderProvider":
+                includeFavoriteFolderProvider = true
                 finderLogicMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
             case "SystemActionsProvider":
                 includeSystemActions = true
@@ -447,8 +447,8 @@ struct EditRingView: View {
             order += 1
         }
         
-        if includeFinderLogic {
-            providers.append(("FinderLogic", order, finderLogicMode.rawValue, nil))
+        if includeFavoriteFolderProvider {
+            providers.append(("FavoriteFolderProvider", order, finderLogicMode.rawValue, nil))
             order += 1
         }
         

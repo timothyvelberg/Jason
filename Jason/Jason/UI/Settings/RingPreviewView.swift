@@ -117,7 +117,7 @@ struct RingPreviewView: View {
             ("doc.fill", "Document", .file),
             ("photo.fill", "Image", .file),
         ],
-        "FinderLogic": [
+        "FavoriteFolderProvider": [
             ("folder.fill", "Downloads", .folder),
             ("folder.fill", "Documents", .folder),
             ("folder.fill", "Desktop", .folder),
@@ -189,7 +189,7 @@ struct RingPreviewView: View {
         switch providerType {
         case "CombinedAppsProvider": return "square.grid.2x2.fill"
         case "FavoriteFilesProvider": return "doc.on.doc.fill"
-        case "FinderLogic": return "folder.fill"
+        case "FavoriteFolderProvider": return "folder.fill"
         case "SystemActionsProvider": return "gearshape.fill"
         case "WindowManagementProvider": return "uiwindow.split.2x1"
         default: return "circle.fill"
@@ -201,7 +201,7 @@ struct RingPreviewView: View {
         switch providerType {
         case "CombinedAppsProvider": return "Apps"
         case "FavoriteFilesProvider": return "Files"
-        case "FinderLogic": return "Folders"
+        case "FavoriteFolderProvider": return "Folders"
         case "SystemActionsProvider": return "System"
         case "WindowManagementProvider": return "Windows"
         default: return providerType
@@ -264,7 +264,7 @@ struct RingPreviewView_Previews: PreviewProvider {
                 iconSize: 32,
                 providers: [
                     ProviderConfiguration(id: 1, providerType: "CombinedAppsProvider", order: 1, parentItemAngle: nil, config: nil),
-                    ProviderConfiguration(id: 2, providerType: "FinderLogic", order: 2, parentItemAngle: nil, config: nil),
+                    ProviderConfiguration(id: 2, providerType: "FavoriteFolderProvider", order: 2, parentItemAngle: nil, config: nil),
                 ]
             )
         }

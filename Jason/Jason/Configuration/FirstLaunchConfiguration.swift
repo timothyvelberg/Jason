@@ -78,7 +78,7 @@ class FirstLaunchConfiguration {
                 providers: [
                     (type: "CombinedAppsProvider", order: 1, displayMode: "parent", angle: nil),
                     (type: "FavoriteFilesProvider", order: 2,displayMode: "parent", nil),
-                    (type: "FinderLogic", order: 3,displayMode: "parent", angle: nil),
+                    (type: "FavoriteFolderProvider", order: 3,displayMode: "parent", angle: nil),
                     (type: "SystemActionsProvider", order: 4, displayMode: "parent", angle: nil)
                 ]
             )
@@ -126,7 +126,7 @@ class FirstLaunchConfiguration {
                 keyCode: DefaultShortcut.ctrlShiftA.keyCode,
                 modifierFlags: DefaultShortcut.ctrlShiftA.modifierFlags,
                 providers: [
-                    (type: "FinderLogic", order: 1, displayMode: "direct", angle: nil)
+                    (type: "FavoriteFolderProvider", order: 1, displayMode: "direct", angle: nil)
                 ]
             )
             print("   ✅ Created '\(folderRing.name)' - \(folderRing.shortcutDescription)")
@@ -156,7 +156,7 @@ class FirstLaunchConfiguration {
                 modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue,
                 providers: [
                     (type: "CombinedAppsProvider", order: 1, displayMode: "direct", angle: nil),
-                    (type: "FinderLogic", order: 2, displayMode: "direct", nil)
+                    (type: "FavoriteFolderProvider", order: 2, displayMode: "direct", nil)
                 ]
             )
             print("   ✅ Created '\(everythingDirectRing.name)' - \(everythingDirectRing.shortcutDescription)")

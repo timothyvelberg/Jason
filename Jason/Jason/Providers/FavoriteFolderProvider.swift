@@ -1,0 +1,694 @@
+//
+//  FavoriteFolderProvider.swift
+//  Jason
+//
+//  Provides favorite folder navigation with enhanced caching for heavy folders
+//
+
+import Foundation
+import AppKit
+
+class FavoriteFolderProvider: ObservableObject, FunctionProvider {
+    
+    // MARK: - Provider Info
+    
+    var providerId: String { "favorite-folders" }
+    var providerName: String { "Favorite Folders" }
+    var providerIcon: NSImage {
+        NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage()
+    }
+    
+    private let maxItemsPerFolder: Int = 40
+    private var nodeCache: [String: [FunctionNode]] = [:]
+    
+    // MARK: - FunctionProvider Protocol
+    
+    func provideFunctions() -> [FunctionNode] {
+        print("📁 [FavoriteFolderProvider] provideFunctions() called")
+        
+        // Get favorites from database
+        let favoritesFromDB = DatabaseManager.shared.getFavoriteFolders()
+        
+        // If no favorites in database, add defaults
+        if favoritesFromDB.isEmpty {
+            print("📁 [FavoriteFolderProvider] No favorites found - adding defaults")
+            addDefaultFavorites()
+            return provideFunctions() // Recurse once after adding defaults
+        }
+        
+        let favoriteChildren = favoritesFromDB.map { (folder, settings) in
+            createFavoriteFolderEntry(folderEntry: folder, settings: settings)
+        }
+        
+        // Wrap in category node - applyDisplayMode will unwrap if displayMode == .direct
+        return [FunctionNode(
+            id: "favorite-folders-section",
+            name: "Folders",
+            type: .category,
+            icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
+            children: favoriteChildren,
+            preferredLayout: .partialSlice,
+            slicePositioning: .center,
+            providerId: providerId,
+            onLeftClick: ModifierAwareInteraction(base: .expand),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onBoundaryCross: ModifierAwareInteraction(base: .expand)
+        )]
+    }
+    
+    func clearCache() {
+        nodeCache.removeAll()
+        print("🗑️ [FavoriteFolderProvider] Cache cleared")
+    }
+    
+    func invalidateCache(for url: URL) {
+        let cacheKey = url.path
+        nodeCache.removeValue(forKey: cacheKey)
+        print("🗑️ [FavoriteFolderProvider] Invalidated cache for: \(url.path)")
+    }
+    
+    func refresh() {
+        print("🔄 [FavoriteFolderProvider] refresh() called")
+        nodeCache.removeAll()
+    }
+    
+    // MARK: - Dynamic Loading
+    
+    func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
+        print("📂 [FavoriteFolderProvider] loadChildren called for: \(node.name)")
+        
+        guard let metadata = node.metadata,
+              let urlString = metadata["folderURL"] as? String else {
+            print("❌ No folderURL in metadata")
+            return []
+        }
+        
+        let folderURL = URL(fileURLWithPath: urlString)
+        let folderPath = folderURL.path
+        let db = DatabaseManager.shared
+        
+        // Get custom max items from metadata
+        let customMaxItems = metadata["maxItems"] as? Int
+        
+        // Get sort order
+        let requestedSortOrder = getSortOrderForFolder(path: folderPath)
+        print("🎯 [SORT] Folder: \(node.name) - Sort: \(requestedSortOrder.displayName)")
+        
+        // Record folder access
+        db.recordFolderAccess(folderPath: folderPath)
+        
+        // Check if this is a HEAVY folder and try ENHANCED CACHE
+        if db.isHeavyFolder(path: folderPath) {
+            print("📦 [FavoriteFolderProvider] Heavy folder detected: \(node.name)")
+            
+            if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
+                print("⚡ [EnhancedCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
+                
+                // Convert to nodes
+                var nodes = cachedItems.map { item in
+                    if item.isDirectory {
+                        return createFolderNodeFromCache(item: item)
+                    } else {
+                        return createFileNodeFromCache(item: item)
+                    }
+                }
+                
+                // Apply sort order
+                nodes = sortNodes(nodes, by: requestedSortOrder)
+                
+                // Apply custom limit if specified
+                if let limit = customMaxItems {
+                    print("✂️ [FavoriteFolderProvider] Applying custom limit: \(limit) items")
+                    return Array(nodes.prefix(limit))
+                }
+                
+                return nodes
+            } else {
+                print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
+            }
+        }
+        
+        // CACHE MISS OR NOT HEAVY - Load from disk
+        print("💿 [START] Loading from disk: \(folderURL.path)")
+        let startTime = Date()
+        
+        // Check ACTUAL folder size BEFORE limiting display
+        let actualItemCount = countFolderItems(at: folderURL)
+        print("📊 [FavoriteFolderProvider] Actual folder contains: \(actualItemCount) items")
+        
+        let nodes: [FunctionNode] = await Task.detached(priority: .userInitiated) { [weak self] () -> [FunctionNode] in
+            guard let self = self else {
+                print("❌ [FavoriteFolderProvider] Self deallocated during load")
+                return []
+            }
+            print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
+            
+            let result = self.getFolderContents(at: folderURL, sortOrder: requestedSortOrder, maxItems: customMaxItems)
+            
+            print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items")
+            return result
+        }.value
+        
+        let elapsed = Date().timeIntervalSince(startTime)
+        print("✅ [END] Loaded \(nodes.count) nodes in \(String(format: "%.2f", elapsed))s")
+        
+        // Handle folder watching status dynamically
+        handleFolderWatchingStatus(folderPath: folderPath, itemCount: actualItemCount, folderName: node.name)
+        
+        // Cache heavy folders
+        if actualItemCount > 100 {
+            print("📊 [EnhancedCache] Folder has \(actualItemCount) items - caching with thumbnails")
+            
+            // Convert nodes to EnhancedFolderItem format WITH THUMBNAILS
+            let enhancedItems = convertToEnhancedFolderItems(nodes: nodes, folderURL: folderURL)
+            
+            // Save to Enhanced Cache
+            db.saveEnhancedFolderContents(folderPath: folderPath, items: enhancedItems)
+            print("💾 [EnhancedCache] Cached \(nodes.count) items for future instant loads!")
+        } else {
+            print("ℹ️ [EnhancedCache] Folder has only \(actualItemCount) items - not caching (threshold: 100)")
+        }
+        
+        // Update folder access tracking
+        db.updateFolderAccess(path: folderPath)
+        
+        return nodes
+    }
+    
+    // MARK: - Sorting
+    
+    private func getSortOrderForFolder(path: String) -> FolderSortOrder {
+        let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
+        
+        if let favoriteFolder = favoriteFolders.first(where: { $0.folder.path == path }),
+           let sortOrder = favoriteFolder.settings.contentSortOrder {
+            return sortOrder
+        }
+        
+        return .modifiedNewest
+    }
+    
+    private func sortNodes(_ nodes: [FunctionNode], by sortOrder: FolderSortOrder) -> [FunctionNode] {
+        // Extract URLs from nodes for sorting
+        var urlNodePairs: [(URL, FunctionNode)] = []
+        
+        for node in nodes {
+            if let previewURL = node.previewURL {
+                urlNodePairs.append((previewURL, node))
+            } else if let metadata = node.metadata,
+                      let urlString = metadata["folderURL"] as? String {
+                urlNodePairs.append((URL(fileURLWithPath: urlString), node))
+            }
+        }
+        
+        // Sort URLs using FolderSortingUtility
+        let urls = urlNodePairs.map { $0.0 }
+        let sortedURLs = FolderSortingUtility.sortURLs(urls, by: sortOrder)
+        
+        // Reorder nodes to match sorted URLs
+        var sortedNodes: [FunctionNode] = []
+        for sortedURL in sortedURLs {
+            if let pair = urlNodePairs.first(where: { $0.0 == sortedURL }) {
+                sortedNodes.append(pair.1)
+            }
+        }
+        
+        return sortedNodes
+    }
+    
+    // MARK: - Folder Watching
+    
+    private func isFavoriteFolder(path: String) -> Bool {
+        let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
+        return favoriteFolders.contains { $0.folder.path == path }
+    }
+    
+    private func handleFolderWatchingStatus(folderPath: String, itemCount: Int, folderName: String) {
+        let db = DatabaseManager.shared
+        let isCurrentlyHeavy = db.isHeavyFolder(path: folderPath)
+        let shouldBeHeavy = itemCount > 100
+        let isFavorite = isFavoriteFolder(path: folderPath)
+        
+        if shouldBeHeavy && !isCurrentlyHeavy {
+            // FOLDER JUST BECAME HEAVY
+            print("📊 [FavoriteFolderProvider] Folder crossed threshold: \(itemCount) items")
+            
+            db.markAsHeavyFolder(path: folderPath, itemCount: itemCount)
+            
+            if isFavorite {
+                FolderWatcherManager.shared.startWatching(path: folderPath, itemName: folderName)
+                print("👀 [FSEvents] Started watching newly-heavy favorite folder: \(folderName)")
+            }
+            
+        } else if !shouldBeHeavy && isCurrentlyHeavy {
+            // FOLDER JUST BECAME LIGHT
+            print("📉 [FavoriteFolderProvider] Folder dropped below threshold: \(itemCount) items")
+            
+            db.removeHeavyFolder(path: folderPath)
+            FolderWatcherManager.shared.stopWatching(path: folderPath)
+            print("🛑 [FSEvents] Stopped watching - folder is now light: \(folderName)")
+            
+            db.invalidateEnhancedCache(for: folderPath)
+            
+        } else if shouldBeHeavy && isCurrentlyHeavy {
+            // FOLDER IS STILL HEAVY - update count
+            db.updateHeavyFolderItemCount(path: folderPath, itemCount: itemCount)
+        }
+    }
+    
+    // MARK: - Folder Contents
+    
+    private func getFolderContents(at url: URL, sortOrder: FolderSortOrder, maxItems: Int? = nil) -> [FunctionNode] {
+        do {
+            let contents = try FileManager.default.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: [.isDirectoryKey, .nameKey, .contentModificationDateKey, .creationDateKey, .fileSizeKey],
+                options: [.skipsHiddenFiles]
+            )
+            
+            let sortedContents = FolderSortingUtility.sortURLs(contents, by: sortOrder)
+            
+            let itemLimit = maxItems ?? maxItemsPerFolder
+            let limitedContents = Array(sortedContents.prefix(itemLimit))
+            
+            return limitedContents.map { contentURL in
+                var isDirectory: ObjCBool = false
+                FileManager.default.fileExists(atPath: contentURL.path, isDirectory: &isDirectory)
+                
+                if isDirectory.boolValue {
+                    return createFolderNode(for: contentURL)
+                } else {
+                    return createFileNode(for: contentURL)
+                }
+            }
+            
+        } catch {
+            print("❌ [FavoriteFolderProvider] Failed to get folder contents: \(error)")
+            return []
+        }
+    }
+    
+    private func countFolderItems(at url: URL) -> Int {
+        do {
+            let items = try FileManager.default.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            )
+            return items.count
+        } catch {
+            print("⚠️ [FavoriteFolderProvider] Failed to count folder items: \(error)")
+            return 0
+        }
+    }
+    
+    // MARK: - Node Creation
+    
+    private func createFileNode(for url: URL) -> FunctionNode {
+        let fileName = url.lastPathComponent
+        let dragImage = createThumbnail(for: url)
+        
+        return FunctionNode(
+            id: "file-\(url.path)",
+            name: fileName,
+            type: .file,
+            icon: dragImage,
+            contextActions: [
+                StandardContextActions.copyFile(url),
+                StandardContextActions.deleteFile(url),
+                StandardContextActions.showInFinder(url)
+            ],
+            preferredLayout: .partialSlice,
+            previewURL: url,
+            showLabel: true,
+            slicePositioning: .center,
+            
+            onLeftClick: ModifierAwareInteraction(base: .drag(DragProvider(
+                fileURLs: [url],
+                dragImage: dragImage,
+                allowedOperations: .move,
+                onClick: {
+                    print("📂 Opening file: \(fileName)")
+                    NSWorkspace.shared.open(url)
+                },
+                onDragStarted: {
+                    print("📦 Started dragging: \(fileName)")
+                },
+                onDragCompleted: { success in
+                    if success {
+                        print("✅ Successfully dragged: \(fileName)")
+                    } else {
+                        print("❌ Drag cancelled: \(fileName)")
+                    }
+                }
+            ))),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
+                print("🖱️ Middle-click opening: \(fileName)")
+                NSWorkspace.shared.open(url)
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
+    }
+    
+    private func createFolderNode(for url: URL) -> FunctionNode {
+        let folderName = url.lastPathComponent
+        
+        return FunctionNode(
+            id: "folder-\(url.path)",
+            name: folderName,
+            type: .folder,
+            icon: IconProvider.shared.getFolderIcon(for: url, size: 64, cornerRadius: 8),
+            children: nil,
+            contextActions: [
+                StandardContextActions.showInFinder(url),
+                StandardContextActions.deleteFile(url)
+            ],
+            preferredLayout: .partialSlice,
+            previewURL: url,
+            showLabel: true,
+            slicePositioning: .center,
+            metadata: ["folderURL": url.path],
+            providerId: self.providerId,
+            onLeftClick: ModifierAwareInteraction(base: .navigateInto),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
+                print("📂 Middle-click opening folder: \(folderName)")
+                NSWorkspace.shared.open(url)
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
+    }
+    
+    // MARK: - Cache Node Creation
+    
+    private func createFileNodeFromCache(item: EnhancedFolderItem) -> FunctionNode {
+        let url = URL(fileURLWithPath: item.path)
+        let fileName = item.name
+        
+        let icon: NSImage
+        if let thumbnailData = item.thumbnailData, let cachedThumbnail = NSImage(data: thumbnailData) {
+            icon = cachedThumbnail
+        } else {
+            icon = IconProvider.shared.getFileIcon(for: url, size: 64, cornerRadius: 8)
+        }
+        
+        return FunctionNode(
+            id: "file-\(item.path)",
+            name: fileName,
+            type: .file,
+            icon: icon,
+            contextActions: [
+                StandardContextActions.copyFile(url),
+                StandardContextActions.deleteFile(url),
+                StandardContextActions.showInFinder(url)
+            ],
+            preferredLayout: .partialSlice,
+            previewURL: url,
+            showLabel: true,
+            slicePositioning: .center,
+            
+            onLeftClick: ModifierAwareInteraction(base: .drag(DragProvider(
+                fileURLs: [url],
+                dragImage: icon,
+                allowedOperations: .move,
+                onClick: {
+                    print("📂 Opening file: \(fileName)")
+                    NSWorkspace.shared.open(url)
+                },
+                onDragStarted: {
+                    print("📦 Started dragging: \(fileName)")
+                },
+                onDragCompleted: { success in
+                    if success {
+                        print("✅ Successfully dragged: \(fileName)")
+                    } else {
+                        print("❌ Drag cancelled: \(fileName)")
+                    }
+                }
+            ))),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
+                print("🖱️ Middle-click opening: \(fileName)")
+                NSWorkspace.shared.open(url)
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
+    }
+    
+    private func createFolderNodeFromCache(item: EnhancedFolderItem) -> FunctionNode {
+        let url = URL(fileURLWithPath: item.path)
+        let folderName = item.name
+        let icon = IconProvider.shared.getFolderIcon(for: url, size: 64, cornerRadius: 8)
+        
+        return FunctionNode(
+            id: "folder-\(item.path)",
+            name: folderName,
+            type: .folder,
+            icon: icon,
+            children: nil,
+            contextActions: [
+                StandardContextActions.showInFinder(url),
+                StandardContextActions.deleteFile(url)
+            ],
+            preferredLayout: .partialSlice,
+            previewURL: url,
+            showLabel: true,
+            slicePositioning: .center,
+            metadata: ["folderURL": item.path],
+            providerId: self.providerId,
+            onLeftClick: ModifierAwareInteraction(base: .navigateInto),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
+                print("📂 Middle-click opening folder: \(folderName)")
+                NSWorkspace.shared.open(url)
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
+    }
+    
+    // MARK: - Favorites Management
+    
+    private func createFavoriteFolderEntry(folderEntry: FolderEntry, settings: FavoriteFolderSettings) -> FunctionNode {
+        let path = URL(fileURLWithPath: folderEntry.path)
+        var metadata: [String: Any] = ["folderURL": folderEntry.path]
+        
+        if let maxItems = settings.maxItems {
+            metadata["maxItems"] = maxItems
+        }
+        
+        let layout: LayoutStyle = {
+            guard let layoutString = settings.preferredLayout else { return .fullCircle }
+            return layoutString == "partialSlice" ? .partialSlice : .fullCircle
+        }()
+        
+        let positioning: SlicePositioning = {
+            guard let posString = settings.slicePositioning else { return .startClockwise }
+            switch posString {
+            case "startCounterClockwise": return .startCounterClockwise
+            case "center": return .center
+            default: return .startClockwise
+            }
+        }()
+        
+        let itemAngle = settings.itemAngleSize.map { CGFloat($0) }
+        let childThickness = settings.childRingThickness.map { CGFloat($0) }
+        let childIcon = settings.childIconSize.map { CGFloat($0) }
+        
+        let folderIcon: NSImage = {
+            if folderEntry.baseAsset != "folder-blue" || folderEntry.iconName != nil {
+                let symbolName = folderEntry.iconName ?? ""
+                
+                return IconProvider.shared.createCompositeIcon(
+                    baseAssetName: folderEntry.baseAsset,
+                    symbolName: symbolName,
+                    symbolColor: .white,
+                    size: 64,
+                    symbolSize: folderEntry.symbolSize,
+                    cornerRadius: 8,
+                    symbolOffset: -4
+                )
+            }
+            
+            return IconProvider.shared.getFolderIcon(for: path, size: 64, cornerRadius: 8)
+        }()
+        
+        return FunctionNode(
+            id: "favorite-\(path.path)",
+            name: folderEntry.title,
+            type: .folder,
+            icon: folderIcon,
+            children: nil,
+            preferredLayout: layout,
+            itemAngleSize: itemAngle,
+            showLabel: true,
+            childRingThickness: childThickness,
+            childIconSize: childIcon,
+            slicePositioning: positioning,
+            metadata: metadata,
+            providerId: self.providerId,
+            onLeftClick: ModifierAwareInteraction(base: .navigateInto),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
+                DatabaseManager.shared.updateFolderAccess(path: path.path)
+                NSWorkspace.shared.open(path)
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
+    }
+    
+    private func addDefaultFavorites() {
+        // Downloads - Newest First
+        if let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
+            let settings = FavoriteFolderSettings(
+                maxItems: nil,
+                preferredLayout: nil,
+                itemAngleSize: nil,
+                slicePositioning: nil,
+                childRingThickness: nil,
+                childIconSize: nil,
+                contentSortOrder: .modifiedNewest
+            )
+            _ = DatabaseManager.shared.addFavoriteFolder(
+                path: downloadsURL.path,
+                title: "Downloads",
+                settings: settings
+            )
+        }
+        
+        // Git folder - Alphabetical
+        let gitPath = "/Users/timothy/Files/Git/"
+        if FileManager.default.fileExists(atPath: gitPath) {
+            let settings = FavoriteFolderSettings(
+                maxItems: nil,
+                preferredLayout: nil,
+                itemAngleSize: nil,
+                slicePositioning: nil,
+                childRingThickness: nil,
+                childIconSize: nil,
+                contentSortOrder: .alphabeticalAsc
+            )
+            _ = DatabaseManager.shared.addFavoriteFolder(
+                path: gitPath,
+                title: "Git",
+                settings: settings
+            )
+        }
+        
+        // Screenshots - Newest First
+        let screenshotsPath = "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots"
+        if FileManager.default.fileExists(atPath: screenshotsPath) {
+            let settings = FavoriteFolderSettings(
+                maxItems: nil,
+                preferredLayout: nil,
+                itemAngleSize: nil,
+                slicePositioning: nil,
+                childRingThickness: nil,
+                childIconSize: nil,
+                contentSortOrder: .modifiedNewest
+            )
+            _ = DatabaseManager.shared.addFavoriteFolder(
+                path: screenshotsPath,
+                title: "Screenshots",
+                settings: settings
+            )
+        }
+        
+        print("✅ [FavoriteFolderProvider] Added default favorites with smart sorting")
+    }
+    
+    // MARK: - Enhanced Cache Helpers
+    
+    private func convertToEnhancedFolderItems(nodes: [FunctionNode], folderURL: URL) -> [EnhancedFolderItem] {
+        return nodes.compactMap { node -> EnhancedFolderItem? in
+            var path: String?
+            var isDirectory = false
+            var modDate = Date()
+            var fileExtension = ""
+            var fileSize: Int64 = 0
+            var thumbnailData: Data?
+            
+            if let metadata = node.metadata,
+               let folderURLString = metadata["folderURL"] as? String {
+                path = folderURLString
+                isDirectory = true
+            } else if let previewURL = node.previewURL {
+                path = previewURL.path
+                isDirectory = false
+                fileExtension = previewURL.pathExtension.lowercased()
+                
+                if let attrs = try? FileManager.default.attributesOfItem(atPath: previewURL.path) {
+                    if let date = attrs[.modificationDate] as? Date {
+                        modDate = date
+                    }
+                    if let size = attrs[.size] as? Int64 {
+                        fileSize = size
+                    }
+                }
+                
+                // Extract thumbnail from the already-generated icon
+                let iconImage = node.icon
+                if let tiffData = iconImage.tiffRepresentation,
+                   let bitmap = NSBitmapImageRep(data: tiffData),
+                   let pngData = bitmap.representation(using: .png, properties: [:]) {
+                    thumbnailData = pngData
+                }
+            }
+            
+            guard let itemPath = path else { return nil }
+            
+            let hasCustomIcon = !fileExtension.isEmpty && IconProvider.shared.hasCustomFileIcon(for: fileExtension)
+            
+            let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
+            let isImageFile = imageExtensions.contains(fileExtension)
+            
+            return EnhancedFolderItem(
+                name: node.name,
+                path: itemPath,
+                isDirectory: isDirectory,
+                modificationDate: modDate,
+                fileExtension: fileExtension,
+                fileSize: fileSize,
+                hasCustomIcon: hasCustomIcon,
+                isImageFile: isImageFile,
+                thumbnailData: thumbnailData,
+                folderConfigJSON: nil
+            )
+        }
+    }
+    
+    // MARK: - Thumbnail Creation
+    
+    private func createThumbnail(for url: URL) -> NSImage {
+        let thumbnailSize = NSSize(width: 64, height: 64)
+        let cornerRadius: CGFloat = 8
+        
+        let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
+        let fileExtension = url.pathExtension.lowercased()
+        
+        if imageExtensions.contains(fileExtension) {
+            if let image = NSImage(contentsOf: url) {
+                let thumbnail = NSImage(size: thumbnailSize)
+                
+                thumbnail.lockFocus()
+                
+                let rect = NSRect(origin: .zero, size: thumbnailSize)
+                let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
+                path.addClip()
+                
+                image.draw(
+                    in: rect,
+                    from: NSRect(origin: .zero, size: image.size),
+                    operation: .sourceOver,
+                    fraction: 1.0
+                )
+                
+                thumbnail.unlockFocus()
+                
+                return thumbnail
+            }
+        }
+        
+        return IconProvider.shared.getFileIcon(for: url, size: thumbnailSize.width, cornerRadius: cornerRadius)
+    }
+}

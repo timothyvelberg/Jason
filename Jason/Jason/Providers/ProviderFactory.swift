@@ -52,8 +52,8 @@ class ProviderFactory {
         case "SystemActionsProvider":
             provider = createSystemActionsProvider(config: config)
             
-        case "FinderLogic":
-            provider = createFinderLogic(config: config)
+        case "FavoriteFolderProvider":
+            provider = createFavoriteFolderProvider(config: config)
             
         case "WindowManagementProvider":
             provider = createWindowManagementProvider(config: config)
@@ -132,10 +132,10 @@ class ProviderFactory {
         return provider
     }
     
-    private func createFinderLogic(config: ProviderConfiguration) -> FinderLogic? {
-        let provider = FinderLogic()
+    private func createFavoriteFolderProvider(config: ProviderConfiguration) -> FavoriteFolderProvider? {
+        let provider = FavoriteFolderProvider()
         
-        // FinderLogic typically doesn't need dependencies
+        // FavoriteFolderProvider typically doesn't need dependencies
         
         // TODO: Apply parentItemAngle from config when provider supports it
         // TODO: Apply additional config parameters if needed
@@ -165,7 +165,7 @@ class ProviderFactory {
             "CombinedAppsProvider",
             "FavoriteFilesProvider",
             "SystemActionsProvider",
-            "FinderLogic",
+            "FavoriteFolderProvider",
             "WindowManagementProvider"
         ]
         
@@ -179,7 +179,7 @@ class ProviderFactory {
             "CombinedAppsProvider",
             "FavoriteFilesProvider",
             "SystemActionsProvider",
-            "FinderLogic",
+            "FavoriteFolderProvider",
             "WindowManagementProvider"
         ]
     }

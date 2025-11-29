@@ -27,7 +27,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     
     // MARK: - Properties
     
-    /// 🆕 CHANGED: This now references AppSwitcherManager.shared (set by ProviderFactory)
+    ///This now references AppSwitcherManager.shared (set by ProviderFactory)
     weak var appSwitcherManager: AppSwitcherManager?
     weak var circularUIManager: CircularUIManager?
     

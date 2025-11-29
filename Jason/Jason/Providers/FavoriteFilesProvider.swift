@@ -253,14 +253,11 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
     // MARK: - Provide Functions
     
     func provideFunctions() -> [FunctionNode] {
-        
-        // Create nodes for each file
         let fileNodes: [FunctionNode] = fileEntries.map { entry in
             createFileNode(from: entry)
         }
         
         if fileNodes.isEmpty {
-            // Return empty state node
             return [
                 FunctionNode(
                     id: "no-favorite-files",
@@ -406,6 +403,86 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             }),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
+    }
+    
+    private func addDefaultFavorites() {
+        // Downloads - Newest First
+        if let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
+            let settings = FavoriteFolderSettings(
+                maxItems: nil,
+                preferredLayout: nil,
+                itemAngleSize: nil,
+                slicePositioning: nil,
+                childRingThickness: nil,
+                childIconSize: nil,
+                contentSortOrder: .modifiedNewest
+            )
+            _ = DatabaseManager.shared.addFavoriteFolder(
+                path: downloadsURL.path,
+                title: "Downloads",
+                settings: settings
+            )
+            
+            // Also add dynamic file for latest download
+            _ = DatabaseManager.shared.addFavoriteDynamicFile(
+                displayName: "Latest Download",
+                folderPath: downloadsURL.path,
+                queryType: "most_recent",
+                fileExtensions: nil,
+                namePattern: nil,
+                iconData: nil
+            )
+        }
+        
+        // Git folder - Alphabetical
+        let gitPath = "/Users/timothy/Files/Git/"
+        if FileManager.default.fileExists(atPath: gitPath) {
+            let settings = FavoriteFolderSettings(
+                maxItems: nil,
+                preferredLayout: nil,
+                itemAngleSize: nil,
+                slicePositioning: nil,
+                childRingThickness: nil,
+                childIconSize: nil,
+                contentSortOrder: .alphabeticalAsc
+            )
+            _ = DatabaseManager.shared.addFavoriteFolder(
+                path: gitPath,
+                title: "Git",
+                settings: settings
+            )
+        }
+        
+        // Screenshots - Newest First
+        let screenshotsPath = "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots"
+        if FileManager.default.fileExists(atPath: screenshotsPath) {
+            let settings = FavoriteFolderSettings(
+                maxItems: nil,
+                preferredLayout: nil,
+                itemAngleSize: nil,
+                slicePositioning: nil,
+                childRingThickness: nil,
+                childIconSize: nil,
+                contentSortOrder: .modifiedNewest
+            )
+            _ = DatabaseManager.shared.addFavoriteFolder(
+                path: screenshotsPath,
+                title: "Screenshots",
+                settings: settings
+            )
+            
+            // Also add dynamic file for latest screenshot
+            _ = DatabaseManager.shared.addFavoriteDynamicFile(
+                displayName: "Latest Screenshot",
+                folderPath: screenshotsPath,
+                queryType: "most_recent",
+                fileExtensions: "png,jpg,jpeg,heic",
+                namePattern: nil,
+                iconData: nil
+            )
+        }
+        
+        print("✅ [FavoriteFolderProvider] Added default favorites with smart sorting")
     }
     
     func refresh() {
