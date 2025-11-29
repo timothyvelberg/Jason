@@ -187,11 +187,9 @@ class CircularUIInstanceManager: ObservableObject {
         }
         
         print("   ✅ Sync complete: \(instances.count) active instance(s)")
+        registerInputTriggers()
     }
     
-    // MARK: - Input Trigger Management
-
-    /// Register keyboard shortcuts and mouse buttons for all active instances
     // MARK: - Input Trigger Management
 
     /// Register keyboard shortcuts and mouse buttons for all active instances
