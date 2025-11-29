@@ -45,7 +45,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             id: "favorite-folders-section",
             name: "Folders",
             type: .category,
-            icon: NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: "ring-favorite-folder") ?? NSImage(),
             children: favoriteChildren,
             preferredLayout: .partialSlice,
             slicePositioning: .center,

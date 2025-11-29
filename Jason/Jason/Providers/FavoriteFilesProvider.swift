@@ -21,7 +21,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
     }
     
     var providerIcon: NSImage {
-        return NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil) ?? NSImage()
+        return NSImage(named: "ring-favorite-file") ?? NSImage()
     }
     
     // MARK: - Properties
