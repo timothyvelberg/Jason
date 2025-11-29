@@ -117,7 +117,11 @@ class DockBadgeReader {
                   let name = app.localizedName else {
                 continue
             }
-            map[name] = bundleId
+            
+            // Strip invisible Unicode characters (e.g., left-to-right mark U+200E)
+            let cleanName = name.filter { !$0.isInvisible }
+            
+            map[cleanName] = bundleId
         }
         
         return map
@@ -168,5 +172,18 @@ class DockBadgeReader {
         }
         
         return badges
+    }
+}
+
+// MARK: - Character Extension
+
+private extension Character {
+    /// Returns true if this character is an invisible Unicode control character
+    var isInvisible: Bool {
+        guard let scalar = unicodeScalars.first else { return false }
+        // Common invisible characters:
+        // U+200E (LTR mark), U+200F (RTL mark), U+200B (zero-width space),
+        // U+FEFF (BOM/zero-width no-break space), etc.
+        return scalar.properties.isDefaultIgnorableCodePoint
     }
 }

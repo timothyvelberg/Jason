@@ -56,6 +56,94 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
+            
+            // 🧪 TEST: Check for invisible characters in WhatsApp name
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                print("🧪 [Name Debug] Checking WhatsApp name encoding...")
+                
+                // From running apps
+                if let whatsapp = NSWorkspace.shared.runningApplications.first(where: {
+                    $0.bundleIdentifier == "net.whatsapp.WhatsApp"
+                }) {
+                    let name = whatsapp.localizedName ?? "(nil)"
+                    print("   Running app name: \"\(name)\"")
+                    print("   Bytes: \(Array(name.utf8))")
+                    print("   Length: \(name.count)")
+                }
+                
+                // What we'd expect
+                let expected = "WhatsApp"
+                print("\n   Expected name: \"\(expected)\"")
+                print("   Bytes: \(Array(expected.utf8))")
+                print("   Length: \(expected.count)")
+            }
+            
+            
+            // 🧪 TEST: WhatsApp badge debug
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                print("🧪 [Dock A11y] Checking all dock items for badges...")
+                
+                guard let dockApp = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == "com.apple.dock" }) else {
+                    print("   ❌ Dock not found")
+                    return
+                }
+                
+                let dockElement = AXUIElementCreateApplication(dockApp.processIdentifier)
+                
+                var childrenRef: CFTypeRef?
+                let childrenResult = AXUIElementCopyAttributeValue(dockElement, kAXChildrenAttribute as CFString, &childrenRef)
+                
+                guard childrenResult == .success, let children = childrenRef as? [AXUIElement] else {
+                    print("   ❌ Failed to get Dock children")
+                    return
+                }
+                
+                for child in children {
+                    var roleRef: CFTypeRef?
+                    AXUIElementCopyAttributeValue(child, kAXRoleAttribute as CFString, &roleRef)
+                    
+                    if (roleRef as? String) == "AXList" {
+                        var listChildrenRef: CFTypeRef?
+                        let listResult = AXUIElementCopyAttributeValue(child, kAXChildrenAttribute as CFString, &listChildrenRef)
+                        
+                        if listResult == .success, let listChildren = listChildrenRef as? [AXUIElement] {
+                            print("   Found \(listChildren.count) dock items:")
+                            
+                            for item in listChildren {
+                                var titleRef: CFTypeRef?
+                                AXUIElementCopyAttributeValue(item, kAXTitleAttribute as CFString, &titleRef)
+                                let title = titleRef as? String ?? "(no title)"
+                                
+                                // Check ALL attributes for WhatsApp
+                                if title.lowercased().contains("whatsapp") {
+                                    print("\n   🔍 WhatsApp found - dumping all attributes:")
+                                    
+                                    var attrNamesRef: CFArray?
+                                    AXUIElementCopyAttributeNames(item, &attrNamesRef)
+                                    
+                                    if let attrNames = attrNamesRef as? [String] {
+                                        for attr in attrNames {
+                                            var valueRef: CFTypeRef?
+                                            AXUIElementCopyAttributeValue(item, attr as CFString, &valueRef)
+                                            let value = valueRef ?? "nil" as CFTypeRef
+                                            print("      \(attr): \(value)")
+                                        }
+                                    }
+                                    print("")
+                                }
+                                
+                                // Also print badge status for all items
+                                var statusRef: CFTypeRef?
+                                AXUIElementCopyAttributeValue(item, "AXStatusLabel" as CFString, &statusRef)
+                                let badge = statusRef as? String
+                                
+                                let badgeInfo = badge != nil ? "✅ badge: \"\(badge!)\"" : "no badge"
+                                print("   - \(title): \(badgeInfo)")
+                            }
+                        }
+                    }
+                }
+            }
         }
         
         // Create the status bar item (menu bar icon)
