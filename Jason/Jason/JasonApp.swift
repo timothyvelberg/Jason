@@ -61,7 +61,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create the status bar item (menu bar icon)
         setupMenuBar()
         
-        // Create the ContentView window (hidden initially)
+        // Create the ContentWindow (hidden initially)
         setupContentWindow()
     }
     

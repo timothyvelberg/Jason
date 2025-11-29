@@ -233,6 +233,10 @@ class AppSwitcherManager: ObservableObject {
         }
         
         print("🚀 [AppSwitcherManager] App launched: \(app.localizedName ?? "Unknown")")
+        
+        // 🆕 Refresh badge cache (new app might have badges)
+        DockBadgeReader.shared.forceRefresh()
+        
         // Trigger immediate refresh instead of waiting for timer
         loadRunningApplications()
     }
@@ -243,6 +247,10 @@ class AppSwitcherManager: ObservableObject {
         }
         
         print("🛑 [AppSwitcherManager] App terminated: \(app.localizedName ?? "Unknown")")
+        
+        // 🆕 Refresh badge cache (removes terminated app's badge)
+        DockBadgeReader.shared.forceRefresh()
+        
         // Trigger immediate refresh instead of waiting for timer
         loadRunningApplications()
     }

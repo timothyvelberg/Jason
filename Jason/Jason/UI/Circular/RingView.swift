@@ -47,6 +47,7 @@ struct RingView: View {
     @State private var iconScales: [String: CGFloat] = [:]         // Track scale per icon ID
     @State private var iconRotationOffsets: [String: Double] = [:] // Track rotation offset per icon ID
     @State private var runningIndicatorOpacities: [String: Double] = [:]  // Track running indicator opacity per icon ID
+    @State private var badgeOpacities: [String: Double] = [:]  //Track badge opacity per icon ID
     
     
     // Animated slice background angles (for partial slice opening animation)
@@ -242,6 +243,10 @@ struct RingView: View {
                     .opacity(opacity)
                     .position(iconPosition(for: index))
                     .allowsHitTesting(false)  // Icons don't intercept clicks
+            }
+            // Badges positioned at top-right of icons
+            ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
+                badgeView(for: node, at: index)
             }
         }
         .frame(width: totalDiameter, height: totalDiameter)
@@ -783,7 +788,8 @@ struct RingView: View {
             iconOpacities[node.id] = 0
             iconScales[node.id] = animationStartScale
             iconRotationOffsets[node.id] = animationRotationOffset
-            runningIndicatorOpacities[node.id] = 0  // 🆕 Initialize running indicators to 0
+            runningIndicatorOpacities[node.id] = 0  //Initialize running indicators to 0
+            badgeOpacities[node.id] = 0
         }
         
         // Animate each icon in with initial delay + staggered delay
@@ -814,11 +820,24 @@ struct RingView: View {
                     }
                 }
             }
+        
+            // Animate badge if present
+            if let metadata = node.metadata,
+               let badge = metadata["badge"] as? String,
+               !badge.isEmpty {
+                DispatchQueue.main.asyncAfter(deadline: .now() + indicatorDelay) {
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        badgeOpacities[node.id] = 1.0
+                    }
+                }
+            }
         }
     }
     
     // MARK: - Center-Out Animation
     
+    // MARK: - Center-Out Animation
+
     private func animateIconsInFromCenter() {
         
         let totalCount = nodes.count
@@ -839,7 +858,8 @@ struct RingView: View {
         for (index, node) in nodes.enumerated() {
             iconOpacities[node.id] = 0
             iconScales[node.id] = animationStartScale
-            runningIndicatorOpacities[node.id] = 0  // 🆕 Initialize running indicators to 0
+            runningIndicatorOpacities[node.id] = 0
+            badgeOpacities[node.id] = 0  // 🆕
             
             // Determine rotation offset based on position relative to center
             let rotationOffset: Double
@@ -934,26 +954,35 @@ struct RingView: View {
             }
         }
         
-        // 🆕 Animate running indicators after all icons are done
+        // 🆕 Animate running indicators and badges after all icons are done
         let lastGroupDelay = animationInitialDelay + (Double(animationGroups.count - 1) * effectiveStaggerDelay)
         let indicatorDelay = lastGroupDelay + animationDuration
         
         for node in nodes {
+            guard let metadata = node.metadata else { continue }
+            
             // Check if this node is a running app
-            if let metadata = node.metadata,
-               let isRunning = metadata["isRunning"] as? Bool,
-               isRunning {
+            if let isRunning = metadata["isRunning"] as? Bool, isRunning {
                 DispatchQueue.main.asyncAfter(deadline: .now() + indicatorDelay) {
                     withAnimation(.easeIn(duration: 0.3)) {
                         runningIndicatorOpacities[node.id] = 1.0
                     }
                 }
             }
+            
+            // 🆕 Animate badge if present
+            if let badge = metadata["badge"] as? String, !badge.isEmpty {
+                DispatchQueue.main.asyncAfter(deadline: .now() + indicatorDelay) {
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        badgeOpacities[node.id] = 1.0
+                    }
+                }
+            }
         }
     }
     
-    // MARK: - 🆕 Surgical Icon Animation
-    
+    // MARK: - Surgical Icon Animation
+
     private func animateIconsSurgical(oldNodes: [FunctionNode], newNodes: [FunctionNode]) {
         let oldIds = Set(oldNodes.map { $0.id })
         let newIds = Set(newNodes.map { $0.id })
@@ -985,6 +1014,7 @@ struct RingView: View {
                 iconOpacities[id] = 0
                 iconScales[id] = 0.8
                 runningIndicatorOpacities[id] = 0
+                badgeOpacities[id] = 0  // 🆕
             }
             
             // Clean up after animation
@@ -993,6 +1023,7 @@ struct RingView: View {
                 iconScales.removeValue(forKey: id)
                 iconRotationOffsets.removeValue(forKey: id)
                 runningIndicatorOpacities.removeValue(forKey: id)
+                badgeOpacities.removeValue(forKey: id)  // 🆕
             }
         }
         
@@ -1005,15 +1036,29 @@ struct RingView: View {
                 iconRotationOffsets[id] = 0
             }
             
-            // Update running indicator if metadata changed
+            // Update running indicator and badge if metadata changed
             if let node = newNodes.first(where: { $0.id == id }),
-               let metadata = node.metadata,
-               let isRunning = metadata["isRunning"] as? Bool {
-                let currentOpacity = runningIndicatorOpacities[id] ?? 0
-                let targetOpacity = isRunning ? 1.0 : 0.0
-                if currentOpacity != targetOpacity {
+               let metadata = node.metadata {
+                
+                // Running indicator
+                if let isRunning = metadata["isRunning"] as? Bool {
+                    let currentOpacity = runningIndicatorOpacities[id] ?? 0
+                    let targetOpacity = isRunning ? 1.0 : 0.0
+                    if currentOpacity != targetOpacity {
+                        withAnimation(.easeIn(duration: 0.3)) {
+                            runningIndicatorOpacities[id] = targetOpacity
+                        }
+                    }
+                }
+                
+                // 🆕 Badge
+                let badge = metadata["badge"] as? String
+                let hasBadge = badge != nil && !badge!.isEmpty
+                let currentBadgeOpacity = badgeOpacities[id] ?? 0
+                let targetBadgeOpacity = hasBadge ? 1.0 : 0.0
+                if currentBadgeOpacity != targetBadgeOpacity {
                     withAnimation(.easeIn(duration: 0.3)) {
-                        runningIndicatorOpacities[id] = targetOpacity
+                        badgeOpacities[id] = targetBadgeOpacity
                     }
                 }
             }
@@ -1028,6 +1073,7 @@ struct RingView: View {
             iconScales[id] = animationStartScale
             iconRotationOffsets[id] = 0
             runningIndicatorOpacities[id] = 0
+            badgeOpacities[id] = 0  // 🆕
             
             // Fade in with slight delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
@@ -1036,14 +1082,25 @@ struct RingView: View {
                     iconScales[id] = 1.0
                 }
                 
-                // Check if should show running indicator
+                // Check if should show running indicator and badge
                 if let node = newNodes.first(where: { $0.id == id }),
-                   let metadata = node.metadata,
-                   let isRunning = metadata["isRunning"] as? Bool,
-                   isRunning {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        withAnimation(.easeIn(duration: 0.3)) {
-                            runningIndicatorOpacities[id] = 1.0
+                   let metadata = node.metadata {
+                    
+                    // Running indicator
+                    if let isRunning = metadata["isRunning"] as? Bool, isRunning {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            withAnimation(.easeIn(duration: 0.3)) {
+                                runningIndicatorOpacities[id] = 1.0
+                            }
+                        }
+                    }
+                    
+                    // 🆕 Badge
+                    if let badge = metadata["badge"] as? String, !badge.isEmpty {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            withAnimation(.easeIn(duration: 0.3)) {
+                                badgeOpacities[id] = 1.0
+                            }
                         }
                     }
                 }
@@ -1061,6 +1118,7 @@ struct RingView: View {
                 iconScales[node.id] = animationStartScale
                 iconRotationOffsets[node.id] = 0
                 runningIndicatorOpacities[node.id] = 0
+                badgeOpacities[node.id] = 0  // 🆕
                 
                 // Immediately fade in (this shouldn't normally happen)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
@@ -1075,12 +1133,51 @@ struct RingView: View {
                        isRunning {
                         runningIndicatorOpacities[node.id] = 1.0
                     }
+                    
+                    // 🆕 Badge if needed
+                    if let metadata = node.metadata,
+                       let badge = metadata["badge"] as? String,
+                       !badge.isEmpty {
+                        badgeOpacities[node.id] = 1.0
+                    }
                 }
             }
         }
         
         if !safetyNetTriggered {
             print("      ✅ All \(newNodes.count) nodes have animation states")
+        }
+    }
+    
+    // MARK: - Badge Rendering
+
+    @ViewBuilder
+    private func badgeView(for node: FunctionNode, at index: Int) -> some View {
+        if let metadata = node.metadata,
+           let badge = metadata["badge"] as? String,
+           !badge.isEmpty {
+            
+            let badgeSize: CGFloat = badge.count > 2 ? 20 : 16
+            let position = iconPosition(for: index)
+            let badgeOffset = iconSize / 2 - 4  // Position at top-right of icon
+            
+            ZStack {
+                // Red background
+                Capsule()
+                    .fill(Color.red)
+                    .frame(width: badgeSize, height: 16)
+                
+                // White text
+                Text(badge)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            .opacity(badgeOpacities[node.id] ?? 0)
+            .position(
+                x: position.x + badgeOffset,
+                y: position.y - badgeOffset
+            )
+            .allowsHitTesting(false)
         }
     }
 }

@@ -43,6 +43,8 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         let runningApp: NSRunningApplication?
         let customIconName: String?
         let sortOrder: Int? // Only for favorites
+        let badge: String?
+        
     }
     
     private var appEntries: [AppEntry] = []
@@ -171,7 +173,8 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                     isRunning: true,
                     runningApp: runningApp,
                     customIconName: iconOverride,
-                    sortOrder: sortOrder
+                    sortOrder: sortOrder,
+                    badge: DockBadgeReader.shared.getBadge(forBundleIdentifier: bundleIdentifier)
                 )
             }
             
@@ -229,7 +232,8 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             isRunning: isRunning,
             runningApp: runningApp,
             customIconName: iconOverride,
-            sortOrder: sortOrder
+            sortOrder: sortOrder,
+            badge: isRunning ? DockBadgeReader.shared.getBadge(forBundleIdentifier: bundleIdentifier) : nil
         )
     }
     
@@ -272,9 +276,11 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 icon: entry.icon,
                 contextActions: contextActions.isEmpty ? nil : contextActions,
                 slicePositioning: .center,
-                metadata: ["isRunning": entry.isRunning],  // 🆕 Add running state to metadata
+                metadata: [
+                    "isRunning": entry.isRunning,
+                    "badge": entry.badge as Any
+                ],
                 providerId: providerId,
-                // EXPLICIT INTERACTION MODEL:
                 onLeftClick: ModifierAwareInteraction(
                         base: .execute { [weak self] in
                             self?.launchOrSwitchToApp(entry)

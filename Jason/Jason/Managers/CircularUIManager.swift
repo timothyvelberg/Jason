@@ -701,6 +701,9 @@ class CircularUIManager: ObservableObject {
             return
         }
         
+        // 🆕 Refresh badge cache before loading functions
+        DockBadgeReader.shared.forceRefresh()
+        
         // 🆕 ADDED: Register as the active CircularUIManager
         print("🔗 [CircularUIManager-\(configId)] Registering as active instance with AppSwitcherManager")
         AppSwitcherManager.shared.activeCircularUIManager = self

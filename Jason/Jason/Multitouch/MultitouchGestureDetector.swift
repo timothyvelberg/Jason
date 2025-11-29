@@ -111,6 +111,9 @@ class MultitouchGestureDetector: LiveDataStream {
     private var devices: [MTDeviceRef] = []
     private(set) var isMonitoring: Bool = false
     
+    /// Lock to protect device operations during sleep/wake transitions
+    private let deviceLock = NSLock()
+    
     // MARK: - Initialization
     
     init() {
@@ -126,6 +129,9 @@ class MultitouchGestureDetector: LiveDataStream {
     
     /// Start monitoring for multitouch gestures
     func startMonitoring() {
+        deviceLock.lock()
+        defer { deviceLock.unlock() }
+        
         guard !isMonitoring else {
             print("⚠️ [MultitouchGestureDetector] Already monitoring")
             return
@@ -175,44 +181,83 @@ class MultitouchGestureDetector: LiveDataStream {
     
     /// Stop monitoring for multitouch gestures
     func stopMonitoring() {
-        guard isMonitoring else { return }
+        deviceLock.lock()
+        defer { deviceLock.unlock() }
+        
+        guard isMonitoring else {
+            print("⚠️ [MultitouchGestureDetector] Not currently monitoring")
+            return
+        }
         
         print("🛑 [MultitouchGestureDetector] Stopping multitouch monitoring...")
         
         for device in devices {
+            // CRITICAL: Unregister the callback BEFORE stopping the device
+            // This prevents callbacks from firing into freed memory
+            MTUnregisterContactFrameCallback(device, touchCallback)
             MTDeviceStop(device)
         }
         
         devices.removeAll()
         isMonitoring = false
         
+        // Reset gesture tracking state
+        resetGestureState()
+        
         print("✅ [MultitouchGestureDetector] Monitoring stopped")
     }
     
-    /// Clear device references without stopping (use after sleep/wake when devices are stale)
-    private func clearStaleDevices() {
-        print("🧹 [MultitouchGestureDetector] Clearing stale device references...")
-        devices.removeAll()
-        isMonitoring = false
+    /// Prepare for system sleep - properly unregisters all callbacks
+    func prepareForSleep() {
+        print("💤 [MultitouchGestureDetector] Preparing for sleep - unregistering callbacks...")
+        stopMonitoring()
     }
     
-    /// Restart monitoring - handles stale devices after sleep/wake
+    /// Restart monitoring after wake or for recovery
     func restartMonitoring() {
         print("🔄 [\(streamId)] Restarting monitoring...")
         
-        // After sleep, device references are stale - don't try to stop them
-        // Just clear the array and start fresh
-        clearStaleDevices()
+        // Always stop first to ensure clean state
+        // This is safe even if not currently monitoring
+        deviceLock.lock()
+        let wasMonitoring = isMonitoring
+        deviceLock.unlock()
+        
+        if wasMonitoring {
+            stopMonitoring()
+        } else {
+            // Even if we think we're not monitoring, clear any stale state
+            deviceLock.lock()
+            devices.removeAll()
+            isMonitoring = false
+            deviceLock.unlock()
+            print("🧹 [MultitouchGestureDetector] Cleared stale state (was not monitoring)")
+        }
         
         startMonitoring()
+    }
+    
+    /// Reset gesture tracking state (call after stop or on wake)
+    private func resetGestureState() {
+        activeTouches.removeAll()
+        touchStartPositions.removeAll()
+        currentFingerCount = 0
+        gestureStartTime = 0
+        gestureFingerCount = 0
+        isTrackingGesture = false
+        lastFingerCount = 0
+        lastZeroTimestamp = nil
+        primaryStartPosition = (0, 0)
+        primaryCurrentPosition = (0, 0)
     }
     
     // MARK: - Touch Processing
     
     /// Process touch frame data
     fileprivate func processTouches(_ touches: UnsafeMutablePointer<MTTouch>?, count: Int, timestamp: Double) {
-        // Use the count from the callback - it's reliable
-        // The framework reports accurate finger count (including 0) but only fills first touch structure
+        // Safety check: ignore callbacks if we're not supposed to be monitoring
+        guard isMonitoring else { return }
+        
         let activeCount = count
         
         // Update finger count FIRST so we can handle 0-finger case

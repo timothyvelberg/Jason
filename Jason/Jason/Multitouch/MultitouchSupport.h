@@ -63,6 +63,7 @@ CFMutableArrayRef MTDeviceCreateList(void);
 
 // Register callback for touch events
 void MTRegisterContactFrameCallback(MTDeviceRef device, MTContactFrameCallback callback);
+void MTUnregisterContactFrameCallback(MTDeviceRef device, MTContactFrameCallback callback);
 
 // Start/stop receiving touch events
 void MTDeviceStart(MTDeviceRef device, int unknown);
