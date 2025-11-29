@@ -9,13 +9,6 @@ import AppKit
 
 // MARK: - Models
 
-struct FolderCacheEntry {
-    let path: String
-    let lastScanned: Int
-    let itemsJSON: String
-    let itemCount: Int
-}
-
 struct FolderEntry: Identifiable {
     let id: Int
     let path: String

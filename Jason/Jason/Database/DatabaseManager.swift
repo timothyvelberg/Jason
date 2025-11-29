@@ -154,16 +154,6 @@ class DatabaseManager {
         );
         """
         
-        // Create folder_cache table (performance optimization)
-        let folderCacheSQL = """
-        CREATE TABLE IF NOT EXISTS folder_cache (
-            path TEXT PRIMARY KEY,
-            last_scanned INTEGER NOT NULL,
-            items_json TEXT NOT NULL,
-            item_count INTEGER NOT NULL
-        );
-        """
-        
         // Create preferences table (general settings)
         let preferencesSQL = """
         CREATE TABLE IF NOT EXISTS preferences (
@@ -228,7 +218,6 @@ class DatabaseManager {
             favoriteAppsSQL,
             favoriteFilesSQL,
             favoriteDynamicFilesSQL,
-            folderCacheSQL,
             preferencesSQL,
             ringConfigurationsSQL,
             ringConfigurationsIndexSQL,
