@@ -309,16 +309,17 @@ private class FolderWatcher {
     }
     
     func stop() {
-        guard let stream = eventStream else { return }
-        
-        FSEventStreamStop(stream)
-        FSEventStreamInvalidate(stream)
-        FSEventStreamRelease(stream)
-        
-        eventStream = nil
+        queue.sync {
+            guard let stream = eventStream else { return }
+            
+            FSEventStreamStop(stream)
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+            
+            eventStream = nil
+        }
         print("[FolderWatcher] 🛑 Monitoring stopped for: \(name)")
     }
-    
     deinit {
         stop()
     }
