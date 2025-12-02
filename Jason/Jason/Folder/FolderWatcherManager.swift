@@ -24,6 +24,7 @@ class FolderWatcherManager: LiveDataStream {
     
     func startMonitoring() {
         startWatchingFavorites()
+        startWatchingDynamicFileFolders()
     }
     
     func stopMonitoring() {
@@ -96,6 +97,75 @@ class FolderWatcherManager: LiveDataStream {
         }
     }
     
+    /// Start watching folders used by dynamic files (that aren't already watched)
+    func startWatchingDynamicFileFolders() {
+        print("🔍 [FolderWatcher] ========== Starting Dynamic File Folder Watchers ==========")
+        
+        // Get all dynamic files
+        let dynamicFiles = DatabaseManager.shared.getFavoriteDynamicFiles()
+        print("🔍 [FolderWatcher] Found \(dynamicFiles.count) dynamic files total")
+        
+        // Get unique folder paths
+        let uniqueFolderPaths = Set(dynamicFiles.map { $0.folderPath })
+        print("🔍 [FolderWatcher] Unique source folders: \(uniqueFolderPaths.count)")
+        
+        // Build list of folders to watch
+        var foldersToWatch: [(path: String, name: String)] = []
+        
+        for folderPath in uniqueFolderPaths {
+            // Skip if already being watched (e.g., it's also a favorite folder)
+            if watchers[folderPath] != nil {
+                print("   ⏭️ Already watching: \(folderPath)")
+                continue
+            }
+            
+            // Verify folder exists
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: folderPath, isDirectory: &isDirectory),
+                  isDirectory.boolValue else {
+                print("   ⚠️ Folder doesn't exist: \(folderPath)")
+                continue
+            }
+            
+            // Check if folder is heavy (>100 items) - if not, we still watch it for dynamic files
+            // but we mark it as heavy so it gets cached
+            let itemCount = countFolderItems(at: folderPath)
+            let folderName = URL(fileURLWithPath: folderPath).lastPathComponent
+            
+            if itemCount > 100 {
+                // Mark as heavy if not already
+                if !DatabaseManager.shared.isHeavyFolder(path: folderPath) {
+                    DatabaseManager.shared.markAsHeavyFolder(path: folderPath, itemCount: itemCount)
+                    print("   📊 Marked as heavy folder: \(folderName) (\(itemCount) items)")
+                }
+                foldersToWatch.append((path: folderPath, name: folderName))
+                print("   ✅ Will watch: \(folderName)")
+            } else {
+                // Even for smaller folders, we might want to watch them for instant updates
+                // For now, only watch heavy folders to keep overhead low
+                print("   ⭕️ Skipping (only \(itemCount) items): \(folderName)")
+            }
+        }
+        
+        print("🔍 [FolderWatcher] Dynamic file folders to watch: \(foldersToWatch.count)")
+        print("🔍 [FolderWatcher] =========================================================")
+        
+        // Start watching on background thread
+        watcherQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            var watchedCount = 0
+            for folder in foldersToWatch {
+                self.startWatching(path: folder.path, itemName: folder.name)
+                watchedCount += 1
+            }
+            
+            if watchedCount > 0 {
+                print("[FolderWatcher] 👀 Started watching \(watchedCount) dynamic file source folders")
+            }
+        }
+    }
+    
     /// Start watching a specific folder
     func startWatching(path: String, itemName: String) {
         watcherQueue.async { [weak self] in
@@ -161,6 +231,21 @@ class FolderWatcherManager: LiveDataStream {
     }
     
     // MARK: - Private Methods
+    
+    private func countFolderItems(at path: String) -> Int {
+        let folderURL = URL(fileURLWithPath: path)
+        do {
+            let items = try FileManager.default.contentsOfDirectory(
+                at: folderURL,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            )
+            return items.count
+        } catch {
+            print("⚠️ [FolderWatcher] Failed to count folder items: \(error)")
+            return 0
+        }
+    }
     
     private func handleFolderChange(path: String, name: String) {
         // Cancel any pending refresh for this folder
@@ -309,17 +394,16 @@ private class FolderWatcher {
     }
     
     func stop() {
-        queue.sync {
-            guard let stream = eventStream else { return }
-            
-            FSEventStreamStop(stream)
-            FSEventStreamInvalidate(stream)
-            FSEventStreamRelease(stream)
-            
-            eventStream = nil
-        }
+        guard let stream = eventStream else { return }
+        
+        FSEventStreamStop(stream)
+        FSEventStreamInvalidate(stream)
+        FSEventStreamRelease(stream)
+        
+        eventStream = nil
         print("[FolderWatcher] 🛑 Monitoring stopped for: \(name)")
     }
+    
     deinit {
         stop()
     }

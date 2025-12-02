@@ -21,14 +21,14 @@ struct FavoriteFilesSettingsView: View {
     @State private var showingEditSheet = false
     
     // Combined entries for display
-    private var allEntries: [(id: String, entry: Any, sortOrder: Int, isStatic: Bool)] {
-        var combined: [(id: String, entry: Any, sortOrder: Int, isStatic: Bool)] = []
+    private var allEntries: [(id: String, entry: Any, listSortOrder: Int, isStatic: Bool)] {
+        var combined: [(id: String, entry: Any, listSortOrder: Int, isStatic: Bool)] = []
         
         for file in staticFiles {
             combined.append((
                 id: "static-\(file.path)",
                 entry: file,
-                sortOrder: file.sortOrder,
+                listSortOrder: file.sortOrder,
                 isStatic: true
             ))
         }
@@ -37,12 +37,12 @@ struct FavoriteFilesSettingsView: View {
             combined.append((
                 id: "dynamic-\(file.id ?? 0)",
                 entry: file,
-                sortOrder: file.sortOrder,
+                listSortOrder: file.listSortOrder,
                 isStatic: false
             ))
         }
         
-        return combined.sorted { $0.sortOrder < $1.sortOrder }
+        return combined.sorted { $0.listSortOrder < $1.listSortOrder }
     }
     
     var body: some View {
@@ -153,11 +153,11 @@ struct FavoriteFilesSettingsView: View {
         }
         .sheet(isPresented: $showingDynamicFileCreator) {
             AddDynamicFileView(
-                onSave: { displayName, folderPath, queryType, extensions, pattern in
+                onSave: { displayName, folderPath, sortOrder, extensions, pattern in
                     addDynamicFile(
                         displayName: displayName,
                         folderPath: folderPath,
-                        queryType: queryType,
+                        sortOrder: sortOrder,
                         extensions: extensions,
                         pattern: pattern
                     )
@@ -183,12 +183,12 @@ struct FavoriteFilesSettingsView: View {
             } else if let file = editingDynamicFile {
                 EditFavoriteDynamicFileView(
                     file: file,
-                    onSave: { displayName, folderPath, queryType, extensions, pattern, iconData in
+                    onSave: { displayName, folderPath, sortOrder, extensions, pattern, iconData in
                         updateDynamicFile(
                             file,
                             displayName: displayName,
                             folderPath: folderPath,
-                            queryType: queryType,
+                            sortOrder: sortOrder,
                             extensions: extensions,
                             pattern: pattern,
                             iconData: iconData
@@ -229,11 +229,11 @@ struct FavoriteFilesSettingsView: View {
         }
     }
     
-    private func addDynamicFile(displayName: String, folderPath: String, queryType: String, extensions: String?, pattern: String?) {
+    private func addDynamicFile(displayName: String, folderPath: String, sortOrder: FolderSortOrder, extensions: String?, pattern: String?) {
         if filesProvider.addFavoriteDynamicFile(
             displayName: displayName,
             folderPath: folderPath,
-            queryType: queryType,
+            sortOrder: sortOrder,
             fileExtensions: extensions,
             namePattern: pattern
         ) {
@@ -265,7 +265,7 @@ struct FavoriteFilesSettingsView: View {
         _ file: FavoriteDynamicFileEntry,
         displayName: String,
         folderPath: String,
-        queryType: String,
+        sortOrder: FolderSortOrder,
         extensions: String?,
         pattern: String?,
         iconData: Data?
@@ -275,7 +275,7 @@ struct FavoriteFilesSettingsView: View {
             id: id,
             displayName: displayName,
             folderPath: folderPath,
-            queryType: queryType,
+            sortOrder: sortOrder,
             fileExtensions: extensions,
             namePattern: pattern,
             iconData: iconData
@@ -463,7 +463,7 @@ struct FavoriteDynamicFileRow: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    Text(queryTypeDisplayName(file.queryType))
+                    Text(file.sortOrder.displayName)
                         .font(.caption)
                 }
                 .foregroundColor(.secondary)
@@ -544,7 +544,7 @@ struct FavoriteDynamicFileRow: View {
             
             guard let contents = try? FileManager.default.contentsOfDirectory(
                 at: folderURL,
-                includingPropertiesForKeys: [.contentModificationDateKey],
+                includingPropertiesForKeys: [.contentModificationDateKey, .creationDateKey, .fileSizeKey],
                 options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
             ) else {
                 return
@@ -557,39 +557,21 @@ struct FavoriteDynamicFileRow: View {
                 return !isDirectory
             }
             
-            // Apply filters and sorting based on query type
+            // Apply extension filter
             if let extensions = file.fileExtensions, !extensions.isEmpty {
                 let extArray = extensions.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces).lowercased() }
                 files = files.filter { extArray.contains($0.pathExtension.lowercased()) }
             }
             
-            if file.queryType == "most_recent" || file.queryType == "modified_newest" {
-                files.sort { url1, url2 in
-                    guard let date1 = try? url1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-                          let date2 = try? url2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
-                        return false
-                    }
-                    return date1 > date2
-                }
-            }
+            // Sort using FolderSortingUtility
+            let sortedFiles = FolderSortingUtility.sortURLs(files, by: file.sortOrder)
             
-            if let firstFile = files.first {
+            if let firstFile = sortedFiles.first {
                 DispatchQueue.main.async {
                     self.resolvedFileName = firstFile.lastPathComponent
                     self.fileIcon = NSWorkspace.shared.icon(forFile: firstFile.path)
                 }
             }
-        }
-    }
-    
-    private func queryTypeDisplayName(_ type: String) -> String {
-        switch type {
-        case "most_recent", "modified_newest": return "Most Recent"
-        case "newest_creation", "created_newest": return "Newest"
-        case "largest": return "Largest"
-        case "smallest": return "Smallest"
-        case "alphabetical": return "Alphabetical"
-        default: return type
         }
     }
     
@@ -600,26 +582,31 @@ struct FavoriteDynamicFileRow: View {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
+
 // MARK: - Add Dynamic File View
 
 struct AddDynamicFileView: View {
-    let onSave: (String, String, String, String?, String?) -> Void
+    let onSave: (String, String, FolderSortOrder, String?, String?) -> Void
     let onCancel: () -> Void
     
     @State private var displayName: String = ""
     @State private var folderPath: String = ""
-    @State private var queryType: String = "most_recent"
+    @State private var sortOrder: FolderSortOrder = .modifiedNewest
     @State private var fileExtensions: String = ""
     @State private var namePattern: String = ""
     @State private var useExtensionFilter = false
     @State private var useNamePattern = false
     
-    let queryTypes = [
-        ("most_recent", "Most Recent (by modification)"),
-        ("newest_creation", "Newest (by creation)"),
-        ("largest", "Largest File"),
-        ("smallest", "Smallest File"),
-        ("alphabetical", "Alphabetical")
+    // Sort options relevant for dynamic files
+    private let sortOptions: [FolderSortOrder] = [
+        .modifiedNewest,
+        .modifiedOldest,
+        .createdNewest,
+        .createdOldest,
+        .sizeDescending,
+        .sizeAscending,
+        .alphabeticalAsc,
+        .alphabeticalDesc
     ]
     
     var body: some View {
@@ -644,9 +631,9 @@ struct AddDynamicFileView: View {
                         }
                     }
                     
-                    Picker("Query Type", selection: $queryType) {
-                        ForEach(queryTypes, id: \.0) { type in
-                            Text(type.1).tag(type.0)
+                    Picker("Sort Order", selection: $sortOrder) {
+                        ForEach(sortOptions, id: \.self) { order in
+                            Text(order.displayName).tag(order)
                         }
                     }
                 }
@@ -683,7 +670,7 @@ struct AddDynamicFileView: View {
                 Button("Save") {
                     let extensions = useExtensionFilter && !fileExtensions.isEmpty ? fileExtensions : nil
                     let pattern = useNamePattern && !namePattern.isEmpty ? namePattern : nil
-                    onSave(displayName, folderPath, queryType, extensions, pattern)
+                    onSave(displayName, folderPath, sortOrder, extensions, pattern)
                 }
                 .keyboardShortcut(.return)
                 .buttonStyle(.borderedProminent)
@@ -782,33 +769,37 @@ struct EditFavoriteFileView: View {
 
 struct EditFavoriteDynamicFileView: View {
     let file: FavoriteDynamicFileEntry
-    let onSave: (String, String, String, String?, String?, Data?) -> Void
+    let onSave: (String, String, FolderSortOrder, String?, String?, Data?) -> Void
     let onCancel: () -> Void
     
     @State private var displayName: String
     @State private var folderPath: String
-    @State private var queryType: String
+    @State private var sortOrder: FolderSortOrder
     @State private var fileExtensions: String
     @State private var namePattern: String
     @State private var useExtensionFilter: Bool
     @State private var useNamePattern: Bool
     
-    let queryTypes = [
-        ("most_recent", "Most Recent (by modification)"),
-        ("newest_creation", "Newest (by creation)"),
-        ("largest", "Largest File"),
-        ("smallest", "Smallest File"),
-        ("alphabetical", "Alphabetical")
+    // Sort options relevant for dynamic files
+    private let sortOptions: [FolderSortOrder] = [
+        .modifiedNewest,
+        .modifiedOldest,
+        .createdNewest,
+        .createdOldest,
+        .sizeDescending,
+        .sizeAscending,
+        .alphabeticalAsc,
+        .alphabeticalDesc
     ]
     
-    init(file: FavoriteDynamicFileEntry, onSave: @escaping (String, String, String, String?, String?, Data?) -> Void, onCancel: @escaping () -> Void) {
+    init(file: FavoriteDynamicFileEntry, onSave: @escaping (String, String, FolderSortOrder, String?, String?, Data?) -> Void, onCancel: @escaping () -> Void) {
         self.file = file
         self.onSave = onSave
         self.onCancel = onCancel
         
         _displayName = State(initialValue: file.displayName)
         _folderPath = State(initialValue: file.folderPath)
-        _queryType = State(initialValue: file.queryType)
+        _sortOrder = State(initialValue: file.sortOrder)
         _fileExtensions = State(initialValue: file.fileExtensions ?? "")
         _namePattern = State(initialValue: file.namePattern ?? "")
         _useExtensionFilter = State(initialValue: file.fileExtensions != nil)
@@ -836,9 +827,9 @@ struct EditFavoriteDynamicFileView: View {
                         }
                     }
                     
-                    Picker("Query Type", selection: $queryType) {
-                        ForEach(queryTypes, id: \.0) { type in
-                            Text(type.1).tag(type.0)
+                    Picker("Sort Order", selection: $sortOrder) {
+                        ForEach(sortOptions, id: \.self) { order in
+                            Text(order.displayName).tag(order)
                         }
                     }
                 }
@@ -875,7 +866,7 @@ struct EditFavoriteDynamicFileView: View {
                 Button("Save") {
                     let extensions = useExtensionFilter && !fileExtensions.isEmpty ? fileExtensions : nil
                     let pattern = useNamePattern && !namePattern.isEmpty ? namePattern : nil
-                    onSave(displayName, folderPath, queryType, extensions, pattern, nil)
+                    onSave(displayName, folderPath, sortOrder, extensions, pattern, nil)
                 }
                 .keyboardShortcut(.return)
                 .buttonStyle(.borderedProminent)

@@ -33,10 +33,10 @@ extension DatabaseManager {
                     let id = Int(sqlite3_column_int(statement, 0))
                     let displayName = String(cString: sqlite3_column_text(statement, 1))
                     let folderPath = String(cString: sqlite3_column_text(statement, 2))
-                    let queryType = String(cString: sqlite3_column_text(statement, 3))
+                    let sortOrderRaw = String(cString: sqlite3_column_text(statement, 3))
                     let fileExtensions = sqlite3_column_text(statement, 4) != nil ? String(cString: sqlite3_column_text(statement, 4)) : nil
                     let namePattern = sqlite3_column_text(statement, 5) != nil ? String(cString: sqlite3_column_text(statement, 5)) : nil
-                    let sortOrder = Int(sqlite3_column_int(statement, 6))
+                    let listSortOrder = Int(sqlite3_column_int(statement, 6))
                     
                     var iconData: Data?
                     if let blob = sqlite3_column_blob(statement, 7) {
@@ -47,14 +47,17 @@ extension DatabaseManager {
                     let lastAccessed: Int? = sqlite3_column_type(statement, 8) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(statement, 8))
                     let accessCount = Int(sqlite3_column_int(statement, 9))
                     
+                    // Parse FolderSortOrder from stored string
+                    let sortOrder = FolderSortOrder(rawValue: sortOrderRaw) ?? .modifiedNewest
+                    
                     results.append(FavoriteDynamicFileEntry(
                         id: id,
                         displayName: displayName,
                         folderPath: folderPath,
-                        queryType: queryType,
+                        sortOrder: sortOrder,
                         fileExtensions: fileExtensions,
                         namePattern: namePattern,
-                        sortOrder: sortOrder,
+                        listSortOrder: listSortOrder,
                         iconData: iconData,
                         lastAccessed: lastAccessed,
                         accessCount: accessCount
@@ -75,7 +78,7 @@ extension DatabaseManager {
     func addFavoriteDynamicFile(
         displayName: String,
         folderPath: String,
-        queryType: String,
+        sortOrder: FolderSortOrder,
         fileExtensions: String? = nil,
         namePattern: String? = nil,
         iconData: Data? = nil
@@ -86,11 +89,11 @@ extension DatabaseManager {
         
         queue.sync {
             // Get next sort order
-            var nextSortOrder = 0
+            var nextListSortOrder = 0
             var countStatement: OpaquePointer?
             if sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM favorite_dynamic_files;", -1, &countStatement, nil) == SQLITE_OK {
                 if sqlite3_step(countStatement) == SQLITE_ROW {
-                    nextSortOrder = Int(sqlite3_column_int(countStatement, 0))
+                    nextListSortOrder = Int(sqlite3_column_int(countStatement, 0))
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
@@ -110,7 +113,7 @@ extension DatabaseManager {
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_text(statement, 1, (displayName as NSString).utf8String, -1, nil)
                 sqlite3_bind_text(statement, 2, (folderPath as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 3, (queryType as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 3, (sortOrder.rawValue as NSString).utf8String, -1, nil)
                 
                 if let fileExtensions = fileExtensions {
                     sqlite3_bind_text(statement, 4, (fileExtensions as NSString).utf8String, -1, nil)
@@ -124,7 +127,7 @@ extension DatabaseManager {
                     sqlite3_bind_null(statement, 5)
                 }
                 
-                sqlite3_bind_int(statement, 6, Int32(nextSortOrder))
+                sqlite3_bind_int(statement, 6, Int32(nextListSortOrder))
                 
                 if let iconData = iconData {
                     iconData.withUnsafeBytes { buffer in
@@ -241,10 +244,10 @@ extension DatabaseManager {
                     let id = Int(sqlite3_column_int(statement, 0))
                     let displayName = String(cString: sqlite3_column_text(statement, 1))
                     let folderPath = String(cString: sqlite3_column_text(statement, 2))
-                    let queryType = String(cString: sqlite3_column_text(statement, 3))
+                    let sortOrderRaw = String(cString: sqlite3_column_text(statement, 3))
                     let fileExtensions = sqlite3_column_text(statement, 4) != nil ? String(cString: sqlite3_column_text(statement, 4)) : nil
                     let namePattern = sqlite3_column_text(statement, 5) != nil ? String(cString: sqlite3_column_text(statement, 5)) : nil
-                    let sortOrder = Int(sqlite3_column_int(statement, 6))
+                    let listSortOrder = Int(sqlite3_column_int(statement, 6))
                     
                     var iconData: Data?
                     if let blob = sqlite3_column_blob(statement, 7) {
@@ -255,14 +258,17 @@ extension DatabaseManager {
                     let lastAccessed: Int? = sqlite3_column_type(statement, 8) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(statement, 8))
                     let accessCount = Int(sqlite3_column_int(statement, 9))
                     
+                    // Parse FolderSortOrder from stored string
+                    let sortOrder = FolderSortOrder(rawValue: sortOrderRaw) ?? .modifiedNewest
+                    
                     result = FavoriteDynamicFileEntry(
                         id: id,
                         displayName: displayName,
                         folderPath: folderPath,
-                        queryType: queryType,
+                        sortOrder: sortOrder,
                         fileExtensions: fileExtensions,
                         namePattern: namePattern,
-                        sortOrder: sortOrder,
+                        listSortOrder: listSortOrder,
                         iconData: iconData,
                         lastAccessed: lastAccessed,
                         accessCount: accessCount
@@ -284,7 +290,7 @@ extension DatabaseManager {
         id: Int,
         displayName: String,
         folderPath: String,
-        queryType: String,
+        sortOrder: FolderSortOrder,
         fileExtensions: String?,
         namePattern: String?,
         iconData: Data?
@@ -305,7 +311,7 @@ extension DatabaseManager {
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_text(statement, 1, (displayName as NSString).utf8String, -1, nil)
                 sqlite3_bind_text(statement, 2, (folderPath as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 3, (queryType as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 3, (sortOrder.rawValue as NSString).utf8String, -1, nil)
                 
                 if let fileExtensions = fileExtensions {
                     sqlite3_bind_text(statement, 4, (fileExtensions as NSString).utf8String, -1, nil)

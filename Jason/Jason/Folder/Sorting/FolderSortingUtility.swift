@@ -42,6 +42,20 @@ class FolderSortingUtility {
                 return date1 < date2  // Oldest first
             }
             
+        case .createdNewest:
+            return urls.sorted { url1, url2 in
+                let date1 = (try? url1.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date.distantPast
+                let date2 = (try? url2.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date.distantPast
+                return date1 > date2  // Newest first
+            }
+            
+        case .createdOldest:
+            return urls.sorted { url1, url2 in
+                let date1 = (try? url1.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date.distantPast
+                let date2 = (try? url2.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date.distantPast
+                return date1 < date2  // Oldest first
+            }
+            
         case .foldersFirst:
             return urls.sorted { url1, url2 in
                 let isDir1 = (try? url1.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
@@ -113,6 +127,7 @@ class FolderSortingUtility {
                 includingPropertiesForKeys: [
                     .isDirectoryKey,
                     .contentModificationDateKey,
+                    .creationDateKey,
                     .fileSizeKey
                 ],
                 options: [.skipsHiddenFiles, .skipsPackageDescendants]
@@ -144,6 +159,16 @@ class FolderSortingUtility {
             return items.sorted { $0.modificationDate > $1.modificationDate }
             
         case .modifiedOldest:
+            return items.sorted { $0.modificationDate < $1.modificationDate }
+            
+        case .createdNewest:
+            // Note: EnhancedFolderItem uses modificationDate - would need creationDate field
+            // For now, fall back to modificationDate
+            return items.sorted { $0.modificationDate > $1.modificationDate }
+            
+        case .createdOldest:
+            // Note: EnhancedFolderItem uses modificationDate - would need creationDate field
+            // For now, fall back to modificationDate
             return items.sorted { $0.modificationDate < $1.modificationDate }
             
         case .foldersFirst:

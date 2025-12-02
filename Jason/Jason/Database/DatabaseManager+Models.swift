@@ -92,10 +92,10 @@ struct FavoriteDynamicFileEntry: Identifiable {
     let id: Int?
     let displayName: String
     let folderPath: String
-    let queryType: String
+    let sortOrder: FolderSortOrder   
     let fileExtensions: String?
     let namePattern: String?
-    let sortOrder: Int
+    let listSortOrder: Int
     let iconData: Data?
     let lastAccessed: Int?
     let accessCount: Int

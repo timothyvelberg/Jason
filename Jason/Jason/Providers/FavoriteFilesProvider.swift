@@ -36,7 +36,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         let isStatic: Bool
         let isDynamic: Bool
         let dynamicId: Int? // For dynamic files
-        let sortOrder: Int
+        let listSortOrder: Int
         let customIconData: Data?
     }
     
@@ -85,7 +85,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 isStatic: true,
                 isDynamic: false,
                 dynamicId: nil,
-                sortOrder: file.sortOrder,
+                listSortOrder: file.sortOrder,
                 customIconData: file.iconData
             ))
         }
@@ -117,7 +117,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                     isStatic: false,
                     isDynamic: true,
                     dynamicId: dynamic.id,
-                    sortOrder: dynamic.sortOrder,
+                    listSortOrder: dynamic.listSortOrder,
                     customIconData: dynamic.iconData
                 ))
             } else {
@@ -135,14 +135,14 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                     isStatic: false,
                     isDynamic: true,
                     dynamicId: dynamic.id,
-                    sortOrder: dynamic.sortOrder,
+                    listSortOrder: dynamic.listSortOrder,
                     customIconData: dynamic.iconData
                 ))
             }
         }
         
-        // Sort by sortOrder
-        entries.sort { $0.sortOrder < $1.sortOrder }
+        // Sort by listSortOrder
+        entries.sort { $0.listSortOrder < $1.listSortOrder }
         
         fileEntries = entries
         
@@ -152,16 +152,78 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
     // MARK: - Dynamic File Resolution
     
     private func resolveDynamicFile(_ dynamic: FavoriteDynamicFileEntry) -> String? {
-        let folderURL = URL(fileURLWithPath: dynamic.folderPath)
+        let folderPath = dynamic.folderPath
         
         // Check if folder exists
-        guard FileManager.default.fileExists(atPath: dynamic.folderPath) else {
-            print("⚠️ [FavoriteFiles] Folder not found: \(dynamic.folderPath)")
+        guard FileManager.default.fileExists(atPath: folderPath) else {
+            print("⚠️ [FavoriteFiles] Folder not found: \(folderPath)")
             return nil
         }
         
-        // Get folder contents
-        guard let contents = try? FileManager.default.contentsOfDirectory(
+        // 🎯 TRY CACHE FIRST for heavy folders
+        if let cachedResult = resolveDynamicFileFromCache(dynamic) {
+            print("⚡ [FavoriteFiles] Cache hit for dynamic file: \(dynamic.displayName)")
+            return cachedResult
+        }
+        
+        // 📂 CACHE MISS - Fall back to filesystem scan
+        print("💿 [FavoriteFiles] Cache miss for '\(dynamic.displayName)' - scanning filesystem")
+        return resolveDynamicFileFromFilesystem(dynamic)
+    }
+    
+    /// Try to resolve dynamic file from enhanced cache
+    private func resolveDynamicFileFromCache(_ dynamic: FavoriteDynamicFileEntry) -> String? {
+        let db = DatabaseManager.shared
+        
+        // Only use cache if folder is marked as heavy
+        guard db.isHeavyFolder(path: dynamic.folderPath) else {
+            return nil
+        }
+        
+        // Get cached contents
+        guard let cachedItems = db.getEnhancedCachedFolderContents(folderPath: dynamic.folderPath) else {
+            return nil
+        }
+        
+        // Filter for files only (not directories)
+        var files = cachedItems.filter { !$0.isDirectory }
+        
+        // Apply file extension filter if specified
+        if let extensions = dynamic.fileExtensions, !extensions.isEmpty {
+            let extArray = extensions.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces).lowercased() }
+            files = files.filter { item in
+                extArray.contains(item.fileExtension.lowercased())
+            }
+        }
+        
+        // Apply name pattern filter if specified
+        if let pattern = dynamic.namePattern, !pattern.isEmpty {
+            files = files.filter { item in
+                item.name.contains(pattern)
+            }
+        }
+        
+        // Cache is already sorted by the folder's sort order
+        // Return the first matching file
+        guard let firstFile = files.first else {
+            return nil
+        }
+        
+        // Verify file still exists (cache might be slightly stale)
+        guard FileManager.default.fileExists(atPath: firstFile.path) else {
+            print("⚠️ [FavoriteFiles] Cached file no longer exists: \(firstFile.path)")
+            return nil
+        }
+        
+        return firstFile.path
+    }
+    
+    /// Resolve dynamic file by scanning filesystem (fallback)
+    private func resolveDynamicFileFromFilesystem(_ dynamic: FavoriteDynamicFileEntry) -> String? {
+        let folderURL = URL(fileURLWithPath: dynamic.folderPath)
+        
+        // Get folder contents with all required properties for sorting
+        guard var files = try? FileManager.default.contentsOfDirectory(
             at: folderURL,
             includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey, .creationDateKey, .fileSizeKey],
             options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
@@ -171,7 +233,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         }
         
         // Filter files (not directories)
-        var files = contents.filter { url in
+        files = files.filter { url in
             guard let isDirectory = try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory else {
                 return false
             }
@@ -194,60 +256,49 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             }
         }
         
-        // Apply query type sorting
-        switch dynamic.queryType {
-        case "most_recent", "modified_newest":
-            // Sort by modification date (newest first)
-            files.sort { url1, url2 in
-                guard let date1 = try? url1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-                      let date2 = try? url2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
-                    return false
-                }
-                return date1 > date2
-            }
-            
-        case "newest_creation", "created_newest":
-            // Sort by creation date (newest first)
-            files.sort { url1, url2 in
-                guard let date1 = try? url1.resourceValues(forKeys: [.creationDateKey]).creationDate,
-                      let date2 = try? url2.resourceValues(forKeys: [.creationDateKey]).creationDate else {
-                    return false
-                }
-                return date1 > date2
-            }
-            
-        case "largest":
-            // Sort by file size (largest first)
-            files.sort { url1, url2 in
-                guard let size1 = try? url1.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-                      let size2 = try? url2.resourceValues(forKeys: [.fileSizeKey]).fileSize else {
-                    return false
-                }
-                return size1 > size2
-            }
-            
-        case "smallest":
-            // Sort by file size (smallest first)
-            files.sort { url1, url2 in
-                guard let size1 = try? url1.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-                      let size2 = try? url2.resourceValues(forKeys: [.fileSizeKey]).fileSize else {
-                    return false
-                }
-                return size1 < size2
-            }
-            
-        case "alphabetical":
-            // Sort alphabetically
-            files.sort { url1, url2 in
-                url1.lastPathComponent.localizedCaseInsensitiveCompare(url2.lastPathComponent) == .orderedAscending
-            }
-            
-        default:
-            print("⚠️ [FavoriteFiles] Unknown query type: \(dynamic.queryType)")
+        // 🎯 Use unified FolderSortingUtility
+        let sortedFiles = FolderSortingUtility.sortURLs(files, by: dynamic.sortOrder)
+        
+        // Check if this folder should be cached for future lookups
+        if files.count > 100 {
+            triggerCachePopulation(for: dynamic.folderPath)
         }
         
         // Return the first (best matching) file
-        return files.first?.path
+        return sortedFiles.first?.path
+    }
+    
+    /// Trigger cache population for a heavy folder that isn't cached yet
+    private func triggerCachePopulation(for folderPath: String) {
+        let db = DatabaseManager.shared
+        
+        // Mark as heavy if not already
+        if !db.isHeavyFolder(path: folderPath) {
+            let itemCount = countFolderItems(at: folderPath)
+            db.markAsHeavyFolder(path: folderPath, itemCount: itemCount)
+            print("📊 [FavoriteFiles] Marked folder as heavy: \(folderPath) (\(itemCount) items)")
+        }
+        
+        // Queue a refresh to populate the cache
+        let folderName = URL(fileURLWithPath: folderPath).lastPathComponent
+        FolderWatcherManager.shared.forceRefresh(path: folderPath, name: folderName)
+        
+        // Start watching for future changes
+        FolderWatcherManager.shared.startWatching(path: folderPath, itemName: folderName)
+    }
+    
+    private func countFolderItems(at path: String) -> Int {
+        let folderURL = URL(fileURLWithPath: path)
+        do {
+            let items = try FileManager.default.contentsOfDirectory(
+                at: folderURL,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            )
+            return items.count
+        } catch {
+            return 0
+        }
     }
     
     // MARK: - Provide Functions
@@ -377,7 +428,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 "filePath": entry.filePath,
                 "isStatic": entry.isStatic,
                 "isDynamic": entry.isDynamic,
-                "sortOrder": entry.sortOrder
+                "listSortOrder": entry.listSortOrder
             ],
             onLeftClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .drag(DragProvider(
                 fileURLs: [URL(fileURLWithPath: entry.filePath)],
@@ -427,7 +478,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             _ = DatabaseManager.shared.addFavoriteDynamicFile(
                 displayName: "Latest Download",
                 folderPath: downloadsURL.path,
-                queryType: "most_recent",
+                sortOrder: .modifiedNewest,
                 fileExtensions: nil,
                 namePattern: nil,
                 iconData: nil
@@ -475,7 +526,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             _ = DatabaseManager.shared.addFavoriteDynamicFile(
                 displayName: "Latest Screenshot",
                 folderPath: screenshotsPath,
-                queryType: "most_recent",
+                sortOrder: .modifiedNewest,
                 fileExtensions: "png,jpg,jpeg,heic",
                 namePattern: nil,
                 iconData: nil
@@ -576,7 +627,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
     func addFavoriteDynamicFile(
         displayName: String,
         folderPath: String,
-        queryType: String,
+        sortOrder: FolderSortOrder,
         fileExtensions: String? = nil,
         namePattern: String? = nil,
         iconData: Data? = nil
@@ -584,7 +635,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         let success = DatabaseManager.shared.addFavoriteDynamicFile(
             displayName: displayName,
             folderPath: folderPath,
-            queryType: queryType,
+            sortOrder: sortOrder,
             fileExtensions: fileExtensions,
             namePattern: namePattern,
             iconData: iconData
@@ -611,7 +662,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         id: Int,
         displayName: String,
         folderPath: String,
-        queryType: String,
+        sortOrder: FolderSortOrder,
         fileExtensions: String?,
         namePattern: String?,
         iconData: Data?
@@ -620,7 +671,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             id: id,
             displayName: displayName,
             folderPath: folderPath,
-            queryType: queryType,
+            sortOrder: sortOrder,
             fileExtensions: fileExtensions,
             namePattern: namePattern,
             iconData: iconData

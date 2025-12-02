@@ -273,7 +273,6 @@ struct RingView: View {
             print("🔄 [RingView] Content changed - count: \(nodes.count)")
             print("   📌 State: isFirstRender=\(isFirstRender), previousNodes.count=\(previousNodes.count)")
             
-            // 🆕 ADD THIS LOGGING:
             print("   🎯 Selection state: selectedIndex=\(selectedIndex?.description ?? "nil")")
             if let index = selectedIndex {
                 if index < nodes.count {
@@ -322,7 +321,7 @@ struct RingView: View {
                 return
             }
             
-            // 🆕 DETERMINE UPDATE TYPE: First render vs Surgical update
+            // First render vs Surgical update
             let isSurgicalUpdate: Bool
             if isFirstRender {
                 isSurgicalUpdate = false
@@ -394,19 +393,62 @@ struct RingView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
                     hasCompletedInitialSelectionFade = true
                 }
-            } else {
-                animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
-                animatedSliceEndAngle = Angle(degrees: sliceConfig.endAngle)
+            } else if !sliceConfig.isFullCircle {
+                // For clockwise/counterClockwise positioning
+                let adjustedEndAngle = sliceConfig.endAngle < sliceConfig.startAngle
+                    ? sliceConfig.endAngle + 360
+                    : sliceConfig.endAngle
                 
-                // Fade in selection indicator with a simple hardcoded delay
+                if isSurgicalUpdate {
+                    // Smooth resize from current to new
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                        animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
+                    }
+                } else {
+                    // Full entrance animation from edge
+                    let initialSliceSize = 10.0
+                    
+                    if sliceConfig.direction == .counterClockwise {
+                        // CounterClockwise: Start at endAngle, grow backward
+                        animatedSliceStartAngle = Angle(degrees: adjustedEndAngle - initialSliceSize)
+                        animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
+                        
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                        }
+                    } else {
+                        // Clockwise: Start at startAngle, grow forward
+                        animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                        animatedSliceEndAngle = Angle(degrees: sliceConfig.startAngle + initialSliceSize)
+                        
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
+                        }
+                    }
+                }
+                
+                // Fade in selection indicator
                 let selectionDelay = 0.05
                 DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
                     withAnimation(.easeIn(duration: 0.2)) {
                         selectionIndicatorOpacity = 1.0
                     }
                 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
+                    hasCompletedInitialSelectionFade = true
+                }
+            } else {
+                // Full circle
+                animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                animatedSliceEndAngle = Angle(degrees: sliceConfig.endAngle)
                 
-                // Mark as completed after animation finishes
+                let selectionDelay = 0.05
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        selectionIndicatorOpacity = 1.0
+                    }
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
                     hasCompletedInitialSelectionFade = true
                 }
@@ -450,7 +492,6 @@ struct RingView: View {
             selectionIndicatorOpacity = 0
             hasCompletedInitialSelectionFade = false
             
-            // 🆕 CRITICAL FIX: Always animate icons on first appearance
             // Even if previousNodes gets initialized for tracking, we still need entrance animation
             if nodes.count > 0 {
                 print("   🎬 Triggering initial icon entrance animation")
@@ -506,22 +547,56 @@ struct RingView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
                     hasCompletedInitialSelectionFade = true
                 }
-            } else {
-                // For non-center or full circle: set angles directly without animation
-                animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
-                animatedSliceEndAngle = Angle(degrees: sliceConfig.endAngle)
+            } else if !sliceConfig.isFullCircle {
+                // For clockwise/counterClockwise positioning: animate from starting edge
+                let initialSliceSize = 10.0  // Start with 10° slice
                 
-                // Fade in selection indicator with a simple hardcoded delay
+                // Handle angle wraparound for animation target
+                let adjustedEndAngle = sliceConfig.endAngle < sliceConfig.startAngle
+                    ? sliceConfig.endAngle + 360
+                    : sliceConfig.endAngle
+                
+                if sliceConfig.direction == .counterClockwise {
+                    // CounterClockwise: Start at endAngle, grow backward toward startAngle
+                    animatedSliceStartAngle = Angle(degrees: adjustedEndAngle - initialSliceSize)
+                    animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
+                    
+                    withAnimation(.easeOut(duration: 0.24)) {
+                        animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                        // endAngle stays fixed
+                    }
+                } else {
+                    // Clockwise: Start at startAngle, grow forward toward endAngle
+                    animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                    animatedSliceEndAngle = Angle(degrees: sliceConfig.startAngle + initialSliceSize)
+                    
+                    withAnimation(.easeOut(duration: 0.24)) {
+                        animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
+                        // startAngle stays fixed
+                    }
+                }
+                
+                // Fade in selection indicator
                 let selectionDelay = 0.05
-                
-                // Use DispatchQueue instead of withAnimation delay
                 DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
                     withAnimation(.easeIn(duration: 0.2)) {
                         selectionIndicatorOpacity = 1.0
                     }
                 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
+                    hasCompletedInitialSelectionFade = true
+                }
+            } else {
+                // Full circle: no slice animation needed
+                animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
+                animatedSliceEndAngle = Angle(degrees: sliceConfig.endAngle)
                 
-                // Mark as completed after animation finishes
+                let selectionDelay = 0.05
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        selectionIndicatorOpacity = 1.0
+                    }
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
                     hasCompletedInitialSelectionFade = true
                 }

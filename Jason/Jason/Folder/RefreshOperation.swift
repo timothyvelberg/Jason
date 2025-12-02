@@ -11,6 +11,9 @@ class RefreshOperation: Operation, @unchecked Sendable {
     let path: String
     let folderName: String
     
+    // Default cache limit for folders
+    private static let defaultCacheLimit = 40
+    
     init(path: String, folderName: String) {
         self.path = path
         self.folderName = folderName
@@ -55,21 +58,14 @@ class RefreshOperation: Operation, @unchecked Sendable {
         let fileManager = FileManager.default
         let folderURL = URL(fileURLWithPath: path)
         
-        // 🎯 Get folder settings from database
-        let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
-        guard let favoriteFolder = favoriteFolders.first(where: { $0.folder.path == path }) else {
-            print("⚠️ Folder '\(folderName)' not in favorites, skipping refresh")
-            return []
-        }
-        
-        let maxItems = favoriteFolder.settings.maxItems ?? 20
-        let sortOrder = favoriteFolder.settings.contentSortOrder ?? .modifiedNewest
+        // 🎯 Get folder settings - check favorite folders first, then dynamic files
+        let (maxItems, sortOrder) = getFolderSettings(for: path)
         
         print("📊 Refresh settings: max=\(maxItems), sort=\(sortOrder.displayName)")
         
         guard let itemURLs = try? fileManager.contentsOfDirectory(
             at: folderURL,
-            includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey],
+            includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey, .creationDateKey],
             options: [.skipsHiddenFiles]
         ) else {
             print("❌ Failed to read contents of \(folderName)")
@@ -132,5 +128,28 @@ class RefreshOperation: Operation, @unchecked Sendable {
         
         // Items are already sorted (we sorted the URLs before converting)
         return items
+    }
+    
+    /// Get settings for a folder - checks favorite folders first, then dynamic files, then defaults
+    private func getFolderSettings(for path: String) -> (maxItems: Int, sortOrder: FolderSortOrder) {
+        let db = DatabaseManager.shared
+        
+        // 1. Check if it's a favorite folder
+        let favoriteFolders = db.getFavoriteFolders()
+        if let favoriteFolder = favoriteFolders.first(where: { $0.folder.path == path }) {
+            let maxItems = favoriteFolder.settings.maxItems ?? Self.defaultCacheLimit
+            let sortOrder = favoriteFolder.settings.contentSortOrder ?? .modifiedNewest
+            return (maxItems, sortOrder)
+        }
+        
+        // 2. Check if it's a dynamic file source folder - use FolderSortOrder directly
+        let dynamicFiles = db.getFavoriteDynamicFiles()
+        if let dynamicFile = dynamicFiles.first(where: { $0.folderPath == path }) {
+            return (Self.defaultCacheLimit, dynamicFile.sortOrder)
+        }
+        
+        // 3. Default settings
+        print("⚠️ Folder '\(folderName)' not in favorites or dynamic files, using defaults")
+        return (Self.defaultCacheLimit, .modifiedNewest)
     }
 }
