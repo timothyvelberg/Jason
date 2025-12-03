@@ -153,11 +153,16 @@ class RingConfigurationCalculator {
                 thisIconSize = collapsedIconSize
                 print("📦 Ring \(index) is COLLAPSED: thickness=\(thisRingThickness), iconSize=\(thisIconSize)")
                 
-                if let existingSliceConfig = ringState.sliceConfig {
-                    print("   ♻️  Collapsed Ring \(index) has existing sliceConfig - preserving it (isFullCircle: \(existingSliceConfig.isFullCircle))")
+                if let existingSliceConfig = ringState.sliceConfig,
+                   existingSliceConfig.itemCount == nodes.count {
+                    print("     Collapsed Ring \(index) has existing sliceConfig - preserving it (isFullCircle: \(existingSliceConfig.isFullCircle))")
                     sliceConfig = existingSliceConfig
                 } else {
-                    print("   🆕 Collapsed Ring \(index) needs new sliceConfig - calculating...")
+                    if let existingSliceConfig = ringState.sliceConfig {
+                        print("   🔄 Collapsed Ring \(index) item count changed (\(existingSliceConfig.itemCount) → \(nodes.count)) - recalculating...")
+                    } else {
+                        print("   🆕 Collapsed Ring \(index) needs new sliceConfig - calculating...")
+                    }
                     sliceConfig = calculateCollapsedRingSliceConfig(
                         index: index,
                         nodes: nodes,
@@ -169,6 +174,8 @@ class RingConfigurationCalculator {
                         ringMargin: ringMargin
                     )
                 }
+                
+                
             } else if index == 0 {
                 let itemCount = nodes.count
                 
@@ -231,11 +238,16 @@ class RingConfigurationCalculator {
                 thisRingThickness = parentInfo.node.childRingThickness ?? ringThickness
                 thisIconSize = parentInfo.node.childIconSize ?? iconSize
                 
-                if let existingSliceConfig = ringState.sliceConfig {
+                if let existingSliceConfig = ringState.sliceConfig,
+                   existingSliceConfig.itemCount == nodes.count {
                     print("   ♻️  Ring \(index) has existing sliceConfig - preserving it (isFullCircle: \(existingSliceConfig.isFullCircle))")
                     sliceConfig = existingSliceConfig
                 } else {
-                    print("   🆕 Ring \(index) needs new sliceConfig - calculating...")
+                    if let existingSliceConfig = ringState.sliceConfig {
+                        print("   🔄 Ring \(index) item count changed (\(existingSliceConfig.itemCount) → \(nodes.count)) - recalculating...")
+                    } else {
+                        print("   🆕 Ring \(index) needs new sliceConfig - calculating...")
+                    }
                     sliceConfig = calculateNewRingSliceConfig(
                         index: index,
                         nodes: nodes,

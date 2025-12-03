@@ -339,7 +339,8 @@ struct PieSliceConfig {
     let itemAngle: Double   // Angle per item (default 30°)
     let perItemAngles: [Double]?  //Optional per-item angles for Ring 0
     let positioning: SlicePositioning
-    
+    let itemCount: Int      // Number of items this config was calculated for
+
     var totalAngle: Double {
         return endAngle - startAngle
     }
@@ -370,7 +371,8 @@ struct PieSliceConfig {
             endAngle: 360,
             itemAngle: anglePerItem,
             perItemAngles: nil,
-            positioning: positioning
+            positioning: positioning,
+            itemCount: itemCount
         )
     }
     
@@ -387,7 +389,8 @@ struct PieSliceConfig {
             endAngle: angle + 360,
             itemAngle: anglePerItem,
             perItemAngles: perItemAngles,
-            positioning: positioning
+            positioning: positioning,
+            itemCount: itemCount
         )
     }
     
@@ -397,7 +400,9 @@ struct PieSliceConfig {
         centeredAt parentAngle: Double,
         defaultItemAngle: Double = 30.0,
         positioning: SlicePositioning = .startClockwise,
-        perItemAngles: [Double]? = nil  // 🆕 Support variable angles
+        perItemAngles: [Double]? = nil  // Support variable angles
+
+        
     ) -> PieSliceConfig {
         // Calculate total angle from perItemAngles if provided, otherwise use default
         let totalAngle: Double
@@ -443,8 +448,9 @@ struct PieSliceConfig {
             startAngle: startAngle,
             endAngle: endAngle,
             itemAngle: itemAngle,
-            perItemAngles: perItemAngles,  // 🆕 Pass through variable angles
-            positioning: positioning
+            perItemAngles: perItemAngles,  //Pass through variable angles
+            positioning: positioning,
+            itemCount: itemCount
         )
     }
 }
