@@ -170,7 +170,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         print("💿 [FavoriteFiles] Cache miss for '\(dynamic.displayName)' - scanning filesystem")
         return resolveDynamicFileFromFilesystem(dynamic)
     }
-    
+
     /// Try to resolve dynamic file from enhanced cache
     private func resolveDynamicFileFromCache(_ dynamic: FavoriteDynamicFileEntry) -> String? {
         let db = DatabaseManager.shared
@@ -178,6 +178,20 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         // Only use cache if folder is marked as heavy
         guard db.isHeavyFolder(path: dynamic.folderPath) else {
             return nil
+        }
+        
+        // Check cache freshness before trusting it
+        guard let cacheTimestamp = db.getEnhancedCacheTimestamp(folderPath: dynamic.folderPath) else {
+            return nil
+        }
+        
+        // Get folder's actual modification date
+        let folderURL = URL(fileURLWithPath: dynamic.folderPath)
+        if let folderModDate = try? FileManager.default.attributesOfItem(atPath: folderURL.path)[.modificationDate] as? Date {
+            if folderModDate > cacheTimestamp {
+                print("⏰ [FavoriteFiles] Cache stale for '\(dynamic.displayName)' - folder modified after cache")
+                return nil
+            }
         }
         
         // Get cached contents

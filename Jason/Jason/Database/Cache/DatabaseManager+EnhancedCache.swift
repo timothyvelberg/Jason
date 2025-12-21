@@ -326,6 +326,34 @@ extension DatabaseManager {
         return count > 0
     }
     
+    func getEnhancedCacheTimestamp(folderPath: String) -> Date? {
+        guard let db = db else { return nil }
+        
+        return queue.sync {
+            let sql = "SELECT MAX(cached_at) FROM folder_contents_enhanced WHERE folder_path = ?;"
+            var statement: OpaquePointer?
+            
+            guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+                let error = String(cString: sqlite3_errmsg(db))
+                print("[EnhancedCache] ❌ Failed to prepare timestamp query: \(error)")
+                return nil
+            }
+            
+            sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
+            
+            var timestamp: Date?
+            if sqlite3_step(statement) == SQLITE_ROW {
+                let cachedAt = sqlite3_column_int64(statement, 0)
+                if cachedAt > 0 {
+                    timestamp = Date(timeIntervalSince1970: TimeInterval(cachedAt))
+                }
+            }
+            
+            sqlite3_finalize(statement)
+            return timestamp
+        }
+    }
+    
     /// Invalidate enhanced cache for a specific folder
     func invalidateEnhancedCache(for folderPath: String) {
         guard let db = db else { return }
