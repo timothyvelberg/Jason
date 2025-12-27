@@ -523,7 +523,7 @@ class IconProvider {
     }
     
     private func createSystemFolderIcon(for url: URL, size: CGFloat, cornerRadius: CGFloat) -> NSImage {
-        let systemIcon = NSWorkspace.shared.icon(forFile: url.path)
+        let folderIcon = NSImage(named: "folder-blue") ?? NSWorkspace.shared.icon(forFile: url.path)
         let roundedIcon = NSImage(size: NSSize(width: size, height: size))
         
         roundedIcon.lockFocus()
@@ -535,9 +535,9 @@ class IconProvider {
         path.addClip()
         
         // Draw system icon
-        systemIcon.draw(
+        folderIcon.draw(
             in: rect,
-            from: NSRect(origin: .zero, size: systemIcon.size),
+            from: NSRect(origin: .zero, size: folderIcon.size),
             operation: .sourceOver,
             fraction: 1.0
         )
