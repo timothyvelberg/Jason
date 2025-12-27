@@ -54,6 +54,9 @@ extension FunctionManager {
         providerId: String
     ) -> [FunctionNode] {
         
+        print("🔍 [DisplayMode] Called for providerId: \(providerId), hasConfig: \(providerConfigurations[providerId] != nil)")
+
+        
         guard let providerConfig = providerConfigurations[providerId] else {
             return nodes
         }

@@ -12,7 +12,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     
     // MARK: - Provider Info
     
-    var providerId: String { "favorite-folders" }
+    var providerId: String { "favorite-folder" }
     var providerName: String { "Favorite Folders" }
     var providerIcon: NSImage {
         NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage()

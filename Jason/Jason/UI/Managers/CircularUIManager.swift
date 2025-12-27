@@ -202,10 +202,15 @@ class CircularUIManager: ObservableObject {
                 .lowercased()
         }
         
+        print("📋 [Setup] Available config providerTypes: \(configuration.providers.map { $0.providerType })")
+
         // Register all providers with their configurations
         for provider in providers {
             // Look up this provider's configuration by matching normalized names
             let normalizedProviderId = normalizeProviderName(provider.providerId)
+            
+            print("🔍 [Setup] Matching '\(provider.providerId)' → normalized: '\(normalizedProviderId)'")
+
             
             let providerConfig = configuration.providers.first { config in
                 let normalizedConfigType = normalizeProviderName(config.providerType)

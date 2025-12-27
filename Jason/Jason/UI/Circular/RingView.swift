@@ -202,8 +202,10 @@ struct RingView: View {
                     let centerAngle = calculateCenterAngle(for: index)
                     let itemAngle = angleForItem(at: index)
 
-                    let indicatorStartAngle = centerAngle - (itemAngle / 2) + 1
-                    let indicatorEndAngle = centerAngle + (itemAngle / 2) - 1
+                  let indicatorStartAngle = centerAngle - (itemAngle / 2) + 2
+                  let indicatorEndAngle = centerAngle + (itemAngle / 2) - 2
+                    
+                    
                     let indicatorThickness: CGFloat = 2
                     let indicatorOuterRadiusRatio = innerRadiusRatio + (indicatorThickness / endRadius)
                     
@@ -213,7 +215,7 @@ struct RingView: View {
                         innerRadiusRatio: innerRadiusRatio,
                         outerRadiusRatio: indicatorOuterRadiusRatio
                     )
-                    .fill(Color.white.opacity(0.32))
+                    .fill(Color.white.opacity(0.16))
                     .opacity(runningIndicatorOpacities[node.id] ?? 0)
                     .frame(width: totalDiameter, height: totalDiameter)
                     .allowsHitTesting(false)
