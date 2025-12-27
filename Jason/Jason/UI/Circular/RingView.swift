@@ -228,10 +228,13 @@ struct RingView: View {
                 let scale = iconScales[node.id] ?? animationStartScale
                 
                 if node.type == .spacer {
-                    // Render spacer as small dot
-                    Circle()
-                        .fill(Color.white.opacity(0.3))
-                        .frame(width: 4, height: 4)
+                    let centerAngle = calculateCenterAngle(for: index)
+                    
+                    // Render spacer as radial line
+                    Rectangle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(width: 1, height: thickness * 0.8)
+                        .rotationEffect(.degrees(centerAngle), anchor: .center)
                         .scaleEffect(scale)
                         .opacity(opacity)
                         .position(iconPosition(for: index))
