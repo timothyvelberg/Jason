@@ -4,6 +4,8 @@
 //
 //  Created by Timothy Velberg on 04/11/2025.
 //  Provider for favorite files (static and dynamic/rule-based)
+//
+//  Updated: Now supports dynamic folders with navigation
 
 import Foundation
 import AppKit
@@ -38,6 +40,8 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         let dynamicId: Int? // For dynamic files
         let listSortOrder: Int
         let customIconData: Data?
+        let isDirectory: Bool
+        let dynamicSortOrder: FolderSortOrder? // For navigating into dynamic folders
     }
     
     private var fileEntries: [FileEntry] = []
@@ -66,6 +70,10 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 continue
             }
             
+            // Check if it's a directory
+            var isDirectory: ObjCBool = false
+            FileManager.default.fileExists(atPath: file.path, isDirectory: &isDirectory)
+            
             // Get display name
             let displayName = file.displayName ?? fileURL.lastPathComponent
             
@@ -73,6 +81,8 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             let icon: NSImage
             if let iconData = file.iconData, let customIcon = NSImage(data: iconData) {
                 icon = customIcon
+            } else if isDirectory.boolValue {
+                icon = IconProvider.shared.getFolderIcon(for: fileURL, size: 64, cornerRadius: 8)
             } else {
                 icon = NSWorkspace.shared.icon(forFile: file.path)
             }
@@ -86,7 +96,9 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 isDynamic: false,
                 dynamicId: nil,
                 listSortOrder: file.sortOrder,
-                customIconData: file.iconData
+                customIconData: file.iconData,
+                isDirectory: isDirectory.boolValue,
+                dynamicSortOrder: nil
             ))
         }
         
@@ -95,16 +107,22 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         print("📋 [FavoriteFiles] Loaded \(dynamicFiles.count) dynamic favorite files")
         
         for dynamic in dynamicFiles {
-            // Execute the query to find the matching file
+            // Execute the query to find the matching file/folder
             if let resolvedPath = resolveDynamicFile(dynamic) {
                 // Get the actual file name from resolved path
                 let resolvedURL = URL(fileURLWithPath: resolvedPath)
                 let fileName = resolvedURL.lastPathComponent
                 
+                // Check if it's a directory
+                var isDirectory: ObjCBool = false
+                FileManager.default.fileExists(atPath: resolvedPath, isDirectory: &isDirectory)
+                
                 // Get icon
                 let icon: NSImage
                 if let iconData = dynamic.iconData, let customIcon = NSImage(data: iconData) {
                     icon = customIcon
+                } else if isDirectory.boolValue {
+                    icon = IconProvider.shared.getFolderIcon(for: resolvedURL, size: 64, cornerRadius: 8)
                 } else {
                     icon = NSWorkspace.shared.icon(forFile: resolvedPath)
                 }
@@ -118,7 +136,9 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                     isDynamic: true,
                     dynamicId: dynamic.id,
                     listSortOrder: dynamic.listSortOrder,
-                    customIconData: dynamic.iconData
+                    customIconData: dynamic.iconData,
+                    isDirectory: isDirectory.boolValue,
+                    dynamicSortOrder: dynamic.sortOrder  // Carry sort order for navigation
                 ))
             } else {
                 print("⚠️ [FavoriteFiles] No file found for dynamic rule: \(dynamic.displayName)")
@@ -136,7 +156,9 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                     isDynamic: true,
                     dynamicId: dynamic.id,
                     listSortOrder: dynamic.listSortOrder,
-                    customIconData: dynamic.iconData
+                    customIconData: dynamic.iconData,
+                    isDirectory: false,
+                    dynamicSortOrder: dynamic.sortOrder
                 ))
             }
         }
@@ -199,37 +221,39 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             return nil
         }
         
-        // Filter for files only (not directories)
-        var files = cachedItems.filter { !$0.isDirectory }
+        // Start with all items (files AND folders now)
+        var items = cachedItems
         
-        // Apply file extension filter if specified
+        // Apply file extension filter if specified (only applies to files)
         if let extensions = dynamic.fileExtensions, !extensions.isEmpty {
             let extArray = extensions.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces).lowercased() }
-            files = files.filter { item in
-                extArray.contains(item.fileExtension.lowercased())
+            items = items.filter { item in
+                // Keep directories (they don't have extensions to filter)
+                // Filter files by extension
+                item.isDirectory || extArray.contains(item.fileExtension.lowercased())
             }
         }
         
         // Apply name pattern filter if specified
         if let pattern = dynamic.namePattern, !pattern.isEmpty {
-            files = files.filter { item in
+            items = items.filter { item in
                 item.name.contains(pattern)
             }
         }
         
         // Cache is already sorted by the folder's sort order
-        // Return the first matching file
-        guard let firstFile = files.first else {
+        // Return the first matching item
+        guard let firstItem = items.first else {
             return nil
         }
         
-        // Verify file still exists (cache might be slightly stale)
-        guard FileManager.default.fileExists(atPath: firstFile.path) else {
-            print("⚠️ [FavoriteFiles] Cached file no longer exists: \(firstFile.path)")
+        // Verify item still exists (cache might be slightly stale)
+        guard FileManager.default.fileExists(atPath: firstItem.path) else {
+            print("⚠️ [FavoriteFiles] Cached item no longer exists: \(firstItem.path)")
             return nil
         }
         
-        return firstFile.path
+        return firstItem.path
     }
     
     /// Resolve dynamic file by scanning filesystem (fallback)
@@ -237,7 +261,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         let folderURL = URL(fileURLWithPath: dynamic.folderPath)
         
         // Get folder contents with all required properties for sorting
-        guard var files = try? FileManager.default.contentsOfDirectory(
+        guard var items = try? FileManager.default.contentsOfDirectory(
             at: folderURL,
             includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey, .creationDateKey, .fileSizeKey],
             options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
@@ -246,18 +270,15 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             return nil
         }
         
-        // Filter files (not directories)
-        files = files.filter { url in
-            guard let isDirectory = try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory else {
-                return false
-            }
-            return !isDirectory
-        }
-        
-        // Apply file extension filter if specified
+        // Apply file extension filter if specified (only for files)
         if let extensions = dynamic.fileExtensions, !extensions.isEmpty {
             let extArray = extensions.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces).lowercased() }
-            files = files.filter { url in
+            items = items.filter { url in
+                // Check if directory - keep all directories
+                if let isDir = try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory, isDir {
+                    return true
+                }
+                // Filter files by extension
                 let ext = url.pathExtension.lowercased()
                 return extArray.contains(ext)
             }
@@ -265,21 +286,21 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         
         // Apply name pattern filter if specified
         if let pattern = dynamic.namePattern, !pattern.isEmpty {
-            files = files.filter { url in
+            items = items.filter { url in
                 url.lastPathComponent.contains(pattern)
             }
         }
         
         // 🎯 Use unified FolderSortingUtility
-        let sortedFiles = FolderSortingUtility.sortURLs(files, by: dynamic.sortOrder)
+        let sortedItems = FolderSortingUtility.sortURLs(items, by: dynamic.sortOrder)
         
         // Check if this folder should be cached for future lookups
-        if files.count > 100 {
+        if items.count > 100 {
             triggerCachePopulation(for: dynamic.folderPath)
         }
         
-        // Return the first (best matching) file
-        return sortedFiles.first?.path
+        // Return the first (best matching) item
+        return sortedItems.first?.path
     }
     
     /// Trigger cache population for a heavy folder that isn't cached yet
@@ -428,46 +449,82 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             )
         }
         
-        // Create the main node
-        return FunctionNode(
-            id: entry.id,
-            name: entry.displayName,
-            type: .file,
-            icon: entry.icon,
-            contextActions: contextActions,
-            preferredLayout: .partialSlice,
-            previewURL: entry.filePath.isEmpty ? nil : URL(fileURLWithPath: entry.filePath),
-            showLabel: true,
-            metadata: [
-                "filePath": entry.filePath,
-                "isStatic": entry.isStatic,
-                "isDynamic": entry.isDynamic,
-                "listSortOrder": entry.listSortOrder
-            ],
-            onLeftClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .drag(DragProvider(
-                fileURLs: [URL(fileURLWithPath: entry.filePath)],
-                dragImage: entry.icon,
-                allowedOperations: [.move, .copy],
-                onClick: { [weak self] in
+        // Build metadata
+        var metadata: [String: Any] = [
+            "filePath": entry.filePath,
+            "isStatic": entry.isStatic,
+            "isDynamic": entry.isDynamic,
+            "listSortOrder": entry.listSortOrder
+        ]
+        
+        // For directories, add folder navigation metadata
+        if entry.isDirectory {
+            metadata["folderURL"] = entry.filePath
+            if let sortOrder = entry.dynamicSortOrder {
+                metadata["sortOrder"] = sortOrder.rawValue
+            }
+        }
+        
+        // Create the main node - different behavior for files vs folders
+        if entry.isDirectory {
+            // FOLDER NODE - navigable
+            return FunctionNode(
+                id: entry.id,
+                name: entry.displayName,
+                type: .folder,
+                icon: entry.icon,
+                children: nil,  // Will be loaded dynamically
+                contextActions: contextActions,
+                preferredLayout: .partialSlice,
+                previewURL: entry.filePath.isEmpty ? nil : URL(fileURLWithPath: entry.filePath),
+                showLabel: true,
+                slicePositioning: .center,
+                metadata: metadata,
+                providerId: providerId,
+                onLeftClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .navigateInto),
+                onRightClick: ModifierAwareInteraction(base: contextActions.isEmpty ? .doNothing : .expand),
+                onMiddleClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .executeKeepOpen { [weak self] in
                     self?.openFile(path: entry.filePath, entry: entry)
-                },
-                onDragStarted: {
-                    print("📦 Started dragging: \(entry.displayName)")
-                },
-                onDragCompleted: { success in
-                    if success {
-                        print("✅ Successfully dragged: \(entry.displayName)")
-                    } else {
-                        print("❌ Drag cancelled: \(entry.displayName)")
+                }),
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+            )
+        } else {
+            // FILE NODE - draggable
+            return FunctionNode(
+                id: entry.id,
+                name: entry.displayName,
+                type: .file,
+                icon: entry.icon,
+                contextActions: contextActions,
+                preferredLayout: .partialSlice,
+                previewURL: entry.filePath.isEmpty ? nil : URL(fileURLWithPath: entry.filePath),
+                showLabel: true,
+                metadata: metadata,
+                onLeftClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .drag(DragProvider(
+                    fileURLs: [URL(fileURLWithPath: entry.filePath)],
+                    dragImage: entry.icon,
+                    allowedOperations: [.move, .copy],
+                    onClick: { [weak self] in
+                        self?.openFile(path: entry.filePath, entry: entry)
+                    },
+                    onDragStarted: {
+                        print("📦 Started dragging: \(entry.displayName)")
+                    },
+                    onDragCompleted: { success in
+                        if success {
+                            print("✅ Successfully dragged: \(entry.displayName)")
+                        } else {
+                            print("❌ Drag cancelled: \(entry.displayName)")
+                        }
                     }
-                }
-            ))),
-            onRightClick: ModifierAwareInteraction(base: contextActions.isEmpty ? .doNothing : .expand),
-            onMiddleClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .executeKeepOpen { [weak self] in
-                self?.openFile(path: entry.filePath, entry: entry)
-            }),
-            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
-        )
+                ))),
+                onRightClick: ModifierAwareInteraction(base: contextActions.isEmpty ? .doNothing : .expand),
+                onMiddleClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .executeKeepOpen { [weak self] in
+                    self?.openFile(path: entry.filePath, entry: entry)
+                }),
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+            )
+        }
     }
     
     private func addDefaultFavorites() {
@@ -555,9 +612,147 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         loadFiles()
     }
     
+    // MARK: - Dynamic Children Loading (for folders)
+    
     func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
-        // Favorite files don't have dynamic children
-        return []
+        print("📂 [FavoriteFilesProvider] loadChildren called for: \(node.name)")
+        
+        guard let metadata = node.metadata,
+              let folderPath = metadata["folderURL"] as? String else {
+            print("❌ [FavoriteFilesProvider] No folderURL in metadata")
+            return []
+        }
+        
+        let folderURL = URL(fileURLWithPath: folderPath)
+        
+        // Get sort order from metadata (carried from dynamic rule) or default
+        let sortOrder: FolderSortOrder
+        if let sortOrderRaw = metadata["sortOrder"] as? String,
+           let order = FolderSortOrder(rawValue: sortOrderRaw) {
+            sortOrder = order
+        } else {
+            sortOrder = .modifiedNewest
+        }
+        
+        print("🎯 [FavoriteFilesProvider] Using sort order: \(sortOrder.displayName)")
+        
+        // Use FolderContentLoader for consistent heavy folder handling
+        let result = await FolderContentLoader.loadContents(
+            folderPath: folderPath,
+            sortOrder: sortOrder,
+            maxItems: nil
+        )
+        
+        // Convert ContentItems to FunctionNodes
+        let nodes = result.items.map { item in
+            createChildNode(from: item, sortOrder: sortOrder)
+        }
+        
+        // Finalize (cache population, watching setup)
+        FolderContentLoader.finalizeLoad(
+            folderPath: folderPath,
+            folderName: node.name,
+            actualCount: result.actualItemCount,
+            wasFromCache: result.wasFromCache,
+            nodes: nodes,
+            folderURL: folderURL
+        )
+        
+        return nodes
+    }
+    
+    /// Create a child node from a ContentItem
+    private func createChildNode(from item: FolderContentLoader.ContentItem, sortOrder: FolderSortOrder) -> FunctionNode {
+        if item.isDirectory {
+            return createChildFolderNode(from: item, sortOrder: sortOrder)
+        } else {
+            return createChildFileNode(from: item)
+        }
+    }
+    
+    /// Create a file node for folder contents
+    private func createChildFileNode(from item: FolderContentLoader.ContentItem) -> FunctionNode {
+        let icon: NSImage
+        if let thumbnailData = item.cachedThumbnailData,
+           let cachedIcon = NSImage(data: thumbnailData) {
+            icon = cachedIcon
+        } else {
+            icon = IconProvider.shared.getFileIcon(for: item.url, size: 64, cornerRadius: 8)
+        }
+        
+        return FunctionNode(
+            id: "file-\(item.path)",
+            name: item.name,
+            type: .file,
+            icon: icon,
+            contextActions: [
+                StandardContextActions.copyFile(item.url),
+                StandardContextActions.deleteFile(item.url),
+                StandardContextActions.showInFinder(item.url)
+            ],
+            preferredLayout: .partialSlice,
+            previewURL: item.url,
+            showLabel: true,
+            slicePositioning: .center,
+            onLeftClick: ModifierAwareInteraction(base: .drag(DragProvider(
+                fileURLs: [item.url],
+                dragImage: icon,
+                allowedOperations: .move,
+                onClick: {
+                    print("📂 Opening file: \(item.name)")
+                    NSWorkspace.shared.open(item.url)
+                },
+                onDragStarted: {
+                    print("📦 Started dragging: \(item.name)")
+                },
+                onDragCompleted: { success in
+                    if success {
+                        print("✅ Successfully dragged: \(item.name)")
+                    } else {
+                        print("❌ Drag cancelled: \(item.name)")
+                    }
+                }
+            ))),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
+                print("🖱️ Middle-click opening: \(item.name)")
+                NSWorkspace.shared.open(item.url)
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
+    }
+    
+    /// Create a folder node for folder contents (supports further navigation)
+    private func createChildFolderNode(from item: FolderContentLoader.ContentItem, sortOrder: FolderSortOrder) -> FunctionNode {
+        let icon = IconProvider.shared.getFolderIcon(for: item.url, size: 64, cornerRadius: 8)
+        
+        return FunctionNode(
+            id: "folder-\(item.path)",
+            name: item.name,
+            type: .folder,
+            icon: icon,
+            children: nil,
+            contextActions: [
+                StandardContextActions.showInFinder(item.url),
+                StandardContextActions.deleteFile(item.url)
+            ],
+            preferredLayout: .partialSlice,
+            previewURL: item.url,
+            showLabel: true,
+            slicePositioning: .center,
+            metadata: [
+                "folderURL": item.path,
+                "sortOrder": sortOrder.rawValue  // Carry sort order down
+            ],
+            providerId: self.providerId,
+            onLeftClick: ModifierAwareInteraction(base: .navigateInto),
+            onRightClick: ModifierAwareInteraction(base: .expand),
+            onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
+                print("📂 Middle-click opening folder: \(item.name)")
+                NSWorkspace.shared.open(item.url)
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
     }
     
     // MARK: - File Actions

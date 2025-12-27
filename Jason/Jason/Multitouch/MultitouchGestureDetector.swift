@@ -175,6 +175,7 @@ class MultitouchGestureDetector: LiveDataStream {
             print("❌ [MultitouchGestureDetector] No suitable devices found")
         } else {
             isMonitoring = true
+            MultitouchGestureDetector.setShared(self)  // 👈 Make sure this is called
             print("✅ [MultitouchGestureDetector] Monitoring started successfully")
         }
     }
@@ -213,27 +214,26 @@ class MultitouchGestureDetector: LiveDataStream {
         stopMonitoring()
     }
     
-    /// Restart monitoring after wake or for recovery
+    /// Restart monitoring after wake - gets fresh device references
     func restartMonitoring() {
         print("🔄 [\(streamId)] Restarting monitoring...")
         
-        // Always stop first to ensure clean state
-        // This is safe even if not currently monitoring
         deviceLock.lock()
-        let wasMonitoring = isMonitoring
+        
+        // Clear shared instance FIRST - makes any pending callbacks no-ops
+        MultitouchGestureDetector.sharedInstance = nil
+        
+        // Don't try to unregister from old devices - they may be invalid after sleep
+        // Just clear our state
+        devices.removeAll()
+        isMonitoring = false
+        resetGestureState()
+        
         deviceLock.unlock()
         
-        if wasMonitoring {
-            stopMonitoring()
-        } else {
-            // Even if we think we're not monitoring, clear any stale state
-            deviceLock.lock()
-            devices.removeAll()
-            isMonitoring = false
-            deviceLock.unlock()
-            print("🧹 [MultitouchGestureDetector] Cleared stale state (was not monitoring)")
-        }
+        print("🧹 [MultitouchGestureDetector] Cleared state for fresh start")
         
+        // Now start fresh with new device references
         startMonitoring()
     }
     
@@ -445,7 +445,7 @@ class MultitouchGestureDetector: LiveDataStream {
 
 // MARK: - C Callback
 
-/// C callback function that bridges to Swift
+/// Callback function that bridges to Swift
 private func touchCallback(
     device: MTDeviceRef?,
     touches: UnsafeMutablePointer<MTTouch>?,
@@ -454,9 +454,11 @@ private func touchCallback(
     frame: Int32,
     refcon: UnsafeMutableRawPointer?
 ) {
-    // Use the shared instance to process touches
-    MultitouchGestureDetector.sharedInstance?.processTouches(touches, count: Int(numTouches), timestamp: timestamp)
+    // Bail immediately if no instance - prevents crashes during sleep/wake transitions
+    guard let detector = MultitouchGestureDetector.sharedInstance else { return }
+    detector.processTouches(touches, count: Int(numTouches), timestamp: timestamp)
 }
+
 
 // MARK: - Singleton for C Callback Access
 
