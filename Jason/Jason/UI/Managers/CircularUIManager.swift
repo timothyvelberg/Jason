@@ -306,10 +306,16 @@ class CircularUIManager: ObservableObject {
                 CircularUIInstanceManager.shared.show(configId: configId)
             }
         case .drag(let provider):
-            // Execute onClick if provided
-            if let onClick = provider.onClick {
-                onClick()
+            // Handle click behavior based on explicit declaration
+            switch provider.clickBehavior {
+            case .execute(let action):
+                action()
                 hide()
+            case .navigate:
+                print("📂 Navigating into draggable folder: '\(node.name)'")
+                functionManager.navigateIntoFolder(ringLevel: ringLevel, index: index)
+            case .none:
+                break
             }
         default:
             break

@@ -353,12 +353,13 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     
     private func createFolderNode(for url: URL) -> FunctionNode {
         let folderName = url.lastPathComponent
+        let icon = IconProvider.shared.getFolderIcon(for: url, size: 64, cornerRadius: 8)
         
         return FunctionNode(
             id: "folder-\(url.path)",
             name: folderName,
             type: .folder,
-            icon: IconProvider.shared.getFolderIcon(for: url, size: 64, cornerRadius: 8),
+            icon: icon,
             children: nil,
             contextActions: [
                 StandardContextActions.showInFinder(url),
@@ -370,7 +371,22 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             slicePositioning: .center,
             metadata: ["folderURL": url.path],
             providerId: self.providerId,
-            onLeftClick: ModifierAwareInteraction(base: .navigateInto),
+            onLeftClick: ModifierAwareInteraction(base: .drag(DragProvider(
+                fileURLs: [url],
+                dragImage: icon,
+                allowedOperations: [.move, .copy],
+                clickBehavior: .navigate,
+                onDragStarted: {
+                    print("📦 Started dragging folder: \(folderName)")
+                },
+                onDragCompleted: { success in
+                    if success {
+                        print("✅ Successfully dragged folder: \(folderName)")
+                    } else {
+                        print("❌ Drag cancelled: \(folderName)")
+                    }
+                }
+            ))),
             onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("📂 Middle-click opening folder: \(folderName)")
@@ -457,7 +473,22 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             slicePositioning: .center,
             metadata: ["folderURL": item.path],
             providerId: self.providerId,
-            onLeftClick: ModifierAwareInteraction(base: .navigateInto),
+            onLeftClick: ModifierAwareInteraction(base: .drag(DragProvider(
+                fileURLs: [url],
+                dragImage: icon,
+                allowedOperations: [.move, .copy],
+                clickBehavior: .navigate,
+                onDragStarted: {
+                    print("📦 Started dragging folder: \(folderName)")
+                },
+                onDragCompleted: { success in
+                    if success {
+                        print("✅ Successfully dragged folder: \(folderName)")
+                    } else {
+                        print("❌ Drag cancelled: \(folderName)")
+                    }
+                }
+            ))),
             onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("📂 Middle-click opening folder: \(folderName)")
@@ -527,7 +558,22 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             slicePositioning: positioning,
             metadata: metadata,
             providerId: self.providerId,
-            onLeftClick: ModifierAwareInteraction(base: .navigateInto),
+            onLeftClick: ModifierAwareInteraction(base: .drag(DragProvider(
+                fileURLs: [path],
+                dragImage: folderIcon,
+                allowedOperations: [.move, .copy],
+                clickBehavior: .navigate,
+                onDragStarted: {
+                    print("📦 Started dragging favorite folder: \(folderEntry.title)")
+                },
+                onDragCompleted: { success in
+                    if success {
+                        print("✅ Successfully dragged favorite folder: \(folderEntry.title)")
+                    } else {
+                        print("❌ Drag cancelled: \(folderEntry.title)")
+                    }
+                }
+            ))),
             onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 DatabaseManager.shared.updateFolderAccess(path: path.path)

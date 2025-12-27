@@ -414,6 +414,20 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                     })
                 )
             )
+            contextActions.append(
+                FunctionNode(
+                    id: "\(entry.id)-delete",
+                    name: "Delete",
+                    type: .action,
+                    icon: NSImage(systemSymbolName: "trash", accessibilityDescription: nil) ?? NSImage(),
+                    onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                        self?.deleteFile(path: entry.filePath)
+                    }),
+                    onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
+                        self?.deleteFile(path: entry.filePath)
+                    })
+                )
+            )
         }
         
         // Remove from favorites (always available)
@@ -467,7 +481,8 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         
         // Create the main node - different behavior for files vs folders
         if entry.isDirectory {
-            // FOLDER NODE - navigable
+            // FOLDER NODE - draggable + navigable
+            let folderURL = URL(fileURLWithPath: entry.filePath)
             return FunctionNode(
                 id: entry.id,
                 name: entry.displayName,
@@ -476,12 +491,27 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 children: nil,  // Will be loaded dynamically
                 contextActions: contextActions,
                 preferredLayout: .partialSlice,
-                previewURL: entry.filePath.isEmpty ? nil : URL(fileURLWithPath: entry.filePath),
+                previewURL: entry.filePath.isEmpty ? nil : folderURL,
                 showLabel: true,
                 slicePositioning: .center,
                 metadata: metadata,
                 providerId: providerId,
-                onLeftClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .navigateInto),
+                onLeftClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .drag(DragProvider(
+                    fileURLs: [folderURL],
+                    dragImage: entry.icon,
+                    allowedOperations: [.move, .copy],
+                    clickBehavior: .navigate,
+                    onDragStarted: {
+                        print("📦 Started dragging folder: \(entry.displayName)")
+                    },
+                    onDragCompleted: { success in
+                        if success {
+                            print("✅ Successfully dragged folder: \(entry.displayName)")
+                        } else {
+                            print("❌ Drag cancelled: \(entry.displayName)")
+                        }
+                    }
+                ))),
                 onRightClick: ModifierAwareInteraction(base: contextActions.isEmpty ? .doNothing : .expand),
                 onMiddleClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .executeKeepOpen { [weak self] in
                     self?.openFile(path: entry.filePath, entry: entry)
@@ -745,7 +775,22 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 "sortOrder": sortOrder.rawValue  // Carry sort order down
             ],
             providerId: self.providerId,
-            onLeftClick: ModifierAwareInteraction(base: .navigateInto),
+            onLeftClick: ModifierAwareInteraction(base: .drag(DragProvider(
+                fileURLs: [item.url],
+                dragImage: icon,
+                allowedOperations: [.move, .copy],
+                clickBehavior: .navigate,
+                onDragStarted: {
+                    print("📦 Started dragging folder: \(item.name)")
+                },
+                onDragCompleted: { success in
+                    if success {
+                        print("✅ Successfully dragged folder: \(item.name)")
+                    } else {
+                        print("❌ Drag cancelled: \(item.name)")
+                    }
+                }
+            ))),
             onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("📂 Middle-click opening folder: \(item.name)")
@@ -817,6 +862,22 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             print("✅ [FavoriteFiles] Removed dynamic file from favorites: \(id)")
             refresh()
             NotificationCenter.default.postProviderUpdate(providerId: providerId)
+        }
+    }
+    
+    private func deleteFile(path: String) {
+        let fileURL = URL(fileURLWithPath: path)
+        
+        do {
+            try FileManager.default.trashItem(at: fileURL, resultingItemURL: nil)
+            print("🗑️ [FavoriteFiles] Moved to trash: \(path)")
+            
+            // Refresh to resolve next matching item for dynamic rules
+            refresh()
+            NotificationCenter.default.postProviderUpdate(providerId: providerId)
+            
+        } catch {
+            print("❌ [FavoriteFiles] Failed to delete: \(error)")
         }
     }
     

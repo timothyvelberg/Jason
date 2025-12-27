@@ -55,33 +55,6 @@ enum SlicePositioning {
     case center                // Center symmetrically on parent (direction doesn't matter)
 }
 
-// MARK: - Drag Provider
-struct DragProvider {
-    let fileURLs: [URL]
-    let dragImage: NSImage?
-    let allowedOperations: NSDragOperation
-    let onClick: (() -> Void)?
-    var onDragStarted: (() -> Void)?  // ← Changed from let to var
-    var onDragCompleted: ((Bool) -> Void)?  // ← Changed from let to var
-    
-    // Modifier flags captured when drag starts (and updated during drag)
-    var modifierFlags: NSEvent.ModifierFlags = []
-    
-    init(fileURLs: [URL],
-         dragImage: NSImage? = nil,
-         allowedOperations: NSDragOperation = [.move],
-         onClick: (() -> Void)? = nil,
-         onDragStarted: (() -> Void)? = nil,
-         onDragCompleted: ((Bool) -> Void)? = nil) {
-        self.fileURLs = fileURLs
-        self.dragImage = dragImage
-        self.allowedOperations = allowedOperations
-        self.onClick = onClick
-        self.onDragStarted = onDragStarted
-        self.onDragCompleted = onDragCompleted
-    }
-}
-
 // MARK: - Extended InteractionBehavior
 enum InteractionBehavior {
     case execute(() -> Void)            // Execute action, close UI
@@ -296,12 +269,18 @@ class FunctionNode: Identifiable, ObservableObject {
     
     //Check if this node needs dynamic loading
     var needsDynamicLoading: Bool {
-        // If it has navigateInto behavior and metadata, it needs dynamic loading
+        // Check for direct navigateInto
         if case .navigateInto = onLeftClick.base, metadata != nil {
             return true
         }
         if case .navigateInto = onBoundaryCross.base, metadata != nil {
             return true
+        }
+        // Check for drag with navigate click behavior
+        if case .drag(let provider) = onLeftClick.base {
+            if case .navigate = provider.clickBehavior, metadata != nil {
+                return true
+            }
         }
         return false
     }

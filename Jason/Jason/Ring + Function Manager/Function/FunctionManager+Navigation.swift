@@ -103,7 +103,7 @@ extension FunctionManager {
         
         print("   - displayedChildren count: \(truncatedChildren.count)")
         
-        guard node.isBranch, !truncatedChildren.isEmpty else {
+        guard !truncatedChildren.isEmpty else {
             print("❌ Cannot expand non-category or empty category: \(node.name)")
             return
         }
