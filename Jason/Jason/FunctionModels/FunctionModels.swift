@@ -38,6 +38,12 @@ enum FunctionNodeType {
     /// - Can have children (folder contents)
     /// - Context: Open, Show in Finder, Add to Favorites
     case folder
+    
+    /// Visual separator between provider groups
+    /// - Always leaf node (no children)
+    /// - Non-interactive (hovering selects nothing)
+    /// - Renders as small dot, not icon
+    case spacer
 }
 
 // MARK: - Layout Style
@@ -244,6 +250,10 @@ class FunctionNode: Identifiable, ObservableObject {
         case .category:
             assert((children?.count ?? 0) > 0 || (contextActions?.count ?? 0) > 0,
                    "[.category] nodes must have children or contextActions (node: \(name))")
+        case .spacer:
+            // Spacers are pure visual separators - no children or contextActions
+            assert((children?.count ?? 0) == 0 && (contextActions?.count ?? 0) == 0,
+                "[spacer] nodes cannot have children or contextActions (node: \(name))")
         case .folder, .app:
             // Can have children or be empty
             break
@@ -257,9 +267,9 @@ class FunctionNode: Identifiable, ObservableObject {
         return previewURL != nil
     }
     
-    // Leaf nodes are determined by type (actions and files are always leaves)
+    // Leaf nodes are determined by type (actions, files, and spacers are always leaves)
     var isLeaf: Bool {
-        return type == .action || type == .file
+        return type == .action || type == .file || type == .spacer
     }
     
     // Branch nodes are determined by type (categories, folders, and apps can have children)
@@ -537,4 +547,23 @@ extension FunctionNode {
     }
 }
 
+// MARK: - Spacer Factory
 
+extension FunctionNode {
+    /// Create a spacer node for visual separation between provider groups
+    static func spacer(afterProvider providerId: String) -> FunctionNode {
+        return FunctionNode(
+            id: "spacer-\(providerId)",
+            name: "",
+            type: .spacer,
+            icon: NSImage(),
+            parentAngleSize: 8.0,  // Fixed 4° width
+            showLabel: false,
+            providerId: providerId,
+            onLeftClick: ModifierAwareInteraction(base: .doNothing),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
+    }
+}

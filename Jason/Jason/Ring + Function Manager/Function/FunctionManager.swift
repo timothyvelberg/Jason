@@ -131,8 +131,9 @@ class FunctionManager: ObservableObject {
         }
         
         let node = nodes[itemIndex]
-        print("📍 Found item at position: ring=\(ringLevel), index=\(itemIndex), name='\(node.name)'")
         
+        print("📍 Found item at position: ring=\(ringLevel), index=\(itemIndex), name='\(node.name)'")
+
         return (ringLevel, itemIndex, node)
     }
     

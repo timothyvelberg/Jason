@@ -38,7 +38,14 @@ extension FunctionManager {
     func hoverNode(ringLevel: Int, index: Int) {
         guard rings.indices.contains(ringLevel) else { return }
         guard rings[ringLevel].nodes.indices.contains(index) else { return }
+
+        let node = rings[ringLevel].nodes[index]
         
+        // Spacers are dead zones - clear hover and exit
+        if node.type == .spacer {
+            return
+        }
+
         // Early return if already hovering this node
         if rings[ringLevel].hoveredIndex == index {
             return
@@ -53,8 +60,6 @@ extension FunctionManager {
         }
         
         rings[ringLevel].hoveredIndex = index
-        
-        let node = rings[ringLevel].nodes[index]
         
         // Call onHover on newly hovered node
         node.onHover?()

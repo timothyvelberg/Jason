@@ -63,65 +63,60 @@ enum RingGeometry {
     static func getItemIndex(for angle: Double, sliceConfig: PieSliceConfig, itemCount: Int) -> Int {
         guard itemCount > 0 else { return -1 }
         
-        let itemAngle = sliceConfig.itemAngle
         let sliceStart = sliceConfig.startAngle
         let sliceEnd = sliceConfig.endAngle
         
-        if sliceConfig.isFullCircle {
-            // Normalize angles to 0-360 range
-            var adjustedAngle = angle
-            while adjustedAngle < 0 { adjustedAngle += 360 }
-            while adjustedAngle >= 360 { adjustedAngle -= 360 }
+        // Normalize the input angle
+        var normalizedAngle = angle
+        while normalizedAngle < 0 { normalizedAngle += 360 }
+        while normalizedAngle >= 360 { normalizedAngle -= 360 }
+        
+        // Calculate relative angle from start
+        var normalizedStart = sliceStart
+        while normalizedStart >= 360 { normalizedStart -= 360 }
+        while normalizedStart < 0 { normalizedStart += 360 }
+        
+        var relativeAngle: Double
+        
+        if sliceConfig.direction == .counterClockwise && !sliceConfig.isFullCircle {
+            // Counter-clockwise: measure from end going backwards
+            var normalizedEnd = sliceEnd
+            while normalizedEnd >= 360 { normalizedEnd -= 360 }
+            while normalizedEnd < 0 { normalizedEnd += 360 }
             
-            var normalizedStart = sliceStart
-            while normalizedStart >= 360 { normalizedStart -= 360 }
-            while normalizedStart < 0 { normalizedStart += 360 }
-            
-            // Calculate relative angle from start
-            var relativeAngle = adjustedAngle - normalizedStart
+            relativeAngle = normalizedEnd - normalizedAngle
             if relativeAngle < 0 { relativeAngle += 360 }
-            
-            let index = Int(relativeAngle / itemAngle) % itemCount
-            return index
-            
         } else {
-            // Partial slice
-            var normalizedAngle = angle
-            while normalizedAngle < 0 { normalizedAngle += 360 }
-            while normalizedAngle >= 360 { normalizedAngle -= 360 }
-            
-            if sliceConfig.direction == .counterClockwise {
-                // Counter-clockwise: Items positioned from END going backwards
-                var normalizedEnd = sliceEnd
-                while normalizedEnd >= 360 { normalizedEnd -= 360 }
-                while normalizedEnd < 0 { normalizedEnd += 360 }
-                
-                var relativeAngle = normalizedEnd - normalizedAngle
-                if relativeAngle < 0 { relativeAngle += 360 }
-                
-                let index = Int(relativeAngle / itemAngle)
-                
-                if index >= 0 && index < itemCount {
-                    return index
-                }
-                
-            } else {
-                // Clockwise: Items positioned from START going forwards
-                var normalizedStart = sliceStart
-                while normalizedStart >= 360 { normalizedStart -= 360 }
-                while normalizedStart < 0 { normalizedStart += 360 }
-                
-                var relativeAngle = normalizedAngle - normalizedStart
-                if relativeAngle < 0 { relativeAngle += 360 }
-                
-                let index = Int(relativeAngle / itemAngle)
-                
-                if index >= 0 && index < itemCount {
+            // Clockwise or full circle: measure from start going forwards
+            relativeAngle = normalizedAngle - normalizedStart
+            if relativeAngle < 0 { relativeAngle += 360 }
+        }
+        
+        // Use variable angles if available, otherwise uniform
+        if let perItemAngles = sliceConfig.perItemAngles, perItemAngles.count == itemCount {
+            // Accumulate angles to find which item contains this angle
+            var accumulatedAngle: Double = 0
+            for (index, itemAngle) in perItemAngles.enumerated() {
+                accumulatedAngle += itemAngle
+                if relativeAngle < accumulatedAngle {
                     return index
                 }
             }
+            // If we're past all items (shouldn't happen normally), return last item
+            return itemCount - 1
+        } else {
+            // Uniform angles - use simple division
+            let itemAngle = sliceConfig.itemAngle
+            let index = Int(relativeAngle / itemAngle)
+            
+            if sliceConfig.isFullCircle {
+                return index % itemCount
+            } else {
+                if index >= 0 && index < itemCount {
+                    return index
+                }
+                return -1
+            }
         }
-        
-        return -1
     }
 }

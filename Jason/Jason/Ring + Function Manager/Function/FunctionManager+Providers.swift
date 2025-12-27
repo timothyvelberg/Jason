@@ -36,13 +36,52 @@ extension FunctionManager {
             provider.refresh()
         }
         
-        // Collect functions from all providers with display mode transformation
-        rootNodes = providers.flatMap { provider in
+        // Collect functions from all providers with spacer insertion
+        var allNodes: [FunctionNode] = []
+        var firstDirectModeProviderId: String? = nil
+        var lastDirectModeProviderId: String? = nil
+        
+        for provider in providers {
             let providerNodes = provider.provideFunctions()
             let transformedNodes = applyDisplayMode(providerNodes, providerId: provider.providerId)
-            return transformedNodes
+            
+            // Check if this provider is in direct mode
+            let isDirectMode = providerConfigurations[provider.providerId]?.effectiveDisplayMode == .direct
+            
+            // Determine if we should insert a spacer
+            // Spacer goes between two direct-mode providers that both contributed nodes
+            if isDirectMode && !transformedNodes.isEmpty {
+                if let lastProviderId = lastDirectModeProviderId {
+                    // Insert spacer between previous direct-mode provider and this one
+                    let spacer = FunctionNode.spacer(afterProvider: lastProviderId)
+                    allNodes.append(spacer)
+                    print("➕ [Spacer] Inserted between '\(lastProviderId)' and '\(provider.providerId)'")
+                }
+                
+                // Track first direct-mode provider for wrap-around spacer
+                if firstDirectModeProviderId == nil {
+                    firstDirectModeProviderId = provider.providerId
+                }
+                lastDirectModeProviderId = provider.providerId
+            } else if !isDirectMode {
+                // Category mode resets the chain (no spacer before categories)
+                lastDirectModeProviderId = nil
+            }
+            
+            allNodes.append(contentsOf: transformedNodes)
         }
         
+        // Add wrap-around spacer if we have multiple direct-mode providers
+        // This separates the last provider's items from the first provider's items in the circular layout
+        if let firstId = firstDirectModeProviderId,
+           let lastId = lastDirectModeProviderId,
+           firstId != lastId {
+            let spacer = FunctionNode.spacer(afterProvider: lastId)
+            allNodes.append(spacer)
+            print("➕ [Spacer] Inserted after '\(lastId)' (wrap-around to '\(firstId)')")
+        }
+        
+        rootNodes = allNodes
         rebuildRings()
     }
     
@@ -147,21 +186,61 @@ extension FunctionManager {
         
         let providerOrder = providers.map { $0.providerId }
         
+        // First pass: collect all non-spacer nodes in provider order
         var newRing0Nodes: [FunctionNode] = []
         
         for orderedProviderId in providerOrder {
             if orderedProviderId == providerId {
                 newRing0Nodes.append(contentsOf: updatedRootNodes)
             } else {
-                let existingNodes = rings[0].nodes.filter { $0.providerId == orderedProviderId }
+                // Filter out spacers - we'll re-add them after
+                let existingNodes = rings[0].nodes.filter {
+                    $0.providerId == orderedProviderId && $0.type != .spacer
+                }
                 newRing0Nodes.append(contentsOf: existingNodes)
                 print("   🔍 Provider '\(orderedProviderId)': found \(existingNodes.count) existing nodes")
             }
         }
         
-        let truncatedRing0Nodes = Array(newRing0Nodes.prefix(maxItems))
-        if newRing0Nodes.count > maxItems {
-            print("   ✂️ Truncated Ring 0 from \(newRing0Nodes.count) to \(truncatedRing0Nodes.count) items")
+        // Second pass: re-insert spacers between direct-mode providers
+        var nodesWithSpacers: [FunctionNode] = []
+        var firstDirectModeProviderId: String? = nil
+        var lastDirectModeProviderId: String? = nil
+        
+        for orderedProviderId in providerOrder {
+            let isDirectMode = providerConfigurations[orderedProviderId]?.effectiveDisplayMode == .direct
+            let providerNodes = newRing0Nodes.filter { $0.providerId == orderedProviderId }
+            
+            if isDirectMode && !providerNodes.isEmpty {
+                if let lastProviderId = lastDirectModeProviderId {
+                    let spacer = FunctionNode.spacer(afterProvider: lastProviderId)
+                    nodesWithSpacers.append(spacer)
+                    print("   ➕ [Spacer] Re-inserted between '\(lastProviderId)' and '\(orderedProviderId)'")
+                }
+                
+                if firstDirectModeProviderId == nil {
+                    firstDirectModeProviderId = orderedProviderId
+                }
+                lastDirectModeProviderId = orderedProviderId
+            } else if !isDirectMode {
+                lastDirectModeProviderId = nil
+            }
+            
+            nodesWithSpacers.append(contentsOf: providerNodes)
+        }
+        
+        // Add wrap-around spacer if needed
+        if let firstId = firstDirectModeProviderId,
+           let lastId = lastDirectModeProviderId,
+           firstId != lastId {
+            let spacer = FunctionNode.spacer(afterProvider: lastId)
+            nodesWithSpacers.append(spacer)
+            print("   ➕ [Spacer] Re-inserted after '\(lastId)' (wrap-around to '\(firstId)')")
+        }
+        
+        let truncatedRing0Nodes = Array(nodesWithSpacers.prefix(maxItems))
+        if nodesWithSpacers.count > maxItems {
+            print("   ✂️ Truncated Ring 0 from \(nodesWithSpacers.count) to \(truncatedRing0Nodes.count) items")
         }
         
         rings[0].nodes = truncatedRing0Nodes

@@ -227,14 +227,26 @@ struct RingView: View {
                 let opacity = iconOpacities[node.id] ?? 0
                 let scale = iconScales[node.id] ?? animationStartScale
                 
-                Image(nsImage: node.icon)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: iconSize, height: iconSize)
-                    .scaleEffect(scale)
-                    .opacity(opacity)
-                    .position(iconPosition(for: index))
-                    .allowsHitTesting(false)
+                if node.type == .spacer {
+                    // Render spacer as small dot
+                    Circle()
+                        .fill(Color.white.opacity(0.3))
+                        .frame(width: 4, height: 4)
+                        .scaleEffect(scale)
+                        .opacity(opacity)
+                        .position(iconPosition(for: index))
+                        .allowsHitTesting(false)
+                } else {
+                    // Render normal icon
+                    Image(nsImage: node.icon)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: iconSize, height: iconSize)
+                        .scaleEffect(scale)
+                        .opacity(opacity)
+                        .position(iconPosition(for: index))
+                        .allowsHitTesting(false)
+                }
             }
             
             // Badges positioned at top-right of icons
