@@ -119,9 +119,11 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 // Apply custom limit if specified
                 if let limit = customMaxItems {
                     print("✂️ [FavoriteFolderProvider] Applying custom limit: \(limit) items")
-                    return Array(nodes.prefix(limit))
+                    nodes = Array(nodes.prefix(limit))
                 }
                 
+                // Add end spacer
+                nodes.append(createEndSpacer(for: folderPath))
                 return nodes
             } else {
                 print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
@@ -169,10 +171,10 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             print("ℹ️ [EnhancedCache] Folder has only \(actualItemCount) items - not caching (threshold: 100)")
         }
         
-        // Update folder access tracking
-        db.updateFolderAccess(path: folderPath)
-        
-        return nodes
+        // Add end spacer
+        var resultNodes = nodes
+        resultNodes.append(createEndSpacer(for: folderPath))
+        return resultNodes
     }
     
     // MARK: - Sorting
@@ -736,5 +738,23 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         }
         
         return IconProvider.shared.getFileIcon(for: url, size: thumbnailSize.width, cornerRadius: cornerRadius)
+    }
+
+    // MARK: - Spacer Creation
+    
+    private func createEndSpacer(for folderPath: String) -> FunctionNode {
+        return FunctionNode(
+            id: "spacer-end-\(folderPath)",
+            name: "",
+            type: .spacer,
+            icon: NSImage(),
+            parentAngleSize: 8.0,
+            showLabel: false,
+            providerId: providerId,
+            onLeftClick: ModifierAwareInteraction(base: .doNothing),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
     }
 }

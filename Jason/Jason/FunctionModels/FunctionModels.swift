@@ -557,7 +557,7 @@ extension FunctionNode {
             name: "",
             type: .spacer,
             icon: NSImage(),
-            parentAngleSize: 8.0,  // Fixed 4° width
+            parentAngleSize: 8.0,
             showLabel: false,
             providerId: providerId,
             onLeftClick: ModifierAwareInteraction(base: .doNothing),

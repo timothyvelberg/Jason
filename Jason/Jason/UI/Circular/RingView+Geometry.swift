@@ -92,7 +92,7 @@ extension RingView {
         let newStartAngle = newAngleOffset - itemAngle / 2 - 90
         let newEndAngle = newAngleOffset + itemAngle / 2 - 90
         
-        withAnimation(.easeOut(duration: 0.08)) {
+        withAnimation(.easeOut(duration: 0.2)) {
             angleOffset = newAngleOffset
             startAngle = Angle(degrees: newStartAngle)
             endAngle = Angle(degrees: newEndAngle)
