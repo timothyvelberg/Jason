@@ -136,7 +136,6 @@ class IconProvider {
     
     // Map folder names to custom icons (applies to any folder with that name)
     private let nameBasedFolderIcons: [String: FolderConfig] = [
-        "Downloads": FolderConfig(type: .systemWithColor(NSColor(red: 0.2, green: 0.6, blue: 0.9, alpha: 1.0))),
         "Documents": FolderConfig(type: .systemWithColor(NSColor(red: 0.3, green: 0.5, blue: 0.8, alpha: 1.0))),
         "Desktop": FolderConfig(type: .systemWithColor(NSColor(red: 0.5, green: 0.4, blue: 0.7, alpha: 1.0))),
         "Projects": FolderConfig(type: .systemWithColor(NSColor(red: 0.9, green: 0.5, blue: 0.2, alpha: 1.0))),

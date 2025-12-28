@@ -193,31 +193,41 @@ struct RingView: View {
                 .allowsHitTesting(false)
             }
             
-            // Running app indicators (thin arc at inner edge)
+            // Icons positioned around the ring (non-interactive, just visual)
             ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
-                if let metadata = node.metadata,
-                   let isRunning = metadata["isRunning"] as? Bool,
-                   isRunning {
+                let opacity = iconOpacities[node.id] ?? 0
+                let scale = iconScales[node.id] ?? animationStartScale
+                
+                if node.type == .spacer {
+                    // Render spacer as small dot
+                    Circle()
+                        .fill(Color.white.opacity(0.16))
+                        .frame(width: 3, height: 3)
+                        .scaleEffect(scale)
+                        .opacity(opacity)
+                        .position(iconPosition(for: index))
+                        .allowsHitTesting(false)
+                } else {
+                    // Render icon with optional running indicator
+                    let isRunning = (node.metadata?["isRunning"] as? Bool) ?? false
                     
-                    let centerAngle = calculateCenterAngle(for: index)
-                    let itemAngle = angleForItem(at: index)
-
-                  let indicatorStartAngle = centerAngle - (itemAngle / 2) + 2
-                  let indicatorEndAngle = centerAngle + (itemAngle / 2) - 2
-                    
-                    
-                    let indicatorThickness: CGFloat = 2
-                    let indicatorOuterRadiusRatio = innerRadiusRatio + (indicatorThickness / endRadius)
-                    
-                    PieSliceShape(
-                        startAngle: .degrees(indicatorStartAngle - 90),
-                        endAngle: .degrees(indicatorEndAngle - 90),
-                        innerRadiusRatio: innerRadiusRatio,
-                        outerRadiusRatio: indicatorOuterRadiusRatio
-                    )
-                    .fill(Color.white.opacity(0.16))
-                    .opacity(runningIndicatorOpacities[node.id] ?? 0)
-                    .frame(width: totalDiameter, height: totalDiameter)
+                    ZStack {
+                        Image(nsImage: node.icon)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: iconSize, height: iconSize)
+                        
+                        if isRunning {
+                            Circle()
+                                .fill(Color.white.opacity(0.16))
+                                .frame(width: 3, height: 3)
+                                .offset(y: iconSize / 2 + 2)
+                                .opacity(runningIndicatorOpacities[node.id] ?? 0)
+                        }
+                    }
+                    .scaleEffect(scale)
+                    .opacity(opacity)
+                    .position(iconPosition(for: index))
                     .allowsHitTesting(false)
                 }
             }
@@ -231,7 +241,7 @@ struct RingView: View {
                     // Render spacer as small dot
                     Circle()
                         .fill(Color.white.opacity(0.16))
-                        .frame(width: 3, height: 3)
+                        .frame(width: 4, height: 4)
                         .scaleEffect(scale)
                         .opacity(opacity)
                         .position(iconPosition(for: index))

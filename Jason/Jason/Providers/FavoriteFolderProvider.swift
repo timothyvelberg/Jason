@@ -123,7 +123,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 }
                 
                 // Add end spacer
-                nodes.append(createEndSpacer(for: folderPath))
+                nodes.append(createOpenFolderNode(for: folderPath))
                 return nodes
             } else {
                 print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
@@ -173,7 +173,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         
         // Add end spacer
         var resultNodes = nodes
-        resultNodes.append(createEndSpacer(for: folderPath))
+        resultNodes.append(createOpenFolderNode(for: folderPath))
         return resultNodes
     }
     
@@ -742,16 +742,22 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
 
     // MARK: - Spacer Creation
     
-    private func createEndSpacer(for folderPath: String) -> FunctionNode {
+    private func createOpenFolderNode(for folderPath: String) -> FunctionNode {
+        let url = URL(fileURLWithPath: folderPath)
+        let icon = NSImage(systemSymbolName: "arrow.up.forward.square", accessibilityDescription: "Open in Finder")?
+            .withSymbolConfiguration(.init(pointSize: 24, weight: .medium)) ?? NSImage()
+        
         return FunctionNode(
-            id: "spacer-end-\(folderPath)",
-            name: "",
-            type: .spacer,
-            icon: NSImage(),
-            parentAngleSize: 8.0,
-            showLabel: false,
+            id: "open-folder-\(folderPath)",
+            name: "Open in Finder",
+            type: .action,
+            icon: icon,
+            parentAngleSize: 12.0,
+            showLabel: true,
             providerId: providerId,
-            onLeftClick: ModifierAwareInteraction(base: .doNothing),
+            onLeftClick: ModifierAwareInteraction(base: .execute {
+                NSWorkspace.shared.open(url)
+            }),
             onRightClick: ModifierAwareInteraction(base: .doNothing),
             onMiddleClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
