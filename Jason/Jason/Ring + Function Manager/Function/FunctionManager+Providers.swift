@@ -1,5 +1,5 @@
 //
-//  FunctionManager+Navigation.swift
+//  FunctionManager+Providers.swift
 //  Jason
 //
 //  Created by Timothy Velberg on 29/11/2025.
@@ -9,292 +9,308 @@ import Foundation
 
 extension FunctionManager {
     
-    // MARK: - Navigation
+    // MARK: - Provider Management
     
-    func navigateInto(_ node: FunctionNode) {
-        guard node.isBranch else {
-            print("Cannot navigate into leaf node: \(node.name)")
-            return
+    func registerProvider(_ provider: FunctionProvider, configuration: ProviderConfiguration? = nil) {
+        providers.append(provider)
+        
+        if let config = configuration {
+            providerConfigurations[provider.providerId] = config
+            print("📦 Registered provider: \(provider.providerName) (displayMode: \(config.effectiveDisplayMode))")
+        } else {
+            print("📦 Registered provider: \(provider.providerName)")
         }
-        navigationStack.append(node)
-        activeRingLevel = 0
-        rebuildRings()
-        print("Navigated into: \(node.name), depth: \(navigationStack.count)")
     }
     
-    func navigateBack() {
-        guard !navigationStack.isEmpty else {
-            print("Already at root level")
-            return
-        }
-        let previous = navigationStack.removeLast()
-        activeRingLevel = 0
-        rebuildRings()
-        print("Navigated back from: \(previous.name), depth: \(navigationStack.count)")
+    func removeProvider(withId id: String) {
+        providers.removeAll { $0.providerId == id }
+        providerConfigurations.removeValue(forKey: id)
+        print("🗑️ Removed provider: \(id)")
     }
     
-    // MARK: - Ring Interaction
+    // MARK: - Data Loading
     
-    func hoverNode(ringLevel: Int, index: Int) {
-        guard rings.indices.contains(ringLevel) else { return }
-        guard rings[ringLevel].nodes.indices.contains(index) else { return }
-
-        let node = rings[ringLevel].nodes[index]
-        
-        // Spacers are dead zones - clear hover and exit
-        if node.type == .spacer {
-            return
-        }
-
-        // Early return if already hovering this node
-        if rings[ringLevel].hoveredIndex == index {
-            return
+    func loadFunctions() {
+        // Refresh all providers to get latest data
+        for provider in providers {
+            provider.refresh()
         }
         
-        // Call onHoverExit on previously hovered node
-        if let prevIndex = rings[ringLevel].hoveredIndex,
-           prevIndex != index,
-           rings[ringLevel].nodes.indices.contains(prevIndex) {
-            let prevNode = rings[ringLevel].nodes[prevIndex]
-            prevNode.onHoverExit?()
-        }
+        // Collect functions from all providers with spacer insertion
+        var allNodes: [FunctionNode] = []
+        var firstDirectModeProviderId: String? = nil
+        var lastDirectModeProviderId: String? = nil
         
-        rings[ringLevel].hoveredIndex = index
-        
-        // Call onHover on newly hovered node
-        node.onHover?()
-    }
-    
-    func selectNode(ringLevel: Int, index: Int) {
-        guard rings.indices.contains(ringLevel) else { return }
-        guard rings[ringLevel].nodes.indices.contains(index) else { return }
-        
-        rings[ringLevel].selectedIndex = index
-        rings[ringLevel].hoveredIndex = index
-        
-        let node = rings[ringLevel].nodes[index]
-        print("Selected ring \(ringLevel), index \(index): \(node.name)")
-    }
-    
-    // MARK: - Category Expansion
-    
-    func expandCategory(ringLevel: Int, index: Int, openedByClick: Bool = false) {
-        print("⭐ expandCategory called: ringLevel=\(ringLevel), index=\(index), openedByClick=\(openedByClick)")
-        
-        guard rings.indices.contains(ringLevel) else {
-            print("❌ Invalid ring level: \(ringLevel)")
-            return
-        }
-        guard rings[ringLevel].nodes.indices.contains(index) else {
-            print("❌ Invalid node index: \(index) for ring level: \(ringLevel)")
-            return
-        }
-        
-        let node = rings[ringLevel].nodes[index]
-        
-        print("⭐ Expanding node: '\(node.name)'")
-        print("   - isBranch: \(node.isBranch)")
-        print("   - children count: \(node.children?.count ?? 0)")
-        print("   - contextActions count: \(node.contextActions?.count ?? 0)")
-        
-        // Use displayedChildren which respects maxDisplayedChildren limit
-        let displayedChildren = node.displayedChildren
-        
-        // Truncate to maxItems to prevent ghost items in child rings
-        let truncatedChildren = Array(displayedChildren.prefix(maxItems))
-        if displayedChildren.count > maxItems {
-            print("   ✂️ Truncated children from \(displayedChildren.count) to \(truncatedChildren.count) items")
-        }
-        
-        print("   - displayedChildren count: \(truncatedChildren.count)")
-        
-        guard !truncatedChildren.isEmpty else {
-            print("❌ Cannot expand non-category or empty category: \(node.name)")
-            return
-        }
-        
-        // Select the node at this level
-        rings[ringLevel].selectedIndex = index
-        rings[ringLevel].hoveredIndex = index
-        
-        // Remove any rings beyond this level
-        if ringLevel + 1 < rings.count {
-            rings.removeSubrange((ringLevel + 1)...)
-        }
-        
-        // Get context from the node
-        let providerId = node.providerId
-        let contentIdentifier = node.metadata?["folderURL"] as? String
-        
-        // Add new ring with displayed children and context tracking
-        rings.append(RingState(
-            nodes: truncatedChildren,
-            isCollapsed: false,
-            openedByClick: openedByClick,
-            providerId: providerId,
-            contentIdentifier: contentIdentifier
-        ))
-        activeRingLevel = ringLevel + 1
-        
-        print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(truncatedChildren.count) nodes (providerId: \(providerId ?? "nil"), contentId: \(contentIdentifier ?? "nil"))")
-    }
-    
-    func loadAndExpandToCategory(providerId: String) {
-        print("🎯 [FunctionManager] Loading and expanding to category: \(providerId)")
-        
-        // First, load all functions normally
-        loadFunctions()
-        
-        // Verify we have a Ring 0
-        guard !rings.isEmpty, !rings[0].nodes.isEmpty else {
-            print("❌ No Ring 0 available after loading")
-            return
-        }
-        
-        // Find the node with matching ID in Ring 0
-        guard let index = rings[0].nodes.firstIndex(where: { $0.id == providerId }) else {
-            print("❌ Provider '\(providerId)' not found in Ring 0")
-            print("   Available providers: \(rings[0].nodes.map { $0.id }.joined(separator: ", "))")
-            return
-        }
-        
-        let node = rings[0].nodes[index]
-        
-        // Verify it's expandable
-        guard node.isBranch, !node.displayedChildren.isEmpty else {
-            print("❌ Provider '\(providerId)' is not expandable or has no children")
-            return
-        }
-        
-        print("✅ Found provider '\(node.name)' at index \(index) with \(node.displayedChildren.count) children")
-        
-        // Expand this category with openedByClick: true
-        // This makes it behave like a right-click context menu - stable until boundary cross
-        expandCategory(ringLevel: 0, index: index, openedByClick: true)
-        
-        print("✅ Successfully expanded to '\(node.name)' - now at Ring \(activeRingLevel)")
-    }
-    
-    // MARK: - Folder Navigation
-    
-    func navigateIntoFolder(ringLevel: Int, index: Int) {
-        print("📂 navigateIntoFolder called: ringLevel=\(ringLevel), index=\(index)")
-        
-        if isLoadingFolder {
-            print("⏸️ Already loading a folder - ignoring navigation request")
-            return
-        }
-        
-        guard rings.indices.contains(ringLevel) else {
-            print("❌ Invalid ring level: \(ringLevel)")
-            return
-        }
-        guard rings[ringLevel].nodes.indices.contains(index) else {
-            print("❌ Invalid node index: \(index) for ring level: \(ringLevel)")
-            return
-        }
-        
-        let node = rings[ringLevel].nodes[index]
-        
-        Task { @MainActor in
-            isLoadingFolder = true
+        for provider in providers {
+            let providerNodes = provider.provideFunctions()
+            let transformedNodes = applyDisplayMode(providerNodes, providerId: provider.providerId)
             
-            let childrenToDisplay: [FunctionNode]
+            // Check if this provider is in direct mode
+            let isDirectMode = providerConfigurations[provider.providerId]?.effectiveDisplayMode == .direct
             
-            if node.needsDynamicLoading {
-                print("🔄 Node '\(node.name)' needs dynamic loading")
-                
-                guard let providerId = node.providerId else {
-                    print("❌ Node '\(node.name)' needs dynamic loading but has no providerId")
-                    isLoadingFolder = false
-                    return
+            // Determine if we should insert a spacer
+            // Spacer goes between two direct-mode providers that both contributed nodes
+            if isDirectMode && !transformedNodes.isEmpty {
+                if let lastProviderId = lastDirectModeProviderId {
+                    // Insert spacer between previous direct-mode provider and this one
+                    let spacer = FunctionNode.spacer(afterProvider: lastProviderId)
+                    allNodes.append(spacer)
+                    print("➕ [Spacer] Inserted between '\(lastProviderId)' and '\(provider.providerId)'")
                 }
                 
-                guard let provider = providers.first(where: { $0.providerId == providerId }) else {
-                    print("❌ Provider '\(providerId)' not found")
-                    isLoadingFolder = false
-                    return
+                // Track first direct-mode provider for wrap-around spacer
+                if firstDirectModeProviderId == nil {
+                    firstDirectModeProviderId = provider.providerId
                 }
+                lastDirectModeProviderId = provider.providerId
+            } else if !isDirectMode {
+                // Category mode resets the chain (no spacer before categories)
+                lastDirectModeProviderId = nil
+            }
+            
+            allNodes.append(contentsOf: transformedNodes)
+        }
+        
+        // Add wrap-around spacer if we have multiple direct-mode providers
+        // This separates the last provider's items from the first provider's items in the circular layout
+        if let firstId = firstDirectModeProviderId,
+           let lastId = lastDirectModeProviderId,
+           firstId != lastId {
+            let spacer = FunctionNode.spacer(afterProvider: lastId)
+            allNodes.append(spacer)
+            print("➕ [Spacer] Inserted after '\(lastId)' (wrap-around to '\(firstId)')")
+        }
+        
+        rootNodes = allNodes
+        rebuildRings()
+    }
+    
+    // MARK: - Display Mode Transformation
+    
+    /// Transform provider output based on display mode configuration
+    func applyDisplayMode(
+        _ nodes: [FunctionNode],
+        providerId: String
+    ) -> [FunctionNode] {
+        
+        print("🔍 [DisplayMode] Called for providerId: \(providerId), hasConfig: \(providerConfigurations[providerId] != nil)")
+
+        
+        guard let providerConfig = providerConfigurations[providerId] else {
+            return nodes
+        }
+        
+        let displayMode = providerConfig.effectiveDisplayMode
+        
+        guard displayMode == .direct else {
+            return nodes
+        }
+        
+        // Direct mode: Extract children from category nodes
+        let transformedNodes = nodes.flatMap { node -> [FunctionNode] in
+            guard node.type == .category else {
+                return [node]
+            }
+            
+            if let children = node.children, !children.isEmpty {
+                print("🔄 [DisplayMode] Extracting \(children.count) children from category '\(node.name)' (provider: \(providerId))")
                 
-                print("📂 Loading children from provider '\(provider.providerName)'")
-                childrenToDisplay = await provider.loadChildren(for: node)
-                print("✅ Loaded \(childrenToDisplay.count) children dynamically")
-                
+                return children.map { child in
+                    if child.providerId != providerId {
+                        return child.withProviderId(providerId)
+                    }
+                    return child
+                }
             } else {
-                childrenToDisplay = node.displayedChildren
+                print("⚠️ [DisplayMode] Category '\(node.name)' has no children in direct mode (provider: \(providerId))")
+                return [node]
             }
-            
-            guard !childrenToDisplay.isEmpty else {
-                print("Cannot navigate into empty folder: \(node.name)")
-                isLoadingFolder = false
-                return
-            }
-            
-            // Truncate to maxItems to prevent ghost items
-            let truncatedChildren = Array(childrenToDisplay.prefix(maxItems))
-            if childrenToDisplay.count > maxItems {
-                print("   ✂️ Truncated folder children from \(childrenToDisplay.count) to \(truncatedChildren.count) items")
-            }
-            
-            // Bounds check after async work
-            guard rings.indices.contains(ringLevel),
-                  rings[ringLevel].nodes.indices.contains(index) else {
-                print("❌ Ring or index out of bounds after async load - rings may have changed")
-                isLoadingFolder = false
-                return
-            }
-            
-            rings[ringLevel].selectedIndex = index
-            rings[ringLevel].hoveredIndex = index
-            
-            // Mark current ring as collapsed (if it's not Ring 0)
-            if ringLevel > 0 {
-                rings[ringLevel].isCollapsed = true
-                print("📦 Collapsed ring \(ringLevel)")
-            }
-            
-            // Remove any rings beyond this level
-            if ringLevel + 1 < rings.count {
-                let removed = rings.count - (ringLevel + 1)
-                rings.removeSubrange((ringLevel + 1)...)
-                print("🗑️ Removed \(removed) ring(s) beyond level \(ringLevel)")
-            }
-            
-            // Add new ring with children
-            let providerId = node.providerId
-            let contentIdentifier = node.metadata?["folderURL"] as? String
-            rings.append(RingState(
-                nodes: truncatedChildren,
-                isCollapsed: false,
-                openedByClick: true,
-                providerId: providerId,
-                contentIdentifier: contentIdentifier
-            ))
-            
-            activeRingLevel = ringLevel + 1
-            isLoadingFolder = false
-            
-            print("✅ Navigated into folder '\(node.name)' at ring \(ringLevel)")
-            print("   Created ring \(ringLevel + 1) with \(truncatedChildren.count) nodes")
-            print("   Active ring is now: \(activeRingLevel)")
         }
+        
+        return transformedNodes
     }
     
-    func collapseToRing(level: Int) {
-        guard level >= 0, level < rings.count else { return }
+    // MARK: - Surgical Ring Updates
+    
+    /// Update a specific ring with fresh data from its provider
+    func updateRing(providerId: String, contentIdentifier: String? = nil) {
+        print("🔄 [updateRing] Looking for ring with providerId: \(providerId), contentId: \(contentIdentifier ?? "nil")")
         
-        // Uncollapse the target ring (we're returning to it)
-        if level > 0 {
-            rings[level].isCollapsed = false
-            print("📦 Uncollapsed ring \(level) - returning to normal size")
+        guard let provider = providers.first(where: { $0.providerId == providerId }) else {
+            print("❌ Provider '\(providerId)' not found")
+            return
         }
         
-        // Remove all rings after the specified level
-        if level + 1 < rings.count {
-            let removed = rings.count - (level + 1)
-            rings.removeSubrange((level + 1)...)
-            activeRingLevel = level
-            print("Collapsed \(removed) ring(s), now at ring \(level)")
+        for (level, ring) in rings.enumerated() {
+            let providerMatches: Bool
+            if ring.providerId == providerId {
+                providerMatches = true
+            } else if ring.providerId == nil {
+                providerMatches = ring.nodes.contains { node in
+                    node.providerId == providerId && node.type != .category
+                }
+            } else {
+                providerMatches = false
+            }
+            
+            let contentMatches = contentIdentifier == nil || ring.contentIdentifier == contentIdentifier
+            
+            if providerMatches && contentMatches {
+                print("✅ Found matching ring at level \(level)")
+                
+                if level + 1 < rings.count {
+                    print("🗑️ Closing \(rings.count - level - 1) child ring(s) before update")
+                    collapseToRing(level: level)
+                }
+                
+                provider.refresh()
+                
+                if level == 0 {
+                    updateRing0(provider: provider, providerId: providerId)
+                } else {
+                    updateChildRing(level: level, provider: provider, providerId: providerId, contentIdentifier: contentIdentifier)
+                }
+                
+                return
+            }
+        }
+        
+        print("⚠️ No matching ring found for providerId: \(providerId), contentId: \(contentIdentifier ?? "nil")")
+    }
+    
+    // MARK: - Private Update Helpers
+    
+    private func updateRing0(provider: FunctionProvider, providerId: String) {
+        let providerNodes = provider.provideFunctions()
+        let updatedRootNodes = applyDisplayMode(providerNodes, providerId: providerId)
+        
+        let providerOrder = providers.map { $0.providerId }
+        
+        // First pass: collect all non-spacer nodes in provider order
+        var newRing0Nodes: [FunctionNode] = []
+        
+        for orderedProviderId in providerOrder {
+            if orderedProviderId == providerId {
+                newRing0Nodes.append(contentsOf: updatedRootNodes)
+            } else {
+                // Filter out spacers - we'll re-add them after
+                let existingNodes = rings[0].nodes.filter {
+                    $0.providerId == orderedProviderId && $0.type != .spacer
+                }
+                newRing0Nodes.append(contentsOf: existingNodes)
+                print("   🔍 Provider '\(orderedProviderId)': found \(existingNodes.count) existing nodes")
+            }
+        }
+        
+        // Second pass: re-insert spacers between direct-mode providers
+        var nodesWithSpacers: [FunctionNode] = []
+        var firstDirectModeProviderId: String? = nil
+        var lastDirectModeProviderId: String? = nil
+        
+        for orderedProviderId in providerOrder {
+            let isDirectMode = providerConfigurations[orderedProviderId]?.effectiveDisplayMode == .direct
+            let providerNodes = newRing0Nodes.filter { $0.providerId == orderedProviderId }
+            
+            if isDirectMode && !providerNodes.isEmpty {
+                if let lastProviderId = lastDirectModeProviderId {
+                    let spacer = FunctionNode.spacer(afterProvider: lastProviderId)
+                    nodesWithSpacers.append(spacer)
+                    print("   ➕ [Spacer] Re-inserted between '\(lastProviderId)' and '\(orderedProviderId)'")
+                }
+                
+                if firstDirectModeProviderId == nil {
+                    firstDirectModeProviderId = orderedProviderId
+                }
+                lastDirectModeProviderId = orderedProviderId
+            } else if !isDirectMode {
+                lastDirectModeProviderId = nil
+            }
+            
+            nodesWithSpacers.append(contentsOf: providerNodes)
+        }
+        
+        // Add wrap-around spacer if needed
+        if let firstId = firstDirectModeProviderId,
+           let lastId = lastDirectModeProviderId,
+           firstId != lastId {
+            let spacer = FunctionNode.spacer(afterProvider: lastId)
+            nodesWithSpacers.append(spacer)
+            print("   ➕ [Spacer] Re-inserted after '\(lastId)' (wrap-around to '\(firstId)')")
+        }
+        
+        let truncatedRing0Nodes = Array(nodesWithSpacers.prefix(maxItems))
+        if nodesWithSpacers.count > maxItems {
+            print("   ✂️ Truncated Ring 0 from \(nodesWithSpacers.count) to \(truncatedRing0Nodes.count) items")
+        }
+        
+        rings[0].nodes = truncatedRing0Nodes
+        rings[0].hoveredIndex = nil
+        rings[0].selectedIndex = nil
+        
+        print("✅ Updated Ring 0: replaced nodes from provider '\(providerId)'")
+    }
+    
+    private func updateChildRing(level: Int, provider: FunctionProvider, providerId: String, contentIdentifier: String?) {
+        guard level > 0, level - 1 < rings.count else {
+            print("❌ Cannot find parent ring for level \(level)")
+            return
+        }
+        
+        let parentRing = rings[level - 1]
+        guard let selectedIndex = parentRing.selectedIndex,
+              selectedIndex < parentRing.nodes.count else {
+            print("❌ No selected node in parent ring")
+            return
+        }
+        
+        let freshRootNodes = provider.provideFunctions()
+        
+        if level == 1 && !freshRootNodes.isEmpty {
+            let freshParentNode = freshRootNodes[0]
+            
+            if let parentIndex = rings[0].nodes.firstIndex(where: { $0.providerId == providerId }) {
+                print("🔄 Updating Ring 0's '\(freshParentNode.name)' node with fresh children")
+                rings[0].nodes[parentIndex] = freshParentNode
+            }
+            
+            if freshParentNode.needsDynamicLoading {
+                Task { @MainActor in
+                    let loadedNodes = await provider.loadChildren(for: freshParentNode)
+                    
+                    guard level < self.rings.count,
+                          self.rings[level].providerId == providerId,
+                          self.rings[level].contentIdentifier == contentIdentifier else {
+                        print("⚠️ Ring changed during async load - ignoring update")
+                        return
+                    }
+                    
+                    let truncatedNodes = Array(loadedNodes.prefix(self.maxItems))
+                    if loadedNodes.count > self.maxItems {
+                        print("   ✂️ Truncated Ring \(level) from \(loadedNodes.count) to \(truncatedNodes.count) items")
+                    }
+                    
+                    self.rings[level].nodes = truncatedNodes
+                    self.rings[level].hoveredIndex = nil
+                    self.rings[level].selectedIndex = nil
+                    
+                    print("✅ Updated Ring \(level) with \(truncatedNodes.count) dynamically loaded nodes")
+                }
+            } else {
+                let freshNodes = freshParentNode.displayedChildren
+                
+                let truncatedNodes = Array(freshNodes.prefix(maxItems))
+                if freshNodes.count > maxItems {
+                    print("   ✂️ Truncated Ring \(level) from \(freshNodes.count) to \(truncatedNodes.count) items")
+                }
+                
+                rings[level].nodes = truncatedNodes
+                rings[level].hoveredIndex = nil
+                rings[level].selectedIndex = nil
+                
+                print("✅ Updated Ring \(level) with \(truncatedNodes.count) nodes")
+            }
+        } else {
+            print("⚠️ Cannot get fresh parent node for Ring \(level)")
         }
     }
 }

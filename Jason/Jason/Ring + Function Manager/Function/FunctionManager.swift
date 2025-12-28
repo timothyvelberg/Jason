@@ -19,11 +19,10 @@ class FunctionManager: ObservableObject {
                 print("🔄 [Cache] Structural change detected - invalidating cache")
                 lastRingsHash = 0
                 cachedConfigurations = []
-            } else {
-                print("✅ [Cache] No structural change - preserving cache (likely sliceConfig update)")
             }
         }
     }
+    
     @Published var activeRingLevel: Int = 0
     @Published var ringResetTrigger: UUID = UUID()
     @Published var isLoadingFolder: Bool = false
@@ -75,26 +74,44 @@ class FunctionManager: ObservableObject {
     // MARK: - Computed Properties for UI
     
     var ringConfigurations: [RingConfiguration] {
+        // Hash only structural properties - not selection state
         let currentHash = rings.map { $0.nodes.count }.reduce(0, ^) ^
-                         activeRingLevel ^
-                         rings.compactMap { $0.selectedIndex }.reduce(0, ^)
+                         rings.map { $0.isCollapsed ? 1 : 0 }.reduce(0, ^)
         
         if currentHash != lastRingsHash || cachedConfigurations.isEmpty {
             cachedConfigurations = configCalculator.calculateRingConfigurations(rings: rings)
             lastRingsHash = currentHash
             
+            // Defer sliceConfig updates to avoid mutating during view update
             let configs = cachedConfigurations
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
-                for (index, config) in configs.enumerated() {
-                    if index < self.rings.count {
-                        self.rings[index].sliceConfig = config.sliceConfig
-                    }
-                }
+                self.applySliceConfigs(configs)
             }
         }
         
-        return cachedConfigurations
+        // Inject current selection state into cached configurations
+        return cachedConfigurations.enumerated().map { (index, config) in
+            guard index < rings.count else { return config }
+            return RingConfiguration(
+                level: config.level,
+                startRadius: config.startRadius,
+                thickness: config.thickness,
+                nodes: config.nodes,
+                selectedIndex: rings[index].hoveredIndex,
+                sliceConfig: config.sliceConfig,
+                iconSize: config.iconSize
+            )
+        }
+    }
+
+    // Separate method to apply slice configs without triggering structural change detection
+    private func applySliceConfigs(_ configs: [RingConfiguration]) {
+        for (index, config) in configs.enumerated() {
+            if index < rings.count && rings[index].sliceConfig == nil {
+                rings[index].sliceConfig = config.sliceConfig
+            }
+        }
     }
     
     // MARK: - Hit Testing
@@ -219,14 +236,6 @@ class FunctionManager: ObservableObject {
             let oldRing = oldRings[index]
             
             if oldRing.nodes.count != newRing.nodes.count {
-                return true
-            }
-            
-            if oldRing.hoveredIndex != newRing.hoveredIndex {
-                return true
-            }
-            
-            if oldRing.selectedIndex != newRing.selectedIndex {
                 return true
             }
             
