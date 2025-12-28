@@ -231,7 +231,7 @@ struct RingView: View {
                     // Render spacer as small dot
                     Circle()
                         .fill(Color.white.opacity(0.16))
-                        .frame(width: 4, height: 4)
+                        .frame(width: 3, height: 3)
                         .scaleEffect(scale)
                         .opacity(opacity)
                         .position(iconPosition(for: index))
