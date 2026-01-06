@@ -323,23 +323,14 @@ class RingConfigurationCalculator {
         let positioning = parentInfo.node.slicePositioning ?? .startClockwise
         
         if preferredLayout == .fullCircle || shouldConvertToFull {
-            let startAngle: Double
-            switch positioning {
-            case .center:
-                let halfTotalAngle = totalAngle / 2.0
-                let parentAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
-                startAngle = parentAngle - halfTotalAngle
-            case .startCounterClockwise:
-                startAngle = parentInfo.rightEdge
-            case .startClockwise:
-                startAngle = parentInfo.leftEdge
-            }
+            // Full circles always use startClockwise positioning for consistent behavior
+            let startAngle = parentInfo.leftEdge
             
             return .fullCircle(
                 itemCount: itemCount,
                 anglePerItem: averageAngle,
                 startingAt: startAngle,
-                positioning: positioning,
+                positioning: .startClockwise,
                 perItemAngles: perItemAngles
             )
         } else {
@@ -389,18 +380,9 @@ class RingConfigurationCalculator {
         let positioning = parentInfo.node.slicePositioning ?? .startClockwise
         
         if preferredLayout == .fullCircle || shouldConvertToFull {
-            let startAngle: Double
-            switch positioning {
-            case .center:
-                let centerIndex = Double(itemCount) / 2.0 - 0.5
-                let parentAngle = (parentInfo.leftEdge + parentInfo.rightEdge) / 2
-                startAngle = parentAngle - (centerIndex * anglePerItem) - (anglePerItem / 2)
-            case .startCounterClockwise:
-                startAngle = parentInfo.rightEdge
-            case .startClockwise:
-                startAngle = parentInfo.leftEdge
-            }
-            return .fullCircle(itemCount: itemCount, anglePerItem: anglePerItem, startingAt: startAngle, positioning: positioning)
+            // Full circles always use startClockwise positioning for consistent behavior
+            let startAngle = parentInfo.leftEdge
+            return .fullCircle(itemCount: itemCount, anglePerItem: anglePerItem, startingAt: startAngle, positioning: .startClockwise)
         } else {
             let startingAngle: Double
             switch positioning {

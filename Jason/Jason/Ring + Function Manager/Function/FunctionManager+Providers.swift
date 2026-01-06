@@ -238,12 +238,9 @@ extension FunctionManager {
             print("   ➕ [Spacer] Re-inserted after '\(lastId)' (wrap-around to '\(firstId)')")
         }
         
-        let truncatedRing0Nodes = Array(nodesWithSpacers.prefix(maxItems))
-        if nodesWithSpacers.count > maxItems {
-            print("   ✂️ Truncated Ring 0 from \(nodesWithSpacers.count) to \(truncatedRing0Nodes.count) items")
-        }
+        let processedNodes = applyRing0OverflowIfNeeded(nodesWithSpacers)
         
-        rings[0].nodes = truncatedRing0Nodes
+        rings[0].nodes = processedNodes
         rings[0].hoveredIndex = nil
         rings[0].selectedIndex = nil
         

@@ -194,13 +194,10 @@ class FunctionManager: ObservableObject {
         
         guard !currentNodes.isEmpty else { return }
         
-        let truncatedNodes = Array(currentNodes.prefix(maxItems))
-        if currentNodes.count > maxItems {
-            print("✂️ [rebuildRings] Truncated Ring 0 from \(currentNodes.count) to \(truncatedNodes.count) items")
-        }
+        let processedNodes = applyRing0OverflowIfNeeded(currentNodes)
         
         rings.append(RingState(
-            nodes: truncatedNodes,
+            nodes: processedNodes,
             providerId: nil,
             contentIdentifier: nil
         ))
