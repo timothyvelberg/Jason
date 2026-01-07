@@ -118,8 +118,8 @@ class HotkeyManager {
         
         // Listen for local key events (when our window is active)
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-            self?.handleKeyEvent(event)
-            return event
+            let handled = self?.handleKeyEvent(event) ?? false
+            return handled ? nil : event
         }
         
         // Listen for local key up events (for hold key release)
@@ -587,63 +587,61 @@ class HotkeyManager {
     
     // MARK: - Private Handlers
     
-    private func handleKeyEvent(_ event: NSEvent) {
+    @discardableResult
+    private func handleKeyEvent(_ event: NSEvent) -> Bool {
         let isUIVisible = isUIVisible?() ?? false
         
         // Log every key event for debugging
         let eventModifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
-//        print("[HotkeyManager] Key event: keyCode=\(event.keyCode), modifiers=\(eventModifiers.rawValue), UI visible=\(isUIVisible)")
+        // print("[HotkeyManager] Key event: keyCode=\(event.keyCode), modifiers=\(eventModifiers.rawValue), UI visible=\(isUIVisible)")
         
         // Hold key pressed (if configured)
         if let holdKeyCode = holdKeyCode, event.keyCode == holdKeyCode && !isHoldKeyCurrentlyPressed {
             // Check if we need to wait for a release first
             if requiresReleaseBeforeNextShow {
                 print("[HotkeyManager] Hold key pressed but waiting for release - ignoring")
-                return
+                return true  // Consume to prevent beep
             }
             
             print("⌨️ [HotkeyManager] Hold key pressed")
             isHoldKeyCurrentlyPressed = true
             onHoldKeyPressed?()
-            return
+            return true  // Consumed
         }
         
         // Escape = Hide UI (only when UI is visible)
         if event.keyCode == 53 && isUIVisible {
             print("⌨️ [HotkeyManager] Escape pressed")
             onHide?()
-            return
+            return true  // Consumed
         }
         
-        // Check dynamic shortcuts (only when UI is hidden)
-        if !isUIVisible {
-            print("🔍 [HotkeyManager] Checking \(registeredShortcuts.count) registered shortcut(s)...")
+        // Check dynamic shortcuts (always check - toggle works when visible too)
+        print("🔍 [HotkeyManager] Checking \(registeredShortcuts.count) registered shortcut(s)...")
+        
+        for (configId, registration) in registeredShortcuts {
+            let registeredModifiers = NSEvent.ModifierFlags(rawValue: registration.modifierFlags)
+                .intersection([.command, .control, .option, .shift])
             
-            for (configId, registration) in registeredShortcuts {
-                let registeredModifiers = NSEvent.ModifierFlags(rawValue: registration.modifierFlags)
-                    .intersection([.command, .control, .option, .shift])
-                
-                print("   🔍 Config \(configId): keyCode=\(registration.keyCode) (want \(event.keyCode)), modifiers=\(registeredModifiers.rawValue) (have \(eventModifiers.rawValue))")
-                
-                if event.keyCode == registration.keyCode &&
-                   eventModifiers == registeredModifiers {
-                    print("[HotkeyManager] Dynamic shortcut MATCHED for config \(configId)!")
-                    registration.callback()
-                    return
-                } else {
-                    if event.keyCode != registration.keyCode {
-                        print("   KeyCode mismatch: \(event.keyCode) != \(registration.keyCode)")
-                    }
-                    if eventModifiers != registeredModifiers {
-                        print("   Modifier mismatch: \(eventModifiers.rawValue) != \(registeredModifiers.rawValue)")
-                    }
+            print("   🔍 Config \(configId): keyCode=\(registration.keyCode) (want \(event.keyCode)), modifiers=\(registeredModifiers.rawValue) (have \(eventModifiers.rawValue))")
+            
+            if event.keyCode == registration.keyCode &&
+               eventModifiers == registeredModifiers {
+                print("[HotkeyManager] Dynamic shortcut MATCHED for config \(configId)!")
+                registration.callback()
+                return true  // Consumed
+            } else {
+                if event.keyCode != registration.keyCode {
+                    print("   KeyCode mismatch: \(event.keyCode) != \(registration.keyCode)")
+                }
+                if eventModifiers != registeredModifiers {
+                    print("   Modifier mismatch: \(eventModifiers.rawValue) != \(registeredModifiers.rawValue)")
                 }
             }
-            
-            print("[HotkeyManager] No matching shortcut found")
-        } else {
-            print("[HotkeyManager] UI is visible, skipping shortcut check")
         }
+        
+        print("[HotkeyManager] No matching shortcut found")
+        return false  // Not handled
     }
     
     private func handleKeyUpEvent(_ event: NSEvent) {

@@ -324,25 +324,25 @@ struct RingView: View {
         selectionIndicatorOpacity = 0
         hasCompletedInitialSelectionFade = false
         
-        // Skip animation if this is being called right after onAppear handled it
         if previousNodes.count == nodes.count &&
            Set(previousNodes.map { $0.id }) == Set(nodes.map { $0.id }) {
-            print("   ⏭️  SKIPPING: onChange fired right after onAppear - animation already handled")
             
             if !sliceConfig.isFullCircle && sliceConfig.positioning == .center {
                 animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
                 animatedSliceEndAngle = Angle(degrees: sliceConfig.endAngle)
-                
-                let selectionDelay = 0.05
-                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
-                    withAnimation(.easeIn(duration: 0.2)) {
-                        selectionIndicatorOpacity = 1.0
-                    }
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
-                    hasCompletedInitialSelectionFade = true
+            }
+            
+            // Always restore selection indicator for all layouts
+            let selectionDelay = 0.05
+            DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
+                withAnimation(.easeIn(duration: 0.2)) {
+                    selectionIndicatorOpacity = 1.0
                 }
             }
+            DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay + 0.2) {
+                hasCompletedInitialSelectionFade = true
+            }
+            
             return
         }
         
