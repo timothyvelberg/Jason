@@ -30,6 +30,8 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     /// Tracks the stable display order of apps by bundle ID
     /// Only changes when apps are added (append) or removed (close non-favorite)
     private var displayedBundleIds: [String] = []
+    // Track db order for reorder detection
+    private var lastFavoritesOrder: [String] = []
     
     // MARK: - Properties
     
@@ -73,7 +75,18 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     private func loadApps() {
         // 1. Get current data sources
         let favorites = DatabaseManager.shared.getFavoriteApps()
-        let favoriteBundleIds = Set(favorites.map { $0.bundleIdentifier })
+        let currentFavoritesOrder = favorites.map { $0.bundleIdentifier }
+        let favoriteBundleIds = Set(currentFavoritesOrder)
+        
+        // 2. Check if favorites were reordered in settings (not add/remove)
+        let lastSet = Set(lastFavoritesOrder)
+        let currentSet = Set(currentFavoritesOrder)
+
+        if lastSet == currentSet && lastFavoritesOrder != currentFavoritesOrder {
+            print("🔀 [CombinedApps] Favorites reordered in settings - rebuilding display order")
+            displayedBundleIds = []
+        }
+        lastFavoritesOrder = currentFavoritesOrder
         
         let runningApps = AppSwitcherManager.shared.runningApps
         let runningAppsMap: [String: NSRunningApplication] = Dictionary(
@@ -84,14 +97,14 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         )
         let runningBundleIds = Set(runningAppsMap.keys)
         
-        // 2. Calculate valid bundle IDs (should be displayed)
+        // 3. Calculate valid bundle IDs (should be displayed)
         // Valid = is favorite OR is running
         let validBundleIds = favoriteBundleIds.union(runningBundleIds)
         
-        // 3. Update display order
+        // 4. Update display order
         if displayedBundleIds.isEmpty {
             // First load: favorites first (in db order), then running non-favorites (alphabetically)
-            displayedBundleIds = favorites.map { $0.bundleIdentifier }
+            displayedBundleIds = currentFavoritesOrder
             
             let nonFavoriteRunning = runningApps
                 .filter { app in
@@ -121,7 +134,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             displayedBundleIds.append(contentsOf: sortedNew)
         }
         
-        // 4. Build app entries in display order
+        // 5. Build app entries in display order
         let favoritesMap: [String: (displayName: String?, iconOverride: String?)] = Dictionary(
             uniqueKeysWithValues: favorites.map { ($0.bundleIdentifier, ($0.displayName, $0.iconOverride)) }
         )
