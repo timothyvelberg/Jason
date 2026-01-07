@@ -25,6 +25,12 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         return NSImage(systemSymbolName: "square.grid.3x3.fill", accessibilityDescription: nil) ?? NSImage()
     }
     
+    // MARK: - Stable Display Order
+    
+    /// Tracks the stable display order of apps by bundle ID
+    /// Only changes when apps are added (append) or removed (close non-favorite)
+    private var displayedBundleIds: [String] = []
+    
     // MARK: - Properties
     
     ///This now references AppSwitcherManager.shared (set by ProviderFactory)
@@ -65,62 +71,72 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     // MARK: - App Loading
     
     private func loadApps() {
-        var entries: [AppEntry] = []
-        
-        // 1. Get favorite apps from database (in sort_order)
+        // 1. Get current data sources
         let favorites = DatabaseManager.shared.getFavoriteApps()
-//        print("📋 [CombinedApps] Loaded \(favorites.count) favorite apps from database")
+        let favoriteBundleIds = Set(favorites.map { $0.bundleIdentifier })
         
-        // 2. Get running apps from AppSwitcherManager (already deduplicated!)
-        // This ensures we use the same source of truth as AppSwitcherManager
         let runningApps = AppSwitcherManager.shared.runningApps
-//        print("🏃 [CombinedApps] Found \(runningApps.count) running apps")
-        
-        // Create a map of running apps by bundle ID for quick lookup
-        // AppSwitcherManager already deduplicates, so we just create the map
         let runningAppsMap: [String: NSRunningApplication] = Dictionary(
             uniqueKeysWithValues: runningApps.compactMap { app in
                 guard let bundleId = app.bundleIdentifier else { return nil }
                 return (bundleId, app)
             }
         )
+        let runningBundleIds = Set(runningAppsMap.keys)
         
-        // 3. Add favorite apps first (in database order)
-        for (index, favorite) in favorites.enumerated() {
-            if let appEntry = createAppEntry(
-                bundleIdentifier: favorite.bundleIdentifier,
-                customName: favorite.displayName,
-                iconOverride: favorite.iconOverride,
-                isFavorite: true,
-                sortOrder: index,
-                runningAppsMap: runningAppsMap
-            ) {
-                entries.append(appEntry)
-            }
-        }
+        // 2. Calculate valid bundle IDs (should be displayed)
+        // Valid = is favorite OR is running
+        let validBundleIds = favoriteBundleIds.union(runningBundleIds)
         
-        // 4. Add non-favorite running apps (alphabetically sorted for consistency)
-        let favoriteBundleIds = Set(favorites.map { $0.bundleIdentifier })
-        // Use deduplicated map instead of original runningApps array (which can have duplicate PIDs)
-        let nonFavoriteRunningApps = Array(runningAppsMap.values)
-            .filter { app in
-                guard let bundleId = app.bundleIdentifier else { return false }
-                return !favoriteBundleIds.contains(bundleId)
-            }
-            .sorted { app1, app2 in
-                let name1 = app1.localizedName ?? ""
-                let name2 = app2.localizedName ?? ""
+        // 3. Update display order
+        if displayedBundleIds.isEmpty {
+            // First load: favorites first (in db order), then running non-favorites (alphabetically)
+            displayedBundleIds = favorites.map { $0.bundleIdentifier }
+            
+            let nonFavoriteRunning = runningApps
+                .filter { app in
+                    guard let bundleId = app.bundleIdentifier else { return false }
+                    return !favoriteBundleIds.contains(bundleId)
+                }
+                .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }
+                .compactMap { $0.bundleIdentifier }
+            
+            displayedBundleIds.append(contentsOf: nonFavoriteRunning)
+        } else {
+            // Subsequent load: maintain order, remove invalid, append new
+            
+            // Remove items that are no longer valid (not favorite AND not running)
+            displayedBundleIds = displayedBundleIds.filter { validBundleIds.contains($0) }
+            
+            // Find new items (valid but not in display list)
+            let currentSet = Set(displayedBundleIds)
+            let newBundleIds = validBundleIds.subtracting(currentSet)
+            
+            // Append new items (newly launched apps) - sort alphabetically
+            let sortedNew = newBundleIds.sorted { id1, id2 in
+                let name1 = runningAppsMap[id1]?.localizedName ?? id1
+                let name2 = runningAppsMap[id2]?.localizedName ?? id2
                 return name1.localizedCaseInsensitiveCompare(name2) == .orderedAscending
             }
+            displayedBundleIds.append(contentsOf: sortedNew)
+        }
         
-        for runningApp in nonFavoriteRunningApps {
-            guard let bundleId = runningApp.bundleIdentifier else { continue }
+        // 4. Build app entries in display order
+        let favoritesMap: [String: (displayName: String?, iconOverride: String?)] = Dictionary(
+            uniqueKeysWithValues: favorites.map { ($0.bundleIdentifier, ($0.displayName, $0.iconOverride)) }
+        )
+        
+        var entries: [AppEntry] = []
+        
+        for bundleId in displayedBundleIds {
+            let isFavorite = favoriteBundleIds.contains(bundleId)
+            let favorite = favoritesMap[bundleId]
             
             if let appEntry = createAppEntry(
                 bundleIdentifier: bundleId,
-                customName: nil,
-                iconOverride: nil,
-                isFavorite: false,
+                customName: favorite?.displayName,
+                iconOverride: favorite?.iconOverride,
+                isFavorite: isFavorite,
                 sortOrder: nil,
                 runningAppsMap: runningAppsMap
             ) {
@@ -131,12 +147,12 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         appEntries = entries
         
         let favoriteCount = entries.filter { $0.isFavorite }.count
-        let runningNonFavoriteCount = entries.filter { !$0.isFavorite && $0.isRunning }.count
+        let runningCount = entries.filter { $0.isRunning }.count
         
         print("[CombinedApps] Total apps: \(appEntries.count)")
         print("   Favorites: \(favoriteCount)")
-        print("   Non-favorites: \(runningNonFavoriteCount)")
-        print("   Source: AppSwitcherManager (\(runningApps.count) deduplicated apps)")
+        print("   Running: \(runningCount)")
+        print("   Display order maintained: \(displayedBundleIds.count) items")
     }
     
     private func createAppEntry(
