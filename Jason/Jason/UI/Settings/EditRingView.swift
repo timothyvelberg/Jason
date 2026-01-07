@@ -374,6 +374,8 @@ struct EditRingView: View {
         case "left": directionSymbol = "← \(fingerCount)-Finger Swipe Left"
         case "right": directionSymbol = "→ \(fingerCount)-Finger Swipe Right"
         case "tap": directionSymbol = "\(fingerCount)-Finger Tap"
+        case "addleft": directionSymbol = "\(fingerCount)-Finger Add Left"
+        case "addright": directionSymbol = "\(fingerCount)-Finger Add Right"
         default: directionSymbol = "\(fingerCount)-Finger Swipe \(direction)"
         }
         
@@ -708,6 +710,8 @@ enum SwipeDirection: String, CaseIterable {
     case left
     case right
     case tap
+    case addLeft
+    case addRight
     
     var displayName: String {
         switch self {
@@ -716,6 +720,8 @@ enum SwipeDirection: String, CaseIterable {
         case .left: return "Swipe Left"
         case .right: return "Swipe Right"
         case .tap: return "Tap"
+        case .addLeft: return "Add Left"
+        case .addRight: return "Add Right"
         }
     }
 }
@@ -733,6 +739,15 @@ struct TrackpadGesturePicker: View {
     @State private var useOption = false
     @State private var useShift = false
     
+    /// Directions available for current finger count
+    private var availableDirections: [SwipeDirection] {
+        if fingerCount == 2 {
+            return [.addLeft, .addRight]
+        } else {
+            return [.up, .down, .left, .right, .tap, .addLeft, .addRight]
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Finger count picker
@@ -741,11 +756,18 @@ struct TrackpadGesturePicker: View {
                     .frame(width: 80, alignment: .leading)
                 
                 Picker("", selection: $fingerCount) {
+                    Text("2 Fingers").tag(2)
                     Text("3 Fingers").tag(3)
                     Text("4 Fingers").tag(4)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 200)
+                .frame(width: 280)
+                .onChange(of: fingerCount) { _, newValue in
+                    // Reset direction to valid option when finger count changes
+                    if !availableDirections.contains(direction) {
+                        direction = availableDirections.first ?? .addLeft
+                    }
+                }
             }
             
             // Direction picker
@@ -754,7 +776,7 @@ struct TrackpadGesturePicker: View {
                     .frame(width: 80, alignment: .leading)
                 
                 Picker("", selection: $direction) {
-                    ForEach(SwipeDirection.allCases, id: \.self) { dir in
+                    ForEach(availableDirections, id: \.self) { dir in
                         Text(dir.displayName).tag(dir)
                     }
                 }

@@ -147,6 +147,7 @@ struct TriggerFormatting {
         // Convert direction to arrow emoji with finger count
         let directionSymbol: String
         let fingerText = fingerCount.map { "\($0)-Finger " } ?? ""
+        
         switch direction.lowercased() {
         case "up":
             directionSymbol = "↑ \(fingerText)Swipe Up"
@@ -158,6 +159,10 @@ struct TriggerFormatting {
             directionSymbol = "→ \(fingerText)Swipe Right"
         case "tap":
             directionSymbol = "\(fingerText)Tap"
+        case "addleft":
+            directionSymbol = "👈 \(fingerText)Add Left"
+        case "addright":
+            directionSymbol = "👉 \(fingerText)Add Right"
         default:
             directionSymbol = "\(fingerText)Swipe \(direction)"
         }
