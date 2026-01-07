@@ -710,8 +710,7 @@ enum SwipeDirection: String, CaseIterable {
     case left
     case right
     case tap
-    case addLeft
-    case addRight
+    case add
     
     var displayName: String {
         switch self {
@@ -720,8 +719,7 @@ enum SwipeDirection: String, CaseIterable {
         case .left: return "Swipe Left"
         case .right: return "Swipe Right"
         case .tap: return "Tap"
-        case .addLeft: return "Add Left"
-        case .addRight: return "Add Right"
+        case .add: return "Add Finger"
         }
     }
 }
@@ -739,12 +737,11 @@ struct TrackpadGesturePicker: View {
     @State private var useOption = false
     @State private var useShift = false
     
-    /// Directions available for current finger count
-    private var availableDirections: [SwipeDirection] {
+    private func availableDirections() -> [SwipeDirection] {
         if fingerCount == 2 {
-            return [.addLeft, .addRight]
+            return [.add]
         } else {
-            return [.up, .down, .left, .right, .tap, .addLeft, .addRight]
+            return [.up, .down, .left, .right, .tap, .add]
         }
     }
     
@@ -764,8 +761,8 @@ struct TrackpadGesturePicker: View {
                 .frame(width: 280)
                 .onChange(of: fingerCount) { _, newValue in
                     // Reset direction to valid option when finger count changes
-                    if !availableDirections.contains(direction) {
-                        direction = availableDirections.first ?? .addLeft
+                    if !availableDirections().contains(direction) {
+                        direction = availableDirections().first ?? .add
                     }
                 }
             }
@@ -776,7 +773,7 @@ struct TrackpadGesturePicker: View {
                     .frame(width: 80, alignment: .leading)
                 
                 Picker("", selection: $direction) {
-                    ForEach(availableDirections, id: \.self) { dir in
+                    ForEach(availableDirections(), id: \.self) { dir in
                         Text(dir.displayName).tag(dir)
                     }
                 }
