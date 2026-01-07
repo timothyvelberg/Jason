@@ -36,6 +36,7 @@ class MultitouchGestureDetector: LiveDataStream {
     
     enum SwipeDirection {
         case up, down, left, right, tap
+        case addLeft, addRight  // New: finger added on left/right side
         
         var string: String {
             switch self {
@@ -44,6 +45,8 @@ class MultitouchGestureDetector: LiveDataStream {
             case .left: return "left"
             case .right: return "right"
             case .tap: return "tap"
+            case .addLeft: return "addLeft"
+            case .addRight: return "addRight"
             }
         }
     }
@@ -89,7 +92,7 @@ class MultitouchGestureDetector: LiveDataStream {
     /// Last reported finger count to detect changes
     private var lastFingerCount: Int = 0
     
-    // 🆕 Zero-finger tracking for gesture validation
+    // Zero-finger tracking for gesture validation
     /// Timestamp when we last had 0 fingers on trackpad
     /// Used to validate "fresh tap" gestures (0→3 within threshold)
     private var lastZeroTimestamp: Double? = nil
@@ -97,6 +100,18 @@ class MultitouchGestureDetector: LiveDataStream {
     /// Time window for valid 0→3 gesture (seconds)
     /// If 3 fingers detected within this time after 0 fingers, accept gesture
     private let zeroToThreeThreshold: Double = 0.5
+    
+    // MARK: - Finger Position Tracking (for left/right detection)
+    
+    /// Anchor position when at stable finger count
+    private var anchorPosition: (id: Int, x: Float, y: Float)? = nil
+    
+    /// Last stable finger count
+    private var stableFingerCount: Int = 0
+    
+    /// Whether we've already fired an addLeft/addRight gesture for this touch sequence
+    /// Prevents firing multiple times as finger count fluctuates
+    private var hasFiredAddGesture: Bool = false
     
     // MARK: - Callbacks
     
@@ -175,7 +190,7 @@ class MultitouchGestureDetector: LiveDataStream {
             print("❌ [MultitouchGestureDetector] No suitable devices found")
         } else {
             isMonitoring = true
-            MultitouchGestureDetector.setShared(self)  // 👈 Make sure this is called
+            MultitouchGestureDetector.setShared(self)
             print("✅ [MultitouchGestureDetector] Monitoring started successfully")
         }
     }
@@ -249,6 +264,9 @@ class MultitouchGestureDetector: LiveDataStream {
         lastZeroTimestamp = nil
         primaryStartPosition = (0, 0)
         primaryCurrentPosition = (0, 0)
+        anchorPosition = nil
+        stableFingerCount = 0
+        hasFiredAddGesture = false
     }
     
     // MARK: - Touch Processing
@@ -264,17 +282,52 @@ class MultitouchGestureDetector: LiveDataStream {
         let previousCount = currentFingerCount
         currentFingerCount = activeCount
         
-        // 🆕 Track timestamp when at 0 fingers
+        // Detect finger additions and check for left/right
+        if currentFingerCount > lastFingerCount && currentFingerCount >= 2 {
+            guard let touches = touches else { return }
+            let touch = touches[0]
+            let newId = Int(touch.identifier)
+            let newX = touch.normalizedX
+            
+            // Check if we have an anchor to compare against and haven't fired yet
+            if let anchor = anchorPosition, !hasFiredAddGesture {
+                if newId != anchor.id {
+                    // Different identifier = this is the NEW finger
+                    let direction: SwipeDirection = newX < anchor.x ? .addLeft : .addRight
+                    let fingerCount = currentFingerCount
+                    
+                    print("✅ [Gesture] \(direction.string.uppercased()) detected: \(lastFingerCount)→\(currentFingerCount) fingers")
+                    
+                    // Mark that we've fired to prevent duplicates
+                    hasFiredAddGesture = true
+                    
+                    // Fire callback
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.delegate?.didDetectSwipe(direction: direction, fingerCount: fingerCount)
+                        self.onSwipeDetected?(direction, fingerCount)
+                    }
+                }
+            }
+            
+            // Update anchor to current touch for next transition
+            anchorPosition = (id: newId, x: newX, y: touch.normalizedY)
+            stableFingerCount = currentFingerCount
+        }
+        
+        // Track timestamp when at 0 fingers
         // Update continuously while at 0 so we always have a fresh reference point
-        // This handles app startup, idle periods, and transitions from touch to 0
         if currentFingerCount == 0 {
             lastZeroTimestamp = timestamp
+            anchorPosition = nil
+            stableFingerCount = 0
+            hasFiredAddGesture = false  // Reset for next gesture sequence
+            
             if previousCount > 0 {
-                print("👆 [Timing] Hit 0 fingers at \(timestamp) - ready for fresh gesture")
+                print("👆 [Touch] Fingers lifted")
             }
             // Reset tracking state when all fingers lifted
             if isTrackingGesture {
-                print("👆 [Gesture] Ended - analyzing movement")
                 analyzeGesture(endTime: timestamp)
                 isTrackingGesture = false
                 gestureFingerCount = 0
@@ -313,10 +366,16 @@ class MultitouchGestureDetector: LiveDataStream {
             currentTouches[Int(firstTouch.identifier)] = touchData
         }
         
+        // Set anchor for first finger (0→1 transition)
+        if currentFingerCount == 1 && lastFingerCount == 0 {
+            anchorPosition = (id: Int(firstTouch.identifier), x: firstTouch.normalizedX, y: firstTouch.normalizedY)
+            stableFingerCount = 1
+        }
+        
         // Detect gesture start (fingers just touched down)
         // Handle both 3-finger and 4-finger gestures with "came from 0" validation
         if !isTrackingGesture && currentFingerCount >= 3 && previousCount < currentFingerCount {
-            // 🆕 VALIDATE: Check if we recently came from 0 fingers (fresh gesture)
+            // VALIDATE: Check if we recently came from 0 fingers (fresh gesture)
             var shouldAccept = false
             
             if let zeroTime = lastZeroTimestamp {
@@ -325,26 +384,22 @@ class MultitouchGestureDetector: LiveDataStream {
                 if timeSinceZero <= zeroToThreeThreshold {
                     // Recently came from 0 - accept as fresh gesture
                     shouldAccept = true
-                    print("✅ [Timing] Accepted \(currentFingerCount)-finger gesture: \(String(format: "%.3f", timeSinceZero))s since 0 fingers ≤ \(zeroToThreeThreshold)s threshold")
                 } else {
                     // Too long since 0 - likely adding fingers to existing touch
-                    print("⚠️ [Timing] Rejected \(currentFingerCount)-finger gesture: \(String(format: "%.3f", timeSinceZero))s since 0 fingers > \(zeroToThreeThreshold)s threshold")
-                    print("   Likely adding fingers to existing 1-2 finger touch (not a fresh gesture)")
+                    // This is handled by the addLeft/addRight logic above
+                    lastFingerCount = currentFingerCount
                     return
                 }
             } else {
                 // No timestamp yet (first gesture after app launch) - accept it
-                print("✅ [Timing] Accepted \(currentFingerCount)-finger gesture: first gesture after launch (no prior 0-finger reference)")
                 shouldAccept = true
             }
             
             // Only proceed if validation passed
             if shouldAccept {
-                print("👆 [Gesture] Started tracking - \(currentFingerCount) fingers")
                 isTrackingGesture = true
                 gestureStartTime = timestamp
-                gestureFingerCount = currentFingerCount  // LOCK IN THE FINGER COUNT
-                // Store the primary touch start position directly from firstTouch
+                gestureFingerCount = currentFingerCount
                 touchStartPositions = currentTouches
                 primaryStartPosition = (firstTouch.normalizedX, firstTouch.normalizedY)
             }
@@ -358,7 +413,6 @@ class MultitouchGestureDetector: LiveDataStream {
         
         // Detect gesture end (fingers lifted)
         if isTrackingGesture && currentFingerCount < 3 {
-            print("👆 [Gesture] Ended - analyzing movement")
             analyzeGesture(endTime: timestamp)
             
             // Reset state
@@ -389,16 +443,12 @@ class MultitouchGestureDetector: LiveDataStream {
         
         // CHECK FOR TAP: Short duration + minimal movement
         if duration <= maxTapDuration && distance < maxTapDistance {
-            print("✅ [Gesture] TAP DETECTED with \(capturedFingerCount) fingers (distance: \(String(format: "%.2f", distance)), duration: \(String(format: "%.2f", duration))s)")
+            print("✅ [Gesture] TAP with \(capturedFingerCount) fingers")
             
             // Dispatch callbacks to main thread for UI updates
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
-                
-                // Notify delegate - use captured value
                 self.delegate?.didDetectSwipe(direction: .tap, fingerCount: capturedFingerCount)
-                
-                // Fire callback - use captured value
                 self.onSwipeDetected?(.tap, capturedFingerCount)
             }
             return
@@ -428,16 +478,12 @@ class MultitouchGestureDetector: LiveDataStream {
             direction = dx > 0 ? .right : .left
         }
         
-        print("✅ [Gesture] SWIPE DETECTED: \(direction.string) with \(capturedFingerCount) fingers (distance: \(String(format: "%.2f", distance)), velocity: \(String(format: "%.2f", velocity)), duration: \(String(format: "%.2f", duration))s)")
+        print("✅ [Gesture] SWIPE \(direction.string.uppercased()) with \(capturedFingerCount) fingers")
         
         // Dispatch callbacks to main thread for UI updates
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            
-            // Notify delegate - use captured value
             self.delegate?.didDetectSwipe(direction: direction, fingerCount: capturedFingerCount)
-            
-            // Fire callback - use captured value
             self.onSwipeDetected?(direction, capturedFingerCount)
         }
     }
