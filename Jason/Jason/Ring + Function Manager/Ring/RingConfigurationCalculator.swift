@@ -100,23 +100,28 @@ class RingConfigurationCalculator {
         
         print("   ⚠️ Angle TOO SMALL - TRIGGERING AUTO-RESIZE")
         
-        let currentArcLength = baseRadius * (anglePerItem * .pi / 180.0)
-        let desiredArcLength = baseRadius * (optimalAnglePerItem * .pi / 180.0)
+        // Calculate based on middle radius (where items sit)
+        let baseMiddleRadius = baseRadius + baseThickness / 2
+        let currentArcLength = baseMiddleRadius * (anglePerItem * .pi / 180.0)
+        let desiredArcLength = baseMiddleRadius * (optimalAnglePerItem * .pi / 180.0)
         let scaleFactor = desiredArcLength / currentArcLength
         
         print("   Arc calculations:")
+        print("      Base middle radius: \(String(format: "%.2f", baseMiddleRadius))")
         print("      Current arc length: \(String(format: "%.2f", currentArcLength))")
         print("      Desired arc length: \(String(format: "%.2f", desiredArcLength))")
         print("      Scale factor: \(String(format: "%.2f", scaleFactor))")
         
-        let adjustedRadius = baseRadius * scaleFactor
-        let thicknessScaleFactor = sqrt(scaleFactor)
-        let adjustedThickness = baseThickness * thicknessScaleFactor
+        // Scale only the middle radius, keep thickness constant
+        let adjustedMiddleRadius = baseMiddleRadius * scaleFactor
+        let adjustedThickness = baseThickness  // Keep tight around items
+        let adjustedRadius = adjustedMiddleRadius - adjustedThickness / 2
         
         print("   🎯 RESIZING:")
         print("      Angle: \(String(format: "%.1f°", anglePerItem)) → target: \(String(format: "%.1f°", optimalAnglePerItem))")
+        print("      Middle radius: \(String(format: "%.0f", baseMiddleRadius)) → \(String(format: "%.0f", adjustedMiddleRadius)) (+\(String(format: "%.0f", adjustedMiddleRadius - baseMiddleRadius))px)")
         print("      Center radius: \(String(format: "%.0f", baseRadius)) → \(String(format: "%.0f", adjustedRadius)) (+\(String(format: "%.0f", adjustedRadius - baseRadius))px)")
-        print("      Thickness: \(String(format: "%.0f", baseThickness)) → \(String(format: "%.0f", adjustedThickness)) (+\(String(format: "%.0f", adjustedThickness - baseThickness))px)")
+        print("      Thickness: \(String(format: "%.0f", baseThickness)) → \(String(format: "%.0f", adjustedThickness)) (unchanged)")
         
         return (adjustedRadius, adjustedThickness)
     }

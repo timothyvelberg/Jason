@@ -369,6 +369,14 @@ extension CircularUIInstanceManager {
             return
         }
         
+        // Toggle: if this instance is already visible, hide it
+        if instance.isVisible && activeInstanceId == configId {
+            print("🔄 [InstanceManager] Toggle OFF - hiding already visible instance (config \(configId))")
+            instance.hide()
+            activeInstanceId = nil
+            return
+        }
+        
         // Hide currently active instance if different
         if let currentActiveId = activeInstanceId, currentActiveId != configId {
             print("🔄 [InstanceManager] Hiding previous instance (config \(currentActiveId))")

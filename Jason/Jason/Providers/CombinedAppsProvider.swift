@@ -391,7 +391,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             name: "Add to Favorites",
             type: .action,
             icon: NSImage(systemSymbolName: "star", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+            onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                 print("⭐ Adding \(name) to favorites")
                 let success = DatabaseManager.shared.addFavoriteApp(
                     bundleIdentifier: bundleIdentifier,
@@ -416,7 +416,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             name: "Remove from Favorites",
             type: .action,
             icon: NSImage(systemSymbolName: "star.slash", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+            onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                 print("⭐ Removing \(name) from favorites")
                 let success = DatabaseManager.shared.removeFavoriteApp(bundleIdentifier: bundleIdentifier)
                 if success {
