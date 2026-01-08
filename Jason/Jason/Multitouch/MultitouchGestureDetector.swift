@@ -187,9 +187,10 @@ class MultitouchGestureDetector: LiveDataStream {
             let isBuiltIn = MTDeviceIsBuiltIn(device)
             let deviceType = isBuiltIn ? "built-in" : "external"
             print("   Device \(i): \(deviceType)")
+            print("   🔧 Registering callbacks for \(deviceType) device...")
             
-            print("   🔧 Registering callback for \(deviceType) device...")
             MTRegisterContactFrameCallback(device, touchCallback)
+            MTRegisterPathCallback(device, pathCallback)
             
             MTDeviceStart(device, 0)
             
@@ -220,6 +221,7 @@ class MultitouchGestureDetector: LiveDataStream {
         
         for device in devices {
             MTUnregisterContactFrameCallback(device, touchCallback)
+            MTUnregisterPathCallback(device, pathCallback)
             MTDeviceStop(device)
         }
         
@@ -274,6 +276,10 @@ class MultitouchGestureDetector: LiveDataStream {
         isEligibleForAdd = false
         stableFingerCount = 0
         hasFiredAddGesture = false
+        lastTouchdownPathID = nil
+        pathTouchdownPositions.removeAll()
+        activePathIDs.removeAll()
+        pendingAddGesture = nil
     }
     
     // MARK: - Touch Processing
@@ -295,6 +301,10 @@ class MultitouchGestureDetector: LiveDataStream {
             isEligibleForAdd = false
             stableFingerCount = 0
             hasFiredAddGesture = false
+            lastTouchdownPathID = nil
+            pathTouchdownPositions.removeAll()
+            activePathIDs.removeAll()
+            pendingAddGesture = nil
             
             if previousCount > 0 {
                 print("👆 [Touch] Fingers lifted")
@@ -318,6 +328,12 @@ class MultitouchGestureDetector: LiveDataStream {
         
         guard firstTouch.state >= 1 && firstTouch.state <= 7 else {
             return
+        }
+        
+        // Track this finger's position for later lookup (first time we see each ID)
+        if pathTouchdownPositions[Int(firstTouch.identifier)] == nil {
+            pathTouchdownPositions[Int(firstTouch.identifier)] = firstTouch.normalizedX
+            print("📍 [Track] First sighting of id=\(firstTouch.identifier) at x=\(String(format: "%.3f", firstTouch.normalizedX))")
         }
         
         // Set anchor for first finger (0→1 transition)
@@ -344,33 +360,80 @@ class MultitouchGestureDetector: LiveDataStream {
         
         // Detect finger additions (1→2 or 2→3)
         if currentFingerCount > lastFingerCount && currentFingerCount >= 2 && currentFingerCount <= 3 {
-            let touch = touches[0]
-            let newId = Int(touch.identifier)
-            let newX = touch.normalizedX
+            let frameID = Int(firstTouch.identifier)
+            let frameX = firstTouch.normalizedX
             
             if let anchor = anchorPosition, !hasFiredAddGesture {
                 let timeSinceAnchor = timestamp - anchorTimestamp
                 let isInTimeWindow = timeSinceAnchor >= addGestureMinDelay && timeSinceAnchor <= addGestureMaxDelay
                 
+                // Determine new finger position
+                var newFingerX: Float? = nil
+                var newFingerID: Int? = nil
+                
+                if frameID != anchor.id {
+                    // Frame shows the NEW finger directly
+                    newFingerX = frameX
+                    newFingerID = frameID
+                    print("🔍 [Add] Frame shows NEW finger (id=\(frameID)) at x=\(String(format: "%.3f", frameX))")
+                } else if let pathID = lastTouchdownPathID, pathID != anchor.id {
+                    // Frame shows anchor, but path told us which ID is new
+                    if let trackedX = pathTouchdownPositions[pathID] {
+                        newFingerX = trackedX
+                        newFingerID = pathID
+                        print("🔍 [Add] Path says new finger is id=\(pathID), tracked at x=\(String(format: "%.3f", trackedX))")
+                    } else {
+                        print("🔍 [Add] Path says new finger is id=\(pathID), but no position tracked yet")
+                    }
+                } else {
+                    // Frame shows anchor, try to find new finger from active paths
+                    for pathID in activePathIDs where pathID != anchor.id {
+                        if let trackedX = pathTouchdownPositions[pathID] {
+                            newFingerX = trackedX
+                            newFingerID = pathID
+                            print("🔍 [Add] Found new finger from active paths: id=\(pathID) at x=\(String(format: "%.3f", trackedX))")
+                            break
+                        }
+                    }
+                    if newFingerX == nil {
+                        print("🔍 [Add] Cannot determine new finger (frameID=\(frameID), anchor=\(anchor.id), active=\(activePathIDs.sorted()))")
+                    }
+                }
+                
+                var detectedDirection: String? = nil
+                if let newX = newFingerX {
+                    detectedDirection = newX > anchor.x ? "RIGHT" : "LEFT"
+                    print("   📍 Anchor x=\(String(format: "%.3f", anchor.x)), New x=\(String(format: "%.3f", newX)) → \(detectedDirection!)")
+                }
+                
                 if isEligibleForAdd && isInTimeWindow {
                     let fingerCount = currentFingerCount
                     
-                    print("✅ [Gesture] ADD detected: \(lastFingerCount)→\(currentFingerCount) fingers (delay: \(String(format: "%.0f", timeSinceAnchor * 1000))ms)")
-                    
-                    hasFiredAddGesture = true
-                    
-                    DispatchQueue.main.async { [weak self] in
-                        guard let self = self else { return }
-                        self.delegate?.didDetectSwipe(direction: .add, fingerCount: fingerCount)
-                        self.onSwipeDetected?(.add, fingerCount)
+                    if let dir = detectedDirection {
+                        // We have direction, fire immediately
+                        print("✅ [Gesture] ADD detected: \(lastFingerCount)→\(currentFingerCount) fingers (delay: \(String(format: "%.0f", timeSinceAnchor * 1000))ms)")
+                        print("   Direction: \(dir)")
+                        
+                        hasFiredAddGesture = true
+                        
+                        DispatchQueue.main.async { [weak self] in
+                            guard let self = self else { return }
+                            self.delegate?.didDetectSwipe(direction: .add, fingerCount: fingerCount)
+                            self.onSwipeDetected?(.add, fingerCount)
+                        }
+                    } else {
+                        // Direction unknown, defer until path callback arrives
+                        print("⏳ [Gesture] ADD pending: \(lastFingerCount)→\(currentFingerCount) fingers, waiting for new finger path...")
+                        pendingAddGesture = (anchorX: anchor.x, fingerCount: fingerCount, anchorID: anchor.id)
+                        hasFiredAddGesture = true  // Prevent duplicate detection
                     }
                 }
             }
             
             // Update anchor for next transition
-            anchorPosition = (id: newId, x: newX, y: touch.normalizedY)
+            anchorPosition = (id: frameID, x: frameX, y: firstTouch.normalizedY)
             anchorTimestamp = timestamp
-            anchorStartPosition = (newX, touch.normalizedY)
+            anchorStartPosition = (frameX, firstTouch.normalizedY)
             isEligibleForAdd = true
             stableFingerCount = currentFingerCount
         }
@@ -518,6 +581,47 @@ private func touchCallback(
 ) {
     guard let detector = MultitouchGestureDetector.sharedInstance else { return }
     detector.processTouches(touches, count: Int(numTouches), timestamp: timestamp)
+}
+
+// MARK: - Path API Callback
+
+private var lastTouchdownPathID: Int? = nil
+private var pathTouchdownPositions: [Int: Float] = [:]
+private var activePathIDs: Set<Int> = []
+private var pendingAddGesture: (anchorX: Float, fingerCount: Int, anchorID: Int)? = nil
+
+private func pathCallback(
+    device: MTDeviceRef?,
+    pathID: Int,
+    state: Int32,
+    path: MTPathRef?
+) {
+    if state == 3 {  // MakeTouch / touchdown
+        lastTouchdownPathID = pathID
+        activePathIDs.insert(pathID)
+        print("🔬 [Path] TOUCHDOWN pathID=\(pathID), active=\(activePathIDs.sorted())")
+        
+        // Check if we have a pending add gesture waiting for this finger
+        if let pending = pendingAddGesture, pathID != pending.anchorID {
+            // This is the new finger we were waiting for
+            if let newX = pathTouchdownPositions[pathID] {
+                let direction = newX > pending.anchorX ? "RIGHT" : "LEFT"
+                print("🔍 [Add] Deferred detection: new finger id=\(pathID) at x=\(String(format: "%.3f", newX)) → \(direction)")
+                print("✅ [Gesture] ADD detected (deferred): \(pending.fingerCount) fingers")
+                print("   Direction: \(direction)")
+                
+                DispatchQueue.main.async {
+                    guard let detector = MultitouchGestureDetector.sharedInstance else { return }
+                    detector.delegate?.didDetectSwipe(direction: .add, fingerCount: pending.fingerCount)
+                    detector.onSwipeDetected?(.add, pending.fingerCount)
+                }
+            }
+            pendingAddGesture = nil
+        }
+    } else if state == 0 || state == 7 {  // NotTracking or OutOfRange
+        activePathIDs.remove(pathID)
+        print("🔬 [Path] LIFTOFF pathID=\(pathID), active=\(activePathIDs.sorted())")
+    }
 }
 
 // MARK: - Singleton for C Callback Access

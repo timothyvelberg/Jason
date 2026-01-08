@@ -53,7 +53,21 @@ typedef struct {
 // Callback function type
 typedef void (*MTContactFrameCallback)(MTDeviceRef device, MTTouch* _Nullable touches, int numTouches, double timestamp, int frame, void* refcon);
 
+// =============================================================================
+// Path API (experimental - for per-finger tracking)
+// =============================================================================
+
+// Opaque types for path-based tracking
+typedef void* MTPathRef;
+typedef void* MTContactRef;
+
+// Path callback function type
+typedef void (*MTPathCallback)(MTDeviceRef device, long pathID, int state, MTPathRef path);
+
+// =============================================================================
 // Framework functions
+// =============================================================================
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -74,6 +88,20 @@ Boolean MTDeviceIsBuiltIn(MTDeviceRef device);
 
 // Release device
 void MTDeviceRelease(MTDeviceRef device);
+
+// Path-based tracking (experimental)
+void MTRegisterPathCallback(MTDeviceRef device, MTPathCallback callback);
+void MTUnregisterPathCallback(MTDeviceRef device, MTPathCallback callback);
+
+// Path accessors - return contact at specific lifecycle points
+MTContactRef MTPath_getMakeContact(MTPathRef path);
+MTContactRef MTPath_getTouchdownContact(MTPathRef path);
+MTContactRef MTPath_getBreakContact(MTPathRef path);
+MTContactRef MTPath_getLiftoffContact(MTPathRef path);
+
+// Contact accessors
+void MTContact_getCentroidPixel(MTContactRef contact, float* x, float* y);
+bool MTContact_isActive(MTContactRef contact);
 
 #ifdef __cplusplus
 }
