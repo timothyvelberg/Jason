@@ -23,7 +23,7 @@ class ShortcutExecuteProvider: ObservableObject, FunctionProvider {
     }
     
     var providerIcon: NSImage {
-        return NSImage(systemSymbolName: "command.square.fill", accessibilityDescription: nil) ?? NSImage()
+        return NSImage(named: "parent-shortcuts") ?? NSImage()
     }
     
     // MARK: - Initialization
@@ -108,7 +108,7 @@ class ShortcutExecuteProvider: ObservableObject, FunctionProvider {
                 id: "shortcuts-category",
                 name: "Shortcuts",
                 type: .category,
-                icon: NSImage(systemSymbolName: "command.square.fill", accessibilityDescription: nil) ?? NSImage(),
+                icon: NSImage(named: "parent-shortcuts") ?? NSImage(),
                 children: shortcuts,
                 preferredLayout: .partialSlice,
                 slicePositioning: .center,
