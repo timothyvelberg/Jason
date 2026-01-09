@@ -23,7 +23,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
     }
     
     var providerIcon: NSImage {
-        return NSImage(named: "ring-favorite-file") ?? NSImage()
+        return NSImage(named: "parent-files") ?? NSImage()
     }
     
     // MARK: - Properties
@@ -74,6 +74,10 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             var isDirectory: ObjCBool = false
             FileManager.default.fileExists(atPath: file.path, isDirectory: &isDirectory)
             
+            // Check if it's a package (.app, .bundle, etc.) - treat as file, not folder
+            let isPackage = NSWorkspace.shared.isFilePackage(atPath: file.path)
+            let treatAsDirectory = isDirectory.boolValue && !isPackage
+            
             // Get display name
             let displayName = file.displayName ?? fileURL.lastPathComponent
             
@@ -81,7 +85,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             let icon: NSImage
             if let iconData = file.iconData, let customIcon = NSImage(data: iconData) {
                 icon = customIcon
-            } else if isDirectory.boolValue {
+            } else if treatAsDirectory {
                 icon = IconProvider.shared.getFolderIcon(for: fileURL, size: 64, cornerRadius: 8)
             } else {
                 icon = NSWorkspace.shared.icon(forFile: file.path)
@@ -97,7 +101,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 dynamicId: nil,
                 listSortOrder: file.sortOrder,
                 customIconData: file.iconData,
-                isDirectory: isDirectory.boolValue,
+                isDirectory: treatAsDirectory,
                 dynamicSortOrder: nil
             ))
         }
@@ -117,11 +121,15 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 var isDirectory: ObjCBool = false
                 FileManager.default.fileExists(atPath: resolvedPath, isDirectory: &isDirectory)
                 
+                // Check if it's a package (.app, .bundle, etc.) - treat as file, not folder
+                let isPackage = NSWorkspace.shared.isFilePackage(atPath: resolvedPath)
+                let treatAsDirectory = isDirectory.boolValue && !isPackage
+                
                 // Get icon
                 let icon: NSImage
                 if let iconData = dynamic.iconData, let customIcon = NSImage(data: iconData) {
                     icon = customIcon
-                } else if isDirectory.boolValue {
+                } else if treatAsDirectory {
                     icon = IconProvider.shared.getFolderIcon(for: resolvedURL, size: 64, cornerRadius: 8)
                 } else {
                     icon = NSWorkspace.shared.icon(forFile: resolvedPath)
@@ -137,8 +145,8 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                     dynamicId: dynamic.id,
                     listSortOrder: dynamic.listSortOrder,
                     customIconData: dynamic.iconData,
-                    isDirectory: isDirectory.boolValue,
-                    dynamicSortOrder: dynamic.sortOrder  // Carry sort order for navigation
+                    isDirectory: treatAsDirectory,
+                    dynamicSortOrder: dynamic.sortOrder
                 ))
             } else {
                 print("⚠️ [FavoriteFiles] No file found for dynamic rule: \(dynamic.displayName)")

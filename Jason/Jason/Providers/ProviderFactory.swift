@@ -58,6 +58,9 @@ class ProviderFactory {
         case "WindowManagementProvider":
             provider = createWindowManagementProvider(config: config)
             
+        case "ShortcutExecuteProvider":
+            provider = createShortcutExecuteProvider(config: config)
+            
         default:
             print("⚠️ [ProviderFactory] Unknown provider type: \(config.providerType)")
             return nil
@@ -155,21 +158,24 @@ class ProviderFactory {
         return provider
     }
     
+    private func createShortcutExecuteProvider(config: ProviderConfiguration) -> ShortcutExecuteProvider? {
+        let provider = ShortcutExecuteProvider()
+        
+        // ShortcutExecuteProvider doesn't need external dependencies
+        
+        // TODO: Apply parentItemAngle from config when provider supports it
+        // TODO: Load shortcuts from database when persistence is implemented
+        
+        return provider
+    }
+    
     // MARK: - Provider Type Validation
     
     /// Check if a provider type is supported by the factory
     /// - Parameter type: The provider type string
     /// - Returns: True if the factory can create this provider type
     static func isProviderTypeSupported(_ type: String) -> Bool {
-        let supportedTypes = [
-            "CombinedAppsProvider",
-            "FavoriteFilesProvider",
-            "SystemActionsProvider",
-            "FavoriteFolderProvider",
-            "WindowManagementProvider"
-        ]
-        
-        return supportedTypes.contains(type)
+        return supportedProviderTypes().contains(type)
     }
     
     /// Get all supported provider types
@@ -180,7 +186,8 @@ class ProviderFactory {
             "FavoriteFilesProvider",
             "SystemActionsProvider",
             "FavoriteFolderProvider",
-            "WindowManagementProvider"
+            "WindowManagementProvider",
+            "ShortcutExecuteProvider"
         ]
     }
 }

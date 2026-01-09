@@ -43,6 +43,8 @@ struct EditRingView: View {
     @State private var systemActionsMode: ProviderDisplayMode = .parent
     @State private var includeWindowManagement: Bool = false
     @State private var windowManagementMode: ProviderDisplayMode = .parent
+    @State private var includeShortcutExecute: Bool = false
+    @State private var shortcutExecuteMode: ProviderDisplayMode = .parent
     
     @State private var errorMessage: String?
     
@@ -233,6 +235,13 @@ struct EditRingView: View {
                                 isIncluded: $includeWindowManagement,
                                 displayMode: $windowManagementMode
                             )
+                            
+                            ProviderRow(
+                                name: "Keyboard Shortcuts",
+                                description: "Execute keyboard shortcuts (Copy, Paste, etc.)",
+                                isIncluded: $includeShortcutExecute,
+                                displayMode: $shortcutExecuteMode
+                            )
                         }
                         .padding(12)
                     }
@@ -295,7 +304,7 @@ struct EditRingView: View {
     }
     
     private var hasAtLeastOneProvider: Bool {
-        includeCombinedApps || includeFavoriteFiles || includeFavoriteFolderProvider || includeSystemActions || includeWindowManagement
+        includeCombinedApps || includeFavoriteFiles || includeFavoriteFolderProvider || includeSystemActions || includeWindowManagement || includeShortcutExecute
     }
     
     // MARK: - Actions
@@ -351,6 +360,9 @@ struct EditRingView: View {
             case "WindowManagementProvider":
                 includeWindowManagement = true
                 windowManagementMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
+            case "ShortcutExecuteProvider":
+                includeShortcutExecute = true
+                shortcutExecuteMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
             default:
                 break
             }
@@ -461,6 +473,11 @@ struct EditRingView: View {
         
         if includeWindowManagement {
             providers.append(("WindowManagementProvider", order, windowManagementMode.rawValue, nil))
+            order += 1
+        }
+        
+        if includeShortcutExecute {
+            providers.append(("ShortcutExecuteProvider", order, shortcutExecuteMode.rawValue, nil))
             order += 1
         }
         

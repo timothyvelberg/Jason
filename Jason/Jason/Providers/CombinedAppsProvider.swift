@@ -22,7 +22,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     }
     
     var providerIcon: NSImage {
-        return NSImage(systemSymbolName: "square.grid.3x3.fill", accessibilityDescription: nil) ?? NSImage()
+        return NSImage(named: "parent-apps") ?? NSImage()
     }
     
     // MARK: - Stable Display Order
@@ -62,13 +62,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     init() {
         print("🔄 CombinedAppsProvider initialized")
         loadApps()
-        
-        // 🆕 REMOVED: NSWorkspace notification listeners
-        // AppSwitcherManager.shared already monitors apps and posts unified notifications
-        // This prevents duplicate notifications when multiple CombinedAppsProvider instances exist
     }
-    
-    // 🆕 REMOVED: deinit - no notification cleanup needed
     
     // MARK: - App Loading
     
@@ -395,13 +389,10 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 } else if let app = app {
                     print("✅ Successfully launched \(entry.name)")
                     
-                    // Update MRU tracking
-                    // 🆕 CHANGED: Now using shared instance
+                
+                    //using shared instance
                     self.appSwitcherManager?.recordAppUsage(app)
-                    
-                    // 🆕 REMOVED: No need to refresh and post notification here
-                    // AppSwitcherManager.shared will detect the launch and post ONE notification
-                    // which all CombinedAppsProvider instances will receive via CircularUIManager
+            
                 }
             }
         }

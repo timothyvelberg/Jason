@@ -15,7 +15,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     var providerId: String { "favorite-folder" }
     var providerName: String { "Favorite Folders" }
     var providerIcon: NSImage {
-        NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage()
+        return NSImage(named: "parent-folders") ?? NSImage()
     }
     
     private let maxItemsPerFolder: Int = 40
@@ -45,7 +45,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             id: "favorite-folders-section",
             name: "Folders",
             type: .category,
-            icon: NSImage(named: "ring-favorite-folder") ?? NSImage(),
+            icon: NSImage(named: "parent-folders") ?? NSImage(),
             children: favoriteChildren,
             preferredLayout: .partialSlice,
             slicePositioning: .center,
