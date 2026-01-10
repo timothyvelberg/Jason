@@ -127,6 +127,13 @@ struct RingConfigurationEntry: Identifiable {
     let autoExecuteOnRelease: Bool // true = auto-execute on release (only when isHoldMode = true)
 }
 
+struct CircleCalibrationEntry {
+    let maxRadiusVariance: Float
+    let minCircles: Float
+    let minRadius: Float
+    let calibratedAt: Date
+}
+
 struct RingProviderEntry: Identifiable {
     let id: Int
     let ringId: Int

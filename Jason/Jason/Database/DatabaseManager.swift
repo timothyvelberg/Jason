@@ -205,6 +205,16 @@ class DatabaseManager {
             FOREIGN KEY (ring_id) REFERENCES ring_configurations(id) ON DELETE CASCADE
         );
         """
+        
+        let circleCalibrationSQL = """
+            CREATE TABLE IF NOT EXISTS circle_calibration (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                max_radius_variance REAL NOT NULL,
+                min_circles REAL NOT NULL,
+                min_radius REAL NOT NULL,
+                calibrated_at INTEGER NOT NULL
+            );
+            """
 
         // Create unique index for provider order within rings
         let ringProvidersIndexSQL = """

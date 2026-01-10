@@ -34,19 +34,31 @@ class MultitouchGestureDetector: LiveDataStream {
         }
     }
     
-    enum SwipeDirection {
-        case up, down, left, right, tap
-        case add  // Generic finger add (1→2 or 2→3)
+    enum SwipeDirection: String, CaseIterable {
+        case up
+        case down
+        case left
+        case right
+        case tap
+        case add
+        case circleClockwise
+        case circleCounterClockwise
         
-        var string: String {
+        var displayName: String {
             switch self {
-            case .up: return "up"
-            case .down: return "down"
-            case .left: return "left"
-            case .right: return "right"
-            case .tap: return "tap"
-            case .add: return "add"
+            case .up: return "Swipe Up"
+            case .down: return "Swipe Down"
+            case .left: return "Swipe Left"
+            case .right: return "Swipe Right"
+            case .tap: return "Tap"
+            case .add: return "Add Finger"
+            case .circleClockwise: return "Circle ↻ (Clockwise)"
+            case .circleCounterClockwise: return "Circle ↺ (Counter-Clockwise)"
             }
+        }
+        
+        var isCircle: Bool {
+            return self == .circleClockwise || self == .circleCounterClockwise
         }
     }
     
@@ -496,7 +508,7 @@ class MultitouchGestureDetector: LiveDataStream {
             direction = dx > 0 ? .right : .left
         }
         
-        print("✅ [Gesture] SWIPE \(direction.string.uppercased()) with \(capturedFingerCount) fingers")
+        print("✅ [Gesture] SWIPE \(direction.rawValue.uppercased()) with \(capturedFingerCount) fingers")
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }

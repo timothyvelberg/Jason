@@ -200,6 +200,8 @@ class CircularUIInstanceManager: ObservableObject {
         hotkeyManager.unregisterAllShortcuts()
         hotkeyManager.unregisterAllMouseButtons()
         hotkeyManager.unregisterAllSwipes()
+        hotkeyManager.unregisterAllCircles()
+
         
         // Reset hold key (only one hold key supported at a time)
         hotkeyManager.setHoldKey(nil)
@@ -294,19 +296,34 @@ class CircularUIInstanceManager: ObservableObject {
                     // Trackpad hold mode not yet supported
                     print("   ⚠️ Skipping '\(config.name)' - trackpad hold mode not yet implemented")
                 } else {
-                    // TAP MODE for trackpad gestures
-                    print("[InstanceManager] Registering trackpad gesture TAP mode for '\(config.name)' (ID: \(config.id))")
-                    hotkeyManager.registerSwipe(
-                        direction: swipeDirection,
-                        fingerCount: fingerCount,
-                        modifierFlags: modifierFlags,
-                        forConfigId: config.id
-                    ) { [weak self] in
-                        print("🎯 [InstanceManager] Trackpad gesture triggered for '\(config.name)' (ID: \(config.id))")
-                        self?.show(configId: config.id)
+                    // Check if this is a circle gesture
+                    if swipeDirection == "circleClockwise" || swipeDirection == "circleCounterClockwise" {
+                        let direction: RotationDirection = swipeDirection == "circleClockwise" ? .clockwise : .counterClockwise
+                        
+                        print("[InstanceManager] Registering circle gesture for '\(config.name)' (ID: \(config.id))")
+                        hotkeyManager.registerCircle(
+                            direction: direction,
+                            fingerCount: fingerCount,
+                            modifierFlags: modifierFlags,
+                            forConfigId: config.id
+                        ) { [weak self] in
+                            print("🎯 [InstanceManager] Circle gesture triggered for '\(config.name)' (ID: \(config.id))")
+                            self?.show(configId: config.id)
+                        }
+                    } else {
+                        // SWIPE/TAP gesture (existing behavior)
+                        print("[InstanceManager] Registering trackpad gesture TAP mode for '\(config.name)' (ID: \(config.id))")
+                        hotkeyManager.registerSwipe(
+                            direction: swipeDirection,
+                            fingerCount: fingerCount,
+                            modifierFlags: modifierFlags,
+                            forConfigId: config.id
+                        ) { [weak self] in
+                            print("🎯 [InstanceManager] Trackpad gesture triggered for '\(config.name)' (ID: \(config.id))")
+                            self?.show(configId: config.id)
+                        }
                     }
-                    // Mark as having a trigger (using hasMouseButton variable for simplicity)
-                    hasMouseButton = true
+                    hasMouseButton = true  // Mark as having a trigger
                 }
             }
             

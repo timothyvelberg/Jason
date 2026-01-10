@@ -388,6 +388,8 @@ struct EditRingView: View {
         case "tap": directionSymbol = "\(fingerCount)-Finger Tap"
         case "addleft": directionSymbol = "\(fingerCount)-Finger Add Left"
         case "addright": directionSymbol = "\(fingerCount)-Finger Add Right"
+        case "circleclockwise": directionSymbol = "↻ \(fingerCount)-Finger Circle Clockwise"
+        case "circlecounterclockwise": directionSymbol = "↺ \(fingerCount)-Finger Circle Counter-Clockwise"
         default: directionSymbol = "\(fingerCount)-Finger Swipe \(direction)"
         }
         
@@ -396,6 +398,12 @@ struct EditRingView: View {
         return parts.joined()
     }
     private func saveRing() {
+        
+        print("🔍 [SaveRing] About to save:")
+        print("   triggerType: \(triggerType)")
+        print("   fingerCount: \(fingerCount)")
+        print("   swipeDirection: \(swipeDirection.rawValue)")
+        
         errorMessage = nil
         
         // Validate numeric fields
@@ -728,6 +736,8 @@ enum SwipeDirection: String, CaseIterable {
     case right
     case tap
     case add
+    case circleClockwise
+    case circleCounterClockwise
     
     var displayName: String {
         switch self {
@@ -737,7 +747,13 @@ enum SwipeDirection: String, CaseIterable {
         case .right: return "Swipe Right"
         case .tap: return "Tap"
         case .add: return "Add Finger"
+        case .circleClockwise: return "Circle ↻ (Clockwise)"
+        case .circleCounterClockwise: return "Circle ↺ (Counter-Clockwise)"
         }
+    }
+    
+    var isCircle: Bool {
+        return self == .circleClockwise || self == .circleCounterClockwise
     }
 }
 
@@ -755,7 +771,10 @@ struct TrackpadGesturePicker: View {
     @State private var useShift = false
     
     private func availableDirections() -> [SwipeDirection] {
-        if fingerCount == 2 {
+        if fingerCount == 1 {
+            // Single finger only supports circles
+            return [.circleClockwise, .circleCounterClockwise]
+        } else if fingerCount == 2 {
             return [.add]
         } else {
             return [.up, .down, .left, .right, .tap, .add]
@@ -770,6 +789,7 @@ struct TrackpadGesturePicker: View {
                     .frame(width: 80, alignment: .leading)
                 
                 Picker("", selection: $fingerCount) {
+                    Text("1 Finger").tag(1)
                     Text("2 Fingers").tag(2)
                     Text("3 Fingers").tag(3)
                     Text("4 Fingers").tag(4)
@@ -777,10 +797,21 @@ struct TrackpadGesturePicker: View {
                 .pickerStyle(.segmented)
                 .frame(width: 280)
                 .onChange(of: fingerCount) { _, newValue in
-                    // Reset direction to valid option when finger count changes
+                    print("🔍 [TrackpadPicker] fingerCount changed to \(newValue)")
+                    print("   Current direction: \(direction.rawValue)")
+                    print("   Available: \(availableDirections().map { $0.rawValue })")
+                    
                     if !availableDirections().contains(direction) {
-                        direction = availableDirections().first ?? .add
+                        let newDirection = availableDirections().first ?? .add
+                        print("   ⚠️ Resetting direction to: \(newDirection.rawValue)")
+                        direction = newDirection
+                    } else {
+                        print("   ✅ Direction is valid, keeping it")
                     }
+                }
+
+                .onChange(of: direction) { _, newValue in
+                    print("🔍 [TrackpadPicker] direction changed to: \(newValue.rawValue)")
                 }
             }
             
