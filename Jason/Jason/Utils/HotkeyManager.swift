@@ -566,16 +566,43 @@ class HotkeyManager {
         
         // Load saved calibration
         if let saved = DatabaseManager.shared.loadCircleCalibration() {
+            print("🎯 [HotkeyManager] Found saved calibration in database:")
+            print("   📅 Calibrated: \(saved.calibratedAt.formatted())")
+            print("   📊 maxRadiusVariance: \(String(format: "%.4f", saved.maxRadiusVariance))")
+            print("   📊 minCircles: \(String(format: "%.2f", saved.minCircles))")
+            print("   📊 minRadius: \(String(format: "%.3f", saved.minRadius))")
+            
             if let circleRecognizer = coordinator.recognizer(identifier: "circle") as? CircleRecognizer {
+                let defaultConfig = CircleRecognizer.Config()
+                print("   🔧 Default config was:")
+                print("      maxRadiusVariance: \(String(format: "%.4f", defaultConfig.maxRadiusVariance))")
+                print("      minCircles: \(String(format: "%.2f", defaultConfig.minCircles))")
+                print("      minRadius: \(String(format: "%.3f", defaultConfig.minRadius))")
+                
                 circleRecognizer.config.maxRadiusVariance = saved.maxRadiusVariance
                 circleRecognizer.config.minCircles = saved.minCircles
                 circleRecognizer.config.minRadius = saved.minRadius
-                print("🎯 [HotkeyManager] Loaded circle calibration from database (calibrated: \(saved.calibratedAt.formatted()))")
+                
+                print("   ✅ Applied calibration to recognizer")
+            } else {
+                print("   ❌ Could not find circle recognizer to apply calibration!")
+            }
+        } else {
+            print("🎯 [HotkeyManager] No saved calibration found - using defaults")
+            if let circleRecognizer = coordinator.recognizer(identifier: "circle") as? CircleRecognizer {
+                print("   📊 maxRadiusVariance: \(String(format: "%.4f", circleRecognizer.config.maxRadiusVariance))")
+                print("   📊 minCircles: \(String(format: "%.2f", circleRecognizer.config.minCircles))")
+                print("   📊 minRadius: \(String(format: "%.3f", circleRecognizer.config.minRadius))")
             }
         }
 
         // Save when calibration completes
         coordinator.onCircleCalibrationComplete = { config in
+            print("💾 [HotkeyManager] Calibration complete - saving to database:")
+            print("   📊 maxRadiusVariance: \(String(format: "%.4f", config.maxRadiusVariance))")
+            print("   📊 minCircles: \(String(format: "%.2f", config.minCircles))")
+            print("   📊 minRadius: \(String(format: "%.3f", config.minRadius))")
+            
             let entry = CircleCalibrationEntry(
                 maxRadiusVariance: config.maxRadiusVariance,
                 minCircles: config.minCircles,

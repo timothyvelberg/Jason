@@ -255,26 +255,26 @@ class CircleRecognizer: GestureRecognizer {
         let hasEnoughRotation = fullCircles >= config.minCircles
         let isLargeEnough = avgRadius >= config.minRadius
         let isClosed = closureDistance < avgRadius * config.maxClosureRatio
-        
-        if debugLogging {
-            print("")
-            print("═══════════════════════════════════════════════════════════")
-            print("🔵 [CircleRecognizer] PATH ANALYSIS")
-            print("═══════════════════════════════════════════════════════════")
-            print("   Points:           \(currentPath.count)")
-            print("   Duration:         \(String(format: "%.3f", duration))s")
-            print("   Radius:           \(String(format: "%.3f", avgRadius)) (min: \(config.minRadius))")
-            print("   Radius variance:  \(String(format: "%.4f", radiusVariance)) (max: \(config.maxRadiusVariance))")
-            print("   Angle:            \(String(format: "%.1f", abs(totalAngle) * 180 / Float.pi))°")
-            print("   Full circles:     \(String(format: "%.2f", fullCircles)) (min: \(config.minCircles))")
-            print("   Closure gap:      \(String(format: "%.3f", closureDistance))")
-            print("───────────────────────────────────────────────────────────")
-            print("   Circular:         \(isCircular ? "✅" : "❌")")
-            print("   Enough rotation:  \(hasEnoughRotation ? "✅" : "❌")")
-            print("   Large enough:     \(isLargeEnough ? "✅" : "❌")")
-            print("   Closed:           \(isClosed ? "✅" : "❌") (optional)")
-            print("═══════════════════════════════════════════════════════════")
-        }
+//        
+//        if debugLogging {
+//            print("")
+//            print("═══════════════════════════════════════════════════════════")
+//            print("🔵 [CircleRecognizer] PATH ANALYSIS")
+//            print("═══════════════════════════════════════════════════════════")
+//            print("   Points:           \(currentPath.count)")
+//            print("   Duration:         \(String(format: "%.3f", duration))s")
+//            print("   Radius:           \(String(format: "%.3f", avgRadius)) (min: \(config.minRadius))")
+//            print("   Radius variance:  \(String(format: "%.4f", radiusVariance)) (max: \(config.maxRadiusVariance))")
+//            print("   Angle:            \(String(format: "%.1f", abs(totalAngle) * 180 / Float.pi))°")
+//            print("   Full circles:     \(String(format: "%.2f", fullCircles)) (min: \(config.minCircles))")
+//            print("   Closure gap:      \(String(format: "%.3f", closureDistance))")
+//            print("───────────────────────────────────────────────────────────")
+//            print("   Circular:         \(isCircular ? "✅" : "❌")")
+//            print("   Enough rotation:  \(hasEnoughRotation ? "✅" : "❌")")
+//            print("   Large enough:     \(isLargeEnough ? "✅" : "❌")")
+//            print("   Closed:           \(isClosed ? "✅" : "❌") (optional)")
+//            print("═══════════════════════════════════════════════════════════")
+//        }
         
         // Fire event if it's a valid circle (closure is optional for now)
         if isCircular && hasEnoughRotation && isLargeEnough {

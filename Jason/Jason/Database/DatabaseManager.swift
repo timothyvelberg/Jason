@@ -232,7 +232,8 @@ class DatabaseManager {
             ringConfigurationsSQL,
             ringConfigurationsIndexSQL,
             ringProvidersSQL,
-            ringProvidersIndexSQL
+            ringProvidersIndexSQL,
+            circleCalibrationSQL
         ]
         
         for sql in tables {
