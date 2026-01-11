@@ -33,9 +33,13 @@ extension RingView {
             badgeOpacities[node.id] = 0
         }
         
-        // Animate each icon in with initial delay + staggered delay
+        // Reverse stagger order for counter-clockwise triggers (full circle only)
+        // Partial slices always animate outward from their anchor
+        let isCounterClockwise = triggerDirection == .counterClockwise && sliceConfig.isFullCircle
+
         for (index, node) in nodes.enumerated() {
-            let delay = animationInitialDelay + (Double(index) * effectiveStaggerDelay)
+            let staggerIndex = isCounterClockwise ? (nodes.count - 1 - index) : index
+            let delay = animationInitialDelay + (Double(staggerIndex) * effectiveStaggerDelay)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 withAnimation(.easeOut(duration: self.animationDuration)) {
@@ -100,16 +104,26 @@ extension RingView {
             badgeOpacities[node.id] = 0
             
             // Determine rotation offset based on position relative to center
+            // For clockwise trigger: left=+, right=- (converging inward)
+            // For counter-clockwise trigger: left=-, right=+ (diverging outward)
             let rotationOffset: Double
+            let baseOffset = abs(effectiveRotationOffset)
+            let isCounterClockwise = triggerDirection == .counterClockwise && sliceConfig.isFullCircle
+
+
             if Double(index) < centerPoint {
-                rotationOffset = abs(effectiveRotationOffset)
+                // Left of center
+                rotationOffset = isCounterClockwise ? -baseOffset : baseOffset
             } else if Double(index) > centerPoint {
-                rotationOffset = -abs(effectiveRotationOffset)
+                // Right of center
+                rotationOffset = isCounterClockwise ? baseOffset : -baseOffset
             } else {
                 // Exactly at center (odd count only): no rotation
                 rotationOffset = 0
             }
             iconRotationOffsets[node.id] = rotationOffset
+            print("   🔄 [CenterOut] Node \(index): rotationOffset=\(rotationOffset), isCounterClockwise=\(isCounterClockwise)")
+
         }
         
         // Build animation groups: items at same distance from center animate together

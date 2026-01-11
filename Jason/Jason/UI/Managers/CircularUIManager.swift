@@ -716,6 +716,8 @@ class CircularUIManager: ObservableObject {
         
         // Store trigger direction for animation
         self.triggerDirection = triggerDirection
+        print("🔄 [CircularUIManager] triggerDirection set to: \(String(describing: triggerDirection))")
+
         
         // 🆕 Refresh badge cache before loading functions
         DockBadgeReader.shared.forceRefresh()

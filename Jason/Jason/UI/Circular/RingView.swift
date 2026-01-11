@@ -27,6 +27,7 @@ struct RingView: View {
     
     // Effective rotation offset - flipped for counter-clockwise triggers
     var effectiveRotationOffset: Double {
+        print("🎬 [RingView] triggerDirection: \(String(describing: triggerDirection)), using offset: \(triggerDirection == .counterClockwise ? -animationRotationOffset : animationRotationOffset)")
         if triggerDirection == .counterClockwise {
             return -animationRotationOffset  // Flip: -10 becomes +10
         }
@@ -234,40 +235,13 @@ struct RingView: View {
                                 .opacity(runningIndicatorOpacities[node.id] ?? 0)
                         }
                     }
+                    .rotationEffect(Angle(degrees: iconRotationOffsets[node.id] ?? 0))
                     .scaleEffect(scale)
                     .opacity(opacity)
                     .position(iconPosition(for: index))
                     .allowsHitTesting(false)
                 }
             }
-            
-            // Icons positioned around the ring (non-interactive, just visual)
-            ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
-                let opacity = iconOpacities[node.id] ?? 0
-                let scale = iconScales[node.id] ?? animationStartScale
-                
-                if node.type == .spacer {
-                    // Render spacer as small dot
-                    Circle()
-                        .fill(Color.white.opacity(0.16))
-                        .frame(width: 4, height: 4)
-                        .scaleEffect(scale)
-                        .opacity(opacity)
-                        .position(iconPosition(for: index))
-                        .allowsHitTesting(false)
-                } else {
-                    // Render normal icon
-                    Image(nsImage: node.icon)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: iconSize, height: iconSize)
-                        .scaleEffect(scale)
-                        .opacity(opacity)
-                        .position(iconPosition(for: index))
-                        .allowsHitTesting(false)
-                }
-            }
-            
             // Badges positioned at top-right of icons
             ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
                 badgeView(for: node, at: index)
