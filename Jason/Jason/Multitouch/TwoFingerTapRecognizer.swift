@@ -41,6 +41,9 @@ class TwoFingerTapRecognizer: GestureRecognizer {
         
         /// Grace period for second finger to lift after first (seconds)
         var liftGracePeriod: Double = 0.15
+        
+        /// Maximum time window for sequential tap detection (seconds)
+        var sequentialTapWindow: Double = 0.15
     }
     
     var config = Config()
@@ -62,7 +65,15 @@ class TwoFingerTapRecognizer: GestureRecognizer {
         let startTime: Double
     }
     
+    private struct LiftedFinger {
+        let identifier: Int
+        let landPosition: CGPoint
+        let liftPosition: CGPoint
+        let liftTime: Double
+    }
+    
     private var state: State = .idle
+    private var recentlyLiftedFinger: LiftedFinger?
     
     // MARK: - Protocol Methods
     
@@ -113,20 +124,52 @@ class TwoFingerTapRecognizer: GestureRecognizer {
     // MARK: - State Handlers
     
     private func handleIdleState(frame: TouchFrame, newTouches: [TouchPoint]) {
-        // Look for first finger landing
-        guard let firstTouch = newTouches.first else { return }
+        guard let newTouch = newTouches.first else {
+            // No new touches - clear stale recentlyLiftedFinger if too old
+            if let recent = recentlyLiftedFinger,
+               frame.timestamp - recent.liftTime > config.sequentialTapWindow {
+                recentlyLiftedFinger = nil
+            }
+            return
+        }
         
+        // Check for sequential tap - new finger landing shortly after previous lifted
+        if let recent = recentlyLiftedFinger {
+            let gap = frame.timestamp - recent.liftTime
+            
+            if gap < config.sequentialTapWindow {
+                let xDiff = newTouch.position.x - recent.landPosition.x
+                
+                if abs(xDiff) >= config.minXDifference {
+                    let side: TapSide = xDiff < 0 ? .left : .right
+                    
+                    if debugLogging {
+                        print("👆 [TwoFingerTap] ✅ Sequential tap - gap=\(String(format: "%.0f", gap * 1000))ms → \(side.rawValue.uppercased())")
+                    }
+                    
+                    let event = GestureEvent.twoFingerTap(side: side)
+                    onGesture?(event)
+                    recentlyLiftedFinger = nil
+                    reset()
+                    return
+                }
+            }
+            
+            recentlyLiftedFinger = nil
+        }
+        
+        // Normal path - start tracking first finger
         let finger = TrackedFinger(
-            identifier: firstTouch.identifier,
-            startPosition: firstTouch.position,
-            currentPosition: firstTouch.position,
+            identifier: newTouch.identifier,
+            startPosition: newTouch.position,
+            currentPosition: newTouch.position,
             startTime: frame.timestamp
         )
         
         state = .trackingFirstFinger(finger: finger)
         
         if debugLogging {
-            print("👆 [TwoFingerTap] First finger down at x=\(String(format: "%.3f", firstTouch.position.x))")
+            print("👆 [TwoFingerTap] First finger down at x=\(String(format: "%.3f", newTouch.position.x))")
         }
     }
     
@@ -148,8 +191,14 @@ class TwoFingerTapRecognizer: GestureRecognizer {
             return
         }
         
-        // Check if first finger lifted (single finger tap, not our gesture)
-        if liftingTouches.contains(where: { $0.identifier == first.identifier }) {
+        // Check if first finger lifted (store for potential sequential tap)
+        if let liftTouch = liftingTouches.first(where: { $0.identifier == first.identifier }) {
+            recentlyLiftedFinger = LiftedFinger(
+                identifier: first.identifier,
+                landPosition: first.startPosition,
+                liftPosition: liftTouch.position,
+                liftTime: frame.timestamp
+            )
             reset()
             return
         }
@@ -269,7 +318,7 @@ class TwoFingerTapRecognizer: GestureRecognizer {
                            !activeTouches.contains(where: { $0.identifier == second.identifier })
         
         if firstLifted && secondLifted {
-            // Success! Fire the event
+            // Success!
             if debugLogging {
                 print("👆 [TwoFingerTap] ✅ Detected: \(side.rawValue.uppercased())")
             }

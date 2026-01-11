@@ -177,9 +177,9 @@ class CircleRecognizer: GestureRecognizer {
             timestamp: touch.timestamp
         ))
         
-        if debugLogging {
-            print("🔵 [CircleRecognizer] Started tracking finger \(touch.identifier)")
-        }
+//        if debugLogging {
+//            print("🔵 [CircleRecognizer] Started tracking finger \(touch.identifier)")
+//        }
     }
     
     private func addPoint(touch: TouchPoint) {
