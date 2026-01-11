@@ -16,6 +16,7 @@ class CircularUIManager: ObservableObject {
     // Drag support
     @Published var currentDragProvider: DragProvider?
     @Published var dragStartPoint: CGPoint?
+    @Published var triggerDirection: RotationDirection? = nil
     private var draggedNode: FunctionNode?
     
     var overlayWindow: OverlayWindow?
@@ -700,17 +701,21 @@ class CircularUIManager: ObservableObject {
     // MARK: - Show Methods
 
     /// Show the UI at the root level (Ring 0)
-    func show() {
-        show(expandingCategory: nil)
+    func show(triggerDirection: RotationDirection? = nil) {
+        show(expandingCategory: nil, triggerDirection: triggerDirection)
     }
 
     /// Show the UI already expanded to a specific category
     /// - Parameter providerId: The ID of the provider to expand (e.g., "app-switcher"), or nil to show Ring 0
-    func show(expandingCategory providerId: String?) {
+    func show(expandingCategory providerId: String?, triggerDirection: RotationDirection? = nil) {
+
         guard let functionManager = functionManager else {
             print("FunctionManager not initialized")
             return
         }
+        
+        // Store trigger direction for animation
+        self.triggerDirection = triggerDirection
         
         // 🆕 Refresh badge cache before loading functions
         DockBadgeReader.shared.forceRefresh()

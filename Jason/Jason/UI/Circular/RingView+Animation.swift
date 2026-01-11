@@ -28,7 +28,7 @@ extension RingView {
         for node in nodes {
             iconOpacities[node.id] = 0
             iconScales[node.id] = animationStartScale
-            iconRotationOffsets[node.id] = animationRotationOffset
+            iconRotationOffsets[node.id] = effectiveRotationOffset
             runningIndicatorOpacities[node.id] = 0
             badgeOpacities[node.id] = 0
         }
@@ -102,11 +102,9 @@ extension RingView {
             // Determine rotation offset based on position relative to center
             let rotationOffset: Double
             if Double(index) < centerPoint {
-                // Left of center: rotate from +10° to 0° (counter-clockwise)
-                rotationOffset = abs(animationRotationOffset)
+                rotationOffset = abs(effectiveRotationOffset)
             } else if Double(index) > centerPoint {
-                // Right of center: rotate from -10° to 0° (clockwise)
-                rotationOffset = -abs(animationRotationOffset)
+                rotationOffset = -abs(effectiveRotationOffset)
             } else {
                 // Exactly at center (odd count only): no rotation
                 rotationOffset = 0

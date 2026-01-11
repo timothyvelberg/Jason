@@ -16,6 +16,7 @@ struct RingView: View {
     let shouldDimOpacity: Bool
     let sliceConfig: PieSliceConfig
     let iconSize: CGFloat
+    let triggerDirection: RotationDirection?
     
     // Animation configuration
     let animationInitialDelay: Double = 0.06
@@ -23,6 +24,14 @@ struct RingView: View {
     let animationDuration: Double = 0.25
     let animationStartScale: CGFloat = 0.9
     let animationRotationOffset: Double = -10
+    
+    // Effective rotation offset - flipped for counter-clockwise triggers
+    var effectiveRotationOffset: Double {
+        if triggerDirection == .counterClockwise {
+            return -animationRotationOffset  // Flip: -10 becomes +10
+        }
+        return animationRotationOffset  // Default: -10 (clockwise)
+    }
     
     // Animation mode selection
     enum AnimationMode {

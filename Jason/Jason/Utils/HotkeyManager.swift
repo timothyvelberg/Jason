@@ -81,8 +81,8 @@ class HotkeyManager {
     private var circleCoordinator: MultitouchCoordinator?
 
     /// Registered circle gestures: [configId: (direction, fingerCount, modifierFlags, callback)]
-    private var registeredCircles: [Int: (direction: RotationDirection, fingerCount: Int, modifierFlags: UInt, callback: () -> Void)] = [:]
-    
+    private var registeredCircles: [Int: (direction: RotationDirection, fingerCount: Int, modifierFlags: UInt, callback: (RotationDirection) -> Void)] = [:]
+
     // Mouse button monitoring (CGEventTap required for buttons 3+)
     private var mouseEventTap: CFMachPort?
     private var mouseRunLoopSource: CFRunLoopSource?
@@ -511,14 +511,12 @@ class HotkeyManager {
         }
     }
     
-    // MARK: - Circle Gesture Registration
-
     func registerCircle(
         direction: RotationDirection,
         fingerCount: Int,
         modifierFlags: UInt,
         forConfigId configId: Int,
-        callback: @escaping () -> Void
+        callback: @escaping (RotationDirection) -> Void
     ) {
         let display = formatCircleGesture(direction: direction, fingerCount: fingerCount, modifiers: modifierFlags)
         print("[HotkeyManager] Registering circle gesture for config \(configId): \(display)")
@@ -653,7 +651,7 @@ class HotkeyManager {
                 
                 // Dispatch to main thread for UI operations
                 DispatchQueue.main.async {
-                    registration.callback()
+                    registration.callback(direction)
                 }
                 return
             }

@@ -96,7 +96,8 @@ struct RingPreviewView: View {
                 selectedIndex: selectedIndex,
                 shouldDimOpacity: false,
                 sliceConfig: sliceConfig,
-                iconSize: iconSize
+                iconSize: iconSize,
+                triggerDirection: nil
             )
             .scaleEffect(scaleFactor)
             .frame(width: previewSize, height: previewSize)

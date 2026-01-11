@@ -64,7 +64,8 @@ struct CircularUIView: View {
                             selectedIndex: ring.selectedIndex,
                             shouldDimOpacity: shouldDimRing(ring.level),
                             sliceConfig: ring.sliceConfig,
-                            iconSize: ring.iconSize
+                            iconSize: ring.iconSize,
+                            triggerDirection: circularUI.triggerDirection
                         )
                         .transition(.customScale(from: 0.7))
                         .id("\(ring.level)-\(functionManager.ringResetTrigger)")

@@ -301,15 +301,18 @@ class CircularUIInstanceManager: ObservableObject {
                         let direction: RotationDirection = swipeDirection == "circleClockwise" ? .clockwise : .counterClockwise
                         
                         print("[InstanceManager] Registering circle gesture for '\(config.name)' (ID: \(config.id))")
+                        
                         hotkeyManager.registerCircle(
                             direction: direction,
                             fingerCount: fingerCount,
                             modifierFlags: modifierFlags,
                             forConfigId: config.id
-                        ) { [weak self] in
-                            print("🎯 [InstanceManager] Circle gesture triggered for '\(config.name)' (ID: \(config.id))")
-                            self?.show(configId: config.id)
+                        ) { [weak self] triggerDirection in
+                            print("🎯 [InstanceManager] Circle gesture triggered for '\(config.name)' (ID: \(config.id)), direction: \(triggerDirection)")
+                            self?.show(configId: config.id, triggerDirection: triggerDirection)
                         }
+                        
+                    
                     } else {
                         // SWIPE/TAP gesture (existing behavior)
                         print("[InstanceManager] Registering trackpad gesture TAP mode for '\(config.name)' (ID: \(config.id))")
@@ -380,7 +383,7 @@ extension CircularUIInstanceManager {
     
     /// Show a specific instance by configuration ID
     /// - Parameter configId: The configuration ID
-    func show(configId: Int) {
+    func show(configId: Int, triggerDirection: RotationDirection? = nil) {
         guard let instance = getInstance(forConfigId: configId) else {
             print("❌ [InstanceManager] Cannot show - no instance for config \(configId)")
             return
@@ -407,7 +410,7 @@ extension CircularUIInstanceManager {
         print("✅ [InstanceManager] Setting active instance to config \(configId)")
         
         // Show the new instance
-        instance.show()
+        instance.show(triggerDirection: triggerDirection)
     }
     
     /// Show a specific instance by shortcut
