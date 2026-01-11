@@ -311,8 +311,20 @@ class CircularUIInstanceManager: ObservableObject {
                             print("🎯 [InstanceManager] Circle gesture triggered for '\(config.name)' (ID: \(config.id)), direction: \(triggerDirection)")
                             self?.show(configId: config.id, triggerDirection: triggerDirection)
                         }
+                        // NEW: Check if this is a two-finger tap gesture
+                    } else if swipeDirection == "twoFingerTapLeft" || swipeDirection == "twoFingerTapRight" {
+                        let side: TapSide = swipeDirection == "twoFingerTapLeft" ? .left : .right
                         
-                    
+                        print("[InstanceManager] Registering two-finger tap for '\(config.name)' (ID: \(config.id))")
+                        
+                        hotkeyManager.registerTwoFingerTap(
+                            side: side,
+                            modifierFlags: modifierFlags,
+                            forConfigId: config.id
+                        ) { [weak self] triggerSide in
+                            print("🎯 [InstanceManager] Two-finger tap triggered for '\(config.name)' (ID: \(config.id)), side: \(triggerSide)")
+                            self?.show(configId: config.id)
+                        }
                     } else {
                         // SWIPE/TAP gesture (existing behavior)
                         print("[InstanceManager] Registering trackpad gesture TAP mode for '\(config.name)' (ID: \(config.id))")

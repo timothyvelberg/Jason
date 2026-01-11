@@ -113,6 +113,8 @@ enum GestureEvent {
     case tap(fingerCount: Int)
     case circle(direction: RotationDirection, fingerCount: Int)
     case fingerAdd(fromCount: Int, toCount: Int)
+    case twoFingerTap(side: TapSide)
+
     
     var description: String {
         switch self {
@@ -125,6 +127,15 @@ enum GestureEvent {
             return "\(count)-finger \(dirStr) circle"
         case .fingerAdd(let from, let to):
             return "finger add \(from)→\(to)"
+        case .twoFingerTap(let side):
+            return "two-finger tap (\(side.rawValue))"
         }
+
     }
+}
+
+/// Side for two-finger tap gestures
+enum TapSide: String {
+    case left   // Second finger landed LEFT of first finger
+    case right  // Second finger landed RIGHT of first finger
 }

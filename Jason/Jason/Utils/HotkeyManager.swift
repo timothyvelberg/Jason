@@ -51,6 +51,9 @@ class HotkeyManager {
     private var isHoldKeyCurrentlyPressed: Bool = false
     private var requiresReleaseBeforeNextShow: Bool = false  // Prevents re-show while key still held
     
+    /// Registered two-finger taps: [configId: (side, modifierFlags, callback)]
+    private var registeredTwoFingerTaps: [Int: (side: TapSide, modifierFlags: UInt, callback: (TapSide) -> Void)] = [:]
+    
     // MARK: - Dynamic Shortcuts
     
     /// Registered keyboard shortcuts: [configId: (keyCode, modifierFlags, callback)]
@@ -558,8 +561,14 @@ class HotkeyManager {
         print("🔵 [HotkeyManager] Starting circle gesture monitoring...")
         
         let coordinator = MultitouchCoordinator.withCircleRecognition(debugLogging: true)
+        
+        // Add two-finger tap recognizer
+        let twoFingerRecognizer = TwoFingerTapRecognizer()
+        
+        coordinator.addRecognizer(twoFingerRecognizer)
+        
         coordinator.onGesture = { [weak self] event in
-            self?.handleCircleGesture(event)
+            self?.handleGestureEvent(event)  // Was handleCircleGesture
         }
         
         // Load saved calibration
@@ -625,13 +634,11 @@ class HotkeyManager {
         circleCoordinator = nil
     }
 
-    private func handleCircleGesture(_ event: GestureEvent) {
-        guard case .circle(let direction, let fingerCount) = event else { return }
-        
+    private func handleGestureEvent(_ event: GestureEvent) {
         let isUIVisible = isUIVisible?() ?? false
         
         guard !isUIVisible else {
-            print("   ⏭️ Ignoring circle - UI is visible")
+            print("   ⏭️ Ignoring gesture - UI is visible")
             return
         }
         
@@ -644,25 +651,44 @@ class HotkeyManager {
         if cgFlags.contains(.maskAlternate) { eventModifiers |= NSEvent.ModifierFlags.option.rawValue }
         if cgFlags.contains(.maskShift) { eventModifiers |= NSEvent.ModifierFlags.shift.rawValue }
         
-        print("🔵 [HotkeyManager] Circle detected: \(direction), fingers=\(fingerCount), modifiers=\(eventModifiers)")
-        
-        // Match against registered circles
-        for (configId, registration) in registeredCircles {
-            if registration.direction == direction &&
-               registration.fingerCount == fingerCount &&
-               registration.modifierFlags == eventModifiers {
-                let display = formatCircleGesture(direction: direction, fingerCount: fingerCount, modifiers: eventModifiers)
-                print("✅ [HotkeyManager] Circle MATCHED for config \(configId): \(display)")
-                
-                // Dispatch to main thread for UI operations
-                DispatchQueue.main.async {
-                    registration.callback(direction)
+        switch event {
+        case .circle(let direction, let fingerCount):
+            print("🔵 [HotkeyManager] Circle detected: \(direction), fingers=\(fingerCount), modifiers=\(eventModifiers)")
+            
+            for (configId, registration) in registeredCircles {
+                if registration.direction == direction &&
+                   registration.fingerCount == fingerCount &&
+                   registration.modifierFlags == eventModifiers {
+                    let display = formatCircleGesture(direction: direction, fingerCount: fingerCount, modifiers: eventModifiers)
+                    print("✅ [HotkeyManager] Circle MATCHED for config \(configId): \(display)")
+                    
+                    DispatchQueue.main.async {
+                        registration.callback(direction)
+                    }
+                    return
                 }
-                return
             }
+            print("   ⚠️ No matching circle gesture found")
+            
+        case .twoFingerTap(let side):
+            print("👆 [HotkeyManager] Two-finger tap detected: \(side.rawValue), modifiers=\(eventModifiers)")
+            
+            for (configId, registration) in registeredTwoFingerTaps {
+                if registration.side == side && registration.modifierFlags == eventModifiers {
+                    let display = formatTwoFingerTap(side: side, modifiers: eventModifiers)
+                    print("✅ [HotkeyManager] Two-finger tap MATCHED for config \(configId): \(display)")
+                    
+                    DispatchQueue.main.async {
+                        registration.callback(side)
+                    }
+                    return
+                }
+            }
+            print("   ⚠️ No matching two-finger tap found")
+            
+        default:
+            break
         }
-        
-        print("   ⚠️ No matching circle gesture found")
     }
 
     private func formatCircleGesture(direction: RotationDirection, fingerCount: Int, modifiers: UInt) -> String {
@@ -1058,6 +1084,56 @@ class HotkeyManager {
         }
         
         parts.append(directionSymbol)
+        
+        return parts.joined()
+    }
+    
+    // MARK: - Two-Finger Tap Registration
+
+    func registerTwoFingerTap(
+        side: TapSide,
+        modifierFlags: UInt,
+        forConfigId configId: Int,
+        callback: @escaping (TapSide) -> Void
+    ) {
+        let display = formatTwoFingerTap(side: side, modifiers: modifierFlags)
+        print("[HotkeyManager] Registering two-finger tap for config \(configId): \(display)")
+        
+        // Check for conflicts
+        for (existingId, existing) in registeredTwoFingerTaps {
+            if existing.side == side && existing.modifierFlags == modifierFlags {
+                print("   [HotkeyManager] Two-finger tap conflict with config \(existingId) - unregistering old")
+                unregisterTwoFingerTap(forConfigId: existingId)
+                break
+            }
+        }
+        
+        registeredTwoFingerTaps[configId] = (side, modifierFlags, callback)
+    }
+
+    func unregisterTwoFingerTap(forConfigId configId: Int) {
+        if let _ = registeredTwoFingerTaps.removeValue(forKey: configId) {
+            print("[HotkeyManager] Unregistered two-finger tap for config \(configId)")
+        }
+    }
+
+    func unregisterAllTwoFingerTaps() {
+        let count = registeredTwoFingerTaps.count
+        registeredTwoFingerTaps.removeAll()
+        print("[HotkeyManager] Unregistered all \(count) two-finger tap(s)")
+    }
+
+    private func formatTwoFingerTap(side: TapSide, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        let sideSymbol = side == .left ? "👆←" : "→👆"
+        parts.append("\(sideSymbol) Two-Finger Tap \(side.rawValue.capitalized)")
         
         return parts.joined()
     }

@@ -386,10 +386,11 @@ struct EditRingView: View {
         case "left": directionSymbol = "← \(fingerCount)-Finger Swipe Left"
         case "right": directionSymbol = "→ \(fingerCount)-Finger Swipe Right"
         case "tap": directionSymbol = "\(fingerCount)-Finger Tap"
-        case "addleft": directionSymbol = "\(fingerCount)-Finger Add Left"
-        case "addright": directionSymbol = "\(fingerCount)-Finger Add Right"
+        case "add": directionSymbol = "\(fingerCount)-Finger Add"
         case "circleclockwise": directionSymbol = "↻ \(fingerCount)-Finger Circle Clockwise"
         case "circlecounterclockwise": directionSymbol = "↺ \(fingerCount)-Finger Circle Counter-Clockwise"
+        case "twofingertapleft": directionSymbol = "👆← Two-Finger Tap Left"      // NEW
+        case "twofingertapright": directionSymbol = "→👆 Two-Finger Tap Right"    // NEW
         default: directionSymbol = "\(fingerCount)-Finger Swipe \(direction)"
         }
         
@@ -397,6 +398,7 @@ struct EditRingView: View {
         
         return parts.joined()
     }
+    
     private func saveRing() {
         
         print("🔍 [SaveRing] About to save:")
@@ -738,6 +740,8 @@ enum SwipeDirection: String, CaseIterable {
     case add
     case circleClockwise
     case circleCounterClockwise
+    case twoFingerTapLeft
+    case twoFingerTapRight
     
     var displayName: String {
         switch self {
@@ -749,6 +753,8 @@ enum SwipeDirection: String, CaseIterable {
         case .add: return "Add Finger"
         case .circleClockwise: return "Circle ↻ (Clockwise)"
         case .circleCounterClockwise: return "Circle ↺ (Counter-Clockwise)"
+        case .twoFingerTapLeft: return "Two-Finger Tap (←Left)"
+        case .twoFingerTapRight: return "Two-Finger Tap (Right→)"
         }
     }
     
@@ -775,7 +781,8 @@ struct TrackpadGesturePicker: View {
             // Single finger only supports circles
             return [.circleClockwise, .circleCounterClockwise]
         } else if fingerCount == 2 {
-            return [.add]
+            // Two finger supports add and two-finger taps
+            return [.twoFingerTapLeft, .twoFingerTapRight, .add]
         } else {
             return [.up, .down, .left, .right, .tap, .add]
         }
@@ -1098,3 +1105,4 @@ class MouseButtonRecorderHandler {
         }
     }
 }
+
