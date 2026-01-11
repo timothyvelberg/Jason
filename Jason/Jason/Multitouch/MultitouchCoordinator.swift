@@ -185,3 +185,18 @@ extension MultitouchCoordinator {
         return coordinator
     }
 }
+
+// MARK: - LiveDataStream Conformance
+
+extension MultitouchCoordinator: LiveDataStream {
+    var streamId: String { "circle-gesture" }
+    
+    func restartMonitoring() {
+        print("🔄 [MultitouchCoordinator] Restarting after wake...")
+        source.stopMonitoring()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.source.startMonitoring()
+        }
+    }
+}

@@ -611,13 +611,18 @@ class HotkeyManager {
         }
         
         coordinator.startMonitoring()
+        
+        // Register with LiveDataCoordinator for sleep/wake handling
+        LiveDataCoordinator.shared.register(coordinator)
         circleCoordinator = coordinator
     }
 
     private func stopCircleMonitoring() {
-        circleCoordinator?.stopMonitoring()
+        guard let coordinator = circleCoordinator else { return }
+        
+        LiveDataCoordinator.shared.unregister(coordinator)
+        coordinator.stopMonitoring()
         circleCoordinator = nil
-        print("🔵 [HotkeyManager] Circle monitoring stopped")
     }
 
     private func handleCircleGesture(_ event: GestureEvent) {

@@ -104,9 +104,13 @@ struct CloseButtonView: View {
     
     var body: some View {
             ZStack {
-                // Background circle
+                // Dark tint layer
                 Circle()
-                    .fill(Color.black.opacity(0.3))
+                    .fill(Color.black.opacity(0.33))
+                
+                // Blur material layer
+                Circle()
+                    .fill(.ultraThinMaterial)
                 
                 // Border
                 Circle()
