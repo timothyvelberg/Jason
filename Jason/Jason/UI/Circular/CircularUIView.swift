@@ -55,6 +55,10 @@ struct CircularUIView: View {
                 let swiftUIY = screenHeight - localMouseY
                 
                 ZStack {
+                    // Close button in center
+                    CloseButtonView()
+                        .animation(nil, value: rings.count)
+                    
                     // Generate rings dynamically
                     ForEach(rings) { ring in
                         RingView(
@@ -91,6 +95,31 @@ struct CircularUIView: View {
         // Dim all rings except the active one
         return level != functionManager.activeRingLevel
     }
+}
+
+// MARK: - Close Button View
+
+struct CloseButtonView: View {
+    private let size: CGFloat = FunctionManager.closeZoneRadius * 2
+    
+    var body: some View {
+            ZStack {
+                // Background circle
+                Circle()
+                    .fill(Color.black.opacity(0.3))
+                
+                // Border
+                Circle()
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                
+                // X icon
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .frame(width: size, height: size)
+            .allowsHitTesting(false)
+        }
 }
 
 // MARK: - Ring Configuration

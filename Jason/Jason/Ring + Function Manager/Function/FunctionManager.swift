@@ -39,8 +39,12 @@ class FunctionManager: ObservableObject {
     // MARK: - Private State
     
     private(set) var favoriteAppsProvider: FavoriteAppsProvider?
-    
     private let configCalculator: RingConfigurationCalculator
+    
+    // MARK: - Close Zone Configuration
+
+    /// Radius of the center close zone. Mouse inside this radius will not select any item.
+    static let closeZoneRadius: CGFloat = 20
     
     // MARK: - Cache for Ring Configurations
     
@@ -155,7 +159,13 @@ class FunctionManager: ObservableObject {
     }
     
     /// Determine which ring level a given distance falls into
+    /// Determine which ring level a given distance falls into
     private func getRingLevel(at distance: CGFloat) -> Int? {
+        // Check if in close zone (center of donut)
+        if distance < FunctionManager.closeZoneRadius {
+            return nil
+        }
+        
         let configs = ringConfigurations
         
         for config in configs {

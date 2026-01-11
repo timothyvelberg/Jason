@@ -115,18 +115,27 @@ class MouseTracker {
                 lastMouseLocation = current
             }
         } else {
-            // Update last position only when NOT paused
-            lastMouseLocation = current
-        }
-        
-        let angle = self.calculateAngle(from: start, to: current)
-//        print("🔍 [Track] Distance: \(String(format: "%.1f", distance)), Angle: \(String(format: "%.1f", angle))°")
+                    // Update last position only when NOT paused
+                    lastMouseLocation = current
+                }
+                
+                // Check if mouse is in close zone (center of donut)
+                if distance < FunctionManager.closeZoneRadius {
+                    // Clear selection when in close zone
+                    if lastFunctionIndex != nil || lastRingLevel != nil {
+                        print("🎯 [Track] In close zone (distance: \(String(format: "%.1f", distance))) - clearing selection")
+                        lastFunctionIndex = nil
+                        lastRingLevel = nil
+                        onPieHover?(nil)
+                    }
+                    return
+                }
+                
+                let angle = self.calculateAngle(from: start, to: current)
         
         // Determine which ring the mouse is in based on distance
         let ringLevel = determineRingLevel(distance: distance)
-        
-//        print("🔍 [Track] RingLevel: \(ringLevel?.description ?? "nil"), Active: \(functionManager.activeRingLevel)")
-        
+    
         // Handle boundary crossing between rings
         handleBoundaryCrossing(distance: distance, currentRingLevel: ringLevel, angle: angle)
         

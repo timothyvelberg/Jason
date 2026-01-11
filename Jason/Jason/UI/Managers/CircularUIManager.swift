@@ -280,11 +280,17 @@ class CircularUIManager: ObservableObject {
     private func handleLeftClick(event: GestureManager.GestureEvent) {
         guard let functionManager = functionManager else { return }
         
-        // Use position-based detection instead of hoveredIndex
         guard let (ringLevel, index, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) else {
-            print("⚠️ Left-click not on any item")
-            return
-        }
+                    // Check if click was in close zone
+                    let distance = hypot(event.position.x - centerPoint.x, event.position.y - centerPoint.y)
+                    if distance < FunctionManager.closeZoneRadius {
+                        print("🎯 [Left Click] In close zone - closing UI")
+                        hide()
+                    } else {
+                        print("⚠️ Left-click not on any item")
+                    }
+                    return
+                }
         
         print("🖱️ [Left Click] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
