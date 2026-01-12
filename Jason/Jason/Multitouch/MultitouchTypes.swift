@@ -90,8 +90,17 @@ struct TouchPoint {
 struct TouchFrame {
     let touches: [TouchPoint]
     let timestamp: Double
+    let rawFingerCount: Int  // Raw count from callback
     
+    // For recognizers that need filtered count
     var fingerCount: Int { touches.filter { $0.state.isActive }.count }
+    
+    // Initialize with raw count
+    init(touches: [TouchPoint], timestamp: Double, rawFingerCount: Int? = nil) {
+        self.touches = touches
+        self.timestamp = timestamp
+        self.rawFingerCount = rawFingerCount ?? touches.count
+    }
 }
 
 // MARK: - Gesture Events

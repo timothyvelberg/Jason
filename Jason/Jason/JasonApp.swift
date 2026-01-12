@@ -56,28 +56,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
-            
-            // 🧪 TEST: Check for invisible characters in WhatsApp name
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                print("🧪 [Name Debug] Checking WhatsApp name encoding...")
-                
-                // From running apps
-                if let whatsapp = NSWorkspace.shared.runningApplications.first(where: {
-                    $0.bundleIdentifier == "net.whatsapp.WhatsApp"
-                }) {
-                    let name = whatsapp.localizedName ?? "(nil)"
-                    print("   Running app name: \"\(name)\"")
-                    print("   Bytes: \(Array(name.utf8))")
-                    print("   Length: \(name.count)")
-                }
-                
-                // What we'd expect
-                let expected = "WhatsApp"
-                print("\n   Expected name: \"\(expected)\"")
-                print("   Bytes: \(Array(expected.utf8))")
-                print("   Length: \(expected.count)")
-            }
-            
+
             
             // 🧪 TEST: WhatsApp badge debug
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {

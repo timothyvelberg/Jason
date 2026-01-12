@@ -130,7 +130,8 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
             for i in 0..<count {
                 let mt = rawTouches[i]
                 
-                guard let state = TouchState(rawValue: Int(mt.state)) else { continue }
+                // Try to get state, default to .touching if invalid (position may still be valid)
+                let state = TouchState(rawValue: Int(mt.state)) ?? .touching
                 
                 let touch = TouchPoint(
                     identifier: Int(mt.identifier),
@@ -143,7 +144,8 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
             }
         }
         
-        let frame = TouchFrame(touches: touches, timestamp: timestamp)
+        // Pass raw count - crucial for multi-finger detection
+        let frame = TouchFrame(touches: touches, timestamp: timestamp, rawFingerCount: count)
         onTouchFrame?(frame)
     }
 }

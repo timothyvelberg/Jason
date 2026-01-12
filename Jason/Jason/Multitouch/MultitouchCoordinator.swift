@@ -24,6 +24,7 @@ class MultitouchCoordinator {
     /// Whether the coordinator is active
     var isMonitoring: Bool { source.isMonitoring }
     
+    var recognizerCount: Int { recognizers.count }
     // MARK: - Debug
     
     var debugLogging: Bool = false {

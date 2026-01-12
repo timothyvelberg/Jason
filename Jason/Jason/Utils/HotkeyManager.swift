@@ -77,11 +77,8 @@ class HotkeyManager {
     // Swipe gesture monitoring
     private var globalSwipeMonitor: Any?
     
-    // Multitouch gesture detection (using private MultitouchSupport framework)
-    private var multitouchDetector: MultitouchGestureDetector?
-    
-    // Circle gesture coordination (new architecture)
-    private var circleCoordinator: MultitouchCoordinator?
+    // Unified multitouch gesture coordination (circles, swipes, taps, two-finger taps)
+    private var multitouchCoordinator: MultitouchCoordinator?
 
     /// Registered circle gestures: [configId: (direction, fingerCount, modifierFlags, callback)]
     private var registeredCircles: [Int: (direction: RotationDirection, fingerCount: Int, modifierFlags: UInt, callback: (RotationDirection) -> Void)] = [:]
@@ -206,27 +203,14 @@ class HotkeyManager {
             }
         }
         
-        // Log all registered trackpad gestures
-        if !registeredSwipes.isEmpty {
-            print("Registered trackpad gestures:")
-            for (configId, registration) in registeredSwipes {
-                let display = formatTrackpadGesture(direction: registration.direction, fingerCount: registration.fingerCount, modifiers: registration.modifierFlags)
-                print("      Config \(configId): \(display) (direction=\(registration.direction), fingers=\(registration.fingerCount), modifiers=\(registration.modifierFlags))")
-            }
-            
-            // Start multitouch monitoring for trackpad gestures
-            print("   🎯 Starting MultitouchSupport framework monitoring...")
-            startMultitouchMonitoring()
-        }
-        
         // Calibration trigger: Ctrl+9
         registerShortcut(keyCode: 25, modifierFlags: NSEvent.ModifierFlags.control.rawValue, forConfigId: 99999) { [weak self] in
             print("🎯 Starting circle calibration...")
             self?.startCircleCalibration()
         }
         
-        // Start circle monitoring regardless of swipe registrations
-        if circleCoordinator == nil {
+        // Start unified multitouch monitoring (handles all gesture types)
+        if multitouchCoordinator == nil {
             startCircleMonitoring()
         }
     }
@@ -269,7 +253,7 @@ class HotkeyManager {
         }
         
         // Stop multitouch monitoring
-        stopMultitouchMonitoring()
+        stopCircleMonitoring()
         
         // Stop mouse monitoring
         stopMouseMonitoring()
@@ -468,52 +452,6 @@ class HotkeyManager {
         print("[HotkeyManager] Unregistered all \(count) swipe gesture(s)")
     }
     
-    // MARK: - Multitouch Monitoring
-    
-    private func startMultitouchMonitoring() {
-        guard multitouchDetector == nil else {
-            print("   ⚠️ Multitouch detector already exists")
-            return
-        }
-        
-        let detector = MultitouchGestureDetector()
-        
-        // Set up swipe callback
-        detector.onSwipeDetected = { [weak self] direction, fingerCount in
-            self?.handleMultitouchSwipe(direction: direction, fingerCount: fingerCount)
-        }
-        
-        // Set as shared instance for C callback
-        MultitouchGestureDetector.setShared(detector)
-        
-        // Register with LiveDataCoordinator for sleep/wake handling
-        LiveDataCoordinator.shared.register(detector)
-        
-        // Start monitoring
-        detector.startMonitoring()
-        
-        multitouchDetector = detector
-        
-        // Start circle gesture coordinator
-        startCircleMonitoring()
-    }
-    
-    private func stopMultitouchMonitoring() {
-        
-        // Stop circle monitoring
-        stopCircleMonitoring()
-        
-        if let detector = multitouchDetector {
-            // Unregister from LiveDataCoordinator
-            LiveDataCoordinator.shared.unregister(detector)
-            
-            detector.stopMonitoring()
-            MultitouchGestureDetector.setShared(nil)
-            multitouchDetector = nil
-            print("🛑 [HotkeyManager] Multitouch monitoring stopped")
-        }
-    }
-    
     func registerCircle(
         direction: RotationDirection,
         fingerCount: Int,
@@ -553,25 +491,34 @@ class HotkeyManager {
     // MARK: - Circle Monitoring
 
     private func startCircleMonitoring() {
-        guard circleCoordinator == nil else {
-            print("⚠️ [HotkeyManager] Circle coordinator already exists")
+        guard multitouchCoordinator == nil else {
+            print("⚠️ [HotkeyManager] Multitouch coordinator already exists")
             return
         }
         
-        print("🔵 [HotkeyManager] Starting circle gesture monitoring...")
+        print("🖐️ [HotkeyManager] Starting unified multitouch monitoring...")
         
-        let coordinator = MultitouchCoordinator.withCircleRecognition(debugLogging: true)
+        let coordinator = MultitouchCoordinator()
+        coordinator.debugLogging = false  // Set to true for debugging
+        
+        // Add circle recognizer
+        let circleRecognizer = CircleRecognizer()
+        coordinator.addRecognizer(circleRecognizer)
         
         // Add two-finger tap recognizer
         let twoFingerRecognizer = TwoFingerTapRecognizer()
-        
         coordinator.addRecognizer(twoFingerRecognizer)
         
+        // Add multi-finger gesture recognizer (swipes, taps, add gestures)
+        let multiFingerRecognizer = MultiFingerGestureRecognizer()
+        multiFingerRecognizer.debugLogging = true  // Set to true for debugging
+        coordinator.addRecognizer(multiFingerRecognizer)
+        
         coordinator.onGesture = { [weak self] event in
-            self?.handleGestureEvent(event)  // Was handleCircleGesture
+            self?.handleGestureEvent(event)
         }
         
-        // Load saved calibration
+        // Load saved circle calibration
         if let saved = DatabaseManager.shared.loadCircleCalibration() {
             print("🎯 [HotkeyManager] Found saved calibration in database:")
             print("   📅 Calibrated: \(saved.calibratedAt.formatted())")
@@ -579,37 +526,19 @@ class HotkeyManager {
             print("   📊 minCircles: \(String(format: "%.2f", saved.minCircles))")
             print("   📊 minRadius: \(String(format: "%.3f", saved.minRadius))")
             
-            if let circleRecognizer = coordinator.recognizer(identifier: "circle") as? CircleRecognizer {
-                let defaultConfig = CircleRecognizer.Config()
-                print("   🔧 Default config was:")
-                print("      maxRadiusVariance: \(String(format: "%.4f", defaultConfig.maxRadiusVariance))")
-                print("      minCircles: \(String(format: "%.2f", defaultConfig.minCircles))")
-                print("      minRadius: \(String(format: "%.3f", defaultConfig.minRadius))")
-                
-                circleRecognizer.config.maxRadiusVariance = saved.maxRadiusVariance
-                circleRecognizer.config.minCircles = saved.minCircles
-                circleRecognizer.config.minRadius = saved.minRadius
-                
+            if let circleRec = coordinator.recognizer(identifier: "circle") as? CircleRecognizer {
+                circleRec.config.maxRadiusVariance = saved.maxRadiusVariance
+                circleRec.config.minCircles = saved.minCircles
+                circleRec.config.minRadius = saved.minRadius
                 print("   ✅ Applied calibration to recognizer")
-            } else {
-                print("   ❌ Could not find circle recognizer to apply calibration!")
             }
         } else {
             print("🎯 [HotkeyManager] No saved calibration found - using defaults")
-            if let circleRecognizer = coordinator.recognizer(identifier: "circle") as? CircleRecognizer {
-                print("   📊 maxRadiusVariance: \(String(format: "%.4f", circleRecognizer.config.maxRadiusVariance))")
-                print("   📊 minCircles: \(String(format: "%.2f", circleRecognizer.config.minCircles))")
-                print("   📊 minRadius: \(String(format: "%.3f", circleRecognizer.config.minRadius))")
-            }
         }
 
         // Save when calibration completes
         coordinator.onCircleCalibrationComplete = { config in
-            print("💾 [HotkeyManager] Calibration complete - saving to database:")
-            print("   📊 maxRadiusVariance: \(String(format: "%.4f", config.maxRadiusVariance))")
-            print("   📊 minCircles: \(String(format: "%.2f", config.minCircles))")
-            print("   📊 minRadius: \(String(format: "%.3f", config.minRadius))")
-            
+            print("💾 [HotkeyManager] Calibration complete - saving to database")
             let entry = CircleCalibrationEntry(
                 maxRadiusVariance: config.maxRadiusVariance,
                 minCircles: config.minCircles,
@@ -623,15 +552,18 @@ class HotkeyManager {
         
         // Register with LiveDataCoordinator for sleep/wake handling
         LiveDataCoordinator.shared.register(coordinator)
-        circleCoordinator = coordinator
+        multitouchCoordinator = coordinator
+        
+        print("✅ [HotkeyManager] Multitouch coordinator started with \(coordinator.recognizerCount) recognizer(s)")
     }
 
     private func stopCircleMonitoring() {
-        guard let coordinator = circleCoordinator else { return }
+        guard let coordinator = multitouchCoordinator else { return }
         
         LiveDataCoordinator.shared.unregister(coordinator)
         coordinator.stopMonitoring()
-        circleCoordinator = nil
+        multitouchCoordinator = nil
+        print("🛑 [HotkeyManager] Multitouch coordinator stopped")
     }
 
     private func handleGestureEvent(_ event: GestureEvent) {
@@ -686,8 +618,62 @@ class HotkeyManager {
             }
             print("   ⚠️ No matching two-finger tap found")
             
-        default:
-            break
+        case .swipe(let direction, let fingerCount):
+            let directionString = direction.rawValue
+            print("👆 [HotkeyManager] Swipe detected: \(directionString), fingers=\(fingerCount), modifiers=\(eventModifiers)")
+            
+            for (configId, registration) in registeredSwipes {
+                if registration.direction == directionString &&
+                   registration.fingerCount == fingerCount &&
+                   registration.modifierFlags == eventModifiers {
+                    let display = formatTrackpadGesture(direction: registration.direction, fingerCount: registration.fingerCount, modifiers: registration.modifierFlags)
+                    print("✅ [HotkeyManager] Swipe MATCHED for config \(configId): \(display)")
+                    
+                    DispatchQueue.main.async {
+                        registration.callback()
+                    }
+                    return
+                }
+            }
+            print("   ⚠️ No matching swipe gesture found")
+            
+        case .tap(let fingerCount):
+            print("👆 [HotkeyManager] Tap detected: fingers=\(fingerCount), modifiers=\(eventModifiers)")
+            
+            // Taps are registered as swipes with direction "tap"
+            for (configId, registration) in registeredSwipes {
+                if registration.direction == "tap" &&
+                   registration.fingerCount == fingerCount &&
+                   registration.modifierFlags == eventModifiers {
+                    let display = formatTrackpadGesture(direction: "tap", fingerCount: fingerCount, modifiers: eventModifiers)
+                    print("✅ [HotkeyManager] Tap MATCHED for config \(configId): \(display)")
+                    
+                    DispatchQueue.main.async {
+                        registration.callback()
+                    }
+                    return
+                }
+            }
+            print("   ⚠️ No matching tap gesture found")
+            
+        case .fingerAdd(let fromCount, let toCount):
+            print("👆 [HotkeyManager] Finger add detected: \(fromCount)→\(toCount), modifiers=\(eventModifiers)")
+            
+            // Check for registered "add" gestures
+            for (configId, registration) in registeredSwipes {
+                if registration.direction == "add" &&
+                   registration.fingerCount == toCount &&
+                   registration.modifierFlags == eventModifiers {
+                    let display = formatTrackpadGesture(direction: "add", fingerCount: toCount, modifiers: eventModifiers)
+                    print("✅ [HotkeyManager] Add MATCHED for config \(configId): \(display)")
+                    
+                    DispatchQueue.main.async {
+                        registration.callback()
+                    }
+                    return
+                }
+            }
+            print("   ⚠️ No matching add gesture found")
         }
     }
 
@@ -705,43 +691,6 @@ class HotkeyManager {
         parts.append("\(dirSymbol) \(fingerCount)-Finger \(dirName) Circle")
         
         return parts.joined()
-    }
-    
-    private func handleMultitouchSwipe(direction: MultitouchGestureDetector.SwipeDirection, fingerCount: Int) {
-        let isUIVisible = isUIVisible?() ?? false
-        
-        // Only handle swipes when UI is hidden
-        guard !isUIVisible else {
-            print("   ⏭️ Ignoring swipe - UI is visible")
-            return
-        }
-        
-        // Get current modifier flags
-        let cgFlags = CGEventSource.flagsState(.combinedSessionState)
-        var eventModifiers: UInt = 0
-        
-        if cgFlags.contains(.maskCommand) { eventModifiers |= NSEvent.ModifierFlags.command.rawValue }
-        if cgFlags.contains(.maskControl) { eventModifiers |= NSEvent.ModifierFlags.control.rawValue }
-        if cgFlags.contains(.maskAlternate) { eventModifiers |= NSEvent.ModifierFlags.option.rawValue }
-        if cgFlags.contains(.maskShift) { eventModifiers |= NSEvent.ModifierFlags.shift.rawValue }
-        
-        let directionString = direction.rawValue
-        
-        print("[HotkeyManager] Multitouch swipe detected: direction=\(directionString), fingers=\(fingerCount), modifiers=\(eventModifiers)")
-        
-        // Check registered trackpad gestures - must match direction, fingerCount, AND modifiers
-        for (configId, registration) in registeredSwipes {
-            if registration.direction == directionString &&
-               registration.fingerCount == fingerCount &&
-               registration.modifierFlags == eventModifiers {
-                let display = formatTrackpadGesture(direction: registration.direction, fingerCount: registration.fingerCount, modifiers: registration.modifierFlags)
-                print("✅ [HotkeyManager] Trackpad gesture MATCHED for config \(configId): \(display)")
-                registration.callback()
-                return
-            }
-        }
-        
-        print("   ⚠️ No matching trackpad gesture found for \(directionString) with \(fingerCount) fingers and modifiers \(eventModifiers)")
     }
     
     // MARK: - Mouse Monitoring
@@ -1142,17 +1091,18 @@ class HotkeyManager {
 
     /// Start circle gesture calibration - draw 5 circles to set thresholds
     func startCircleCalibration() {
-        circleCoordinator?.startCircleCalibration()
+        multitouchCoordinator?.startCircleCalibration()
     }
 
     /// Cancel calibration
     func cancelCircleCalibration() {
-        circleCoordinator?.cancelCircleCalibration()
+        multitouchCoordinator?.cancelCircleCalibration()
+
     }
 
     /// Check if currently calibrating
     var isCircleCalibrating: Bool {
-        circleCoordinator?.isCalibrating ?? false
+        multitouchCoordinator?.isCalibrating ?? false
     }
 }
 
