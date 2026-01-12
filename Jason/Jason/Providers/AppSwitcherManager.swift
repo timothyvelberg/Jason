@@ -477,6 +477,9 @@ extension AppSwitcherManager: FunctionProvider {
     }
     
     func provideFunctions() -> [FunctionNode] {
+        // Normalization size - use a size large enough for quality at all ring sizes
+        let iconNormalizationSize: CGFloat = 128
+        
         // Convert running apps to FunctionNodes with context actions
         let appNodes = runningApps.map { app in
             // Create context actions for each app using StandardContextActions
@@ -486,11 +489,15 @@ extension AppSwitcherManager: FunctionProvider {
                 StandardContextActions.hideApp(app, manager: self)
             ]
             
+            // Normalize the icon to ensure consistent display across all screen densities
+            let normalizedIcon = (app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!)
+                .normalized(to: iconNormalizationSize)
+            
             return FunctionNode(
                 id: "app-\(app.processIdentifier)",
                 name: app.localizedName ?? "Unknown",
                 type: .app,
-                icon: app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!,
+                icon: normalizedIcon,
                 contextActions: contextActions,
                 slicePositioning: .center,
                 // EXPLICIT INTERACTION MODEL:

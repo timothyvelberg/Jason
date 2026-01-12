@@ -174,6 +174,9 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         let runningApp = runningAppsMap[bundleIdentifier]
         let isRunning = runningApp != nil
         
+        // Normalization size - use a size large enough for quality at all ring sizes
+        let iconNormalizationSize: CGFloat = 128
+        
         // Get app URL
         guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
             // If app is running, we can still get info from the running instance
@@ -182,9 +185,10 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 let icon: NSImage
                 if let iconOverride = iconOverride,
                    let customIcon = NSImage(systemSymbolName: iconOverride, accessibilityDescription: nil) {
-                    icon = customIcon
+                    icon = customIcon.normalized(to: iconNormalizationSize)
                 } else {
-                    icon = runningApp.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!
+                    icon = (runningApp.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!)
+                        .normalized(to: iconNormalizationSize)
                 }
                 
                 return AppEntry(
@@ -224,13 +228,13 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             name = appURL.deletingPathExtension().lastPathComponent
         }
         
-        // Get app icon
+        // Get app icon (normalized to consistent size)
         let icon: NSImage
         if let iconOverride = iconOverride,
            let customIcon = NSImage(systemSymbolName: iconOverride, accessibilityDescription: nil) {
-            icon = customIcon
+            icon = customIcon.normalized(to: iconNormalizationSize)
         } else if isRunning, let runningApp = runningApp, let appIcon = runningApp.icon {
-            icon = appIcon
+            icon = appIcon.normalized(to: iconNormalizationSize)
         } else {
             // Try to get icon from file system
             let fileIcon = NSWorkspace.shared.icon(forFile: appURL.path)
@@ -238,11 +242,12 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             // Validate icon - check if it's valid by checking size
             // Invalid/missing icons typically have zero size
             if fileIcon.size.width > 0 && fileIcon.size.height > 0 {
-                icon = fileIcon
+                icon = fileIcon.normalized(to: iconNormalizationSize)
             } else {
                 // Fallback: use generic application icon
                 print("⚠️ [CombinedApps] Failed to load icon for \(name), using fallback")
-                icon = NSImage(systemSymbolName: "app.dashed", accessibilityDescription: nil) ?? NSImage()
+                icon = (NSImage(systemSymbolName: "app.dashed", accessibilityDescription: nil) ?? NSImage())
+                    .normalized(to: iconNormalizationSize)
             }
         }
         
@@ -449,5 +454,39 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             onMiddleClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
+    }
+}
+
+// MARK: - NSImage Extension for Icon Normalization
+
+extension NSImage {
+    /// Creates a new image rasterized at the exact target size.
+    /// This ensures consistent display regardless of what representations
+    /// the source image contains (fixes Electron app icons on low-DPI displays).
+    func normalized(to size: CGFloat) -> NSImage {
+        let targetSize = NSSize(width: size, height: size)
+        
+        // Create a new image at the target size
+        let normalizedImage = NSImage(size: targetSize)
+        
+        normalizedImage.lockFocus()
+        
+        // Enable high-quality interpolation for smooth scaling
+        NSGraphicsContext.current?.imageInterpolation = .high
+        
+        // Draw the source image scaled to fill the target size
+        self.draw(
+            in: NSRect(origin: .zero, size: targetSize),
+            from: NSRect(origin: .zero, size: self.size),
+            operation: .copy,
+            fraction: 1.0
+        )
+        
+        normalizedImage.unlockFocus()
+        
+        // Mark as template if source was template (preserves SF Symbol behavior)
+        normalizedImage.isTemplate = self.isTemplate
+        
+        return normalizedImage
     }
 }
