@@ -201,10 +201,6 @@ class CircularUIInstanceManager: ObservableObject {
         hotkeyManager.unregisterAllMouseButtons()
         hotkeyManager.unregisterAllSwipes()
         hotkeyManager.unregisterAllCircles()
-
-        
-        // Reset hold key (only one hold key supported at a time)
-        hotkeyManager.setHoldKey(nil)
         
         let activeConfigs = configurationManager.getActiveConfigurations()
         var holdKeyConfigured = false
@@ -213,52 +209,43 @@ class CircularUIInstanceManager: ObservableObject {
             var hasKeyboardShortcut = false
             var hasMouseButton = false
             
-            // Register keyboard shortcut if configured
             if config.triggerType == "keyboard",
-               let keyCode = config.keyCode,
-               let modifierFlags = config.modifierFlags {
+               let keyCode = config.keyCode {
+                let modifierFlags = config.modifierFlags ?? 0
                 
-                // Check if this is a hold-mode shortcut
                 if config.isHoldMode {
                     // HOLD MODE: Show while key is held, hide on release
-                    if !holdKeyConfigured {
-                        print("[InstanceManager] Registering HOLD mode for '\(config.name)' (ID: \(config.id))")
-                        
-                        // Set the hold key in HotkeyManager
-                        hotkeyManager.setHoldKey(keyCode)
-                        
-                        // Wire up hold key callbacks
-                        hotkeyManager.onHoldKeyPressed = { [weak self] in
-                            print("🔽 [InstanceManager] Hold key PRESSED for '\(config.name)'")
-                            self?.showInHoldMode(configId: config.id)
-                        }
-                        
-                        hotkeyManager.onHoldKeyReleased = { [weak self] in
-                            print("🔼 [InstanceManager] Hold key RELEASED for '\(config.name)'")
-                            self?.hideFromHoldMode(configId: config.id)
-                        }
-                        
-                        holdKeyConfigured = true
-                        hasKeyboardShortcut = true
-                        
-                        let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
-                        print("   ✅ Hold key configured: \(shortcutDisplay)")
-                    } else {
-                        // Only one hold key supported at a time
-                        print("   ⚠️ Skipping '\(config.name)' - hold key already configured for another ring")
-                        print("      Note: Only one hold-mode shortcut can be active at a time")
-                    }
-                } else {
-                    // TAP MODE: Toggle on each press (existing behavior)
-                    print("[InstanceManager] Registering TAP mode for '\(config.name)' (ID: \(config.id))")
+                    print("[InstanceManager] Registering HOLD mode for '\(config.name)' (ID: \(config.id))")
+                    
                     hotkeyManager.registerShortcut(
                         keyCode: keyCode,
                         modifierFlags: modifierFlags,
-                        forConfigId: config.id
-                    ) { [weak self] in
-                        print("🎯 [InstanceManager] Keyboard shortcut triggered for '\(config.name)' (ID: \(config.id))")
-                        self?.show(configId: config.id)
-                    }
+                        isHoldMode: true,
+                        forConfigId: config.id,
+                        onPress: { [weak self] in
+                            print("🔽 [InstanceManager] Hold key PRESSED for '\(config.name)'")
+                            self?.showInHoldMode(configId: config.id)
+                        },
+                        onRelease: { [weak self] in
+                            print("🔼 [InstanceManager] Hold key RELEASED for '\(config.name)'")
+                            self?.hideFromHoldMode(configId: config.id)
+                        }
+                    )
+                    hasKeyboardShortcut = true
+                } else {
+                    // TAP MODE: Toggle on each press
+                    print("[InstanceManager] Registering TAP mode for '\(config.name)' (ID: \(config.id))")
+                    
+                    hotkeyManager.registerShortcut(
+                        keyCode: keyCode,
+                        modifierFlags: modifierFlags,
+                        isHoldMode: false,
+                        forConfigId: config.id,
+                        onPress: { [weak self] in
+                            print("🎯 [InstanceManager] Keyboard shortcut triggered for '\(config.name)' (ID: \(config.id))")
+                            self?.show(configId: config.id)
+                        }
+                    )
                     hasKeyboardShortcut = true
                 }
             }
