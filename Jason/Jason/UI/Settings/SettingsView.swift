@@ -285,6 +285,23 @@ struct AdvancedSettingsView: View {
                     print("📋 Debug log copy requested")
                 }
             }
+            Section("List Panel Testing") {
+                Button("Show Test Panel") {
+                    if let instance = instanceManager.getFirstInstance() {
+                        // Show overlay first (so we have a window to render in)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            instance.listPanelManager?.showTestPanel()
+                        }
+                        CircularUIInstanceManager.shared.show(configId: instance.configId)
+                    }
+                }
+                
+                Button("Hide Panel") {
+                    if let instance = instanceManager.getFirstInstance() {
+                        instance.listPanelManager?.hide()
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
         .navigationTitle("Advanced")

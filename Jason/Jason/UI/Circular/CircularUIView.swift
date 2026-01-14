@@ -12,7 +12,7 @@ import AppKit
 struct CircularUIView: View {
     @ObservedObject var circularUI: CircularUIManager
     @ObservedObject var functionManager: FunctionManager
-    
+    @ObservedObject var listPanelManager: ListPanelManager
     
     // Get ring configurations directly from FunctionManager
     private var rings: [RingConfiguration] {
@@ -78,6 +78,11 @@ struct CircularUIView: View {
                 .animation(.easeOut(duration: 0.2), value: rings.count)
                 .frame(width: totalSize, height: totalSize)
                 .position(x: localMouseX, y: swiftUIY)
+                
+                if listPanelManager.isVisible {
+                    ListPanelView(items: listPanelManager.items)
+                        .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                }
             }
             .ignoresSafeArea()
             

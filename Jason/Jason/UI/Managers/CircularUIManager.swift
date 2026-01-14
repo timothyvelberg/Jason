@@ -33,6 +33,8 @@ class CircularUIManager: ObservableObject {
     var isInAppSwitcherMode: Bool = false
     var isInHoldMode: Bool = false
     
+    var listPanelManager: ListPanelManager?
+    
     // MARK: - Configuration (Phase 3 Refactoring)
     
     /// Ring configuration for this instance
@@ -168,9 +170,6 @@ class CircularUIManager: ObservableObject {
     }
     
     func setup() {
-        // 🆕 REMOVED: No longer create AppSwitcherManager instance
-        // We use AppSwitcherManager.shared instead
-        
         // Create FunctionManager with configuration values
         self.functionManager = FunctionManager(
             ringThickness: CGFloat(configuration.ringRadius),
@@ -180,8 +179,11 @@ class CircularUIManager: ObservableObject {
         )
         print("   ✅ FunctionManager initialized with config values")
         
+        // Create ListPanelManager
+        self.listPanelManager = ListPanelManager()
+        print("   ✅ ListPanelManager initialized")
+        
         // Create provider factory
-        // 🆕 CHANGED: Pass shared AppSwitcherManager instance
         let factory = ProviderFactory(
             circularUIManager: self,
             appSwitcherManager: AppSwitcherManager.shared
@@ -543,7 +545,8 @@ class CircularUIManager: ObservableObject {
         
         let contentView = CircularUIView(
             circularUI: self,
-            functionManager: functionManager
+            functionManager: functionManager,
+            listPanelManager: self.listPanelManager!
         )
         overlayWindow?.contentView = NSHostingView(rootView: contentView)
     }
