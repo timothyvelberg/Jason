@@ -2,7 +2,6 @@
 //  ListPanelView.swift
 //  Jason
 //
-//  Created by Timothy Velberg on 14/01/2026.
 //  A custom list panel UI that matches the circular ring aesthetic.
 //  Used for folder browsing and other list-based navigation.
 //
@@ -10,33 +9,17 @@
 import SwiftUI
 import AppKit
 
-// MARK: - List Panel Item
-
-struct ListPanelItem: Identifiable {
-    let id: String
-    let name: String
-    let icon: NSImage
-    let isFolder: Bool
-    
-    init(id: String = UUID().uuidString, name: String, icon: NSImage, isFolder: Bool = false) {
-        self.id = id
-        self.name = name
-        self.icon = icon
-        self.isFolder = isFolder
-    }
-}
-
 // MARK: - List Panel View
 
 struct ListPanelView: View {
-    let items: [ListPanelItem]
+    let items: [FunctionNode]
     
     // Configuration
-    let panelWidth: CGFloat = 260
-    let rowHeight: CGFloat = 32
-    let iconSize: CGFloat = 20
-    let cornerRadius: CGFloat = 12
-    let maxVisibleItems: Int = 10
+    var panelWidth: CGFloat = 260
+    var rowHeight: CGFloat = 32
+    var iconSize: CGFloat = 20
+    var cornerRadius: CGFloat = 12
+    var maxVisibleItems: Int = 10
     
     // State
     @State private var hoveredItemId: String? = nil
@@ -45,7 +28,7 @@ struct ListPanelView: View {
     private var panelHeight: CGFloat {
         let itemCount = min(items.count, maxVisibleItems)
         let contentHeight = CGFloat(itemCount) * rowHeight
-        let padding: CGFloat = 8 // Top + bottom padding
+        let padding: CGFloat = 8
         return contentHeight + padding
     }
     
@@ -93,10 +76,14 @@ struct ListPanelView: View {
 // MARK: - List Panel Row
 
 struct ListPanelRow: View {
-    let item: ListPanelItem
+    let item: FunctionNode
     let iconSize: CGFloat
     let rowHeight: CGFloat
     let isHovered: Bool
+    
+    private var isFolder: Bool {
+        item.type == .folder
+    }
     
     var body: some View {
         HStack(spacing: 10) {
@@ -116,7 +103,7 @@ struct ListPanelRow: View {
             Spacer()
             
             // Folder indicator (chevron)
-            if item.isFolder {
+            if isFolder {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(.white.opacity(0.5))

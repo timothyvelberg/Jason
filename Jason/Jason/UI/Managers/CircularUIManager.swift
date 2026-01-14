@@ -776,7 +776,6 @@ class CircularUIManager: ObservableObject {
     // MARK: - Hide Method
 
     func hide() {
-        // 🆕 Auto-execute hovered item if in hold mode and enabled
         if isInHoldMode {
             executeHoveredItemIfInHoldMode()
         }
@@ -790,10 +789,10 @@ class CircularUIManager: ObservableObject {
         // Exit app switcher mode when hiding
         exitAppSwitcherMode()
         
-        // 🆕 Exit hold mode when hiding (prevents double-hide on key release)
+        // Exit hold mode when hiding (prevents double-hide on key release)
         isInHoldMode = false
         
-        // 🆕 ADDED: Unregister as the active CircularUIManager
+        // Unregister as the active CircularUIManager
         if AppSwitcherManager.shared.activeCircularUIManager === self {
             print("🔓 [CircularUIManager-\(configId)] Unregistering as active instance")
             AppSwitcherManager.shared.activeCircularUIManager = nil
@@ -811,6 +810,7 @@ class CircularUIManager: ObservableObject {
         
         // Reset all state for clean slate on next show
         functionManager?.reset()
+        listPanelManager?.hide()
         
         // Close any open preview
         QuickLookManager.shared.hidePreview()
