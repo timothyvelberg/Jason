@@ -23,8 +23,68 @@ class ListPanelManager: ObservableObject {
     
     // MARK: - Show / Hide
     
-    /// Show the panel with the given items
-    func show(items: [FunctionNode], at position: CGPoint = .zero) {
+    // MARK: - Positioned Show
+
+    /// Show the panel as an extension of a ring item
+    /// - Parameters:
+    ///   - items: The items to display
+    ///   - ringCenter: Center point of the ring (global coordinates)
+    ///   - ringOuterRadius: Outer radius of the ring
+    ///   - angle: The angle of the triggering item (in degrees, 0 = top)
+    ///   - panelWidth: Width of the panel (for edge anchoring)
+    func show(
+        items: [FunctionNode],
+        ringCenter: CGPoint,
+        ringOuterRadius: CGFloat,
+        angle: Double,
+        panelWidth: CGFloat = 260
+    ) {
+        // Convert angle to radians (subtract 90° to match ring coordinate system)
+        let angleInRadians = (angle - 90) * (.pi / 180)
+        
+        // Gap between ring edge and panel
+        let gapFromRing: CGFloat = 8
+        
+        // Calculate anchor point at ring edge
+        let anchorRadius = ringOuterRadius + gapFromRing
+        let anchorX = ringCenter.x + anchorRadius * cos(angleInRadians)
+        let anchorY = ringCenter.y - anchorRadius * sin(angleInRadians)
+        
+        // Calculate panel height
+        let maxVisibleItems = 10
+        let rowHeight: CGFloat = 32
+        let padding: CGFloat = 8
+        let itemCount = min(items.count, maxVisibleItems)
+        let panelHeight = CGFloat(itemCount) * rowHeight + padding
+        
+        // Base offset: half-dimensions in angle direction
+        let offsetX = (panelWidth / 2) * cos(angleInRadians)
+        let offsetY = (panelHeight / 2) * -sin(angleInRadians)
+        
+        // Diagonal factor: peaks at 45°, 135°, 225°, 315° (0 at cardinal angles)
+        let angleWithinQuadrant = angle.truncatingRemainder(dividingBy: 90)
+        let diagonalFactor = sin(angleWithinQuadrant * 2 * .pi / 180)
+        
+        // Extra offset for diagonal angles (25% extra at peak)
+        let extraFactor: CGFloat = 0.18 * CGFloat(diagonalFactor)
+        let extraOffsetX = extraFactor * panelWidth * cos(angleInRadians)
+        let extraOffsetY = extraFactor * panelHeight * -sin(angleInRadians)
+        
+        let panelX = anchorX + offsetX + extraOffsetX
+        let panelY = anchorY + offsetY + extraOffsetY
+        
+        let position = CGPoint(x: panelX, y: panelY)
+        
+        print("📋 [ListPanelManager] Showing panel at angle \(angle)°")
+        print("   Diagonal factor: \(diagonalFactor), extra: \(extraFactor * 100)%")
+        print("   Panel center: \(position)")
+        
+        self.items = items
+        self.position = position
+        self.isVisible = true
+    }
+    /// Show the panel with the given items at a specific position
+    func show(items: [FunctionNode], at position: CGPoint) {
         print("📋 [ListPanelManager] Showing panel with \(items.count) items")
         self.items = items
         self.position = position

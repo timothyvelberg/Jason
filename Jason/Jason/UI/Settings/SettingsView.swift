@@ -286,6 +286,11 @@ struct AdvancedSettingsView: View {
                 }
             }
             Section("List Panel Testing") {
+                Button("Test Ring → Panel") {
+                    if let instance = instanceManager.getFirstInstance() {
+                        instance.showTestRingForPanelIntegration()
+                    }
+                }
                 Button("Show Test Panel at Mouse") {
                     if let instance = instanceManager.getFirstInstance() {
                         CircularUIInstanceManager.shared.show(configId: instance.configId)

@@ -8,6 +8,7 @@
 import Foundation
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 class CircularUIManager: ObservableObject {
     @Published var isVisible: Bool = false
@@ -252,6 +253,13 @@ class CircularUIManager: ObservableObject {
                 if let functionManager = functionManager, let pieIndex = pieIndex {
                     functionManager.hoverNode(ringLevel: functionManager.activeRingLevel, index: pieIndex)
                 }
+            }
+            mouseTracker?.onCollapse = { [weak self] in
+                self?.listPanelManager?.hide()
+            }
+            
+            mouseTracker?.onReturnedInsideBoundary = { [weak self] in
+                self?.listPanelManager?.hide()
             }
             
             self.gestureManager = GestureManager()
@@ -843,5 +851,99 @@ class CircularUIManager: ObservableObject {
         
         // Note: hide() will be called by onLostFocus, and it will see our flag
         print("Switching to app (hide() will clean up)")
+    }
+    
+    // MARK: - Test Ring → Panel Integration
+
+    func showTestRingForPanelIntegration() {
+        guard let functionManager = functionManager else {
+            print("❌ [Test] FunctionManager not initialized")
+            return
+        }
+        
+        let mockFolderContents: [FunctionNode] = [
+            createMockFileNode(name: "document.pdf", utType: .pdf),
+            createMockFileNode(name: "notes.txt", utType: .plainText),
+            createMockFileNode(name: "image.jpg", utType: .jpeg),
+            createMockFileNode(name: "spreadsheet.xlsx", utType: .spreadsheet),
+            createMockFolderNode(name: "Subfolder"),
+        ]
+        
+        weak var weakSelf = self
+        
+        // Test with 8 items
+        let names = ["Documents", "Downloads", "Screenshots", "Projects", "Music", "Videos", "Desktop", "Archive"]
+        let itemCount = names.count
+        let anglePerItem = 360.0 / Double(itemCount)
+        
+        let folderNodes: [FunctionNode] = names.enumerated().map { index, name in
+            let angle = Double(index) * anglePerItem
+            return createMockFolderNode(name: name) {
+                weakSelf?.showPanelForFolder(contents: mockFolderContents, atAngle: angle)
+            }
+        }
+        
+        functionManager.loadTestNodes(folderNodes)
+        
+        mousePosition = NSEvent.mouseLocation
+        centerPoint = mousePosition
+        isVisible = true
+        overlayWindow?.showOverlay(at: mousePosition)
+        
+        mouseTracker?.startTrackingMouse()
+        gestureManager?.startMonitoring()
+        
+        print("🧪 [Test] Showing test ring with \(itemCount) items, \(anglePerItem)° per item")
+    }
+
+    private func showPanelForFolder(contents: [FunctionNode], atAngle angle: Double) {
+        guard let functionManager = functionManager else { return }
+        
+        // Get ring geometry
+        let ringCenter = mousePosition  // Ring is centered at mouse position
+        let configs = functionManager.ringConfigurations
+        guard let ring0Config = configs.first else { return }
+        
+        let ringOuterRadius = ring0Config.startRadius + ring0Config.thickness
+        
+        listPanelManager?.show(
+            items: contents,
+            ringCenter: ringCenter,
+            ringOuterRadius: ringOuterRadius,
+            angle: angle
+        )
+        
+        print("📋 [Test] Panel triggered at angle \(angle)°")
+    }
+
+    private func createMockFolderNode(name: String, onTap: (() -> Void)? = nil) -> FunctionNode {
+        let icon = NSWorkspace.shared.icon(for: .folder)
+        
+        let interaction: ModifierAwareInteraction
+        if let action = onTap {
+            interaction = ModifierAwareInteraction(base: .executeKeepOpen(action))
+        } else {
+            interaction = ModifierAwareInteraction(base: .doNothing)
+        }
+        
+        return FunctionNode(
+            id: "test-folder-\(name)",
+            name: name,
+            type: .folder,
+            icon: icon,
+            onLeftClick: interaction,
+            onBoundaryCross: interaction
+        )
+    }
+
+    private func createMockFileNode(name: String, utType: UTType) -> FunctionNode {
+        let icon = NSWorkspace.shared.icon(for: utType)
+        
+        return FunctionNode(
+            id: "test-file-\(name)",
+            name: name,
+            type: .file,
+            icon: icon
+        )
     }
 }

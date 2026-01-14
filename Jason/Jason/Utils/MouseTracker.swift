@@ -17,9 +17,12 @@ class MouseTracker {
     private var lastMouseLocation: NSPoint?
     internal var ringLevelAtPause: Int?
     private var lastExecutedNodeId: String?
+    private var wasOutsideBoundary: Bool = false
 
     
     var onPieHover: ((Int?) -> Void)?
+    var onCollapse: (() -> Void)?
+    var onReturnedInsideBoundary: (() -> Void)?
     var onExecuteAction: (() -> Void)?
     private var functionManager: FunctionManager
 
@@ -212,6 +215,15 @@ class MouseTracker {
         let activeRingConfig = configs[activeRingLevel]
         let activeRingOuterRadius = activeRingConfig.startRadius + activeRingConfig.thickness
         
+        
+        // Track boundary crossing for panel dismissal
+        let isOutside = distance > activeRingOuterRadius
+        if wasOutsideBoundary && !isOutside {
+            // Just crossed back inside
+            onReturnedInsideBoundary?()
+        }
+        wasOutsideBoundary = isOutside
+        
         if let currentRingLevel = currentRingLevel,
            currentRingLevel == activeRingLevel,
            distance <= activeRingOuterRadius {
@@ -324,6 +336,7 @@ class MouseTracker {
                         // Moved backward past where we clicked - collapse
                         print("🔴 Click-opened ring - moved backward from ring \(pauseLevel) to ring \(currentRingLevel) - collapsing")
                         functionManager.collapseToRing(level: currentRingLevel)
+                        onCollapse?()
                         ringLevelAtPause = nil  // Reset
                         return
                     } else if currentRingLevel == pauseLevel {
@@ -339,12 +352,14 @@ class MouseTracker {
                     // No pause level recorded - apply regular boundary rules
                     print("🔴 Click-opened ring (no pause level) - collapsing to ring \(currentRingLevel)")
                     functionManager.collapseToRing(level: currentRingLevel)
+                    onCollapse?()
                     return
                 }
             } else {
                 // Not click-opened - normal boundary crossing behavior
                 print("🔴 Boundary crossed inward - collapsing to ring \(currentRingLevel)")
                 functionManager.collapseToRing(level: currentRingLevel)
+                onCollapse?()
                 return
             }
         }

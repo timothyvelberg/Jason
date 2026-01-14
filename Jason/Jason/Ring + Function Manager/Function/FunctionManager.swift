@@ -258,4 +258,13 @@ class FunctionManager: ObservableObject {
         
         return false
     }
+    
+    // MARK: - Test Support
+
+    /// Load test nodes directly (bypasses providers)
+    func loadTestNodes(_ nodes: [FunctionNode]) {
+        rootNodes = nodes
+        rebuildRings()
+        print("🧪 [FunctionManager] Loaded \(nodes.count) test nodes")
+    }
 }
