@@ -79,9 +79,21 @@ struct CircularUIView: View {
                 .frame(width: totalSize, height: totalSize)
                 .position(x: localMouseX, y: swiftUIY)
                 
+                // List Panel (when visible)
                 if listPanelManager.isVisible {
+                    let window = circularUI.overlayWindow
+                    let screen = window?.currentScreen ?? NSScreen.main
+                    let screenOriginX = screen?.frame.origin.x ?? 0
+                    let screenOriginY = screen?.frame.origin.y ?? 0
+                    let screenHeight = screen?.frame.height ?? 1080
+                    
+                    // Convert panel position from global AppKit to SwiftUI coordinates
+                    let panelLocalX = listPanelManager.position.x - screenOriginX
+                    let panelLocalY = listPanelManager.position.y - screenOriginY
+                    let panelSwiftUIY = screenHeight - panelLocalY
+                    
                     ListPanelView(items: listPanelManager.items)
-                        .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                        .position(x: panelLocalX, y: panelSwiftUIY)
                 }
             }
             .ignoresSafeArea()

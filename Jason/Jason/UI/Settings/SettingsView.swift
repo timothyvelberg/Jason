@@ -286,13 +286,14 @@ struct AdvancedSettingsView: View {
                 }
             }
             Section("List Panel Testing") {
-                Button("Show Test Panel") {
+                Button("Show Test Panel at Mouse") {
                     if let instance = instanceManager.getFirstInstance() {
-                        // Show overlay first (so we have a window to render in)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            instance.listPanelManager?.showTestPanel()
-                        }
                         CircularUIInstanceManager.shared.show(configId: instance.configId)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            // Use current mouse position
+                            let mousePos = NSEvent.mouseLocation
+                            instance.listPanelManager?.showTestPanel(at: mousePos)
+                        }
                     }
                 }
                 

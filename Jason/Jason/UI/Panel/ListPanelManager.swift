@@ -41,7 +41,7 @@ class ListPanelManager: ObservableObject {
     // MARK: - Test Helpers
     
     /// Show panel with sample test data (for development/testing)
-    func showTestPanel() {
+    func showTestPanel(at position: CGPoint = NSEvent.mouseLocation) {
         let testItems: [FunctionNode] = [
             createTestNode(name: "Documents", type: .folder),
             createTestNode(name: "Screenshots", type: .folder),
@@ -53,10 +53,7 @@ class ListPanelManager: ObservableObject {
             createTestNode(name: "archive.zip", type: .file, utType: .zip),
         ]
         
-        // Center of screen for testing
-        let screenCenter = NSScreen.main?.frame.center ?? CGPoint(x: 500, y: 500)
-        
-        show(items: testItems, at: screenCenter)
+        show(items: testItems, at: position)
     }
     
     private func createTestNode(name: String, type: FunctionNodeType, utType: UTType? = nil) -> FunctionNode {
