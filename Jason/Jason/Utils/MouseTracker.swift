@@ -28,7 +28,8 @@ class MouseTracker {
 
     var mouseAngleOffset: CGFloat = 0
     
-    
+    var onExpandToPanel: ((_ node: FunctionNode, _ angle: Double, _ ringCenter: CGPoint, _ ringOuterRadius: CGFloat) -> Void)?
+
     init(functionManager: FunctionManager) {
         self.functionManager = functionManager
     }
@@ -271,12 +272,36 @@ class MouseTracker {
                             // USE EXPLICIT INTERACTION MODEL
                             switch node.onBoundaryCross.base {
                             case .expand:
+                                // Check display mode preference
+                                if node.childDisplayMode == .panel {
+                                    if let center = trackingStartPoint {
+                                        print("📋 Beyond boundary - expanding '\(node.name)' to panel")
+                                        onExpandToPanel?(node, Double(angle), center, activeRingOuterRadius)
+                                    }
+                                    lastFunctionIndex = pieIndex
+                                    lastRingLevel = activeRingLevel
+                                    return
+                                }
+                                
+                                // Default: expand as ring
                                 functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)
                                 lastFunctionIndex = pieIndex
                                 lastRingLevel = activeRingLevel
                                 return
 
                             case .navigateInto:
+                                // Check display mode preference
+                                if node.childDisplayMode == .panel {
+                                    if let center = trackingStartPoint {
+                                        print("📋 Beyond boundary - navigating '\(node.name)' to panel")
+                                        onExpandToPanel?(node, Double(angle), center, activeRingOuterRadius)
+                                    }
+                                    lastFunctionIndex = pieIndex
+                                    lastRingLevel = activeRingLevel
+                                    return
+                                }
+                                
+                                // Default: navigate in ring
                                 print("📂 Beyond boundary (\(distance) > \(activeRingOuterRadius)) - navigating into '\(node.name)'")
                                 functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: pieIndex)
                                 lastFunctionIndex = pieIndex

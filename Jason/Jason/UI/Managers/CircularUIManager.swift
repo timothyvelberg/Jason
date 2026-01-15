@@ -262,6 +262,31 @@ class CircularUIManager: ObservableObject {
                 self?.listPanelManager?.hide()
             }
             
+            mouseTracker?.onExpandToPanel = { [weak self] node, angle, ringCenter, ringOuterRadius in
+                guard let self = self else { return }
+                
+                guard let children = node.children, !children.isEmpty else {
+                    print("📋 [ExpandToPanel] Node '\(node.name)' has no children")
+                    return
+                }
+                
+                self.listPanelManager?.show(
+                    items: children,
+                    ringCenter: ringCenter,
+                    ringOuterRadius: ringOuterRadius,
+                    angle: angle
+                )
+            }
+            
+            // Wire panel item click callbacks
+            listPanelManager?.onItemLeftClick = { [weak self] node, modifiers in
+                self?.handlePanelItemLeftClick(node: node, modifiers: modifiers)
+            }
+
+            listPanelManager?.onItemRightClick = { [weak self] node, modifiers in
+                self?.handlePanelItemRightClick(node: node, modifiers: modifiers)
+            }
+            
             self.gestureManager = GestureManager()
             
             gestureManager?.onGesture = { [weak self] event in
@@ -527,6 +552,110 @@ class CircularUIManager: ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 CircularUIInstanceManager.shared.show(configId: configId)
             }
+        default:
+            break
+        }
+    }
+    
+    // MARK: - Panel Item Handlers
+
+    private func handlePanelItemLeftClick(node: FunctionNode, modifiers: NSEvent.ModifierFlags) {
+        print("🖱️ [Panel Left Click] On item: '\(node.name)'")
+        
+        let behavior = node.onLeftClick.resolve(with: modifiers)
+        
+        switch behavior {
+        case .execute(let action):
+            action()
+            hide()
+            
+        case .executeKeepOpen(let action):
+            action()
+            
+        case .expand, .navigateInto:
+            // Check display mode for cascading
+            guard let children = node.children, !children.isEmpty else {
+                print("📋 [Panel] Node '\(node.name)' has no children")
+                return
+            }
+            
+            // In panel context, folders cascade to another panel
+            // (regardless of childDisplayMode - we're already in panel)
+            if let manager = listPanelManager {
+                manager.show(
+                    items: children,
+                    ringCenter: manager.currentRingCenter,
+                    ringOuterRadius: manager.currentRingOuterRadius,
+                    angle: manager.currentAngle
+                )
+            }
+            
+        case .launchRing(let configId):
+            print("🚀 [Panel] Launching ring config \(configId)")
+            hide()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                CircularUIInstanceManager.shared.show(configId: configId)
+            }
+            
+        case .drag(let provider):
+            // Handle click behavior for draggable items
+            switch provider.clickBehavior {
+            case .execute(let action):
+                action()
+                hide()
+            case .navigate:
+                if let children = node.children, !children.isEmpty,
+                   let manager = listPanelManager {
+                    manager.show(
+                        items: children,
+                        ringCenter: manager.currentRingCenter,
+                        ringOuterRadius: manager.currentRingOuterRadius,
+                        angle: manager.currentAngle
+                    )
+                }
+            case .none:
+                break
+            }
+            
+        case .doNothing:
+            break
+        }
+    }
+
+    private func handlePanelItemRightClick(node: FunctionNode, modifiers: NSEvent.ModifierFlags) {
+        print("🖱️ [Panel Right Click] On item: '\(node.name)'")
+        
+        let behavior = node.onRightClick.resolve(with: modifiers)
+        
+        switch behavior {
+        case .execute(let action):
+            action()
+            hide()
+            
+        case .executeKeepOpen(let action):
+            action()
+            
+        case .expand:
+            // Show context actions if available
+            if let contextActions = node.contextActions, !contextActions.isEmpty {
+                print("📋 [Panel] Expanding context actions for '\(node.name)'")
+                if let manager = listPanelManager {
+                    manager.show(
+                        items: contextActions,
+                        ringCenter: manager.currentRingCenter,
+                        ringOuterRadius: manager.currentRingOuterRadius,
+                        angle: manager.currentAngle
+                    )
+                }
+            }
+            
+        case .launchRing(let configId):
+            print("🚀 [Panel Right Click] Launching ring config \(configId)")
+            hide()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                CircularUIInstanceManager.shared.show(configId: configId)
+            }
+            
         default:
             break
         }

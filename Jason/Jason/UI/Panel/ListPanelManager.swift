@@ -21,17 +21,16 @@ class ListPanelManager: ObservableObject {
     /// Position for the panel (screen coordinates, for later integration)
     @Published var position: CGPoint = .zero
     
-    // MARK: - Show / Hide
+    var onItemLeftClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
+    var onItemRightClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
+
+    private(set) var currentAngle: Double = 0
+    private(set) var currentRingCenter: CGPoint = .zero
+    private(set) var currentRingOuterRadius: CGFloat = 0
     
     // MARK: - Positioned Show
 
     /// Show the panel as an extension of a ring item
-    /// - Parameters:
-    ///   - items: The items to display
-    ///   - ringCenter: Center point of the ring (global coordinates)
-    ///   - ringOuterRadius: Outer radius of the ring
-    ///   - angle: The angle of the triggering item (in degrees, 0 = top)
-    ///   - panelWidth: Width of the panel (for edge anchoring)
     func show(
         items: [FunctionNode],
         ringCenter: CGPoint,
@@ -39,6 +38,11 @@ class ListPanelManager: ObservableObject {
         angle: Double,
         panelWidth: CGFloat = 260
     ) {
+        // Store for cascading
+        self.currentAngle = angle
+        self.currentRingCenter = ringCenter
+        self.currentRingOuterRadius = ringOuterRadius
+        
         // Convert angle to radians (subtract 90° to match ring coordinate system)
         let angleInRadians = (angle - 90) * (.pi / 180)
         

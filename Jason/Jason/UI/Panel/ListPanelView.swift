@@ -14,6 +14,10 @@ import AppKit
 struct ListPanelView: View {
     let items: [FunctionNode]
     
+    // Callbacks for interactions (mirrors ring interaction model)
+    var onItemLeftClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
+    var onItemRightClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
+    
     // Configuration
     var panelWidth: CGFloat = 260
     var rowHeight: CGFloat = 32
@@ -56,7 +60,13 @@ struct ListPanelView: View {
                             item: item,
                             iconSize: iconSize,
                             rowHeight: rowHeight,
-                            isHovered: hoveredItemId == item.id
+                            isHovered: hoveredItemId == item.id,
+                            onLeftClick: { modifiers in
+                                onItemLeftClick?(item, modifiers)
+                            },
+                            onRightClick: { modifiers in
+                                onItemRightClick?(item, modifiers)
+                            }
                         )
                         .onHover { hovering in
                             hoveredItemId = hovering ? item.id : nil
@@ -80,6 +90,10 @@ struct ListPanelRow: View {
     let iconSize: CGFloat
     let rowHeight: CGFloat
     let isHovered: Bool
+    
+    // Click callbacks
+    var onLeftClick: ((NSEvent.ModifierFlags) -> Void)?
+    var onRightClick: ((NSEvent.ModifierFlags) -> Void)?
     
     private var isFolder: Bool {
         item.type == .folder
@@ -116,5 +130,16 @@ struct ListPanelRow: View {
                 .fill(isHovered ? Color.white.opacity(0.15) : Color.clear)
         )
         .padding(.horizontal, 4)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onLeftClick?(NSEvent.modifierFlags)
+        }
+        .simultaneousGesture(
+            TapGesture()
+                .modifiers(.control)
+                .onEnded { _ in
+                    onRightClick?(NSEvent.modifierFlags)
+                }
+        )
     }
 }

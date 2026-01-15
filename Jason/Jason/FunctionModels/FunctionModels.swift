@@ -46,6 +46,13 @@ enum FunctionNodeType {
     case spacer
 }
 
+// MARK: - Display Mode
+
+enum ChildDisplayMode {
+    case ring       // Children display as a new ring level
+    case panel      // Children display in a list panel
+}
+
 // MARK: - Layout Style
 
 enum LayoutStyle {
@@ -132,6 +139,8 @@ class FunctionNode: Identifiable, ObservableObject {
     let contextActions: [FunctionNode]?
     let maxDisplayedChildren: Int?
     
+    let childDisplayMode: ChildDisplayMode?
+    
     let preferredLayout: LayoutStyle?
     let itemAngleSize: CGFloat?          // My own angle size when rendered as an item
     let childItemAngleSize: CGFloat?     // Default angle for my children (if they don't specify itemAngleSize)
@@ -169,6 +178,7 @@ class FunctionNode: Identifiable, ObservableObject {
         type: FunctionNodeType,
         icon: NSImage,
         children: [FunctionNode]? = nil,
+        childDisplayMode: ChildDisplayMode? = nil,
         contextActions: [FunctionNode]? = nil,
         maxDisplayedChildren: Int? = nil,
         
@@ -207,6 +217,7 @@ class FunctionNode: Identifiable, ObservableObject {
         self.type = type
         self.icon = icon
         self.children = children
+        self.childDisplayMode = childDisplayMode
         self.contextActions = contextActions
         self.maxDisplayedChildren = maxDisplayedChildren
         
@@ -523,6 +534,7 @@ extension FunctionNode {
             type: type,
             icon: icon,
             children: children,
+            childDisplayMode:childDisplayMode,
             contextActions: contextActions,
             maxDisplayedChildren: maxDisplayedChildren,
             preferredLayout: preferredLayout,

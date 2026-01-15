@@ -92,8 +92,12 @@ struct CircularUIView: View {
                     let panelLocalY = listPanelManager.position.y - screenOriginY
                     let panelSwiftUIY = screenHeight - panelLocalY
                     
-                    ListPanelView(items: listPanelManager.items)
-                        .position(x: panelLocalX, y: panelSwiftUIY)
+                    ListPanelView(
+                        items: listPanelManager.items,
+                        onItemLeftClick: listPanelManager.onItemLeftClick,
+                        onItemRightClick: listPanelManager.onItemRightClick
+                    )
+                    .position(x: panelLocalX, y: panelSwiftUIY)
                 }
             }
             .ignoresSafeArea()
