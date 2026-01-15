@@ -24,6 +24,7 @@ class MouseTracker {
     var onCollapse: (() -> Void)?
     var onReturnedInsideBoundary: (() -> Void)?
     var onExecuteAction: (() -> Void)?
+    var isMouseInPanel: (() -> Bool)?
     private var functionManager: FunctionManager
 
     var mouseAngleOffset: CGFloat = 0
@@ -95,6 +96,11 @@ class MouseTracker {
         guard let start = trackingStartPoint else { return }
 
         let current = NSEvent.mouseLocation
+        
+        // Skip ALL tracking if mouse is inside a panel
+        if let inPanel = isMouseInPanel, inPanel() {
+            return
+        }
         
         //Check if paused for drag FIRST (don't auto-resume)
         if isPausedForDrag {

@@ -79,8 +79,8 @@ struct CircularUIView: View {
                 .frame(width: totalSize, height: totalSize)
                 .position(x: localMouseX, y: swiftUIY)
                 
-                // List Panel (when visible)
-                if listPanelManager.isVisible {
+                // List Panels (when visible)
+                ForEach(listPanelManager.panelStack) { panel in
                     let window = circularUI.overlayWindow
                     let screen = window?.currentScreen ?? NSScreen.main
                     let screenOriginX = screen?.frame.origin.x ?? 0
@@ -88,16 +88,16 @@ struct CircularUIView: View {
                     let screenHeight = screen?.frame.height ?? 1080
                     
                     // Convert panel position from global AppKit to SwiftUI coordinates
-                    let panelLocalX = listPanelManager.position.x - screenOriginX
-                    let panelLocalY = listPanelManager.position.y - screenOriginY
+                    let panelLocalX = panel.position.x - screenOriginX
+                    let panelLocalY = panel.position.y - screenOriginY
                     let panelSwiftUIY = screenHeight - panelLocalY
                     
                     ListPanelView(
-                        items: listPanelManager.items,
+                        items: panel.items,
                         onItemLeftClick: listPanelManager.onItemLeftClick,
                         onItemRightClick: listPanelManager.onItemRightClick,
                         onContextAction: listPanelManager.onContextAction,
-                        expandedItemId: $listPanelManager.expandedItemId
+                        expandedItemId: expandedItemIdBinding(for: panel.level)
                     )
                     .position(x: panelLocalX, y: panelSwiftUIY)
                 }
@@ -117,6 +117,20 @@ struct CircularUIView: View {
     private func shouldDimRing(_ level: Int) -> Bool {
         // Dim all rings except the active one
         return level != functionManager.activeRingLevel
+    }
+    
+    // Helper to create binding for panel's expandedItemId
+    private func expandedItemIdBinding(for level: Int) -> Binding<String?> {
+        Binding(
+            get: {
+                listPanelManager.panelStack.first { $0.level == level }?.expandedItemId
+            },
+            set: { newValue in
+                if let index = listPanelManager.panelStack.firstIndex(where: { $0.level == level }) {
+                    listPanelManager.panelStack[index].expandedItemId = newValue
+                }
+            }
+        )
     }
 }
 

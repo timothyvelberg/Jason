@@ -262,6 +262,12 @@ class CircularUIManager: ObservableObject {
                 self?.listPanelManager?.hide()
             }
             
+            mouseTracker?.isMouseInPanel = { [weak self] in
+                guard let self = self else { return false }
+                let mousePos = NSEvent.mouseLocation
+                return self.listPanelManager?.isInPanelZone(point: mousePos) ?? false
+            }
+            
             mouseTracker?.onExpandToPanel = { [weak self] node, angle, ringCenter, ringOuterRadius in
                 guard let self = self else { return }
                 
@@ -317,13 +323,15 @@ class CircularUIManager: ObservableObject {
     // MARK: - Gesture Handlers (Click, Drag, Scroll)
     
     private func handleLeftClick(event: GestureManager.GestureEvent) {
+        // Check if click is inside the panel
         if let panelManager = listPanelManager {
-            if let clickedNode = panelManager.handleLeftClick(at: event.position) {
-                print("🖱️ [Left Click] Panel item: '\(clickedNode.name)'")
-                handlePanelItemLeftClick(node: clickedNode, modifiers: event.modifierFlags)
+            if let result = panelManager.handleLeftClick(at: event.position) {
+                print("🖱️ [Left Click] Panel item: '\(result.node.name)' at level \(result.level)")
+                handlePanelItemLeftClick(node: result.node, modifiers: event.modifierFlags, fromLevel: result.level)
                 return
             }
         }
+        
         guard let functionManager = functionManager else { return }
         
         guard let (ringLevel, index, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) else {
@@ -576,8 +584,11 @@ class CircularUIManager: ObservableObject {
     // MARK: - Panel Item Handlers
 
     private func handlePanelItemLeftClick(node: FunctionNode, modifiers: NSEvent.ModifierFlags) {
-        
-        print("🖱️ [Panel Left Click] On item: '\(node.name)'")
+        handlePanelItemLeftClick(node: node, modifiers: modifiers, fromLevel: 0)
+    }
+
+    private func handlePanelItemLeftClick(node: FunctionNode, modifiers: NSEvent.ModifierFlags, fromLevel level: Int) {
+        print("🖱️ [Panel Left Click] On item: '\(node.name)' at level \(level)")
         
         let behavior = node.onLeftClick.resolve(with: modifiers)
         
@@ -590,22 +601,18 @@ class CircularUIManager: ObservableObject {
             action()
             
         case .expand, .navigateInto:
-            // Check display mode for cascading
+            // Check if we should cascade to panel
             guard let children = node.children, !children.isEmpty else {
                 print("📋 [Panel] Node '\(node.name)' has no children")
                 return
             }
             
-            // In panel context, folders cascade to another panel
-            // (regardless of childDisplayMode - we're already in panel)
-            if let manager = listPanelManager {
-                manager.show(
-                    items: children,
-                    ringCenter: manager.currentRingCenter,
-                    ringOuterRadius: manager.currentRingOuterRadius,
-                    angle: manager.currentAngle
-                )
-            }
+            // Cascade: push new panel to the right
+            listPanelManager?.pushPanel(
+                items: children,
+                fromPanelAtLevel: level,
+                sourceNodeId: node.id
+            )
             
         case .launchRing(let configId):
             print("🚀 [Panel] Launching ring config \(configId)")
@@ -615,19 +622,16 @@ class CircularUIManager: ObservableObject {
             }
             
         case .drag(let provider):
-            // Handle click behavior for draggable items
             switch provider.clickBehavior {
             case .execute(let action):
                 action()
                 hide()
             case .navigate:
-                if let children = node.children, !children.isEmpty,
-                   let manager = listPanelManager {
-                    manager.show(
+                if let children = node.children, !children.isEmpty {
+                    listPanelManager?.pushPanel(
                         items: children,
-                        ringCenter: manager.currentRingCenter,
-                        ringOuterRadius: manager.currentRingOuterRadius,
-                        angle: manager.currentAngle
+                        fromPanelAtLevel: level,
+                        sourceNodeId: node.id
                     )
                 }
             case .none:

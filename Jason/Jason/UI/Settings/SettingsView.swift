@@ -291,11 +291,21 @@ struct AdvancedSettingsView: View {
                         instance.showTestRingForPanelIntegration()
                     }
                 }
+                
                 Button("Show Test Panel at Mouse") {
                     if let instance = instanceManager.getFirstInstance() {
                         CircularUIInstanceManager.shared.show(configId: instance.configId)
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            // Use current mouse position
+                            let mousePos = NSEvent.mouseLocation
+                            instance.listPanelManager?.showTestPanel(at: mousePos)
+                        }
+                    }
+                }
+                
+                Button("Test Panel Cascading") {
+                    if let instance = instanceManager.getFirstInstance() {
+                        CircularUIInstanceManager.shared.show(configId: instance.configId)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             let mousePos = NSEvent.mouseLocation
                             instance.listPanelManager?.showTestPanel(at: mousePos)
                         }
