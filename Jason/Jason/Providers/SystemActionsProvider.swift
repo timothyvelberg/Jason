@@ -109,6 +109,7 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
             type: .category,
             icon: NSImage(systemSymbolName: "app.dashed", accessibilityDescription: nil) ?? NSImage(),
             children: items,
+            childDisplayMode: .panel,
             preferredLayout: .partialSlice,
             slicePositioning: .center,
             onLeftClick: ModifierAwareInteraction(base: .doNothing),

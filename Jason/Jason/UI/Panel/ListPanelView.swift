@@ -14,9 +14,13 @@ import AppKit
 struct ListPanelView: View {
     let items: [FunctionNode]
     
-    // Callbacks for interactions (mirrors ring interaction model)
+    // Callbacks for interactions
     var onItemLeftClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onItemRightClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
+    var onContextAction: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
+    
+    // Expanded state from manager
+    @Binding var expandedItemId: String?
     
     // Configuration
     var panelWidth: CGFloat = 260
@@ -61,15 +65,29 @@ struct ListPanelView: View {
                             iconSize: iconSize,
                             rowHeight: rowHeight,
                             isHovered: hoveredItemId == item.id,
+                            isExpanded: expandedItemId == item.id,
                             onLeftClick: { modifiers in
+                                expandedItemId = nil
                                 onItemLeftClick?(item, modifiers)
                             },
                             onRightClick: { modifiers in
                                 onItemRightClick?(item, modifiers)
+                            },
+                            onContextAction: { action, modifiers in
+                                expandedItemId = nil
+                                onContextAction?(action, modifiers)
                             }
                         )
                         .onHover { hovering in
-                            hoveredItemId = hovering ? item.id : nil
+                            if hovering {
+                                // Collapse expanded item when hovering a different row
+                                if expandedItemId != nil && expandedItemId != item.id {
+                                    expandedItemId = nil
+                                }
+                                hoveredItemId = item.id
+                            } else {
+                                hoveredItemId = nil
+                            }
                         }
                     }
                 }
@@ -90,14 +108,23 @@ struct ListPanelRow: View {
     let iconSize: CGFloat
     let rowHeight: CGFloat
     let isHovered: Bool
+    let isExpanded: Bool
     
     // Click callbacks
     var onLeftClick: ((NSEvent.ModifierFlags) -> Void)?
     var onRightClick: ((NSEvent.ModifierFlags) -> Void)?
+    var onContextAction: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     
     private var isFolder: Bool {
         item.type == .folder
     }
+    
+    private var hasContextActions: Bool {
+        guard let actions = item.contextActions else { return false }
+        return !actions.isEmpty
+    }
+    
+    private var contextActionIconSize: CGFloat { 16 }
     
     var body: some View {
         HStack(spacing: 10) {
@@ -107,17 +134,22 @@ struct ListPanelRow: View {
                 .scaledToFit()
                 .frame(width: iconSize, height: iconSize)
             
-            // Name
+            // Name (always visible, truncates when expanded)
             Text(item.name)
                 .font(.system(size: 13))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .truncationMode(.middle)
+                .truncationMode(.tail)
             
             Spacer()
             
-            // Folder indicator (chevron)
-            if isFolder {
+            // Context actions (visible when expanded via right-click)
+            if isExpanded && hasContextActions {
+                contextActionsView
+            }
+            
+            // Folder indicator (chevron) - hide when expanded
+            if isFolder && !isExpanded {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(.white.opacity(0.5))
@@ -125,21 +157,38 @@ struct ListPanelRow: View {
         }
         .padding(.horizontal, 10)
         .frame(height: rowHeight)
+        .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isHovered ? Color.white.opacity(0.15) : Color.clear)
+                .fill(isHovered || isExpanded ? Color.white.opacity(0.15) : Color.clear)
         )
         .padding(.horizontal, 4)
         .contentShape(Rectangle())
-        .onTapGesture {
-            onLeftClick?(NSEvent.modifierFlags)
-        }
-        .simultaneousGesture(
-            TapGesture()
-                .modifiers(.control)
-                .onEnded { _ in
-                    onRightClick?(NSEvent.modifierFlags)
+    }
+    
+    // Break out context actions to simplify type checking
+    @ViewBuilder
+    private var contextActionsView: some View {
+        HStack(spacing: 8) {
+            ForEach(item.contextActions!) { action in
+                Button {
+                    onContextAction?(action, NSEvent.modifierFlags)
+                } label: {
+                    Image(nsImage: action.icon)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: contextActionIconSize, height: contextActionIconSize)
+                        .opacity(0.85)
                 }
-        )
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    if hovering {
+                        NSCursor.pointingHand.push()
+                    } else {
+                        NSCursor.pop()
+                    }
+                }
+            }
+        }
     }
 }

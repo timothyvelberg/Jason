@@ -17,16 +17,17 @@ class ListPanelManager: ObservableObject {
     
     @Published var isVisible: Bool = false
     @Published var items: [FunctionNode] = []
-    
-    /// Position for the panel (screen coordinates, for later integration)
     @Published var position: CGPoint = .zero
+    @Published var expandedItemId: String? = nil
     
     var onItemLeftClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onItemRightClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
+    var onContextAction: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
 
     private(set) var currentAngle: Double = 0
     private(set) var currentRingCenter: CGPoint = .zero
     private(set) var currentRingOuterRadius: CGFloat = 0
+    
     
     // MARK: - Positioned Show
 
@@ -100,7 +101,92 @@ class ListPanelManager: ObservableObject {
         print("📋 [ListPanelManager] Hiding panel")
         self.isVisible = false
         self.items = []
+        self.expandedItemId = nil
     }
+    
+    // MARK: - Bounds & Hit Testing
+
+    /// Current panel bounds in screen coordinates
+    var panelBounds: NSRect? {
+        guard isVisible else { return nil }
+        
+        let panelWidth: CGFloat = 260
+        let maxVisibleItems = 10
+        let rowHeight: CGFloat = 32
+        let padding: CGFloat = 8
+        let itemCount = min(items.count, maxVisibleItems)
+        let panelHeight = CGFloat(itemCount) * rowHeight + padding
+        
+        // Position is center of panel
+        let origin = CGPoint(
+            x: position.x - panelWidth / 2,
+            y: position.y - panelHeight / 2
+        )
+        
+        return NSRect(origin: origin, size: CGSize(width: panelWidth, height: panelHeight))
+    }
+
+    /// Check if a point (in screen coordinates) is inside the panel
+    func contains(point: CGPoint) -> Bool {
+        guard let bounds = panelBounds else { return false }
+        return bounds.contains(point)
+    }
+
+    /// Handle right-click at position, returns true if handled
+    func handleRightClick(at position: CGPoint) -> Bool {
+        guard isVisible, contains(point: position) else { return false }
+        
+        // Calculate which row was clicked
+        guard let bounds = panelBounds else { return false }
+        
+        let rowHeight: CGFloat = 32
+        let padding: CGFloat = 4
+        
+        // Position relative to panel top
+        let relativeY = (bounds.maxY - position.y) - padding
+        let rowIndex = Int(relativeY / rowHeight)
+        
+        guard rowIndex >= 0 && rowIndex < items.count else {
+            print("📋 [Panel] Right-click outside rows")
+            expandedItemId = nil
+            return true
+        }
+        
+        let clickedItem = items[rowIndex]
+        print("📋 [Panel] Right-click on row \(rowIndex): '\(clickedItem.name)'")
+        
+        // Toggle expanded state
+        if expandedItemId == clickedItem.id {
+            expandedItemId = nil
+        } else {
+            expandedItemId = clickedItem.id
+        }
+        
+        return true
+    }
+
+    /// Handle left-click at position, returns the clicked item if inside panel
+    func handleLeftClick(at position: CGPoint) -> FunctionNode? {
+        guard isVisible, contains(point: position) else { return nil }
+        
+        guard let bounds = panelBounds else { return nil }
+        
+        let rowHeight: CGFloat = 32
+        let padding: CGFloat = 4
+        
+        let relativeY = (bounds.maxY - position.y) - padding
+        let rowIndex = Int(relativeY / rowHeight)
+        
+        guard rowIndex >= 0 && rowIndex < items.count else {
+            return nil
+        }
+        
+        // Collapse any expanded row
+        expandedItemId = nil
+        
+        return items[rowIndex]
+    }
+
     
     // MARK: - Test Helpers
     

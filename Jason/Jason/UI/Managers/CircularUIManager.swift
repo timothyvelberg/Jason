@@ -287,6 +287,10 @@ class CircularUIManager: ObservableObject {
                 self?.handlePanelItemRightClick(node: node, modifiers: modifiers)
             }
             
+            listPanelManager?.onContextAction = { [weak self] actionNode, modifiers in
+                self?.handlePanelContextAction(actionNode: actionNode, modifiers: modifiers)
+            }
+
             self.gestureManager = GestureManager()
             
             gestureManager?.onGesture = { [weak self] event in
@@ -313,6 +317,13 @@ class CircularUIManager: ObservableObject {
     // MARK: - Gesture Handlers (Click, Drag, Scroll)
     
     private func handleLeftClick(event: GestureManager.GestureEvent) {
+        if let panelManager = listPanelManager {
+            if let clickedNode = panelManager.handleLeftClick(at: event.position) {
+                print("🖱️ [Left Click] Panel item: '\(clickedNode.name)'")
+                handlePanelItemLeftClick(node: clickedNode, modifiers: event.modifierFlags)
+                return
+            }
+        }
         guard let functionManager = functionManager else { return }
         
         guard let (ringLevel, index, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) else {
@@ -471,6 +482,11 @@ class CircularUIManager: ObservableObject {
     }
     
     private func handleRightClick(event: GestureManager.GestureEvent) {
+        if let panelManager = listPanelManager, panelManager.handleRightClick(at: event.position) {
+            print("🖱️ [Right Click] Handled by panel")
+            return
+        }
+        
         guard let functionManager = functionManager else { return }
         
         // Use position-based detection instead of hoveredIndex
@@ -560,6 +576,7 @@ class CircularUIManager: ObservableObject {
     // MARK: - Panel Item Handlers
 
     private func handlePanelItemLeftClick(node: FunctionNode, modifiers: NSEvent.ModifierFlags) {
+        
         print("🖱️ [Panel Left Click] On item: '\(node.name)'")
         
         let behavior = node.onLeftClick.resolve(with: modifiers)
@@ -619,6 +636,32 @@ class CircularUIManager: ObservableObject {
             
         case .doNothing:
             break
+        }
+    }
+    
+    private func handlePanelContextAction(actionNode: FunctionNode, modifiers: NSEvent.ModifierFlags) {
+        print("🖱️ [Panel Context Action] '\(actionNode.name)'")
+        
+        // Context actions typically use onLeftClick for their action
+        let behavior = actionNode.onLeftClick.resolve(with: modifiers)
+        
+        switch behavior {
+        case .execute(let action):
+            action()
+            hide()
+            
+        case .executeKeepOpen(let action):
+            action()
+            
+        case .launchRing(let configId):
+            print("🚀 [Panel Context] Launching ring config \(configId)")
+            hide()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                CircularUIInstanceManager.shared.show(configId: configId)
+            }
+            
+        default:
+            print("⚠️ [Panel Context] Unhandled behavior for '\(actionNode.name)'")
         }
     }
 

@@ -271,12 +271,17 @@ class MouseTracker {
                             
                             // USE EXPLICIT INTERACTION MODEL
                             switch node.onBoundaryCross.base {
+                                
                             case .expand:
                                 // Check display mode preference
                                 if node.childDisplayMode == .panel {
-                                    if let center = trackingStartPoint {
-                                        print("📋 Beyond boundary - expanding '\(node.name)' to panel")
-                                        onExpandToPanel?(node, Double(angle), center, activeRingOuterRadius)
+                                    // Debounce: only trigger once per node
+                                    if lastExecutedNodeId != node.id {
+                                        if let center = trackingStartPoint {
+                                            print("📋 Beyond boundary - expanding '\(node.name)' to panel")
+                                            onExpandToPanel?(node, Double(angle), center, activeRingOuterRadius)
+                                        }
+                                        lastExecutedNodeId = node.id
                                     }
                                     lastFunctionIndex = pieIndex
                                     lastRingLevel = activeRingLevel
@@ -292,9 +297,13 @@ class MouseTracker {
                             case .navigateInto:
                                 // Check display mode preference
                                 if node.childDisplayMode == .panel {
-                                    if let center = trackingStartPoint {
-                                        print("📋 Beyond boundary - navigating '\(node.name)' to panel")
-                                        onExpandToPanel?(node, Double(angle), center, activeRingOuterRadius)
+                                    // Debounce: only trigger once per node
+                                    if lastExecutedNodeId != node.id {
+                                        if let center = trackingStartPoint {
+                                            print("📋 Beyond boundary - navigating '\(node.name)' to panel")
+                                            onExpandToPanel?(node, Double(angle), center, activeRingOuterRadius)
+                                        }
+                                        lastExecutedNodeId = node.id
                                     }
                                     lastFunctionIndex = pieIndex
                                     lastRingLevel = activeRingLevel
@@ -302,7 +311,7 @@ class MouseTracker {
                                 }
                                 
                                 // Default: navigate in ring
-                                print("📂 Beyond boundary (\(distance) > \(activeRingOuterRadius)) - navigating into '\(node.name)'")
+                                print("📂 Beyond boundary - navigating into '\(node.name)'")
                                 functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: pieIndex)
                                 lastFunctionIndex = pieIndex
                                 lastRingLevel = activeRingLevel
