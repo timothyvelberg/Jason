@@ -271,7 +271,6 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         // Create nodes for each app
         let appNodes: [FunctionNode] = appEntries.map { entry in
             // Get AppSwitcherManager for context actions
-            // 🆕 CHANGED: This is now AppSwitcherManager.shared
             let manager = appSwitcherManager
             
             var contextActions: [FunctionNode] = []
@@ -413,7 +412,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             id: "add-favorite-\(bundleIdentifier)",
             name: "Add to Favorites",
             type: .action,
-            icon: NSImage(systemSymbolName: "star", accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: "context-actions-favorited") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                 print("⭐ Adding \(name) to favorites")
                 let success = DatabaseManager.shared.addFavoriteApp(
@@ -438,7 +437,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             id: "remove-favorite-\(bundleIdentifier)",
             name: "Remove from Favorites",
             type: .action,
-            icon: NSImage(systemSymbolName: "star.slash", accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: "context_actions_unfavorited") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                 print("⭐ Removing \(name) from favorites")
                 let success = DatabaseManager.shared.removeFavoriteApp(bundleIdentifier: bundleIdentifier)

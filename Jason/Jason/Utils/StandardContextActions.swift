@@ -51,7 +51,7 @@ struct StandardContextActions {
             id: "quit-\(app.processIdentifier)",
             name: "Quit",
             type: .action,
-            icon: NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: "context_actions_close") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak manager] in
                 manager?.quitApp(app)
             }),
@@ -85,7 +85,7 @@ struct StandardContextActions {
             id: "show-in-finder-\(url.path)",
             name: "Show in Finder",
             type: .action,
-            icon: NSImage(systemSymbolName: "folder", accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: "context-actions-folder") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             }),
