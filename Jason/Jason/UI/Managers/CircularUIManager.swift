@@ -296,6 +296,36 @@ class CircularUIManager: ObservableObject {
             listPanelManager?.onContextAction = { [weak self] actionNode, modifiers in
                 self?.handlePanelContextAction(actionNode: actionNode, modifiers: modifiers)
             }
+            
+            listPanelManager?.onItemHover = { [weak self] node, level, rowIndex in
+                guard let self = self, let node = node else {
+                    return
+                }
+                
+                // Only cascade for folders with children
+                guard node.type == .folder,
+                      let children = node.children,
+                      !children.isEmpty else {
+                    // Not a folder or no children - pop any panels above this level
+                    self.listPanelManager?.popToLevel(level)
+                    return
+                }
+                
+                // Check if this node's panel is already showing
+                if let existingPanel = self.listPanelManager?.panel(at: level + 1),
+                   existingPanel.sourceNodeId == node.id {
+                    // Already showing this folder's panel
+                    return
+                }
+                
+                // Cascade: push new panel aligned with source row
+                self.listPanelManager?.pushPanel(
+                    items: children,
+                    fromPanelAtLevel: level,
+                    sourceNodeId: node.id,
+                    sourceRowIndex: rowIndex
+                )
+            }
 
             self.gestureManager = GestureManager()
             

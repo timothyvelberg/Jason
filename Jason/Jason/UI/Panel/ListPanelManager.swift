@@ -87,6 +87,7 @@ class ListPanelManager: ObservableObject {
     var onItemLeftClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onItemRightClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onContextAction: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
+    var onItemHover: ((FunctionNode?, Int, Int?) -> Void)?
     
     // MARK: - Show Panel (from Ring)
     
@@ -146,7 +147,8 @@ class ListPanelManager: ObservableObject {
     func pushPanel(
         items: [FunctionNode],
         fromPanelAtLevel level: Int,
-        sourceNodeId: String
+        sourceNodeId: String,
+        sourceRowIndex: Int? = nil  // ADD THIS
     ) {
         // Find the source panel
         guard let sourcePanel = panelStack.first(where: { $0.level == level }) else {
@@ -166,9 +168,20 @@ class ListPanelManager: ObservableObject {
         let newPanelHeight = CGFloat(itemCount) * PanelState.rowHeight + PanelState.padding
         
         // New panel's left edge aligns with source panel's right edge + gap
-        // Center the new panel vertically with the source panel
         let newX = sourceBounds.maxX + gap + (newPanelWidth / 2)
-        let newY = sourceBounds.midY
+        
+        // Calculate Y position based on source row
+        let newY: CGFloat
+        if let rowIndex = sourceRowIndex {
+            // Align new panel's top with the source row's vertical center
+            let rowCenterY = sourceBounds.maxY - (PanelState.padding / 2) - (CGFloat(rowIndex) * PanelState.rowHeight) - (PanelState.rowHeight / 2)
+            // New panel's center Y = top of new panel + half height
+            // We want new panel's top row to align with source row
+            newY = rowCenterY - (newPanelHeight / 2) + (PanelState.rowHeight / 2) + (PanelState.padding / 2)
+        } else {
+            // Fallback: center vertically with source panel
+            newY = sourceBounds.midY
+        }
         
         let newPosition = CGPoint(x: newX, y: newY)
         
@@ -185,6 +198,7 @@ class ListPanelManager: ObservableObject {
         print("📋 [ListPanelManager] Pushed panel level \(level + 1)")
         print("   Items: \(items.count)")
         print("   Position: \(newPosition)")
+        print("   Source row: \(sourceRowIndex ?? -1)")
     }
 
     /// Pop panels above a certain level

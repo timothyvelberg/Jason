@@ -97,6 +97,9 @@ struct CircularUIView: View {
                         onItemLeftClick: listPanelManager.onItemLeftClick,
                         onItemRightClick: listPanelManager.onItemRightClick,
                         onContextAction: listPanelManager.onContextAction,
+                        onItemHover: { node, rowIndex in
+                            listPanelManager.onItemHover?(node, panel.level, rowIndex)
+                        },
                         expandedItemId: expandedItemIdBinding(for: panel.level)
                     )
                     .position(x: panelLocalX, y: panelSwiftUIY)

@@ -18,6 +18,7 @@ struct ListPanelView: View {
     var onItemLeftClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onItemRightClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onContextAction: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
+    var onItemHover: ((FunctionNode?, Int?) -> Void)?
     
     // Expanded state from manager
     @Binding var expandedItemId: String?
@@ -59,7 +60,7 @@ struct ListPanelView: View {
             // Content
             ScrollView(.vertical, showsIndicators: needsScroll) {
                 VStack(spacing: 0) {
-                    ForEach(items) { item in
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                         ListPanelRow(
                             item: item,
                             iconSize: iconSize,
@@ -80,11 +81,11 @@ struct ListPanelView: View {
                         )
                         .onHover { hovering in
                             if hovering {
-                                // Collapse expanded item when hovering a different row
                                 if expandedItemId != nil && expandedItemId != item.id {
                                     expandedItemId = nil
                                 }
                                 hoveredItemId = item.id
+                                onItemHover?(item, index)
                             } else {
                                 hoveredItemId = nil
                             }
