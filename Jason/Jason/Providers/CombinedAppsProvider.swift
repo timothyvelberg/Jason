@@ -279,9 +279,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             // Add app-specific actions if running
             if entry.isRunning, let runningApp = entry.runningApp, let manager = manager {
                 contextActions = [
-                    StandardContextActions.bringToFront(runningApp, manager: manager),
                     StandardContextActions.quitApp(runningApp, manager: manager),
-                    StandardContextActions.hideApp(runningApp, manager: manager)
                 ]
             }
             
