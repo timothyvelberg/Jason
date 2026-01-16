@@ -187,7 +187,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             return sortOrder
         }
         
-        return .modifiedNewest
+        return .alphabeticalAsc
     }
     
     private func sortNodes(_ nodes: [FunctionNode], by sortOrder: FolderSortOrder) -> [FunctionNode] {
