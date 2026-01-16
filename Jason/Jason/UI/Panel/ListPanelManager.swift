@@ -22,7 +22,10 @@ struct PanelState: Identifiable {
     let sourceNodeId: String?         // Which node spawned this panel
     let sourceRowIndex: Int?
     var expandedItemId: String?       // Which row has context actions showing
+    var areChildrenArmed: Bool = false
     var isOverlapping: Bool = false
+    
+    
     
     // Panel dimensions (constants for now, could be configurable)
     static let panelWidth: CGFloat = 260
@@ -93,6 +96,10 @@ class ListPanelManager: ObservableObject {
     private(set) var currentRingCenter: CGPoint = .zero
     private(set) var currentRingOuterRadius: CGFloat = 0
     private(set) var currentAngle: Double = 0
+    
+    // MARK: - Pending Panel (waiting for arming)
+
+    private var pendingPanel: (title: String, items: [FunctionNode], fromLevel: Int, sourceNodeId: String, sourceRowIndex: Int)?
     
     // MARK: - Callbacks (wired by CircularUIManager)
     
@@ -201,11 +208,32 @@ class ListPanelManager: ObservableObject {
 
     /// Handle mouse movement to trigger panel sliding
     func handleMouseMove(at point: CGPoint) {
-        // Check each panel that has a child panel
+        // Check for arming on panels that might have pending children
         for index in panelStack.indices {
             let panel = panelStack[index]
             
-            // Find child panel (level + 1)
+            // Check if there's a pending panel for this level
+            if let pending = pendingPanel, pending.fromLevel == panel.level {
+                // Get the row bounds for the pending row
+                if let sourceBounds = rowBounds(forPanel: panel, rowIndex: pending.sourceRowIndex) {
+                    if sourceBounds.contains(point) {
+                        let progress = (point.x - sourceBounds.minX) / sourceBounds.width
+                        
+                        // Check for arming
+                        if !panelStack[index].areChildrenArmed && progress < slideThreshold {
+                            panelStack[index].areChildrenArmed = true
+                            print("📋 [Slide] Panel level \(panel.level) children now ARMED")
+                            
+                            // Spawn the pending panel
+                            let p = pending
+                            pendingPanel = nil
+                            actuallyPushPanel(title: p.title, items: p.items, fromPanelAtLevel: p.fromLevel, sourceNodeId: p.sourceNodeId, sourceRowIndex: p.sourceRowIndex)
+                        }
+                    }
+                }
+            }
+            
+            // Find child panel (level + 1) for overlap logic
             guard let childIndex = panelStack.firstIndex(where: { $0.level == panel.level + 1 }),
                   let sourceRowIndex = panelStack[childIndex].sourceRowIndex else {
                 continue
@@ -218,8 +246,9 @@ class ListPanelManager: ObservableObject {
             
             // Check if mouse is in the source row
             if sourceBounds.contains(point) {
-                // Calculate progress across the row (0 to 1)
                 let progress = (point.x - sourceBounds.minX) / sourceBounds.width
+                
+                // Armed - normal threshold logic applies
                 let shouldOverlap = progress > slideThreshold
                 
                 // Update if changed
@@ -283,6 +312,36 @@ class ListPanelManager: ObservableObject {
             return
         }
         
+        // Check if parent is armed for child spawning
+        guard let sourceIndex = panelStack.firstIndex(where: { $0.level == level }) else { return }
+        
+        if !panelStack[sourceIndex].areChildrenArmed {
+            // Not armed yet - store as pending
+            if let rowIndex = sourceRowIndex {
+                pendingPanel = (title, items, level, sourceNodeId, rowIndex)
+                print("📋 [ListPanelManager] Panel '\(title)' PENDING - waiting for arming")
+            }
+            return
+        }
+        
+        // Armed - proceed with push
+        actuallyPushPanel(title: title, items: items, fromPanelAtLevel: level, sourceNodeId: sourceNodeId, sourceRowIndex: sourceRowIndex)
+    }
+
+    /// Internal: actually push the panel (called after arming check passes)
+    private func actuallyPushPanel(
+        title: String,
+        items: [FunctionNode],
+        fromPanelAtLevel level: Int,
+        sourceNodeId: String,
+        sourceRowIndex: Int? = nil
+    ) {
+        // Find the source panel
+        guard let sourcePanel = panelStack.first(where: { $0.level == level }) else {
+            print("❌ [ListPanelManager] Cannot find panel at level \(level)")
+            return
+        }
+        
         // Pop any panels above this level first
         popToLevel(level)
         
@@ -298,11 +357,9 @@ class ListPanelManager: ObservableObject {
         let newX = sourceBounds.maxX + gap + (newPanelWidth / 2)
         
         // Calculate Y position based on source row
-        // Offset DOWN by 1 row so panel title aligns with source row
         let newY: CGFloat
         if let rowIndex = sourceRowIndex {
             let rowCenterY = sourceBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight - (CGFloat(rowIndex) * PanelState.rowHeight) - (PanelState.rowHeight / 2)
-            // Offset by 1 row: subtract rowHeight so title aligns with source row
             newY = rowCenterY - (newPanelHeight / 2) + (PanelState.rowHeight / 2) + (PanelState.padding / 2) + PanelState.titleHeight - PanelState.rowHeight
         } else {
             newY = sourceBounds.midY
@@ -316,9 +373,10 @@ class ListPanelManager: ObservableObject {
             position: newPosition,
             level: level + 1,
             sourceNodeId: sourceNodeId,
-            sourceRowIndex: sourceRowIndex,    // NEW: pass through
+            sourceRowIndex: sourceRowIndex,
             expandedItemId: nil,
-            isOverlapping: false               // NEW: starts not overlapping
+            areChildrenArmed: false,
+            isOverlapping: false
         )
         
         panelStack.append(newPanel)
@@ -329,7 +387,6 @@ class ListPanelManager: ObservableObject {
         print("   Source row: \(sourceRowIndex ?? -1)")
     }
 
-    /// Pop panels above a certain level
     func popToLevel(_ level: Int) {
         let before = panelStack.count
         panelStack.removeAll { $0.level > level }
@@ -337,13 +394,11 @@ class ListPanelManager: ObservableObject {
         if removed > 0 {
             print("📋 [ListPanelManager] Popped \(removed) panel(s), now at level \(level)")
         }
-    }
-
-    /// Pop the topmost panel
-    func popPanel() {
-        guard !panelStack.isEmpty else { return }
-        let removed = panelStack.removeLast()
-        print("📋 [ListPanelManager] Popped panel level \(removed.level)")
+        
+        // Clear pending if it was for a level we're popping
+        if let pending = pendingPanel, pending.fromLevel > level {
+            pendingPanel = nil
+        }
     }
     
     // MARK: - Position Calculation
@@ -394,6 +449,7 @@ class ListPanelManager: ObservableObject {
         guard isVisible else { return }
         print("📋 [ListPanelManager] Hiding all panels")
         panelStack.removeAll()
+        pendingPanel = nil
     }
     
     /// Alias for hide (clearer intent)
