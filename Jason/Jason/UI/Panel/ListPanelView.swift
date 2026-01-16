@@ -12,6 +12,7 @@ import AppKit
 // MARK: - List Panel View
 
 struct ListPanelView: View {
+    let title: String                 // NEW
     let items: [FunctionNode]
     
     // Callbacks for interactions
@@ -34,11 +35,13 @@ struct ListPanelView: View {
     @State private var hoveredItemId: String? = nil
     
     // Computed
+    private var titleHeight: CGFloat { 28 }    // NEW
+    
     private var panelHeight: CGFloat {
         let itemCount = min(items.count, maxVisibleItems)
         let contentHeight = CGFloat(itemCount) * rowHeight
         let padding: CGFloat = 8
-        return contentHeight + padding
+        return titleHeight + contentHeight + padding    // UPDATED: added titleHeight
     }
     
     private var needsScroll: Bool {
@@ -58,45 +61,58 @@ struct ListPanelView: View {
                 .stroke(Color.white.opacity(0.18), lineWidth: 1)
             
             // Content
-            ScrollView(.vertical, showsIndicators: needsScroll) {
-                VStack(spacing: 0) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                        ListPanelRow(
-                            item: item,
-                            iconSize: iconSize,
-                            rowHeight: rowHeight,
-                            isHovered: hoveredItemId == item.id,
-                            isExpanded: expandedItemId == item.id,
-                            onLeftClick: { modifiers in
-                                expandedItemId = nil
-                                onItemLeftClick?(item, modifiers)
-                            },
-                            onRightClick: { modifiers in
-                                onItemRightClick?(item, modifiers)
-                            },
-                            onContextAction: { action, modifiers in
-                                expandedItemId = nil
-                                onContextAction?(action, modifiers)
-                            }
-                        )
-                        .onHover { hovering in
-                            if hovering {
-                                if expandedItemId != nil && expandedItemId != item.id {
+            VStack(spacing: 0) {
+                // NEW: Title bar
+                HStack {
+                    Text(title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .frame(height: titleHeight)
+                
+                // Item list
+                ScrollView(.vertical, showsIndicators: needsScroll) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            ListPanelRow(
+                                item: item,
+                                iconSize: iconSize,
+                                rowHeight: rowHeight,
+                                isHovered: hoveredItemId == item.id,
+                                isExpanded: expandedItemId == item.id,
+                                onLeftClick: { modifiers in
                                     expandedItemId = nil
+                                    onItemLeftClick?(item, modifiers)
+                                },
+                                onRightClick: { modifiers in
+                                    onItemRightClick?(item, modifiers)
+                                },
+                                onContextAction: { action, modifiers in
+                                    expandedItemId = nil
+                                    onContextAction?(action, modifiers)
                                 }
-                                hoveredItemId = item.id
-                                onItemHover?(item, index)
-                            } else {
-                                hoveredItemId = nil
+                            )
+                            .onHover { hovering in
+                                if hovering {
+                                    if expandedItemId != nil && expandedItemId != item.id {
+                                        expandedItemId = nil
+                                    }
+                                    hoveredItemId = item.id
+                                    onItemHover?(item, index)
+                                } else {
+                                    hoveredItemId = nil
+                                }
                             }
                         }
                     }
                 }
-                .padding(.vertical, 4)
+                .frame(maxHeight: CGFloat(maxVisibleItems) * rowHeight)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 2))
+                .padding(.horizontal, 4)
+                .padding(.bottom, 4)
             }
-            .frame(maxHeight: CGFloat(maxVisibleItems) * rowHeight)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 2))
-            .padding(4)
         }
         .frame(width: panelWidth, height: panelHeight)
     }

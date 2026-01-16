@@ -93,6 +93,7 @@ struct CircularUIView: View {
                     let panelSwiftUIY = screenHeight - panelLocalY
                     
                     ListPanelView(
+                        title: panel.title,
                         items: panel.items,
                         onItemLeftClick: listPanelManager.onItemLeftClick,
                         onItemRightClick: listPanelManager.onItemRightClick,

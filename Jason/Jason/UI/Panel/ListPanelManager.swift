@@ -15,6 +15,7 @@ import UniformTypeIdentifiers
 
 struct PanelState: Identifiable {
     let id: UUID = UUID()
+    let title: String
     let items: [FunctionNode]
     let position: CGPoint
     let level: Int                    // 0 = from ring, 1+ = from panel
@@ -93,6 +94,7 @@ class ListPanelManager: ObservableObject {
     
     /// Show a panel as an extension of a ring item
     func show(
+        title: String,
         items: [FunctionNode],
         ringCenter: CGPoint,
         ringOuterRadius: CGFloat,
@@ -118,6 +120,7 @@ class ListPanelManager: ObservableObject {
         // Clear any existing panels and push new one
         panelStack = [
             PanelState(
+                title: title,
                 items: items,
                 position: position,
                 level: 0,
@@ -128,10 +131,11 @@ class ListPanelManager: ObservableObject {
     }
     
     /// Show panel at a specific position (for testing)
-    func show(items: [FunctionNode], at position: CGPoint) {
+    func show(title: String, items: [FunctionNode], at position: CGPoint) {
         print("📋 [ListPanelManager] Showing panel with \(items.count) items")
         panelStack = [
             PanelState(
+                title: title,
                 items: items,
                 position: position,
                 level: 0,
@@ -145,6 +149,7 @@ class ListPanelManager: ObservableObject {
 
     /// Push a new panel from an existing panel (cascade to the right)
     func pushPanel(
+        title: String,
         items: [FunctionNode],
         fromPanelAtLevel level: Int,
         sourceNodeId: String,
@@ -186,6 +191,7 @@ class ListPanelManager: ObservableObject {
         let newPosition = CGPoint(x: newX, y: newY)
         
         let newPanel = PanelState(
+            title: title,
             items: items,
             position: newPosition,
             level: level + 1,
@@ -395,7 +401,7 @@ class ListPanelManager: ObservableObject {
             createTestFolderWithChildren(name: "Projects"),
         ]
         
-        show(items: testItems, at: position)
+        show(title: "Test Panel", items: testItems, at: position)    // UPDATED
     }
     
     private func createTestFolderWithChildren(name: String, depth: Int = 0) -> FunctionNode {

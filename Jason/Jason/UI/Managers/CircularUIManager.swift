@@ -277,6 +277,7 @@ class CircularUIManager: ObservableObject {
                 }
                 
                 self.listPanelManager?.show(
+                    title: node.name,
                     items: children,
                     ringCenter: ringCenter,
                     ringOuterRadius: ringOuterRadius,
@@ -321,6 +322,7 @@ class CircularUIManager: ObservableObject {
                 
                 // Different folder - cascade: push new panel (this pops level+1 and above)
                 self.listPanelManager?.pushPanel(
+                    title: node.name,
                     items: children,
                     fromPanelAtLevel: level,
                     sourceNodeId: node.id,
@@ -643,6 +645,7 @@ class CircularUIManager: ObservableObject {
             
             // Cascade: push new panel to the right
             listPanelManager?.pushPanel(
+                title: node.name,
                 items: children,
                 fromPanelAtLevel: level,
                 sourceNodeId: node.id
@@ -663,6 +666,7 @@ class CircularUIManager: ObservableObject {
             case .navigate:
                 if let children = node.children, !children.isEmpty {
                     listPanelManager?.pushPanel(
+                        title: node.name,
                         items: children,
                         fromPanelAtLevel: level,
                         sourceNodeId: node.id
@@ -722,6 +726,7 @@ class CircularUIManager: ObservableObject {
                 print("📋 [Panel] Expanding context actions for '\(node.name)'")
                 if let manager = listPanelManager {
                     manager.show(
+                        title: node.name,
                         items: contextActions,
                         ringCenter: manager.currentRingCenter,
                         ringOuterRadius: manager.currentRingOuterRadius,
@@ -1089,7 +1094,7 @@ class CircularUIManager: ObservableObject {
         let folderNodes: [FunctionNode] = names.enumerated().map { index, name in
             let angle = Double(index) * anglePerItem
             return createMockFolderNode(name: name) {
-                weakSelf?.showPanelForFolder(contents: mockFolderContents, atAngle: angle)
+                weakSelf?.showPanelForFolder(title: name, contents: mockFolderContents, atAngle: angle)
             }
         }
         
@@ -1106,7 +1111,7 @@ class CircularUIManager: ObservableObject {
         print("🧪 [Test] Showing test ring with \(itemCount) items, \(anglePerItem)° per item")
     }
 
-    private func showPanelForFolder(contents: [FunctionNode], atAngle angle: Double) {
+    private func showPanelForFolder(title: String,contents: [FunctionNode], atAngle angle: Double) {
         guard let functionManager = functionManager else { return }
         
         // Get ring geometry
@@ -1117,6 +1122,7 @@ class CircularUIManager: ObservableObject {
         let ringOuterRadius = ring0Config.startRadius + ring0Config.thickness
         
         listPanelManager?.show(
+            title: title,
             items: contents,
             ringCenter: ringCenter,
             ringOuterRadius: ringOuterRadius,
