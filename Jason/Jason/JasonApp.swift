@@ -27,6 +27,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         
+        PermissionManager.shared.requestAccessToFavoriteFolders()
+        
         // Run ALL database operations sequentially on main thread
         DatabaseManager.shared.setupSmartCacheTables()
         print("⚡ SmartCache: System initialized!")

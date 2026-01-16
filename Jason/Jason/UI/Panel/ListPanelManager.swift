@@ -511,6 +511,37 @@ class ListPanelManager: ObservableObject {
         return (panel.items[rowIndex], level)
     }
     
+    /// Handle drag start at position, returns the node and its DragProvider if draggable
+    func handleDragStart(at point: CGPoint) -> (node: FunctionNode, dragProvider: DragProvider, level: Int)? {
+        // Find which panel was clicked
+        guard let level = panelLevel(at: point),
+              let panelIndex = panelStack.firstIndex(where: { $0.level == level }) else {
+            return nil
+        }
+        
+        let panel = panelStack[panelIndex]
+        let bounds = currentBounds(for: panel)
+        
+        // Calculate which row was clicked (accounting for title)
+        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
+        let rowIndex = Int(relativeY / PanelState.rowHeight)
+        
+        guard rowIndex >= 0 && rowIndex < panel.items.count else {
+            return nil
+        }
+        
+        let node = panel.items[rowIndex]
+        
+        // Check if node is draggable (resolve with current modifiers)
+        let behavior = node.onLeftClick.resolve(with: NSEvent.modifierFlags)
+        
+        if case .drag(let provider) = behavior {
+            return (node, provider, level)
+        }
+        
+        return nil
+    }
+    
     // MARK: - Test Helpers
     
     /// Show panel with sample test data

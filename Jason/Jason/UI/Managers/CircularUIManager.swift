@@ -504,22 +504,57 @@ class CircularUIManager: ObservableObject {
     }
     
     private func handleDragStart(event: GestureManager.GestureEvent) {
+        // 1. Check if drag started inside a panel FIRST
+        if let panelManager = listPanelManager {
+            if let result = panelManager.handleDragStart(at: event.position) {
+                print("🖱️ [Drag Start] On panel item: '\(result.node.name)' at level \(result.level)")
+                
+                // Stop tracking during drag
+                mouseTracker?.stopTrackingMouse()
+                gestureManager?.stopMonitoring()
+                print("⏸️ Mouse tracking paused for panel drag operation")
+                
+                // Copy provider and update modifier flags
+                var provider = result.dragProvider
+                provider.modifierFlags = event.modifierFlags
+                
+                // Wrap completion to hide UI after drag
+                let originalCompletion = provider.onDragCompleted
+                provider.onDragCompleted = { [weak self] success in
+                    originalCompletion?(success)
+                    DispatchQueue.main.async {
+                        print("🏁 Panel drag completed - hiding UI")
+                        self?.hide()
+                    }
+                }
+                
+                self.currentDragProvider = provider
+                self.dragStartPoint = event.position
+                self.draggedNode = result.node
+                
+                print("✅ Panel drag initialized for: \(result.node.name)")
+                print("   Files: \(provider.fileURLs.map { $0.lastPathComponent }.joined(separator: ", "))")
+                
+                provider.onDragStarted?()
+                return
+            }
+        }
+        
+        // 2. Fall through to ring check
         guard let functionManager = functionManager else { return }
         
-        // Use position-based detection instead of hoveredIndex
         guard let (ringLevel, index, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) else {
             print("⚠️ Drag start not on any item")
             return
         }
         
-        print("🖱️ [Drag Start] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
+        print("🖱️ [Drag Start] On ring item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
         // Check if the node is draggable (resolve with current modifiers)
         let behavior = node.onLeftClick.resolve(with: event.modifierFlags)
         
         if case .drag(var provider) = behavior {
-            // 🛑 STOP MOUSE TRACKING DURING DRAG
-            // This prevents the ring UI from updating while user is dragging
+            // Stop mouse tracking during drag
             mouseTracker?.stopTrackingMouse()
             gestureManager?.stopMonitoring()
             print("⏸️ Mouse tracking paused for drag operation")
@@ -530,10 +565,7 @@ class CircularUIManager: ObservableObject {
             // Wrap the original onDragCompleted to hide UI after drag
             let originalCompletion = provider.onDragCompleted
             provider.onDragCompleted = { [weak self] success in
-                // Call original completion handler first
                 originalCompletion?(success)
-                
-                // Hide the UI after drag completes (success or cancelled)
                 DispatchQueue.main.async {
                     print("🏁 Drag completed - hiding UI")
                     self?.hide()
@@ -544,11 +576,10 @@ class CircularUIManager: ObservableObject {
             self.dragStartPoint = event.position
             self.draggedNode = node
             
-            print("✅ Drag initialized for: \(node.name)")
+            print("✅ Ring drag initialized for: \(node.name)")
             print("   Files: \(provider.fileURLs.map { $0.lastPathComponent }.joined(separator: ", "))")
             print("   Modifiers: \(event.modifierFlags)")
             
-            // Call onDragStarted if provided
             provider.onDragStarted?()
         } else {
             print("⚠️ Node is not draggable")
@@ -1078,6 +1109,9 @@ class CircularUIManager: ObservableObject {
     // MARK: - Hide Method
 
     func hide() {
+        // Stop mouse monitor FIRST to prevent blocking permission dialogs
+        pauseMouseMonitor()
+        
         if isInHoldMode {
             executeHoveredItemIfInHoldMode()
         }
@@ -1240,5 +1274,32 @@ class CircularUIManager: ObservableObject {
             type: .file,
             icon: icon
         )
+    }
+
+    func pauseMouseMonitor() {
+        if let monitor = panelMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            panelMouseMonitor = nil
+            print("⏸️ [MouseMonitor] Paused")
+        }
+    }
+
+    func resumeMouseMonitor() {
+        guard panelMouseMonitor == nil else { return }
+        
+        panelMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            guard let self = self,
+                  self.isVisible,
+                  let panelManager = self.listPanelManager,
+                  panelManager.isVisible else {
+                return event
+            }
+            
+            let mousePosition = NSEvent.mouseLocation
+            panelManager.handleMouseMove(at: mousePosition)
+            
+            return event
+        }
+        print("▶️ [MouseMonitor] Resumed")
     }
 }
