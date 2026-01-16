@@ -20,18 +20,21 @@ struct PanelState: Identifiable {
     let position: CGPoint
     let level: Int                    // 0 = from ring, 1+ = from panel
     let sourceNodeId: String?         // Which node spawned this panel
+    let sourceRowIndex: Int?
     var expandedItemId: String?       // Which row has context actions showing
+    var isOverlapping: Bool = false
     
     // Panel dimensions (constants for now, could be configurable)
     static let panelWidth: CGFloat = 260
     static let rowHeight: CGFloat = 32
+    static let titleHeight: CGFloat = 28
     static let maxVisibleItems: Int = 10
     static let padding: CGFloat = 8
     
     /// Calculate panel height based on item count
     var panelHeight: CGFloat {
         let itemCount = min(items.count, Self.maxVisibleItems)
-        return CGFloat(itemCount) * Self.rowHeight + Self.padding
+        return Self.titleHeight + CGFloat(itemCount) * Self.rowHeight + Self.padding    // UPDATED
     }
     
     /// Panel bounds in screen coordinates
@@ -52,6 +55,14 @@ class ListPanelManager: ObservableObject {
     // MARK: - Published State
     
     @Published var panelStack: [PanelState] = []
+    
+    // MARK: - Sliding Configuration
+    
+    /// How much of the previous panel stays visible when overlapped
+    let peekWidth: CGFloat = 75
+    
+    /// How far across the row (0-1) before triggering slide
+    let slideThreshold: CGFloat = 0.5
     
     // MARK: - Computed Properties
     
@@ -125,7 +136,9 @@ class ListPanelManager: ObservableObject {
                 position: position,
                 level: 0,
                 sourceNodeId: nil,
-                expandedItemId: nil
+                sourceRowIndex: nil,
+                expandedItemId: nil,
+                isOverlapping: false
             )
         ]
     }
@@ -140,11 +153,120 @@ class ListPanelManager: ObservableObject {
                 position: position,
                 level: 0,
                 sourceNodeId: nil,
-                expandedItemId: nil
+                sourceRowIndex: nil,
+                expandedItemId: nil,
+                isOverlapping: false
             )
         ]
     }
     
+    // MARK: - Bounds Calculation
+
+    /// Get the current bounds for a panel (accounting for overlap state)
+    func currentBounds(for panel: PanelState) -> NSRect {
+        let currentPos = currentPosition(for: panel)
+        return NSRect(
+            x: currentPos.x - PanelState.panelWidth / 2,
+            y: currentPos.y - panel.panelHeight / 2,
+            width: PanelState.panelWidth,
+            height: panel.panelHeight
+        )
+    }
+
+    /// Calculate the screen bounds of a specific row in a panel
+    func rowBounds(forPanel panel: PanelState, rowIndex: Int) -> NSRect? {
+        guard rowIndex >= 0 && rowIndex < panel.items.count else { return nil }
+        
+        let panelBounds = currentBounds(for: panel)    // CHANGED: use current bounds
+        
+        // Row Y position: starts below title, each row is rowHeight tall
+        // In screen coordinates, Y increases upward, so top row has highest Y
+        let rowTop = panelBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight - (CGFloat(rowIndex) * PanelState.rowHeight)
+        let rowBottom = rowTop - PanelState.rowHeight
+        
+        // Row X spans the panel width (with some padding)
+        let horizontalPadding: CGFloat = 4
+        let rowLeft = panelBounds.minX + horizontalPadding
+        let rowRight = panelBounds.maxX - horizontalPadding
+        
+        return NSRect(
+            x: rowLeft,
+            y: rowBottom,
+            width: rowRight - rowLeft,
+            height: PanelState.rowHeight
+        )
+    }
+    
+    // MARK: - Mouse Movement Tracking
+
+    /// Handle mouse movement to trigger panel sliding
+    func handleMouseMove(at point: CGPoint) {
+        // Check each panel that has a child panel
+        for index in panelStack.indices {
+            let panel = panelStack[index]
+            
+            // Find child panel (level + 1)
+            guard let childIndex = panelStack.firstIndex(where: { $0.level == panel.level + 1 }),
+                  let sourceRowIndex = panelStack[childIndex].sourceRowIndex else {
+                continue
+            }
+            
+            // Get the source row bounds
+            guard let sourceBounds = rowBounds(forPanel: panel, rowIndex: sourceRowIndex) else {
+                continue
+            }
+            
+            // Check if mouse is in the source row
+            if sourceBounds.contains(point) {
+                // Calculate progress across the row (0 to 1)
+                let progress = (point.x - sourceBounds.minX) / sourceBounds.width
+                let shouldOverlap = progress > slideThreshold
+                
+                // Update if changed
+                if panelStack[childIndex].isOverlapping != shouldOverlap {
+                    panelStack[childIndex].isOverlapping = shouldOverlap
+                    print("📋 [Slide] Panel level \(panelStack[childIndex].level) isOverlapping: \(shouldOverlap)")
+                }
+            }
+        }
+    }
+
+    // MARK: - Position Calculation
+
+    /// Get the current position for a panel (accounting for overlap state)
+    func currentPosition(for panel: PanelState) -> CGPoint {
+        guard panel.isOverlapping else {
+            // Not overlapping, but ancestors might be shifted - need to adjust
+            if panel.level > 0,
+               let parentPanel = panelStack.first(where: { $0.level == panel.level - 1 }) {
+                let parentOriginalX = parentPanel.position.x
+                let parentCurrentPos = currentPosition(for: parentPanel)
+                let parentShift = parentCurrentPos.x - parentOriginalX
+                
+                // Only shift if there's actually a difference
+                if abs(parentShift) > 0.1 {
+                    return CGPoint(x: panel.position.x + parentShift, y: panel.position.y)
+                }
+            }
+            return panel.position
+        }
+        
+        // Panel is overlapping - calculate position relative to parent's CURRENT position
+        guard let parentPanel = panelStack.first(where: { $0.level == panel.level - 1 }) else {
+            return panel.position
+        }
+        
+        // Get parent's current position (recursive - handles chain of overlaps)
+        let parentCurrentPos = currentPosition(for: parentPanel)
+        
+        // Calculate parent's current left edge
+        let parentCurrentLeftEdge = parentCurrentPos.x - (PanelState.panelWidth / 2)
+        
+        // Overlapping X: parent's current left edge + peekWidth + half panel width
+        let overlappingX = parentCurrentLeftEdge + peekWidth + (PanelState.panelWidth / 2)
+        
+        return CGPoint(x: overlappingX, y: panel.position.y)
+    }
     // MARK: - Push Panel (Cascading)
 
     /// Push a new panel from an existing panel (cascade to the right)
@@ -153,7 +275,7 @@ class ListPanelManager: ObservableObject {
         items: [FunctionNode],
         fromPanelAtLevel level: Int,
         sourceNodeId: String,
-        sourceRowIndex: Int? = nil  // ADD THIS
+        sourceRowIndex: Int? = nil
     ) {
         // Find the source panel
         guard let sourcePanel = panelStack.first(where: { $0.level == level }) else {
@@ -170,21 +292,19 @@ class ListPanelManager: ObservableObject {
         
         let newPanelWidth = PanelState.panelWidth
         let itemCount = min(items.count, PanelState.maxVisibleItems)
-        let newPanelHeight = CGFloat(itemCount) * PanelState.rowHeight + PanelState.padding
+        let newPanelHeight = CGFloat(itemCount) * PanelState.rowHeight + PanelState.padding + PanelState.titleHeight
         
         // New panel's left edge aligns with source panel's right edge + gap
         let newX = sourceBounds.maxX + gap + (newPanelWidth / 2)
         
         // Calculate Y position based on source row
+        // Offset DOWN by 1 row so panel title aligns with source row
         let newY: CGFloat
         if let rowIndex = sourceRowIndex {
-            // Align new panel's top with the source row's vertical center
-            let rowCenterY = sourceBounds.maxY - (PanelState.padding / 2) - (CGFloat(rowIndex) * PanelState.rowHeight) - (PanelState.rowHeight / 2)
-            // New panel's center Y = top of new panel + half height
-            // We want new panel's top row to align with source row
-            newY = rowCenterY - (newPanelHeight / 2) + (PanelState.rowHeight / 2) + (PanelState.padding / 2)
+            let rowCenterY = sourceBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight - (CGFloat(rowIndex) * PanelState.rowHeight) - (PanelState.rowHeight / 2)
+            // Offset by 1 row: subtract rowHeight so title aligns with source row
+            newY = rowCenterY - (newPanelHeight / 2) + (PanelState.rowHeight / 2) + (PanelState.padding / 2) + PanelState.titleHeight - PanelState.rowHeight
         } else {
-            // Fallback: center vertically with source panel
             newY = sourceBounds.midY
         }
         
@@ -196,12 +316,14 @@ class ListPanelManager: ObservableObject {
             position: newPosition,
             level: level + 1,
             sourceNodeId: sourceNodeId,
-            expandedItemId: nil
+            sourceRowIndex: sourceRowIndex,    // NEW: pass through
+            expandedItemId: nil,
+            isOverlapping: false               // NEW: starts not overlapping
         )
         
         panelStack.append(newPanel)
         
-        print("📋 [ListPanelManager] Pushed panel level \(level + 1)")
+        print("📋 [ListPanelManager] Pushed panel '\(title)' at level \(level + 1)")
         print("   Items: \(items.count)")
         print("   Position: \(newPosition)")
         print("   Source row: \(sourceRowIndex ?? -1)")
@@ -311,7 +433,7 @@ class ListPanelManager: ObservableObject {
     func panelLevel(at point: CGPoint) -> Int? {
         // Check from rightmost to leftmost (higher levels first)
         for panel in panelStack.reversed() {
-            if panel.bounds.contains(point) {
+            if currentBounds(for: panel).contains(point) {    // CHANGED
                 return panel.level
             }
         }
@@ -339,10 +461,10 @@ class ListPanelManager: ObservableObject {
         }
         
         let panel = panelStack[panelIndex]
-        let bounds = panel.bounds
+        let bounds = currentBounds(for: panel)    // CHANGED
         
-        // Calculate which row was clicked
-        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2)
+        // Calculate which row was clicked (accounting for title)
+        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight    // CHANGED
         let rowIndex = Int(relativeY / PanelState.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < panel.items.count else {
@@ -373,10 +495,10 @@ class ListPanelManager: ObservableObject {
         }
         
         let panel = panelStack[panelIndex]
-        let bounds = panel.bounds
+        let bounds = currentBounds(for: panel)    // CHANGED
         
-        // Calculate which row was clicked
-        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2)
+        // Calculate which row was clicked (accounting for title)
+        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight    // CHANGED
         let rowIndex = Int(relativeY / PanelState.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < panel.items.count else {

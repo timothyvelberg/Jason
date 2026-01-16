@@ -87,9 +87,10 @@ struct CircularUIView: View {
                     let screenOriginY = screen?.frame.origin.y ?? 0
                     let screenHeight = screen?.frame.height ?? 1080
                     
-                    // Convert panel position from global AppKit to SwiftUI coordinates
-                    let panelLocalX = panel.position.x - screenOriginX
-                    let panelLocalY = panel.position.y - screenOriginY
+                    // Use currentPosition which accounts for overlap state
+                    let currentPos = listPanelManager.currentPosition(for: panel)
+                    let panelLocalX = currentPos.x - screenOriginX
+                    let panelLocalY = currentPos.y - screenOriginY
                     let panelSwiftUIY = screenHeight - panelLocalY
                     
                     ListPanelView(
@@ -104,6 +105,7 @@ struct CircularUIView: View {
                         expandedItemId: expandedItemIdBinding(for: panel.level)
                     )
                     .position(x: panelLocalX, y: panelSwiftUIY)
+                    .animation(.easeInOut(duration: 0.15), value: panel.isOverlapping)
                 }
             }
             .ignoresSafeArea()

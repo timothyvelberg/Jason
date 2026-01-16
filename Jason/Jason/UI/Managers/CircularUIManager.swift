@@ -18,7 +18,9 @@ class CircularUIManager: ObservableObject {
     @Published var currentDragProvider: DragProvider?
     @Published var dragStartPoint: CGPoint?
     @Published var triggerDirection: RotationDirection? = nil
+    
     private var draggedNode: FunctionNode?
+    private var panelMouseMonitor: Any?
     
     var overlayWindow: OverlayWindow?
     private(set) var combinedAppsProvider: CombinedAppsProvider?
@@ -89,7 +91,13 @@ class CircularUIManager: ObservableObject {
         // Clean up notification observer
         NotificationCenter.default.removeObserver(self)
         print("🧹 CircularUIManager deallocated - removed observers")
+        
+        if let monitor = panelMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
     }
+    
+    
     
     // MARK: - Provider Update Handler
 
@@ -343,13 +351,24 @@ class CircularUIManager: ObservableObject {
                 case .click(.middle):
                     self.handleMiddleClick(event: event)
                 case .dragStarted:
-                    
-                    
-                    
                     self.handleDragStart(event: event)
                 default:
                     break
                 }
+            }
+            
+            // Wire mouse movement for panel sliding
+            panelMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+                guard let self = self,
+                      let panelManager = self.listPanelManager,
+                      panelManager.isVisible else {
+                    return event
+                }
+                
+                let mousePosition = NSEvent.mouseLocation
+                panelManager.handleMouseMove(at: mousePosition)
+                
+                return event
             }
         }
         
