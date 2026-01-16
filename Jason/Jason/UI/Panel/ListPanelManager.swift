@@ -59,7 +59,7 @@ class ListPanelManager: ObservableObject {
     // MARK: - Sliding Configuration
     
     /// How much of the previous panel stays visible when overlapped
-    let peekWidth: CGFloat = 75
+    let peekWidth: CGFloat = 80
     
     /// How far across the row (0-1) before triggering slide
     let slideThreshold: CGFloat = 0.5
