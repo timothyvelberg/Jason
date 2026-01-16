@@ -311,14 +311,15 @@ class CircularUIManager: ObservableObject {
                     return
                 }
                 
-                // Check if this node's panel is already showing
+                // Check if this node's panel is already showing at level+1
                 if let existingPanel = self.listPanelManager?.panel(at: level + 1),
                    existingPanel.sourceNodeId == node.id {
-                    // Already showing this folder's panel
+                    // Same folder - keep level+1 but pop anything ABOVE it
+                    self.listPanelManager?.popToLevel(level + 1)
                     return
                 }
                 
-                // Cascade: push new panel aligned with source row
+                // Different folder - cascade: push new panel (this pops level+1 and above)
                 self.listPanelManager?.pushPanel(
                     items: children,
                     fromPanelAtLevel: level,
@@ -340,6 +341,9 @@ class CircularUIManager: ObservableObject {
                 case .click(.middle):
                     self.handleMiddleClick(event: event)
                 case .dragStarted:
+                    
+                    
+                    
                     self.handleDragStart(event: event)
                 default:
                     break
