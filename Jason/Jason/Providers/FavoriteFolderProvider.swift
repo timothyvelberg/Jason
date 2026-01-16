@@ -315,6 +315,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             name: fileName,
             type: .file,
             icon: dragImage,
+            childDisplayMode: .panel,
             contextActions: [
                 StandardContextActions.copyFile(url),
                 StandardContextActions.deleteFile(url),
@@ -363,6 +364,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             type: .folder,
             icon: icon,
             children: nil,
+            childDisplayMode: .panel,
             contextActions: [
                 StandardContextActions.showInFinder(url),
                 StandardContextActions.deleteFile(url)
@@ -416,6 +418,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             name: fileName,
             type: .file,
             icon: icon,
+            childDisplayMode: .panel,
             contextActions: [
                 StandardContextActions.copyFile(url),
                 StandardContextActions.deleteFile(url),
@@ -450,7 +453,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 print("🖱️ Middle-click opening: \(fileName)")
                 NSWorkspace.shared.open(url)
             }),
-            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+            onBoundaryCross: ModifierAwareInteraction(base: .navigateInto)
         )
     }
     
@@ -465,6 +468,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             type: .folder,
             icon: icon,
             children: nil,
+            childDisplayMode: .panel,
             contextActions: [
                 StandardContextActions.showInFinder(url),
                 StandardContextActions.deleteFile(url)
@@ -496,7 +500,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 print("📂 Middle-click opening folder: \(folderName)")
                 NSWorkspace.shared.open(url)
             }),
-            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+            onBoundaryCross: ModifierAwareInteraction(base: .navigateInto)
         )
     }
     
@@ -552,6 +556,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             type: .folder,
             icon: folderIcon,
             children: nil,
+            childDisplayMode: .panel,
             preferredLayout: layout,
             itemAngleSize: itemAngle,
             showLabel: true,
@@ -581,7 +586,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 DatabaseManager.shared.updateFolderAccess(path: path.path)
                 NSWorkspace.shared.open(path)
             }),
-            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+            onBoundaryCross: ModifierAwareInteraction(base: .navigateInto)
         )
     }
     

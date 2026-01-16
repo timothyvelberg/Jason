@@ -279,18 +279,46 @@ class CircularUIManager: ObservableObject {
             mouseTracker?.onExpandToPanel = { [weak self] node, angle, ringCenter, ringOuterRadius in
                 guard let self = self else { return }
                 
-                guard let children = node.children, !children.isEmpty else {
-                    print("📋 [ExpandToPanel] Node '\(node.name)' has no children")
+                // Check if children already loaded
+                if let children = node.children, !children.isEmpty {
+                    self.listPanelManager?.show(
+                        title: node.name,
+                        items: children,
+                        ringCenter: ringCenter,
+                        ringOuterRadius: ringOuterRadius,
+                        angle: angle
+                    )
                     return
                 }
                 
-                self.listPanelManager?.show(
-                    title: node.name,
-                    items: children,
-                    ringCenter: ringCenter,
-                    ringOuterRadius: ringOuterRadius,
-                    angle: angle
-                )
+                // Children not loaded - check if we can load dynamically
+                guard node.needsDynamicLoading,
+                      let providerId = node.providerId,
+                      let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) else {
+                    print("📋 [ExpandToPanel] Node '\(node.name)' has no children and can't load dynamically")
+                    return
+                }
+                
+                // Load children asynchronously
+                Task {
+                    let children = await provider.loadChildren(for: node)
+                    
+                    guard !children.isEmpty else {
+                        print("📋 [ExpandToPanel] No children loaded for: \(node.name)")
+                        return
+                    }
+                    
+                    // Show panel on main thread
+                    await MainActor.run {
+                        self.listPanelManager?.show(
+                            title: node.name,
+                            items: children,
+                            ringCenter: ringCenter,
+                            ringOuterRadius: ringOuterRadius,
+                            angle: angle
+                        )
+                    }
+                }
             }
             
             // Wire panel item click callbacks
@@ -311,11 +339,9 @@ class CircularUIManager: ObservableObject {
                     return
                 }
                 
-                // Only cascade for folders with children
-                guard node.type == .folder,
-                      let children = node.children,
-                      !children.isEmpty else {
-                    // Not a folder or no children - pop any panels above this level
+                // Only cascade for folders
+                guard node.type == .folder else {
+                    // Not a folder - pop any panels above this level
                     self.listPanelManager?.popToLevel(level)
                     return
                 }
@@ -328,14 +354,48 @@ class CircularUIManager: ObservableObject {
                     return
                 }
                 
-                // Different folder - cascade: push new panel (this pops level+1 and above)
-                self.listPanelManager?.pushPanel(
-                    title: node.name,
-                    items: children,
-                    fromPanelAtLevel: level,
-                    sourceNodeId: node.id,
-                    sourceRowIndex: rowIndex
-                )
+                // Check if children already loaded
+                if let children = node.children, !children.isEmpty {
+                    // Cascade with existing children
+                    self.listPanelManager?.pushPanel(
+                        title: node.name,
+                        items: children,
+                        fromPanelAtLevel: level,
+                        sourceNodeId: node.id,
+                        sourceRowIndex: rowIndex
+                    )
+                    return
+                }
+                
+                // Children not loaded - check if we can load dynamically
+                guard node.needsDynamicLoading,
+                      let providerId = node.providerId,
+                      let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) else {
+                    // Can't load dynamically - pop panels above
+                    self.listPanelManager?.popToLevel(level)
+                    return
+                }
+                
+                // Load children asynchronously
+                Task {
+                    let children = await provider.loadChildren(for: node)
+                    
+                    guard !children.isEmpty else {
+                        print("📋 [Panel] No children loaded for: \(node.name)")
+                        return
+                    }
+                    
+                    // Push panel on main thread
+                    await MainActor.run {
+                        self.listPanelManager?.pushPanel(
+                            title: node.name,
+                            items: children,
+                            fromPanelAtLevel: level,
+                            sourceNodeId: node.id,
+                            sourceRowIndex: rowIndex
+                        )
+                    }
+                }
             }
 
             self.gestureManager = GestureManager()
