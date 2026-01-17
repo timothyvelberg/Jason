@@ -337,7 +337,6 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 type: .category,
                 icon: providerIcon,
                 children: appNodes,
-                childDisplayMode: .panel,
                 preferredLayout: .partialSlice,
                 slicePositioning: .center,
                 providerId: providerId,

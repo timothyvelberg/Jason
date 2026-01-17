@@ -289,6 +289,13 @@ class MouseTracker {
                                         }
                                         lastExecutedNodeId = node.id
                                     }
+                                    
+                                    // Always update ring hover state (keeps highlight in sync with mouse angle)
+                                    if pieIndex != lastFunctionIndex || activeRingLevel != lastRingLevel {
+                                        functionManager.hoverNode(ringLevel: activeRingLevel, index: pieIndex)
+                                        onPieHover?(pieIndex)
+                                    }
+                                    
                                     lastFunctionIndex = pieIndex
                                     lastRingLevel = activeRingLevel
                                     return
@@ -311,6 +318,13 @@ class MouseTracker {
                                         }
                                         lastExecutedNodeId = node.id
                                     }
+                                    
+                                    // Always update ring hover state (keeps highlight in sync with mouse angle)
+                                    if pieIndex != lastFunctionIndex || activeRingLevel != lastRingLevel {
+                                        functionManager.hoverNode(ringLevel: activeRingLevel, index: pieIndex)
+                                        onPieHover?(pieIndex)
+                                    }
+                                    
                                     lastFunctionIndex = pieIndex
                                     lastRingLevel = activeRingLevel
                                     return
