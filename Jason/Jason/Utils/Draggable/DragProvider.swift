@@ -26,6 +26,7 @@ struct DragProvider {
     let allowedOperations: NSDragOperation
     let clickBehavior: DragClickBehavior
     var onDragStarted: (() -> Void)?
+    var onDragSessionBegan: (() -> Void)?
     var onDragCompleted: ((Bool) -> Void)?
     
     // Modifier flags captured when drag starts (and updated during drag)

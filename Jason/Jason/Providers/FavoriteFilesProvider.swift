@@ -379,9 +379,9 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 preferredLayout: .partialSlice,
                 slicePositioning: .center,
                 providerId: providerId,
-                onLeftClick: ModifierAwareInteraction(base: .expand),
+                onLeftClick: ModifierAwareInteraction(base: .doNothing),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
-                onMiddleClick: ModifierAwareInteraction(base: .expand),
+                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
                 onBoundaryCross: ModifierAwareInteraction(base: .expand)
             )
         ]

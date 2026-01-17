@@ -56,6 +56,7 @@ class DraggableOverlayView: NSView {
         // Write file URLs to pasteboard
         pasteboard.writeObjects(provider.fileURLs as [NSPasteboardWriting])
         
+        
         // Create drag image
         let dragImage = createDragImage(for: provider)
         
@@ -195,6 +196,8 @@ extension DraggableOverlayView: NSDraggingSource {
     
     func draggingSession(_ session: NSDraggingSession, willBeginAt screenPoint: NSPoint) {
         print("🎯 Drag session beginning at \(screenPoint)")
+        
+        dragProvider?.onDragSessionBegan?()
         
         // Log the initial operation
         let currentModifiers = NSEvent.modifierFlags

@@ -518,6 +518,13 @@ class CircularUIManager: ObservableObject {
                 var provider = result.dragProvider
                 provider.modifierFlags = event.modifierFlags
                 
+                // Add this after setting up the provider, before calling onDragStarted:
+                provider.onDragSessionBegan = { [weak self] in
+                    DispatchQueue.main.async {
+                        self?.overlayWindow?.orderOut(nil)
+                    }
+                }
+                
                 // Wrap completion to hide UI after drag
                 let originalCompletion = provider.onDragCompleted
                 provider.onDragCompleted = { [weak self] success in
