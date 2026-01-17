@@ -198,6 +198,13 @@ class ListPanelManager: ObservableObject {
             itemCount: items.count
         )
         
+        // Calculate panel height for boundary check
+        let itemCountClamped = min(items.count, PanelState.maxVisibleItems)
+        let panelHeight = PanelState.titleHeight + CGFloat(itemCountClamped) * PanelState.rowHeight + PanelState.padding
+
+        // Constrain to screen boundaries (left, top, bottom only)
+        let constrainedPosition = constrainToScreenBounds(position: position, panelWidth: panelWidth, panelHeight: panelHeight)
+        
         print("📋 [ListPanelManager] Showing panel at angle \(angle)°")
         print("   Items: \(items.count)")
         print("   Panel center: \(position)")
@@ -207,7 +214,7 @@ class ListPanelManager: ObservableObject {
             PanelState(
                 title: title,
                 items: items,
-                position: position,
+                position: constrainedPosition,
                 level: 0,
                 sourceNodeId: nil,
                 sourceRowIndex: nil,
@@ -473,11 +480,13 @@ class ListPanelManager: ObservableObject {
         }
         
         let newPosition = CGPoint(x: newX, y: newY)
+        // Constrain to screen boundaries (left, top, bottom only)
+        let constrainedPosition = constrainToScreenBounds(position: newPosition, panelWidth: newPanelWidth, panelHeight: newPanelHeight)
         
         let newPanel = PanelState(
             title: title,
             items: items,
-            position: newPosition,
+            position: constrainedPosition,
             level: level + 1,
             sourceNodeId: sourceNodeId,
             sourceRowIndex: sourceRowIndex,
@@ -792,5 +801,45 @@ class ListPanelManager: ObservableObject {
                 print("🧪 [Test] Would open: \(name)")
             })
         )
+    }
+    
+    // MARK: - Screen Boundary Constraints
+
+    /// Constrain panel position to screen boundaries (left, top, bottom only - NOT right)
+    private func constrainToScreenBounds(position: CGPoint, panelWidth: CGFloat, panelHeight: CGFloat) -> CGPoint {
+        // Get current screen (use main screen as fallback)
+        let screen = NSScreen.main ?? NSScreen.screens.first
+        guard let visibleFrame = screen?.visibleFrame else {
+            return position
+        }
+        
+        var constrainedX = position.x
+        var constrainedY = position.y
+        
+        let halfWidth = panelWidth / 2
+        let halfHeight = panelHeight / 2
+        
+        // Left boundary: panel's left edge can't go past screen's left edge
+        let minX = visibleFrame.minX + halfWidth
+        if constrainedX < minX {
+            constrainedX = minX
+        }
+        
+        // Bottom boundary: panel's bottom edge can't go past screen's bottom edge
+        let minY = visibleFrame.minY + halfHeight
+        if constrainedY < minY {
+            constrainedY = minY
+        }
+        
+        // Top boundary: panel's top edge can't go past screen's top edge
+        let maxY = visibleFrame.maxY - halfHeight
+        if constrainedY > maxY {
+            constrainedY = maxY
+        }
+        
+        // RIGHT boundary: intentionally NOT constrained
+        // Panels flow left-to-right; if they go off-screen, user should reposition ring
+        
+        return CGPoint(x: constrainedX, y: constrainedY)
     }
 }

@@ -13,7 +13,7 @@ class MouseTracker {
     private var trackingTimer: Timer?
     private var lastFunctionIndex: Int?
     private var lastRingLevel: Int?  // Can be nil when outside all rings
-    private var isPausedAfterScroll = false
+    private var isPausedUntilMovement = false
     private var lastMouseLocation: NSPoint?
     internal var ringLevelAtPause: Int?
     private var lastExecutedNodeId: String?
@@ -67,8 +67,8 @@ class MouseTracker {
         print("Mouse tracking stopped")
     }
     
-    func pauseAfterScroll() {
-        isPausedAfterScroll = true
+    func pauseUntilMovement() {
+        isPausedUntilMovement = true
         lastMouseLocation = NSEvent.mouseLocation
         ringLevelAtPause = lastRingLevel  // Remember which ring we clicked in
         print("⏸️ [MouseTracker] Paused tracking - clicked in ring level: \(ringLevelAtPause ?? -1)")
@@ -87,7 +87,7 @@ class MouseTracker {
     }
     
     func resumeTracking() {
-        isPausedAfterScroll = false
+        isPausedUntilMovement = false
         lastMouseLocation = NSEvent.mouseLocation
         print("▶️ [MouseTracker] Resumed tracking")
     }
@@ -108,11 +108,11 @@ class MouseTracker {
         }
         
         // Check if paused and if mouse moved enough to resume
-        if isPausedAfterScroll {
+        if isPausedUntilMovement {
             if let last = lastMouseLocation {
                 let moved = abs(current.x - last.x) > 5 || abs(current.y - last.y) > 5  // Increased threshold
                 if moved {
-                    isPausedAfterScroll = false
+                    isPausedUntilMovement = false
                     print("▶️ [MouseTracker] Resumed tracking after mouse movement")
                     lastMouseLocation = current  // Update now that we resumed
                 } else {
@@ -121,7 +121,7 @@ class MouseTracker {
                 }
             } else {
                 // No last position stored, resume immediately
-                isPausedAfterScroll = false
+                isPausedUntilMovement = false
                 lastMouseLocation = current
             }
         } else {

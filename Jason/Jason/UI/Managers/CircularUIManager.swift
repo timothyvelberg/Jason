@@ -288,6 +288,7 @@ class CircularUIManager: ObservableObject {
                         ringOuterRadius: ringOuterRadius,
                         angle: angle
                     )
+                    self.mouseTracker?.pauseUntilMovement()
                     return
                 }
                 
@@ -317,6 +318,7 @@ class CircularUIManager: ObservableObject {
                             ringOuterRadius: ringOuterRadius,
                             angle: angle
                         )
+                        self.mouseTracker?.pauseUntilMovement()
                     }
                 }
             }
@@ -613,12 +615,12 @@ class CircularUIManager: ObservableObject {
                 case .navigateInto:
                     print("📜 Scroll detected - navigating into folder")
                     functionManager.navigateIntoFolder(ringLevel: hoveredRingLevel, index: hoveredIndex)
-                    mouseTracker?.pauseAfterScroll()
+                    mouseTracker?.pauseUntilMovement()
                     
                 case .expand:
                     print("📜 Scroll detected - expanding category")
                     functionManager.expandCategory(ringLevel: hoveredRingLevel, index: hoveredIndex, openedByClick: true)
-                    mouseTracker?.pauseAfterScroll()
+                    mouseTracker?.pauseUntilMovement()
                     
                 default:
                     break
@@ -638,7 +640,7 @@ class CircularUIManager: ObservableObject {
         if currentLevel > 0 {
             print("📜 Scroll back detected - collapsing to ring \(currentLevel - 1)")
             functionManager.collapseToRing(level: currentLevel - 1)
-            mouseTracker?.pauseAfterScroll()
+            mouseTracker?.pauseUntilMovement()
         }
     }
     
@@ -665,13 +667,13 @@ class CircularUIManager: ObservableObject {
         case .expand:
             functionManager.expandCategory(ringLevel: ringLevel, index: index, openedByClick: true)
             // Pause mouse tracking to prevent immediate collapse
-            mouseTracker?.pauseAfterScroll()
+            mouseTracker?.pauseUntilMovement()
             
         case .navigateInto:
             print("📂 Navigating into folder: '\(node.name)'")
             functionManager.navigateIntoFolder(ringLevel: ringLevel, index: index)
             // Pause mouse tracking to prevent immediate collapse
-            mouseTracker?.pauseAfterScroll()
+            mouseTracker?.pauseUntilMovement()
             
         case .launchRing(let configId):
             print("🚀 [Right Click] Launching ring config \(configId)")
