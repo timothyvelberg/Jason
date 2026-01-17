@@ -1,4 +1,3 @@
-
 //
 //  CircularUIView.swift
 //  Jason
@@ -93,6 +92,9 @@ struct CircularUIView: View {
                     let panelLocalY = currentPos.y - screenOriginY
                     let panelSwiftUIY = screenHeight - panelLocalY
                     
+                    // Capture panel level for the closure
+                    let panelLevel = panel.level
+                    
                     ListPanelView(
                         title: panel.title,
                         items: panel.items,
@@ -100,7 +102,13 @@ struct CircularUIView: View {
                         onItemRightClick: listPanelManager.onItemRightClick,
                         onContextAction: listPanelManager.onContextAction,
                         onItemHover: { node, rowIndex in
-                            listPanelManager.onItemHover?(node, panel.level, rowIndex)
+                            listPanelManager.handleItemHover(node: node, level: panelLevel, rowIndex: rowIndex)
+                        },
+                        onScrollOffsetChanged: { offset in
+                            listPanelManager.updateScrollOffset(offset, forLevel: panelLevel)
+                        },
+                        onScrollStateChanged: { isScrolling in
+                            listPanelManager.handleScrollStateChanged(isScrolling: isScrolling, forLevel: panelLevel)
                         },
                         expandedItemId: expandedItemIdBinding(for: panel.level)
                     )

@@ -12,7 +12,7 @@ import AppKit
 // MARK: - List Panel View
 
 struct ListPanelView: View {
-    let title: String                 // NEW
+    let title: String
     let items: [FunctionNode]
     
     // Callbacks for interactions
@@ -20,6 +20,8 @@ struct ListPanelView: View {
     var onItemRightClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onContextAction: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onItemHover: ((FunctionNode?, Int?) -> Void)?
+    var onScrollOffsetChanged: ((CGFloat) -> Void)?  // Current scroll offset
+    var onScrollStateChanged: ((Bool) -> Void)?  // true = scrolling started, false = stopped
     
     // Expanded state from manager
     @Binding var expandedItemId: String?
@@ -33,15 +35,18 @@ struct ListPanelView: View {
     
     // State
     @State private var hoveredItemId: String? = nil
+    @State private var isScrolling: Bool = false
+    @State private var lastScrollOffset: CGFloat = 0
+    @State private var scrollDebounceTask: DispatchWorkItem? = nil
     
     // Computed
-    private var titleHeight: CGFloat { 28 }    // NEW
+    private var titleHeight: CGFloat { 28 }
     
     private var panelHeight: CGFloat {
         let itemCount = min(items.count, maxVisibleItems)
         let contentHeight = CGFloat(itemCount) * rowHeight
         let padding: CGFloat = 8
-        return titleHeight + contentHeight + padding    // UPDATED: added titleHeight
+        return titleHeight + contentHeight + padding
     }
     
     private var needsScroll: Bool {
@@ -62,7 +67,7 @@ struct ListPanelView: View {
             
             // Content
             VStack(spacing: 0) {
-                // NEW: Title bar
+                // Title bar
                 HStack {
                     Text(title)
                         .font(.system(size: 12, weight: .semibold))
@@ -80,7 +85,7 @@ struct ListPanelView: View {
                                 item: item,
                                 iconSize: iconSize,
                                 rowHeight: rowHeight,
-                                isHovered: hoveredItemId == item.id,
+                                isHovered: !isScrolling && hoveredItemId == item.id,
                                 isExpanded: expandedItemId == item.id,
                                 onLeftClick: { modifiers in
                                     expandedItemId = nil
@@ -100,14 +105,27 @@ struct ListPanelView: View {
                                         expandedItemId = nil
                                     }
                                     hoveredItemId = item.id
-                                    onItemHover?(item, index)
+                                    
+                                    // Only fire hover callback if not scrolling
+                                    if !isScrolling {
+                                        onItemHover?(item, index)
+                                    }
                                 } else {
                                     hoveredItemId = nil
                                 }
                             }
                         }
                     }
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear
+                                .onChange(of: geo.frame(in: .named("panelScroll")).minY) { newValue in
+                                    handleScrollChange(-newValue)
+                                }
+                        }
+                    )
                 }
+                .coordinateSpace(name: "panelScroll")
                 .frame(maxHeight: CGFloat(maxVisibleItems) * rowHeight)
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 2))
                 .padding(.horizontal, 4)
@@ -115,6 +133,37 @@ struct ListPanelView: View {
             }
         }
         .frame(width: panelWidth, height: panelHeight)
+    }
+    
+    private func handleScrollChange(_ newOffset: CGFloat) {
+        let delta = abs(newOffset - lastScrollOffset)
+        lastScrollOffset = newOffset
+        
+        // Always report offset changes for position tracking
+        onScrollOffsetChanged?(newOffset)
+        
+        // Ignore tiny changes for scroll state (noise)
+        guard delta > 1 else { return }
+        
+        // Start scrolling if not already
+        if !isScrolling {
+            isScrolling = true
+            hoveredItemId = nil  // Clear hover during scroll
+            onScrollStateChanged?(true)
+            print("📜 [View] '\(title)' scroll STARTED")
+        }
+        
+        // Cancel existing debounce
+        scrollDebounceTask?.cancel()
+        
+        // Set up debounce to detect scroll end
+        let task = DispatchWorkItem { [self] in
+            isScrolling = false
+            onScrollStateChanged?(false)
+            print("📜 [View] '\(title)' scroll STOPPED")
+        }
+        scrollDebounceTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: task)
     }
 }
 

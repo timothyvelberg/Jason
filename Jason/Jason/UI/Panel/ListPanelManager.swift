@@ -24,8 +24,7 @@ struct PanelState: Identifiable {
     var expandedItemId: String?       // Which row has context actions showing
     var areChildrenArmed: Bool = false
     var isOverlapping: Bool = false
-    
-    
+    var scrollOffset: CGFloat = 0     // Track scroll position for accurate row positioning
     
     // Panel dimensions (constants for now, could be configurable)
     static let panelWidth: CGFloat = 260
@@ -37,7 +36,7 @@ struct PanelState: Identifiable {
     /// Calculate panel height based on item count
     var panelHeight: CGFloat {
         let itemCount = min(items.count, Self.maxVisibleItems)
-        return Self.titleHeight + CGFloat(itemCount) * Self.rowHeight + Self.padding    // UPDATED
+        return Self.titleHeight + CGFloat(itemCount) * Self.rowHeight + Self.padding
     }
     
     /// Panel bounds in screen coordinates
@@ -101,12 +100,80 @@ class ListPanelManager: ObservableObject {
 
     private var pendingPanel: (title: String, items: [FunctionNode], fromLevel: Int, sourceNodeId: String, sourceRowIndex: Int)?
     
+    /// Track which node ID is currently being loaded for each panel level
+    /// Used to discard stale async completions when user has moved to a different row
+    private var currentlyHoveredNodeId: [Int: String] = [:]
+    
     // MARK: - Callbacks (wired by CircularUIManager)
     
     var onItemLeftClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onItemRightClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onContextAction: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onItemHover: ((FunctionNode?, Int, Int?) -> Void)?
+    
+    // MARK: - Scroll State Tracking
+    
+    /// Panels currently being scrolled (suppress hover during scroll)
+    private var scrollingPanels: Set<Int> = []
+    
+    /// Debounce timers per panel level
+    private var scrollDebounceTimers: [Int: DispatchWorkItem] = [:]
+    
+    /// How long to wait after scroll stops before re-enabling hover (seconds)
+    private let scrollDebounceDelay: Double = 0.1
+    
+    /// Check if a panel is currently scrolling
+    func isPanelScrolling(_ level: Int) -> Bool {
+        scrollingPanels.contains(level)
+    }
+    
+    /// Handle item hover with scroll-suppression logic
+    func handleItemHover(node: FunctionNode?, level: Int, rowIndex: Int?) {
+        // Suppress hover events while panel is scrolling
+        if isPanelScrolling(level) {
+            print("📜 [Hover] Suppressed - panel \(level) is scrolling")
+            return
+        }
+        
+        // Track which node is currently hovered at this level
+        if let node = node {
+            currentlyHoveredNodeId[level] = node.id
+        } else {
+            currentlyHoveredNodeId.removeValue(forKey: level)
+        }
+        
+        // Forward to the actual handler
+        onItemHover?(node, level, rowIndex)
+    }
+    
+    /// Handle scroll state changes from a panel
+    func handleScrollStateChanged(isScrolling: Bool, forLevel level: Int) {
+        if isScrolling {
+            // Scrolling started - close any child panels and clear hover tracking
+            scrollingPanels.insert(level)
+            currentlyHoveredNodeId.removeValue(forKey: level)  // Clear stale hover
+            popToLevel(level)
+            print("📜 [Scroll] Level \(level) scrolling - closed child panels")
+        } else {
+            // Scrolling stopped - re-enable hover
+            scrollingPanels.remove(level)
+            print("📜 [Scroll] Level \(level) scroll stopped - hover re-enabled")
+        }
+    }
+    
+    // MARK: - Scroll Offset Updates
+    
+    /// Update scroll offset for a panel at the given level
+    func updateScrollOffset(_ offset: CGFloat, forLevel level: Int) {
+        guard let index = panelStack.firstIndex(where: { $0.level == level }) else {
+            return
+        }
+        
+        let currentOffset = panelStack[index].scrollOffset
+        if abs(currentOffset - offset) > 0.5 {
+            panelStack[index].scrollOffset = offset
+        }
+    }
     
     // MARK: - Show Panel (from Ring)
     
@@ -145,7 +212,8 @@ class ListPanelManager: ObservableObject {
                 sourceNodeId: nil,
                 sourceRowIndex: nil,
                 expandedItemId: nil,
-                isOverlapping: false
+                isOverlapping: false,
+                scrollOffset: 0
             )
         ]
     }
@@ -162,7 +230,8 @@ class ListPanelManager: ObservableObject {
                 sourceNodeId: nil,
                 sourceRowIndex: nil,
                 expandedItemId: nil,
-                isOverlapping: false
+                isOverlapping: false,
+                scrollOffset: 0
             )
         ]
     }
@@ -181,15 +250,29 @@ class ListPanelManager: ObservableObject {
     }
 
     /// Calculate the screen bounds of a specific row in a panel
+    /// Accounts for scroll offset to return the VISIBLE position of the row
     func rowBounds(forPanel panel: PanelState, rowIndex: Int) -> NSRect? {
         guard rowIndex >= 0 && rowIndex < panel.items.count else { return nil }
         
-        let panelBounds = currentBounds(for: panel)    // CHANGED: use current bounds
+        let panelBounds = currentBounds(for: panel)
         
-        // Row Y position: starts below title, each row is rowHeight tall
-        // In screen coordinates, Y increases upward, so top row has highest Y
-        let rowTop = panelBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight - (CGFloat(rowIndex) * PanelState.rowHeight)
-        let rowBottom = rowTop - PanelState.rowHeight
+        // Calculate the logical position of this row (as if not scrolled)
+        // Then adjust for scroll offset
+        let logicalRowTop = panelBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight - (CGFloat(rowIndex) * PanelState.rowHeight)
+        
+        // Scroll offset is positive when scrolled down (content moved up)
+        // So visible row position = logical position + scrollOffset
+        let visibleRowTop = logicalRowTop + panel.scrollOffset
+        let visibleRowBottom = visibleRowTop - PanelState.rowHeight
+        
+        // Check if row is actually visible in the panel's scroll area
+        let scrollAreaTop = panelBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight
+        let scrollAreaBottom = panelBounds.minY + (PanelState.padding / 2)
+        
+        // Row must be at least partially visible
+        if visibleRowTop < scrollAreaBottom || visibleRowBottom > scrollAreaTop {
+            return nil  // Row is scrolled out of view
+        }
         
         // Row X spans the panel width (with some padding)
         let horizontalPadding: CGFloat = 4
@@ -198,7 +281,7 @@ class ListPanelManager: ObservableObject {
         
         return NSRect(
             x: rowLeft,
-            y: rowBottom,
+            y: visibleRowBottom,
             width: rowRight - rowLeft,
             height: PanelState.rowHeight
         )
@@ -296,6 +379,7 @@ class ListPanelManager: ObservableObject {
         
         return CGPoint(x: overlappingX, y: panel.position.y)
     }
+    
     // MARK: - Push Panel (Cascading)
 
     /// Push a new panel from an existing panel (cascade to the right)
@@ -306,6 +390,12 @@ class ListPanelManager: ObservableObject {
         sourceNodeId: String,
         sourceRowIndex: Int? = nil
     ) {
+        // Check if this is a stale async completion (user has moved to different row)
+        if let currentHovered = currentlyHoveredNodeId[level], currentHovered != sourceNodeId {
+            print("📋 [ListPanelManager] Discarding stale panel '\(title)' - user moved to different row")
+            return
+        }
+        
         // Find the source panel
         guard let sourcePanel = panelStack.first(where: { $0.level == level }) else {
             print("❌ [ListPanelManager] Cannot find panel at level \(level)")
@@ -356,10 +446,27 @@ class ListPanelManager: ObservableObject {
         // New panel's left edge aligns with source panel's right edge + gap
         let newX = sourceBounds.maxX + gap + (newPanelWidth / 2)
         
-        // Calculate Y position based on source row
+        // Calculate Y position based on source row's VISUAL position
+        // Use scroll offset to determine where the row actually appears on screen
         let newY: CGFloat
         if let rowIndex = sourceRowIndex {
-            let rowCenterY = sourceBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight - (CGFloat(rowIndex) * PanelState.rowHeight) - (PanelState.rowHeight / 2)
+            // Calculate visual row index from scroll offset
+            let scrolledRows = Int(sourcePanel.scrollOffset / PanelState.rowHeight)
+            let visualRowIndex = rowIndex - scrolledRows
+            
+            if visualRowIndex >= 0 && visualRowIndex < PanelState.maxVisibleItems {
+                print("📜 [Push] Row \(rowIndex) → visual row \(visualRowIndex) (scrolled \(scrolledRows))")
+            } else {
+                print("📜 [Push] Row \(rowIndex) out of visible range (scrolled \(scrolledRows))")
+            }
+            
+            // Clamp visual row to visible range
+            let clampedVisualRow = max(0, min(visualRowIndex, PanelState.maxVisibleItems - 1))
+            
+            // Calculate Y using visual row index
+            let rowCenterY = sourceBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight - (CGFloat(clampedVisualRow) * PanelState.rowHeight) - (PanelState.rowHeight / 2)
+            
+            // Align new panel so its first row aligns with the source row
             newY = rowCenterY - (newPanelHeight / 2) + (PanelState.rowHeight / 2) + (PanelState.padding / 2) + PanelState.titleHeight - PanelState.rowHeight
         } else {
             newY = sourceBounds.midY
@@ -376,7 +483,8 @@ class ListPanelManager: ObservableObject {
             sourceRowIndex: sourceRowIndex,
             expandedItemId: nil,
             areChildrenArmed: false,
-            isOverlapping: false
+            isOverlapping: false,
+            scrollOffset: 0
         )
         
         panelStack.append(newPanel)
@@ -389,6 +497,15 @@ class ListPanelManager: ObservableObject {
 
     func popToLevel(_ level: Int) {
         let before = panelStack.count
+        
+        // Clean up scroll state and hover tracking for panels being popped
+        for panel in panelStack where panel.level > level {
+            scrollDebounceTimers[panel.level]?.cancel()
+            scrollDebounceTimers.removeValue(forKey: panel.level)
+            scrollingPanels.remove(panel.level)
+            currentlyHoveredNodeId.removeValue(forKey: panel.level)
+        }
+        
         panelStack.removeAll { $0.level > level }
         let removed = before - panelStack.count
         if removed > 0 {
@@ -450,6 +567,16 @@ class ListPanelManager: ObservableObject {
         print("📋 [ListPanelManager] Hiding all panels")
         panelStack.removeAll()
         pendingPanel = nil
+        
+        // Clean up scroll state
+        for (_, timer) in scrollDebounceTimers {
+            timer.cancel()
+        }
+        scrollDebounceTimers.removeAll()
+        scrollingPanels.removeAll()
+        
+        // Clean up hover tracking
+        currentlyHoveredNodeId.removeAll()
     }
     
     /// Alias for hide (clearer intent)
@@ -489,7 +616,7 @@ class ListPanelManager: ObservableObject {
     func panelLevel(at point: CGPoint) -> Int? {
         // Check from rightmost to leftmost (higher levels first)
         for panel in panelStack.reversed() {
-            if currentBounds(for: panel).contains(point) {    // CHANGED
+            if currentBounds(for: panel).contains(point) {
                 return panel.level
             }
         }
@@ -517,11 +644,14 @@ class ListPanelManager: ObservableObject {
         }
         
         let panel = panelStack[panelIndex]
-        let bounds = currentBounds(for: panel)    // CHANGED
+        let bounds = currentBounds(for: panel)
         
-        // Calculate which row was clicked (accounting for title)
-        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight    // CHANGED
-        let rowIndex = Int(relativeY / PanelState.rowHeight)
+        // Calculate which row was clicked (accounting for title and scroll)
+        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
+        
+        // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
+        let scrollAdjustedY = relativeY - panel.scrollOffset
+        let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < panel.items.count else {
             print("📋 [Panel] Right-click outside rows")
@@ -551,11 +681,14 @@ class ListPanelManager: ObservableObject {
         }
         
         let panel = panelStack[panelIndex]
-        let bounds = currentBounds(for: panel)    // CHANGED
+        let bounds = currentBounds(for: panel)
         
-        // Calculate which row was clicked (accounting for title)
-        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight    // CHANGED
-        let rowIndex = Int(relativeY / PanelState.rowHeight)
+        // Calculate which row was clicked (accounting for title and scroll)
+        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
+        
+        // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
+        let scrollAdjustedY = relativeY - panel.scrollOffset
+        let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < panel.items.count else {
             return nil
@@ -578,9 +711,12 @@ class ListPanelManager: ObservableObject {
         let panel = panelStack[panelIndex]
         let bounds = currentBounds(for: panel)
         
-        // Calculate which row was clicked (accounting for title)
+        // Calculate which row was clicked (accounting for title and scroll)
         let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
-        let rowIndex = Int(relativeY / PanelState.rowHeight)
+        
+        // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
+        let scrollAdjustedY = relativeY - panel.scrollOffset
+        let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < panel.items.count else {
             return nil
@@ -610,7 +746,7 @@ class ListPanelManager: ObservableObject {
             createTestFolderWithChildren(name: "Projects"),
         ]
         
-        show(title: "Test Panel", items: testItems, at: position)    // UPDATED
+        show(title: "Test Panel", items: testItems, at: position)
     }
     
     private func createTestFolderWithChildren(name: String, depth: Int = 0) -> FunctionNode {
