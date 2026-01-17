@@ -21,6 +21,7 @@ struct PanelState: Identifiable {
     let level: Int                    // 0 = from ring, 1+ = from panel
     let sourceNodeId: String?         // Which node spawned this panel
     let sourceRowIndex: Int?
+    let spawnAngle: Double?
     var expandedItemId: String?       // Which row has context actions showing
     var areChildrenArmed: Bool = false
     var isOverlapping: Bool = false
@@ -32,6 +33,8 @@ struct PanelState: Identifiable {
     static let titleHeight: CGFloat = 28
     static let maxVisibleItems: Int = 10
     static let padding: CGFloat = 8
+    static let cascadeSlideDistance: CGFloat = 30
+
     
     /// Calculate panel height based on item count
     var panelHeight: CGFloat {
@@ -218,6 +221,7 @@ class ListPanelManager: ObservableObject {
                 level: 0,
                 sourceNodeId: nil,
                 sourceRowIndex: nil,
+                spawnAngle: angle,
                 expandedItemId: nil,
                 isOverlapping: false,
                 scrollOffset: 0
@@ -236,6 +240,7 @@ class ListPanelManager: ObservableObject {
                 level: 0,
                 sourceNodeId: nil,
                 sourceRowIndex: nil,
+                spawnAngle: nil,
                 expandedItemId: nil,
                 isOverlapping: false,
                 scrollOffset: 0
@@ -490,6 +495,7 @@ class ListPanelManager: ObservableObject {
             level: level + 1,
             sourceNodeId: sourceNodeId,
             sourceRowIndex: sourceRowIndex,
+            spawnAngle: nil,
             expandedItemId: nil,
             areChildrenArmed: false,
             isOverlapping: false,

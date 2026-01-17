@@ -113,9 +113,12 @@ struct CircularUIView: View {
                         expandedItemId: expandedItemIdBinding(for: panel.level)
                     )
                     .position(x: panelLocalX, y: panelSwiftUIY)
-                    .animation(.easeInOut(duration: 0.15), value: panel.isOverlapping)
-                }
+                    .transition(panel.level == 0
+                        ? .slideFromAngle(angle: panel.spawnAngle ?? 0, distance: PanelState.cascadeSlideDistance)
+                        : .slideFromLeft(distance: PanelState.cascadeSlideDistance))    
+                    .animation(.easeInOut(duration: 0.2), value: panel.isOverlapping)             }
             }
+            .animation(.easeOut(duration: 0.1), value: listPanelManager.panelStack.count)
             .ignoresSafeArea()
             
             // Drag overlay - sits on top to handle drag gestures
@@ -124,7 +127,7 @@ struct CircularUIView: View {
                 dragStartPoint: $circularUI.dragStartPoint
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .allowsHitTesting(false)  // CRITICAL: Don't block clicks, only handle drags
+            .allowsHitTesting(false)  //Don't block clicks, only handle drags
         }
     }
     
@@ -208,6 +211,56 @@ struct ScaleModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scaleEffect(scale)
+            .opacity(opacity)
+    }
+}
+
+// MARK: - Slide From Left Transition
+
+extension AnyTransition {
+    static func slideFromLeft(distance: CGFloat) -> AnyTransition {
+        .modifier(
+            active: SlideFromLeftModifier(offset: -distance, opacity: 0),
+            identity: SlideFromLeftModifier(offset: 0, opacity: 1)
+        )
+    }
+}
+
+struct SlideFromLeftModifier: ViewModifier {
+    let offset: CGFloat
+    let opacity: Double
+    
+    func body(content: Content) -> some View {
+        content
+            .offset(x: offset)
+            .opacity(opacity)
+    }
+}
+
+// MARK: - Angle-Based Slide Transition
+
+extension AnyTransition {
+    static func slideFromAngle(angle: Double, distance: CGFloat) -> AnyTransition {
+        // Calculate offset based on angle (Jason's system: 0° = top, clockwise)
+        let angleRadians = angle * .pi / 180
+        let offsetX = -distance * sin(angleRadians)
+        let offsetY = distance * cos(angleRadians)
+        
+        return .modifier(
+            active: AngleSlideModifier(offsetX: offsetX, offsetY: offsetY, opacity: 0),
+            identity: AngleSlideModifier(offsetX: 0, offsetY: 0, opacity: 1)
+        )
+    }
+}
+
+struct AngleSlideModifier: ViewModifier {
+    let offsetX: CGFloat
+    let offsetY: CGFloat
+    let opacity: Double
+    
+    func body(content: Content) -> some View {
+        content
+            .offset(x: offsetX, y: offsetY)
             .opacity(opacity)
     }
 }
