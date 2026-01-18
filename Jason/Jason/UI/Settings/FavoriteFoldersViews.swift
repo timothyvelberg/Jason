@@ -17,6 +17,7 @@ struct FavoritesSettingsView: View {
     @State private var editingFavorite: FolderEntry?
     @State private var editingName: String = ""
     @State private var editingMaxItems: String = ""
+    @State private var newFolderPath: String = ""
     
     let circularUI: CircularUIManager
     
@@ -39,7 +40,6 @@ struct FavoritesSettingsView: View {
             
             Divider()
             
-            // Favorites List
             if favorites.isEmpty {
                 VStack(spacing: 20) {
                     Image(systemName: "folder.badge.plus")
@@ -50,10 +50,17 @@ struct FavoritesSettingsView: View {
                         .font(.headline)
                         .foregroundColor(.secondary)
                     
-                    Button("Add Folder") {
-                        addFolder()
+                    HStack {
+                        TextField("Paste folder path...", text: $newFolderPath)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: 400)
+                        
+                        Button("Add") {
+                            addFolder()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(newFolderPath.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
-                    .buttonStyle(.borderedProminent)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -81,12 +88,15 @@ struct FavoritesSettingsView: View {
             
             Divider()
             
-            // Footer
             HStack {
-                Button(action: addFolder) {
-                    Label("Add Folder", systemImage: "plus")
+                TextField("Paste folder path...", text: $newFolderPath)
+                    .textFieldStyle(.roundedBorder)
+                
+                Button("Add") {
+                    addFolder()
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
+                .disabled(newFolderPath.trimmingCharacters(in: .whitespaces).isEmpty)
                 
                 Spacer()
                 
@@ -126,24 +136,18 @@ struct FavoritesSettingsView: View {
     }
     
     private func addFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.message = "Select a folder to add to favorites"
+        let path = newFolderPath.trimmingCharacters(in: .whitespaces)
+        guard !path.isEmpty else { return }
         
-        panel.begin { response in
-            guard response == .OK, let url = panel.url else { return }
-            
-            let path = url.path
-            let title = url.lastPathComponent
-            
-            if DatabaseManager.shared.addFavoriteFolder(path: path, title: title, settings: nil) {
-                print("✅ Added favorite: \(title)")
-                loadFavorites()
-            } else {
-                print("❌ Failed to add favorite")
-            }
+        let url = URL(fileURLWithPath: path)
+        let title = url.lastPathComponent
+        
+        if DatabaseManager.shared.addFavoriteFolder(path: path, title: title, settings: nil) {
+            print("✅ Added favorite: \(title)")
+            newFolderPath = ""
+            loadFavorites()
+        } else {
+            print("❌ Failed to add favorite")
         }
     }
     

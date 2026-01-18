@@ -103,7 +103,7 @@ struct StandardContextActions {
             name: "Delete",
             type: .action,
             icon: NSImage(systemSymbolName: "trash", accessibilityDescription: nil) ?? NSImage(),
-            onLeftClick: ModifierAwareInteraction(base: .execute {
+            onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("🗑️ Moving to trash: \(fileName)")
                 NSWorkspace.shared.recycle([url]) { trashedURLs, error in
                     if let error = error {

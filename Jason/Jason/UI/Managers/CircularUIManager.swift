@@ -279,6 +279,10 @@ class CircularUIManager: ObservableObject {
             mouseTracker?.onExpandToPanel = { [weak self] node, angle, ringCenter, ringOuterRadius in
                 guard let self = self else { return }
                 
+                // Extract identity from node
+                let providerId = node.providerId
+                let contentIdentifier = node.metadata?["folderURL"] as? String ?? node.previewURL?.path
+                
                 // Check if children already loaded
                 if let children = node.children, !children.isEmpty {
                     self.listPanelManager?.show(
@@ -286,7 +290,9 @@ class CircularUIManager: ObservableObject {
                         items: children,
                         ringCenter: ringCenter,
                         ringOuterRadius: ringOuterRadius,
-                        angle: angle
+                        angle: angle,
+                        providerId: providerId,                 // ADD
+                        contentIdentifier: contentIdentifier    // ADD
                     )
                     self.mouseTracker?.pauseUntilMovement()
                     return
@@ -316,7 +322,9 @@ class CircularUIManager: ObservableObject {
                             items: children,
                             ringCenter: ringCenter,
                             ringOuterRadius: ringOuterRadius,
-                            angle: angle
+                            angle: angle,
+                            providerId: providerId,              // ADD
+                            contentIdentifier: contentIdentifier // ADD
                         )
                         self.mouseTracker?.pauseUntilMovement()
                     }
@@ -343,7 +351,6 @@ class CircularUIManager: ObservableObject {
                 
                 // Only cascade for folders
                 guard node.type == .folder else {
-                    // Not a folder - pop any panels above this level
                     self.listPanelManager?.popToLevel(level)
                     return
                 }
@@ -351,20 +358,24 @@ class CircularUIManager: ObservableObject {
                 // Check if this node's panel is already showing at level+1
                 if let existingPanel = self.listPanelManager?.panel(at: level + 1),
                    existingPanel.sourceNodeId == node.id {
-                    // Same folder - keep level+1 but pop anything ABOVE it
                     self.listPanelManager?.popToLevel(level + 1)
                     return
                 }
                 
+                // Extract identity from node
+                let providerId = node.providerId
+                let contentIdentifier = node.metadata?["folderURL"] as? String ?? node.previewURL?.path
+                
                 // Check if children already loaded
                 if let children = node.children, !children.isEmpty {
-                    // Cascade with existing children
                     self.listPanelManager?.pushPanel(
                         title: node.name,
                         items: children,
                         fromPanelAtLevel: level,
                         sourceNodeId: node.id,
-                        sourceRowIndex: rowIndex
+                        sourceRowIndex: rowIndex,
+                        providerId: providerId,              // ADD
+                        contentIdentifier: contentIdentifier // ADD
                     )
                     return
                 }
@@ -373,7 +384,6 @@ class CircularUIManager: ObservableObject {
                 guard node.needsDynamicLoading,
                       let providerId = node.providerId,
                       let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) else {
-                    // Can't load dynamically - pop panels above
                     self.listPanelManager?.popToLevel(level)
                     return
                 }
@@ -394,10 +404,38 @@ class CircularUIManager: ObservableObject {
                             items: children,
                             fromPanelAtLevel: level,
                             sourceNodeId: node.id,
-                            sourceRowIndex: rowIndex
+                            sourceRowIndex: rowIndex,
+                            providerId: providerId,              // ADD
+                            contentIdentifier: contentIdentifier // ADD
                         )
                     }
                 }
+            }
+            
+            // Wire panel content reload callback
+            listPanelManager?.onReloadContent = { [weak self] providerId, contentIdentifier in
+                guard let self = self,
+                      let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) else {
+                    print("❌ [Panel Reload] Provider '\(providerId)' not found")
+                    return []
+                }
+                
+                // Create a minimal node to call loadChildren
+                // Provider extracts folderURL from metadata
+                let reloadNode = FunctionNode(
+                    id: "reload-\(contentIdentifier ?? "unknown")",
+                    name: "reload",
+                    type: .folder,
+                    icon: NSImage(),
+                    metadata: contentIdentifier != nil ? ["folderURL": contentIdentifier!] : nil,
+                    providerId: providerId
+                )
+                
+                print("🔄 [Panel Reload] Reloading content for '\(contentIdentifier ?? "unknown")'")
+                let freshChildren = await provider.loadChildren(for: reloadNode)
+                print("🔄 [Panel Reload] Got \(freshChildren.count) items")
+                
+                return freshChildren
             }
 
             self.gestureManager = GestureManager()

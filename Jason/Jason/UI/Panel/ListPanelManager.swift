@@ -16,16 +16,23 @@ import UniformTypeIdentifiers
 struct PanelState: Identifiable {
     let id: UUID = UUID()
     let title: String
-    let items: [FunctionNode]
+    var items: [FunctionNode]
     let position: CGPoint
     let level: Int                    // 0 = from ring, 1+ = from panel
     let sourceNodeId: String?         // Which node spawned this panel
     let sourceRowIndex: Int?
     let spawnAngle: Double?
+    
+    //Identity tracking for updates
+    let providerId: String?
+    let contentIdentifier: String?    // Folder path for folder content
+    
     var expandedItemId: String?       // Which row has context actions showing
     var areChildrenArmed: Bool = false
     var isOverlapping: Bool = false
     var scrollOffset: CGFloat = 0     // Track scroll position for accurate row positioning
+    
+   
     
     // Panel dimensions (constants for now, could be configurable)
     static let panelWidth: CGFloat = 260
@@ -101,7 +108,16 @@ class ListPanelManager: ObservableObject {
     
     // MARK: - Pending Panel (waiting for arming)
 
-    private var pendingPanel: (title: String, items: [FunctionNode], fromLevel: Int, sourceNodeId: String, sourceRowIndex: Int)?
+    private var pendingPanel: (
+        title: String,
+        items: [FunctionNode],
+        fromLevel: Int,
+        sourceNodeId: String,
+        sourceRowIndex: Int?,
+        providerId: String?,
+        contentIdentifier: String?
+    )?
+    
     
     /// Track which node ID is currently being loaded for each panel level
     /// Used to discard stale async completions when user has moved to a different row
@@ -113,6 +129,92 @@ class ListPanelManager: ObservableObject {
     var onItemRightClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onContextAction: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onItemHover: ((FunctionNode?, Int, Int?) -> Void)?
+    
+    /// Callback to reload content for a panel
+    var onReloadContent: ((String, String?) async -> [FunctionNode])?
+    
+    
+    // MARK: - Initialization
+
+    init() {
+        // Register for provider update notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleProviderUpdate(_:)),
+            name: .providerContentUpdated,
+            object: nil
+        )
+        print("📋 [ListPanelManager] Initialized - registered for provider updates")
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        print("📋 [ListPanelManager] Deallocated - removed observers")
+    }
+    
+    // MARK: - Provider Update Handler
+
+    @objc private func handleProviderUpdate(_ notification: Notification) {
+        guard let updateInfo = ProviderUpdateInfo.from(notification) else {
+            print("❌ [ListPanelManager] Invalid provider update notification")
+            return
+        }
+        
+        print("📢 [ListPanelManager] Received update for provider: \(updateInfo.providerId)")
+        if let folderPath = updateInfo.folderPath {
+            print("   Folder: \(folderPath)")
+        }
+        
+        // Check if any panel matches this update
+        guard let matchingIndex = panelStack.firstIndex(where: { panel in
+            guard panel.providerId == updateInfo.providerId else { return false }
+            
+            // If folderPath specified, must match contentIdentifier
+            if let folderPath = updateInfo.folderPath {
+                return panel.contentIdentifier == folderPath
+            }
+            
+            // No folderPath specified - provider match is enough
+            return true
+        }) else {
+            print("   ⏭️ No matching panel found - ignoring")
+            return
+        }
+        
+        let matchingPanel = panelStack[matchingIndex]
+        print("   ✅ Found matching panel at level \(matchingPanel.level): '\(matchingPanel.title)'")
+        
+        // Close any child panels
+        if matchingIndex < panelStack.count - 1 {
+            let childCount = panelStack.count - matchingIndex - 1
+            print("   🗑️ Closing \(childCount) child panel(s)")
+            popToLevel(matchingPanel.level)
+        }
+        
+        // Reload content
+        guard let onReloadContent = onReloadContent,
+              let providerId = matchingPanel.providerId else {
+            print("   ❌ No reload callback or providerId - cannot refresh")
+            return
+        }
+        
+        let contentIdentifier = matchingPanel.contentIdentifier
+        
+        Task {
+            let freshItems = await onReloadContent(providerId, contentIdentifier)
+            
+            await MainActor.run {
+                // Find the panel again (stack may have changed)
+                guard let currentIndex = self.panelStack.firstIndex(where: { $0.id == matchingPanel.id }) else {
+                    print("   ⚠️ Panel no longer exists - skipping update")
+                    return
+                }
+                
+                print("   🔄 Updating panel with \(freshItems.count) items (was \(self.panelStack[currentIndex].items.count))")
+                self.panelStack[currentIndex].items = freshItems
+            }
+        }
+    }
     
     // MARK: - Scroll State Tracking
     
@@ -187,7 +289,9 @@ class ListPanelManager: ObservableObject {
         ringCenter: CGPoint,
         ringOuterRadius: CGFloat,
         angle: Double,
-        panelWidth: CGFloat = PanelState.panelWidth
+        panelWidth: CGFloat = PanelState.panelWidth,
+        providerId: String? = nil,
+        contentIdentifier: String? = nil
     ) {
         // Store ring context for cascading
         self.currentAngle = angle
@@ -222,6 +326,8 @@ class ListPanelManager: ObservableObject {
                 sourceNodeId: nil,
                 sourceRowIndex: nil,
                 spawnAngle: angle,
+                providerId: providerId,
+                contentIdentifier: contentIdentifier,
                 expandedItemId: nil,
                 isOverlapping: false,
                 scrollOffset: 0
@@ -241,6 +347,8 @@ class ListPanelManager: ObservableObject {
                 sourceNodeId: nil,
                 sourceRowIndex: nil,
                 spawnAngle: nil,
+                providerId: nil,
+                contentIdentifier: nil,
                 expandedItemId: nil,
                 isOverlapping: false,
                 scrollOffset: 0
@@ -308,9 +416,11 @@ class ListPanelManager: ObservableObject {
             let panel = panelStack[index]
             
             // Check if there's a pending panel for this level
-            if let pending = pendingPanel, pending.fromLevel == panel.level {
+            if let pending = pendingPanel,
+               pending.fromLevel == panel.level,
+               let sourceRowIndex = pending.sourceRowIndex {
                 // Get the row bounds for the pending row
-                if let sourceBounds = rowBounds(forPanel: panel, rowIndex: pending.sourceRowIndex) {
+                if let sourceBounds = rowBounds(forPanel: panel, rowIndex: sourceRowIndex) {
                     if sourceBounds.contains(point) {
                         let progress = (point.x - sourceBounds.minX) / sourceBounds.width
                         
@@ -322,7 +432,15 @@ class ListPanelManager: ObservableObject {
                             // Spawn the pending panel
                             let p = pending
                             pendingPanel = nil
-                            actuallyPushPanel(title: p.title, items: p.items, fromPanelAtLevel: p.fromLevel, sourceNodeId: p.sourceNodeId, sourceRowIndex: p.sourceRowIndex)
+                            actuallyPushPanel(
+                                title: p.title,
+                                items: p.items,
+                                fromPanelAtLevel: p.fromLevel,
+                                sourceNodeId: p.sourceNodeId,
+                                sourceRowIndex: p.sourceRowIndex,
+                                providerId: p.providerId,
+                                contentIdentifier: p.contentIdentifier
+                            )
                         }
                     }
                 }
@@ -400,7 +518,9 @@ class ListPanelManager: ObservableObject {
         items: [FunctionNode],
         fromPanelAtLevel level: Int,
         sourceNodeId: String,
-        sourceRowIndex: Int? = nil
+        sourceRowIndex: Int? = nil,
+        providerId: String? = nil,
+        contentIdentifier: String? = nil
     ) {
         // Check if this is a stale async completion (user has moved to different row)
         if let currentHovered = currentlyHoveredNodeId[level], currentHovered != sourceNodeId {
@@ -420,14 +540,22 @@ class ListPanelManager: ObservableObject {
         if !panelStack[sourceIndex].areChildrenArmed {
             // Not armed yet - store as pending
             if let rowIndex = sourceRowIndex {
-                pendingPanel = (title, items, level, sourceNodeId, rowIndex)
+                pendingPanel = (title, items, level, sourceNodeId, rowIndex, providerId, contentIdentifier)
                 print("📋 [ListPanelManager] Panel '\(title)' PENDING - waiting for arming")
             }
             return
         }
         
         // Armed - proceed with push
-        actuallyPushPanel(title: title, items: items, fromPanelAtLevel: level, sourceNodeId: sourceNodeId, sourceRowIndex: sourceRowIndex)
+        actuallyPushPanel(
+            title: title,
+            items: items,
+            fromPanelAtLevel: level,
+            sourceNodeId: sourceNodeId,
+            sourceRowIndex: sourceRowIndex,
+            providerId: providerId,
+            contentIdentifier: contentIdentifier
+        )
     }
 
     /// Internal: actually push the panel (called after arming check passes)
@@ -436,7 +564,9 @@ class ListPanelManager: ObservableObject {
         items: [FunctionNode],
         fromPanelAtLevel level: Int,
         sourceNodeId: String,
-        sourceRowIndex: Int? = nil
+        sourceRowIndex: Int? = nil,
+        providerId: String? = nil,
+        contentIdentifier: String? = nil
     ) {
         // Find the source panel
         guard let sourcePanel = panelStack.first(where: { $0.level == level }) else {
@@ -496,6 +626,8 @@ class ListPanelManager: ObservableObject {
             sourceNodeId: sourceNodeId,
             sourceRowIndex: sourceRowIndex,
             spawnAngle: nil,
+            providerId: providerId,
+            contentIdentifier: contentIdentifier,
             expandedItemId: nil,
             areChildrenArmed: false,
             isOverlapping: false,
@@ -709,10 +841,18 @@ class ListPanelManager: ObservableObject {
             return nil
         }
         
+        let clickedItem = panel.items[rowIndex]
+        
+        // NEW: If this row is expanded (showing context actions), let SwiftUI handle the click
+        if panel.expandedItemId == clickedItem.id {
+            print("📋 [Panel] Click on expanded row - letting SwiftUI handle context actions")
+            return nil
+        }
+        
         // Collapse any expanded row in this panel
         panelStack[panelIndex].expandedItemId = nil
         
-        return (panel.items[rowIndex], level)
+        return (clickedItem, level)
     }
     
     /// Handle drag start at position, returns the node and its DragProvider if draggable

@@ -63,23 +63,17 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         print("📋 [FavoriteFiles] Loaded \(staticFiles.count) static favorite files")
         
         for file in staticFiles {
-            // Check if file exists
             let fileURL = URL(fileURLWithPath: file.path)
             guard FileManager.default.fileExists(atPath: file.path) else {
                 print("⚠️ [FavoriteFiles] Static file not found: \(file.path)")
                 continue
             }
-            
-            // Check if it's a directory
-            var isDirectory: ObjCBool = false
-            FileManager.default.fileExists(atPath: file.path, isDirectory: &isDirectory)
-            
-            // Check if it's a package (.app, .bundle, etc.) - treat as file, not folder
-            let isPackage = NSWorkspace.shared.isFilePackage(atPath: file.path)
-            let treatAsDirectory = isDirectory.boolValue && !isPackage
+
+            let treatAsDirectory = fileURL.isNavigableDirectory
             
             // Get display name
             let displayName = file.displayName ?? fileURL.lastPathComponent
+
             
             // Get icon
             let icon: NSImage
@@ -117,13 +111,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 let resolvedURL = URL(fileURLWithPath: resolvedPath)
                 let fileName = resolvedURL.lastPathComponent
                 
-                // Check if it's a directory
-                var isDirectory: ObjCBool = false
-                FileManager.default.fileExists(atPath: resolvedPath, isDirectory: &isDirectory)
-                
-                // Check if it's a package (.app, .bundle, etc.) - treat as file, not folder
-                let isPackage = NSWorkspace.shared.isFilePackage(atPath: resolvedPath)
-                let treatAsDirectory = isDirectory.boolValue && !isPackage
+                let treatAsDirectory = resolvedURL.isNavigableDirectory
                 
                 // Get icon
                 let icon: NSImage

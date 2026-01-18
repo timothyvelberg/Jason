@@ -50,8 +50,8 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             preferredLayout: .partialSlice,
             slicePositioning: .center,
             providerId: providerId,
-            onLeftClick: ModifierAwareInteraction(base: .expand),
-            onRightClick: ModifierAwareInteraction(base: .expand),
+            onLeftClick: ModifierAwareInteraction(base: .doNothing),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .expand)
         )]
     }
@@ -274,10 +274,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             let limitedContents = Array(sortedContents.prefix(itemLimit))
             
             return limitedContents.map { contentURL in
-                var isDirectory: ObjCBool = false
-                FileManager.default.fileExists(atPath: contentURL.path, isDirectory: &isDirectory)
-                
-                if isDirectory.boolValue {
+                if contentURL.isNavigableDirectory {
                     return createFolderNode(for: contentURL)
                 } else {
                     return createFileNode(for: contentURL)
@@ -309,6 +306,8 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     private func createFileNode(for url: URL) -> FunctionNode {
         let fileName = url.lastPathComponent
         let dragImage = createThumbnail(for: url)
+        let folderPath = url.deletingLastPathComponent().path
+        let providerId = self.providerId
         
         return FunctionNode(
             id: "file-\(url.path)",
@@ -318,7 +317,14 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             childDisplayMode: .panel,
             contextActions: [
                 StandardContextActions.copyFile(url),
-                StandardContextActions.deleteFile(url),
+                StandardContextActions.deleteFile(url) { success in
+                    if success {
+                        NotificationCenter.default.postProviderUpdate(
+                            providerId: providerId,
+                            folderPath: folderPath
+                        )
+                    }
+                },
                 StandardContextActions.showInFinder(url)
             ],
             preferredLayout: .partialSlice,
@@ -405,6 +411,8 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     private func createFileNodeFromCache(item: EnhancedFolderItem) -> FunctionNode {
         let url = URL(fileURLWithPath: item.path)
         let fileName = item.name
+        let folderPath = url.deletingLastPathComponent().path
+        let providerId = self.providerId
         
         let icon: NSImage
         if let thumbnailData = item.thumbnailData, let cachedThumbnail = NSImage(data: thumbnailData) {
@@ -421,7 +429,14 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             childDisplayMode: .panel,
             contextActions: [
                 StandardContextActions.copyFile(url),
-                StandardContextActions.deleteFile(url),
+                StandardContextActions.deleteFile(url) { success in  // UPDATE
+                    if success {
+                        NotificationCenter.default.postProviderUpdate(
+                            providerId: providerId,
+                            folderPath: folderPath
+                        )
+                    }
+                },
                 StandardContextActions.showInFinder(url)
             ],
             preferredLayout: .partialSlice,
@@ -461,6 +476,8 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         let url = URL(fileURLWithPath: item.path)
         let folderName = item.name
         let icon = IconProvider.shared.getFolderIcon(for: url, size: 64, cornerRadius: 8)
+        let parentPath = url.deletingLastPathComponent().path
+        let providerId = self.providerId
         
         return FunctionNode(
             id: "folder-\(item.path)",
@@ -471,7 +488,14 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             childDisplayMode: .panel,
             contextActions: [
                 StandardContextActions.showInFinder(url),
-                StandardContextActions.deleteFile(url)
+                StandardContextActions.deleteFile(url) { success in  // UPDATE
+                    if success {
+                        NotificationCenter.default.postProviderUpdate(
+                            providerId: providerId,
+                            folderPath: parentPath
+                        )
+                    }
+                }
             ],
             preferredLayout: .partialSlice,
             previewURL: url,
@@ -569,7 +593,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 fileURLs: [path],
                 dragImage: folderIcon,
                 allowedOperations: [.move, .copy],
-                clickBehavior: .navigate,
+//                clickBehavior: .navigate,
                 onDragStarted: {
                     print("📦 Started dragging favorite folder: \(folderEntry.title)")
                 },
