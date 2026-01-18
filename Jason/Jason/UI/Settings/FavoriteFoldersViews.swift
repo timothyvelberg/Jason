@@ -169,7 +169,29 @@ struct FavoriteRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: folder.path))
+            // Use layered folder icon with stored color
+            let folderColor = folder.iconColor ?? NSColor(hex: "#55C2EE") ?? .systemBlue
+            let icon: NSImage = {
+                if let iconName = folder.iconName, !iconName.isEmpty {
+                    return IconProvider.shared.createLayeredFolderIconWithSymbol(
+                        color: folderColor,
+                        symbolName: iconName,
+                        symbolColor: .white,
+                        size: 32,
+                        symbolSize: 14,
+                        cornerRadius: 4,
+                        symbolOffset: -2
+                    )
+                } else {
+                    return IconProvider.shared.createLayeredFolderIcon(
+                        color: folderColor,
+                        size: 32,
+                        cornerRadius: 4
+                    )
+                }
+            }()
+            
+            Image(nsImage: icon)
                 .resizable()
                 .frame(width: 32, height: 32)
             
@@ -230,7 +252,7 @@ struct EditFavoriteView: View {
     
     // Icon customization
     @State private var iconName: String = ""
-    @State private var selectedFolderColor: FolderColor = .blue
+    @State private var folderColorHex: String = "#55C2EE"
     @State private var selectedSortOrder: FolderSortOrder = .modifiedNewest
     
     var body: some View {
@@ -257,55 +279,77 @@ struct EditFavoriteView: View {
                     
                     // Icon Customization Section
                     Section("Icon Customization") {
-                        Picker("Folder Color", selection: $selectedFolderColor) {
-                            ForEach(FolderColor.allCases) { color in
-                                HStack {
-                                    Circle()
-                                        .fill(color.swiftUIColor)
-                                        .frame(width: 12, height: 12)
-                                    Text(color.rawValue)
-                                }
-                                .tag(color)
+                        HStack {
+                            TextField("Folder Color (hex)", text: $folderColorHex)
+                                .textFieldStyle(.roundedBorder)
+                            
+                            // Color preview swatch
+                            if let color = NSColor(hex: folderColorHex) {
+                                Circle()
+                                    .fill(Color(nsColor: color))
+                                    .frame(width: 20, height: 20)
+                                    .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                            } else {
+                                Circle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 20, height: 20)
+                                    .overlay(
+                                        Image(systemName: "xmark")
+                                            .font(.caption2)
+                                            .foregroundColor(.red)
+                                    )
                             }
                         }
-                        .help("Choose the base folder color")
+                        .help("Enter a hex color like #55C2EE or #FF9500")
                         
                         TextField("SF Symbol Name (optional)", text: $iconName)
-                            .help("e.g., star.fill, camera.fill, music.note - will appear in white on the folder")
+                            .help("e.g., star.fill, camera.fill, music.note")
                         
-                        // Preview
-                        if !iconName.isEmpty || selectedFolderColor != .blue {
-                            HStack {
-                                Text("Preview:")
-                                    .foregroundColor(.secondary)
+                        // Live Preview
+                        HStack {
+                            Text("Preview:")
+                                .foregroundColor(.secondary)
+                            
+                            if let folderColor = NSColor(hex: folderColorHex) {
+                                let previewIcon: NSImage = {
+                                    let trimmedIcon = iconName.trimmingCharacters(in: .whitespaces)
+                                    if trimmedIcon.isEmpty {
+                                        return IconProvider.shared.createLayeredFolderIcon(
+                                            color: folderColor,
+                                            size: 48,
+                                            cornerRadius: 4
+                                        )
+                                    } else {
+                                        return IconProvider.shared.createLayeredFolderIconWithSymbol(
+                                            color: folderColor,
+                                            symbolName: trimmedIcon,
+                                            symbolColor: .white,
+                                            size: 48,
+                                            symbolSize: 20,
+                                            cornerRadius: 4,
+                                            symbolOffset: -4
+                                        )
+                                    }
+                                }()
                                 
-                                // Show preview of folder with symbol
-                                ZStack {
-                                    // Base folder
-                                    if let folderImage = NSImage(named: selectedFolderColor.assetName) {
-                                        Image(nsImage: folderImage)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fit)
-                                            .frame(width: 32, height: 32)
-                                    }
-                                    
-                                    // SF Symbol on top (if provided)
-                                    if !iconName.isEmpty,
-                                       let symbolImage = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) {
-                                        Image(nsImage: symbolImage)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fit)
-                                            .frame(width: 16, height: 16)
-                                            .foregroundColor(.white)
-                                            .offset(y: -2)
-                                    } else if !iconName.isEmpty {
-                                        Text("Invalid symbol")
-                                            .foregroundColor(.red)
-                                            .font(.caption)
-                                            .offset(x: 40)
-                                    }
+                                Image(nsImage: previewIcon)
+                                    .frame(width: 48, height: 48)
+                            } else {
+                                Text("Invalid hex")
+                                    .foregroundColor(.red)
+                                    .font(.caption)
+                            }
+                            
+                            // Symbol validation
+                            if !iconName.trimmingCharacters(in: .whitespaces).isEmpty {
+                                if NSImage(systemSymbolName: iconName.trimmingCharacters(in: .whitespaces), accessibilityDescription: nil) == nil {
+                                    Text("Invalid symbol")
+                                        .foregroundColor(.red)
+                                        .font(.caption)
                                 }
                             }
+                            
+                            Spacer()
                         }
                     }
                     
@@ -376,25 +420,11 @@ struct EditFavoriteView: View {
             iconName = existingIconName
         }
         
-        // Load folder color based on baseAsset
-        selectedFolderColor = matchFolderColor(folder.baseAsset)
-    }
-    
-    private func matchFolderColor(_ baseAsset: String) -> FolderColor {
-        // Match the base asset to our enum
-        switch baseAsset {
-        case "folder-blue":
-            return .blue
-        case "folder-orange":
-            return .orange
-        case "folder-red":
-            return .red
-        case "folder-purple":
-            return .purple
-        case "folder-green":
-            return .green
-        default:
-            return .blue
+        // Load folder color hex (or default to blue)
+        if let existingColorHex = folder.iconColorHex, !existingColorHex.isEmpty {
+            folderColorHex = existingColorHex
+        } else {
+            folderColorHex = "#55C2EE"
         }
     }
     
@@ -417,64 +447,29 @@ struct EditFavoriteView: View {
         
         // Update layout settings in database
         if DatabaseManager.shared.updateFavoriteSettings(path: folder.path, title: name, settings: settings) {
-            print("✅ Updated favorite settings for: \(folder.title) (sort: \(selectedSortOrder.displayName))")
+            print("✅ Updated favorite settings for: \(folder.title)")
             
             // Update icon customization
             let trimmedIconName = iconName.trimmingCharacters(in: .whitespaces)
+            let trimmedColorHex = folderColorHex.trimmingCharacters(in: .whitespaces)
             
-            // Always save folder color and optional symbol
+            // Validate hex before saving
+            let colorToSave = NSColor(hex: trimmedColorHex) != nil ? trimmedColorHex : "#55C2EE"
+            
             DatabaseManager.shared.setFolderIcon(
                 path: folder.path,
                 iconName: trimmedIconName.isEmpty ? nil : trimmedIconName,
-                iconColorHex: "#FFFFFF",
-                baseAsset: selectedFolderColor.assetName,
+                iconColorHex: colorToSave,
+                baseAsset: "folder-layered",
                 symbolSize: 24,
                 symbolOffset: -4
             )
             
-            if !trimmedIconName.isEmpty {
-                print("✅ Updated folder: \(selectedFolderColor.assetName) with symbol: \(trimmedIconName)")
-            } else {
-                print("✅ Updated folder color: \(selectedFolderColor.assetName)")
-            }
+            print("✅ Updated folder color: \(colorToSave)")
             
             onSave()
         } else {
             print("❌ Failed to update favorite settings")
-        }
-    }
-}
-
-// MARK: - Folder Color Enum
-
-enum FolderColor: String, CaseIterable, Identifiable {
-    case blue = "Blue"
-    case orange = "Orange"
-    case red = "Red"
-    case purple = "Purple"
-    case green = "Green"
-    
-    var id: String { rawValue }
-    
-    // Asset name in your Assets folder
-    var assetName: String {
-        switch self {
-        case .blue: return "folder-blue"
-        case .orange: return "folder-orange"
-        case .red: return "folder-red"
-        case .purple: return "folder-purple"
-        case .green: return "folder-green"
-        }
-    }
-    
-    // Color for the preview circle
-    var swiftUIColor: Color {
-        switch self {
-        case .blue: return Color(red: 0.2, green: 0.6, blue: 0.9)
-        case .orange: return Color(red: 1.0, green: 0.6, blue: 0.2)
-        case .red: return Color(red: 0.9, green: 0.2, blue: 0.2)
-        case .purple: return Color(red: 0.6, green: 0.3, blue: 0.8)
-        case .green: return Color(red: 0.2, green: 0.7, blue: 0.3)
         }
     }
 }

@@ -34,6 +34,7 @@ class IconProvider {
         case systemWithColor(NSColor)     // System folder icon with custom color tint
         case customAsset(String)           // Custom icon from Asset Catalog
         case composite(baseAsset: String, symbol: String, symbolColor: NSColor, symbolSize: CGFloat, symbolOffset: CGFloat)
+        case layered(color: NSColor)       // New: Layered SVG folder with custom color
     }
     
     private struct FolderConfig {
@@ -179,14 +180,14 @@ class IconProvider {
             return createFolderIcon(config: config, url: url, size: size, cornerRadius: cornerRadius)
         }
         
-        // Priority 3: Fallback to system icon
-        return createSystemFolderIcon(for: url, size: size, cornerRadius: cornerRadius)
+        // Priority 3: Fallback to default layered folder icon (blue)
+        return createLayeredFolderIcon(color: NSColor(hex: "#55C2EE") ?? .systemBlue, size: size, cornerRadius: cornerRadius)
     }
     
-    /// Set a custom color for a specific folder path
+    /// Set a custom color for a specific folder path using layered rendering
     func setFolderColor(_ color: NSColor, forPath path: String) {
-        pathBasedFolderIcons[path] = FolderConfig(type: .systemWithColor(color))
-        print("🎨 [IconProvider] Set custom color for folder path: \(path)")
+        pathBasedFolderIcons[path] = FolderConfig(type: .layered(color: color))
+        print("🎨 [IconProvider] Set layered folder color for path: \(path)")
     }
     
     /// Set a custom asset icon for a specific folder path
@@ -230,6 +231,166 @@ class IconProvider {
     /// Get all folder paths with custom icons
     func getCustomizedFolderPaths() -> [String] {
         return Array(pathBasedFolderIcons.keys)
+    }
+    
+    // MARK: - Layered Folder Icon
+    
+    /// Create a folder icon by compositing 4 SVG layers with customizable color
+    /// - Parameters:
+    ///   - color: The primary folder color (front folder)
+    ///   - size: The icon size
+    ///   - cornerRadius: Corner radius for clipping (optional)
+    /// - Returns: Composited folder icon
+    func createLayeredFolderIcon(color: NSColor, size: CGFloat = 64, cornerRadius: CGFloat = 0) -> NSImage {
+        let compositeImage = NSImage(size: NSSize(width: size, height: size))
+        
+        // Derive back folder color (HSL lightness - 20)
+        let backColor = color.adjustingLightness(by: -20)
+        
+        compositeImage.lockFocus()
+        
+        let rect = NSRect(origin: .zero, size: NSSize(width: size, height: size))
+        
+        // Optional corner radius clipping
+        if cornerRadius > 0 {
+            let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
+            path.addClip()
+        }
+        
+        // Layer 1 (bottom): Back folder - derived darker color
+        if let backLayer = NSImage(named: "folder-blue-04") {
+            drawTintedLayer(backLayer, in: rect, tintColor: backColor)
+        }
+        
+        // Layer 2: Highlight - draw as-is (white + alpha)
+        if let highlight1 = NSImage(named: "folder-blue-03") {
+            highlight1.draw(in: rect, from: NSRect(origin: .zero, size: highlight1.size), operation: .sourceOver, fraction: 1.0)
+        }
+        
+        // Layer 3: Front folder - user's chosen color
+        if let frontLayer = NSImage(named: "folder-blue-02") {
+            drawTintedLayer(frontLayer, in: rect, tintColor: color)
+        }
+        
+        // Layer 4 (top): Highlight - draw as-is (white + alpha)
+        if let highlight2 = NSImage(named: "folder-blue-01") {
+            highlight2.draw(in: rect, from: NSRect(origin: .zero, size: highlight2.size), operation: .sourceOver, fraction: 1.0)
+        }
+        
+        compositeImage.unlockFocus()
+        
+        return compositeImage
+    }
+    
+    /// Create a layered folder icon with an SF Symbol overlay
+    /// - Parameters:
+    ///   - color: The primary folder color
+    ///   - symbolName: SF Symbol to overlay
+    ///   - symbolColor: Color of the SF Symbol
+    ///   - size: The icon size
+    ///   - symbolSize: Absolute point size for the symbol
+    ///   - cornerRadius: Corner radius for clipping
+    ///   - symbolOffset: Vertical offset for the symbol
+    /// - Returns: Composited folder icon with symbol
+    func createLayeredFolderIconWithSymbol(
+        color: NSColor,
+        symbolName: String,
+        symbolColor: NSColor,
+        size: CGFloat = 64,
+        symbolSize: CGFloat = 24,
+        cornerRadius: CGFloat = 0,
+        symbolOffset: CGFloat = -4
+    ) -> NSImage {
+        let compositeImage = NSImage(size: NSSize(width: size, height: size))
+        
+        compositeImage.lockFocus()
+        
+        // Draw base layered folder
+        let baseFolder = createLayeredFolderIcon(color: color, size: size, cornerRadius: cornerRadius)
+        baseFolder.draw(in: NSRect(origin: .zero, size: NSSize(width: size, height: size)))
+        
+        // Draw SF Symbol overlay
+        if let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
+            let symbolConfig = NSImage.SymbolConfiguration(pointSize: symbolSize, weight: .medium)
+            if let configuredSymbol = symbol.withSymbolConfiguration(symbolConfig) {
+                
+                let symbolActualSize = configuredSymbol.size
+                
+                // Create colored version with shadow baked in
+                let shadowOffset: CGFloat = 1
+                let shadowBlur: CGFloat = 1
+                let imageSize = NSSize(
+                    width: symbolActualSize.width + shadowBlur * 2,
+                    height: symbolActualSize.height + shadowBlur * 2 + shadowOffset
+                )
+                
+                let coloredSymbol = NSImage(size: imageSize)
+                coloredSymbol.lockFocus()
+                
+                // Set up shadow
+                let shadow = NSShadow()
+                shadow.shadowColor = NSColor.black.withAlphaComponent(0.3)
+                shadow.shadowOffset = NSSize(width: 0, height: -shadowOffset)
+                shadow.shadowBlurRadius = shadowBlur
+                shadow.set()
+                
+                // Draw symbol with padding for shadow
+                let drawRect = NSRect(
+                    x: shadowBlur,
+                    y: shadowBlur + shadowOffset,
+                    width: symbolActualSize.width,
+                    height: symbolActualSize.height
+                )
+                
+                configuredSymbol.draw(
+                    in: drawRect,
+                    from: NSRect(origin: .zero, size: symbolActualSize),
+                    operation: .sourceOver,
+                    fraction: 1.0
+                )
+                
+                symbolColor.setFill()
+                drawRect.fill(using: .sourceAtop)
+                
+                coloredSymbol.unlockFocus()
+                
+                // Draw colored symbol centered on composite
+                let symbolRect = NSRect(
+                    x: (size - imageSize.width) / 2,
+                    y: (size - imageSize.height) / 2 + symbolOffset,
+                    width: imageSize.width,
+                    height: imageSize.height
+                )
+                
+                coloredSymbol.draw(in: symbolRect)
+            }
+        }
+        
+        compositeImage.unlockFocus()
+        
+        return compositeImage
+    }
+    
+    private func drawTintedLayer(_ image: NSImage, in rect: NSRect, tintColor: NSColor) {
+        // Create a temporary image for tinting
+        let tintedImage = NSImage(size: rect.size)
+        
+        tintedImage.lockFocus()
+        
+        // Draw the original image
+        image.draw(in: NSRect(origin: .zero, size: rect.size),
+                   from: NSRect(origin: .zero, size: image.size),
+                   operation: .sourceOver,
+                   fraction: 1.0)
+        
+        // Apply tint - replaces color while preserving alpha
+        tintColor.setFill()
+        NSRect(origin: .zero, size: rect.size).fill(using: .sourceAtop)
+        
+        tintedImage.unlockFocus()
+        
+        // Draw the tinted result
+        tintedImage.draw(in: rect)
     }
     
     // MARK: - Public API - Composite Icons
@@ -458,6 +619,8 @@ class IconProvider {
                 cornerRadius: cornerRadius,
                 symbolOffset: symbolOffset
             )
+        case .layered(let color):
+            return createLayeredFolderIcon(color: color, size: size, cornerRadius: cornerRadius)
         }
     }
     
@@ -690,5 +853,76 @@ extension NSColor {
         let b = CGFloat(rgb & 0x0000FF) / 255.0
         
         self.init(red: r, green: g, blue: b, alpha: 1.0)
+    }
+}
+
+// MARK: - NSColor Extension for HSL Adjustment
+
+extension NSColor {
+    /// Adjust the lightness component in HSL color space
+    /// - Parameter delta: Amount to add/subtract from lightness (0-100 scale)
+    /// - Returns: New color with adjusted lightness
+    func adjustingLightness(by delta: CGFloat) -> NSColor {
+        guard let rgbColor = usingColorSpace(.deviceRGB) else { return self }
+        
+        let r = rgbColor.redComponent
+        let g = rgbColor.greenComponent
+        let b = rgbColor.blueComponent
+        
+        // Convert RGB to HSL
+        let maxC = max(r, g, b)
+        let minC = min(r, g, b)
+        let l = (maxC + minC) / 2
+        
+        var h: CGFloat = 0
+        var s: CGFloat = 0
+        
+        if maxC != minC {
+            let d = maxC - minC
+            s = l > 0.5 ? d / (2 - maxC - minC) : d / (maxC + minC)
+            
+            switch maxC {
+            case r:
+                h = (g - b) / d + (g < b ? 6 : 0)
+            case g:
+                h = (b - r) / d + 2
+            case b:
+                h = (r - g) / d + 4
+            default:
+                break
+            }
+            h /= 6
+        }
+        
+        // Adjust lightness (delta is on 0-100 scale, convert to 0-1)
+        let newL = max(0, min(1, l + (delta / 100)))
+        
+        // Convert HSL back to RGB
+        return Self.fromHSL(hue: h, saturation: s, lightness: newL)
+    }
+    
+    /// Create color from HSL values (hue: 0-1, saturation: 0-1, lightness: 0-1)
+    static func fromHSL(hue h: CGFloat, saturation s: CGFloat, lightness l: CGFloat, alpha: CGFloat = 1.0) -> NSColor {
+        let c = (1 - abs(2 * l - 1)) * s
+        let x = c * (1 - abs((h * 6).truncatingRemainder(dividingBy: 2) - 1))
+        let m = l - c / 2
+        
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        
+        let segment = Int(h * 6) % 6
+        
+        switch segment {
+        case 0: r = c; g = x; b = 0
+        case 1: r = x; g = c; b = 0
+        case 2: r = 0; g = c; b = x
+        case 3: r = 0; g = x; b = c
+        case 4: r = x; g = 0; b = c
+        case 5: r = c; g = 0; b = x
+        default: break
+        }
+        
+        return NSColor(red: r + m, green: g + m, blue: b + m, alpha: alpha)
     }
 }

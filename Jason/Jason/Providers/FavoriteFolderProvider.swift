@@ -557,21 +557,28 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         let childIcon = settings.childIconSize.map { CGFloat($0) }
         
         let folderIcon: NSImage = {
-            if folderEntry.baseAsset != "folder-blue" || folderEntry.iconName != nil {
-                let symbolName = folderEntry.iconName ?? ""
-                
-                return IconProvider.shared.createCompositeIcon(
-                    baseAssetName: folderEntry.baseAsset,
-                    symbolName: symbolName,
+            // Get color from hex stored in database, fallback to default blue
+            let folderColor = folderEntry.iconColor ?? NSColor(hex: "#55C2EE") ?? .systemBlue
+            
+            if let iconName = folderEntry.iconName, !iconName.isEmpty {
+                // Folder with symbol overlay
+                return IconProvider.shared.createLayeredFolderIconWithSymbol(
+                    color: folderColor,
+                    symbolName: iconName,
                     symbolColor: .white,
                     size: 64,
                     symbolSize: folderEntry.symbolSize,
                     cornerRadius: 8,
-                    symbolOffset: -4
+                    symbolOffset: folderEntry.symbolOffset
+                )
+            } else {
+                // Plain colored folder
+                return IconProvider.shared.createLayeredFolderIcon(
+                    color: folderColor,
+                    size: 64,
+                    cornerRadius: 8
                 )
             }
-            
-            return IconProvider.shared.getFolderIcon(for: path, size: 64, cornerRadius: 8)
         }()
         
         return FunctionNode(
