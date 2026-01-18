@@ -37,7 +37,7 @@ class FolderWatcherManager: LiveDataStream {
     private var watchers: [String: FolderWatcher] = [:]
     private let watcherQueue = DispatchQueue(label: "com.jason.folderwatcher", qos: .utility)
     
-    // 🆕 OPERATION QUEUE: Limit concurrent refreshes to prevent CPU spikes
+    // Limit concurrent refreshes to prevent CPU spikes
     private let refreshQueue = OperationQueue()
     
     // Debouncing configuration
@@ -258,7 +258,7 @@ class FolderWatcherManager: LiveDataStream {
             print("[FolderWatcher] 📂 Change detected in: \(name)")
             print("[FolderWatcher] 🔄 Queueing cache refresh...")
             
-            // 🆕 QUEUE THE REFRESH: Add to operation queue
+            //Add to operation queue
             self.queueRefresh(for: path, name: name)
             
             // Remove from pending

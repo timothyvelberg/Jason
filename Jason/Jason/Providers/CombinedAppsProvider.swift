@@ -337,6 +337,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 type: .category,
                 icon: providerIcon,
                 children: appNodes,
+                childDisplayMode: .panel,
                 preferredLayout: .partialSlice,
                 slicePositioning: .center,
                 providerId: providerId,
@@ -363,7 +364,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             print("🔄 Switching to running app: \(entry.name)")
             
             // Record app usage in MRU tracker
-            // 🆕 CHANGED: Now using shared instance
+            // Now using shared instance
             appSwitcherManager?.recordAppUsage(runningApp)
             
             // Hide UI and switch to app

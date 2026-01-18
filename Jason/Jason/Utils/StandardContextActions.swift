@@ -85,7 +85,7 @@ struct StandardContextActions {
             id: "show-in-finder-\(url.path)",
             name: "Show in Finder",
             type: .action,
-            icon: NSImage(named: "context-actions-folder") ?? NSImage(),
+            icon: NSImage(named: "context_actions_folder") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             }),
