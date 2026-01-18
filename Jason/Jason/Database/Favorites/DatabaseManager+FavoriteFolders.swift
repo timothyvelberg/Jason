@@ -341,4 +341,66 @@ extension DatabaseManager {
         
         return success
     }
+    
+    /// Reorder favorite folders by updating sort_order values
+    func reorderFavoriteFolders(from sourceIndex: Int, to destinationIndex: Int) -> Bool {
+        guard let db = db else { return false }
+        
+        var success = false
+        
+        queue.sync {
+            // Get current order of favorite folders
+            var folderIds: [Int] = []
+            
+            let selectSQL = """
+            SELECT folder_id FROM favorite_folders ORDER BY sort_order;
+            """
+            var selectStatement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, selectSQL, -1, &selectStatement, nil) == SQLITE_OK {
+                while sqlite3_step(selectStatement) == SQLITE_ROW {
+                    folderIds.append(Int(sqlite3_column_int(selectStatement, 0)))
+                }
+            }
+            sqlite3_finalize(selectStatement)
+            
+            guard sourceIndex < folderIds.count else {
+                print("❌ [DatabaseManager] Source index out of bounds")
+                return
+            }
+            
+            // Reorder the array
+            let movedId = folderIds.remove(at: sourceIndex)
+            folderIds.insert(movedId, at: destinationIndex)
+            
+            // Update all sort_order values
+            let updateSQL = "UPDATE favorite_folders SET sort_order = ? WHERE folder_id = ?;"
+            var updateStatement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, updateSQL, -1, &updateStatement, nil) == SQLITE_OK {
+                for (index, folderId) in folderIds.enumerated() {
+                    sqlite3_bind_int(updateStatement, 1, Int32(index))
+                    sqlite3_bind_int(updateStatement, 2, Int32(folderId))
+                    
+                    if sqlite3_step(updateStatement) != SQLITE_DONE {
+                        if let error = sqlite3_errmsg(db) {
+                            print("❌ [DatabaseManager] Failed to update sort_order: \(String(cString: error))")
+                        }
+                        sqlite3_finalize(updateStatement)
+                        return
+                    }
+                    sqlite3_reset(updateStatement)
+                }
+                sqlite3_finalize(updateStatement)
+                success = true
+                print("✅ [DatabaseManager] Reordered \(folderIds.count) favorite folders")
+            } else {
+                if let error = sqlite3_errmsg(db) {
+                    print("❌ [DatabaseManager] Failed to prepare UPDATE for reorder: \(String(cString: error))")
+                }
+            }
+        }
+        
+        return success
+    }
 }

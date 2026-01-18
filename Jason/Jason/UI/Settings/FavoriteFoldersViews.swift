@@ -64,26 +64,25 @@ struct FavoritesSettingsView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    VStack(spacing: 8) {
-                        ForEach(favorites, id: \.folder.id) { item in
-                            FavoriteRow(
-                                folder: item.folder,
-                                maxItems: item.settings.maxItems,
-                                onEdit: {
-                                    editingFavorite = item.folder
-                                    editingName = item.folder.title
-                                    editingMaxItems = item.settings.maxItems.map { String($0) } ?? ""
-                                },
-                                onRemove: {
-                                    removeFavorite(item.folder)
-                                }
-                            )
-                            Divider()
-                        }
+                List {
+                    ForEach(favorites, id: \.folder.id) { item in
+                        FavoriteRow(
+                            folder: item.folder,
+                            maxItems: item.settings.maxItems,
+                            onEdit: {
+                                editingFavorite = item.folder
+                                editingName = item.folder.title
+                                editingMaxItems = item.settings.maxItems.map { String($0) } ?? ""
+                            },
+                            onRemove: {
+                                removeFavorite(item.folder)
+                            }
+                        )
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
-                    .padding()
+                    .onMove(perform: moveFolder)
                 }
+                .listStyle(.inset)
             }
             
             Divider()
@@ -157,6 +156,28 @@ struct FavoritesSettingsView: View {
             loadFavorites()
         }
     }
+    
+    private func moveFolder(from source: IndexSet, to destination: Int) {
+        // Update local state first for immediate UI feedback
+        favorites.move(fromOffsets: source, toOffset: destination)
+        
+        // Get the index we're moving from
+        guard let sourceIndex = source.first else { return }
+        
+        // Calculate actual destination (accounting for the removal)
+        let actualDestination = sourceIndex < destination ? destination - 1 : destination
+        
+        print("🔄 Moving folder from index \(sourceIndex) to \(actualDestination)")
+        
+        // Update database order
+        if DatabaseManager.shared.reorderFavoriteFolders(from: sourceIndex, to: actualDestination) {
+            print("✅ Successfully reordered favorite folders in database")
+        } else {
+            print("❌ Failed to reorder favorites - reverting")
+            // Revert local changes if database update failed
+            loadFavorites()
+        }
+    }
 }
 
 // MARK: - Favorite Row
@@ -169,6 +190,12 @@ struct FavoriteRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
+            // Drag indicator
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 14))
+                .foregroundColor(.secondary.opacity(0.5))
+                .help("Drag to reorder")
+            
             // Use layered folder icon with stored color
             let folderColor = folder.iconColor ?? NSColor(hex: "#55C2EE") ?? .systemBlue
             let icon: NSImage = {
@@ -218,15 +245,20 @@ struct FavoriteRow: View {
             
             HStack(spacing: 8) {
                 Button(action: onEdit) {
-                    Image(systemName: "pencil")
+                    Image(systemName: "pencil.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.blue)
                 }
                 .buttonStyle(.borderless)
+                .help("Edit folder settings")
                 
                 Button(action: onRemove) {
-                    Image(systemName: "trash")
+                    Image(systemName: "trash.circle.fill")
+                        .font(.title3)
                         .foregroundColor(.red)
                 }
                 .buttonStyle(.borderless)
+                .help("Remove from favorites")
             }
         }
         .padding(.vertical, 4)
