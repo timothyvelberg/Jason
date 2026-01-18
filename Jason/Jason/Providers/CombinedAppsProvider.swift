@@ -411,7 +411,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             id: "add-favorite-\(bundleIdentifier)",
             name: "Add to Favorites",
             type: .action,
-            icon: NSImage(named: "context-actions-favorited") ?? NSImage(),
+            icon: NSImage(named: "context_actions_favorited") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                 print("⭐ Adding \(name) to favorites")
                 let success = DatabaseManager.shared.addFavoriteApp(
