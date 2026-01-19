@@ -61,6 +61,9 @@ class ProviderFactory {
         case "ShortcutExecuteProvider":
             provider = createShortcutExecuteProvider(config: config)
             
+        case "ClipboardHistoryProvider":
+            provider = createClipboardHistoryProvider(config: config)
+            
         default:
             print("⚠️ [ProviderFactory] Unknown provider type: \(config.providerType)")
             return nil
@@ -108,6 +111,15 @@ class ProviderFactory {
         // if let customConfig = config.config {
         //     // Apply provider-specific configuration
         // }
+        
+        return provider
+    }
+    
+    private func createClipboardHistoryProvider(config: ProviderConfiguration) -> ClipboardHistoryProvider? {
+        let provider = ClipboardHistoryProvider()
+        
+        // ClipboardHistoryProvider doesn't need external dependencies
+        // ClipboardManager.shared is accessed internally
         
         return provider
     }
@@ -187,7 +199,8 @@ class ProviderFactory {
             "SystemActionsProvider",
             "FavoriteFolderProvider",
             "WindowManagementProvider",
-            "ShortcutExecuteProvider"
+            "ShortcutExecuteProvider",
+            "ClipboardHistoryProvider"
         ]
     }
 }

@@ -31,6 +31,8 @@ struct EditRingView: View {
     @State private var iconSize: String = "32"
     @State private var startAngle: Double = 0.0
     @State private var isActive: Bool = true
+    @State private var includeClipboardHistory: Bool = false
+    @State private var clipboardHistoryMode: ProviderDisplayMode = .parent
     
     // Provider selection
     @State private var includeCombinedApps: Bool = true
@@ -242,6 +244,12 @@ struct EditRingView: View {
                                 isIncluded: $includeShortcutExecute,
                                 displayMode: $shortcutExecuteMode
                             )
+                            ProviderRow(
+                                name: "Clipboard History",
+                                description: "Access previously copied text",
+                                isIncluded: $includeClipboardHistory,
+                                displayMode: $clipboardHistoryMode
+                            )
                         }
                         .padding(12)
                     }
@@ -304,7 +312,7 @@ struct EditRingView: View {
     }
     
     private var hasAtLeastOneProvider: Bool {
-        includeCombinedApps || includeFavoriteFiles || includeFavoriteFolderProvider || includeSystemActions || includeWindowManagement || includeShortcutExecute
+        includeCombinedApps || includeFavoriteFiles || includeFavoriteFolderProvider || includeSystemActions || includeWindowManagement || includeShortcutExecute || includeClipboardHistory
     }
     
     // MARK: - Actions
@@ -363,6 +371,9 @@ struct EditRingView: View {
             case "ShortcutExecuteProvider":
                 includeShortcutExecute = true
                 shortcutExecuteMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
+            case "ClipboardHistoryProvider":
+                includeClipboardHistory = true
+                clipboardHistoryMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
             default:
                 break
             }
@@ -488,6 +499,10 @@ struct EditRingView: View {
         
         if includeShortcutExecute {
             providers.append(("ShortcutExecuteProvider", order, shortcutExecuteMode.rawValue, nil))
+            order += 1
+        }
+        if includeClipboardHistory {
+            providers.append(("ClipboardHistoryProvider", order, clipboardHistoryMode.rawValue, nil))
             order += 1
         }
         
