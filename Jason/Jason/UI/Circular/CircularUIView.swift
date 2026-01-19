@@ -87,18 +87,21 @@ struct CircularUIView: View {
                     let screenOriginY = screen?.frame.origin.y ?? 0
                     let screenHeight = screen?.frame.height ?? 1080
                     
-                    // Use currentPosition which accounts for overlap state
+                    // Use currentPosition which accounts for overlap state and resize anchor
                     let currentPos = listPanelManager.currentPosition(for: panel)
                     let panelLocalX = currentPos.x - screenOriginX
                     let panelLocalY = currentPos.y - screenOriginY
                     let panelSwiftUIY = screenHeight - panelLocalY
                     
                     let panelLevel = panel.level
-                        let isDeepestPanel = panel.level == listPanelManager.panelStack.map(\.level).max()
+                    let isDeepestPanel = listPanelManager.isDeepestPanel(panel)
+                    
+                    // Get filtered items from manager (ensures consistency with hit-testing)
+                    let filteredItems = listPanelManager.filteredItems(for: panel)
                     
                     ListPanelView(
                         title: panel.title,
-                        items: panel.items,
+                        items: filteredItems,
                         onItemLeftClick: listPanelManager.onItemLeftClick,
                         onItemRightClick: listPanelManager.onItemRightClick,
                         onContextAction: listPanelManager.onContextAction,
@@ -113,14 +116,14 @@ struct CircularUIView: View {
                         },
                         contextActions: panel.contextActions,
                         expandedItemId: expandedItemIdBinding(for: panel.level),
-                        searchText: isDeepestPanel ? $listPanelManager.searchText : .constant("")
-                        
+                        searchText: isDeepestPanel ? listPanelManager.searchText : ""
                     )
                     .position(x: panelLocalX, y: panelSwiftUIY)
                     .transition(panel.level == 0
                         ? .slideFromAngle(angle: panel.spawnAngle ?? 0, distance: PanelState.cascadeSlideDistance)
-                        : .slideFromLeft(distance: PanelState.cascadeSlideDistance))    
-                    .animation(.easeInOut(duration: 0.2), value: panel.isOverlapping)             }
+                        : .slideFromLeft(distance: PanelState.cascadeSlideDistance))
+                    .animation(.easeInOut(duration: 0.2), value: panel.isOverlapping)
+                }
             }
             .animation(.easeOut(duration: 0.1), value: listPanelManager.panelStack.count)
             .ignoresSafeArea()

@@ -13,7 +13,7 @@ import AppKit
 
 struct ListPanelView: View {
     let title: String
-    let items: [FunctionNode]
+    let items: [FunctionNode]           // Now receives FILTERED items from manager
 
     // Callbacks for interactions
     var onItemLeftClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
@@ -28,8 +28,8 @@ struct ListPanelView: View {
     // Expanded state from manager
     @Binding var expandedItemId: String?
     
-    // Search binding
-    @Binding var searchText: String
+    // Search text for display in title bar
+    let searchText: String
     
     // Configuration
     var panelWidth: CGFloat = 260
@@ -47,28 +47,16 @@ struct ListPanelView: View {
     // Computed
     private var titleHeight: CGFloat { 40 }
     
-    // Update computed properties to use filteredItems
+    // Panel height based on FILTERED items
     private var panelHeight: CGFloat {
-        let itemCount = min(filteredItems.count, maxVisibleItems)
+        let itemCount = min(items.count, maxVisibleItems)
         let contentHeight = CGFloat(itemCount) * rowHeight
         let padding: CGFloat = 8
         return titleHeight + contentHeight + padding
     }
     
     private var needsScroll: Bool {
-        filteredItems.count > maxVisibleItems
-    }
-    
-    //Computed filtered items
-    private var filteredItems: [FunctionNode] {
-        guard !searchText.isEmpty else { return items }
-        let query = searchText.lowercased()
-        return items.filter { item in
-            if item.name.lowercased().contains(query) { return true }
-            if let fullContent = item.metadata?["fullContent"] as? String,
-               fullContent.lowercased().contains(query) { return true }
-            return false
-        }
+        items.count > maxVisibleItems
     }
     
     var body: some View {
@@ -138,62 +126,73 @@ struct ListPanelView: View {
                         .frame(height: 1)
                 }
                 
-                // Item list
-                ScrollView(.vertical, showsIndicators: needsScroll) {
-                    VStack(spacing: 0) {
-                        ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
-                            ListPanelRow(
-                                item: item,
-                                iconSize: iconSize,
-                                rowHeight: rowHeight,
-                                isHovered: !isScrolling && hoveredItemId == item.id,
-                                isExpanded: expandedItemId == item.id,
-                                onLeftClick: { modifiers in
-                                    expandedItemId = nil
-                                    onItemLeftClick?(item, modifiers)
-                                },
-                                onRightClick: { modifiers in
-                                    onItemRightClick?(item, modifiers)
-                                },
-                                onContextAction: { action, modifiers in
-                                    expandedItemId = nil
-                                    onContextAction?(action, modifiers)
-                                }
-                            )
-                            .onHover { hovering in
-                                if hovering {
-                                    if expandedItemId != nil && expandedItemId != item.id {
+                // Item list - now uses filtered items directly
+                if items.isEmpty && !searchText.isEmpty {
+                    // No results message
+                    VStack {
+                        Text("No matches")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .frame(height: rowHeight * 2)
+                } else {
+                    ScrollView(.vertical, showsIndicators: needsScroll) {
+                        VStack(spacing: 0) {
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                ListPanelRow(
+                                    item: item,
+                                    iconSize: iconSize,
+                                    rowHeight: rowHeight,
+                                    isHovered: !isScrolling && hoveredItemId == item.id,
+                                    isExpanded: expandedItemId == item.id,
+                                    onLeftClick: { modifiers in
                                         expandedItemId = nil
+                                        onItemLeftClick?(item, modifiers)
+                                    },
+                                    onRightClick: { modifiers in
+                                        onItemRightClick?(item, modifiers)
+                                    },
+                                    onContextAction: { action, modifiers in
+                                        expandedItemId = nil
+                                        onContextAction?(action, modifiers)
                                     }
-                                    hoveredItemId = item.id
-                                    
-                                    // Only fire hover callback if not scrolling
-                                    if !isScrolling {
-                                        onItemHover?(item, index)
+                                )
+                                .onHover { hovering in
+                                    if hovering {
+                                        if expandedItemId != nil && expandedItemId != item.id {
+                                            expandedItemId = nil
+                                        }
+                                        hoveredItemId = item.id
+                                        
+                                        // Only fire hover callback if not scrolling
+                                        if !isScrolling {
+                                            onItemHover?(item, index)
+                                        }
+                                    } else {
+                                        hoveredItemId = nil
                                     }
-                                } else {
-                                    hoveredItemId = nil
                                 }
                             }
                         }
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear
+                                    .onChange(of: geo.frame(in: .named("panelScroll")).minY) { newValue in
+                                        handleScrollChange(-newValue)
+                                    }
+                            }
+                        )
                     }
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear
-                                .onChange(of: geo.frame(in: .named("panelScroll")).minY) { newValue in
-                                    handleScrollChange(-newValue)
-                                }
-                        }
-                    )
+                    .coordinateSpace(name: "panelScroll")
+                    .frame(maxHeight: CGFloat(maxVisibleItems) * rowHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 2))
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 4)
                 }
-                .coordinateSpace(name: "panelScroll")
-                .frame(maxHeight: CGFloat(maxVisibleItems) * rowHeight)
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 2))
-                .padding(.horizontal, 4)
-                .padding(.bottom, 4)
             }
         }
         .frame(width: panelWidth, height: panelHeight)
+        .animation(.easeInOut(duration: 0.15), value: items.count)
     }
     
     private func handleScrollChange(_ newOffset: CGFloat) {

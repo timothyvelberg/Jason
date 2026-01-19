@@ -11,6 +11,14 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Resize Anchor
+
+enum ResizeAnchor {
+    case top      // Panel anchored at top, grows/shrinks downward
+    case bottom   // Panel anchored at bottom, grows/shrinks upward
+    case sourceRow // Child panels anchor to their source row
+}
+
 // MARK: - Panel State
 
 struct PanelState: Identifiable {
@@ -39,19 +47,25 @@ struct PanelState: Identifiable {
     // Panel dimensions (constants for now, could be configurable)
     static let panelWidth: CGFloat = 260
     static let rowHeight: CGFloat = 32
-    static let titleHeight: CGFloat = 28
+    static let titleHeight: CGFloat = 40
     static let maxVisibleItems: Int = 10
     static let padding: CGFloat = 8
     static let cascadeSlideDistance: CGFloat = 30
 
     
-    /// Calculate panel height based on item count
+    /// Calculate panel height based on item count (unfiltered)
     var panelHeight: CGFloat {
         let itemCount = min(items.count, Self.maxVisibleItems)
         return Self.titleHeight + CGFloat(itemCount) * Self.rowHeight + Self.padding
     }
     
-    /// Panel bounds in screen coordinates
+    /// Calculate panel height for a specific item count (used for filtered)
+    func panelHeight(forItemCount count: Int) -> CGFloat {
+        let itemCount = min(count, Self.maxVisibleItems)
+        return Self.titleHeight + CGFloat(itemCount) * Self.rowHeight + Self.padding
+    }
+    
+    /// Panel bounds in screen coordinates (unfiltered)
     var bounds: NSRect {
         NSRect(
             x: position.x - Self.panelWidth / 2,
@@ -59,6 +73,18 @@ struct PanelState: Identifiable {
             width: Self.panelWidth,
             height: panelHeight
         )
+    }
+    
+    /// Get resize anchor based on spawn angle
+    var resizeAnchor: ResizeAnchor {
+        if level == 0 {
+            let angle = spawnAngle ?? 0
+            // Bottom half of circle (90° to 270°): anchor top, panel grows down
+            // Top half: anchor bottom, panel grows up
+            return (angle >= 90 && angle <= 270) ? .top : .bottom
+        } else {
+            return .sourceRow
+        }
     }
 }
 
@@ -154,6 +180,35 @@ class ListPanelManager: ObservableObject {
     deinit {
         NotificationCenter.default.removeObserver(self)
         print("📋 [ListPanelManager] Deallocated - removed observers")
+    }
+    
+    // MARK: - Filtered Items Support
+    
+    /// Get filtered items for a panel (applies search to deepest panel only)
+    func filteredItems(for panel: PanelState) -> [FunctionNode] {
+        // Only filter the deepest panel
+        guard isDeepestPanel(panel), !searchText.isEmpty else {
+            return panel.items
+        }
+        
+        let query = searchText.lowercased()
+        return panel.items.filter { item in
+            if item.name.lowercased().contains(query) { return true }
+            if let fullContent = item.metadata?["fullContent"] as? String,
+               fullContent.lowercased().contains(query) { return true }
+            return false
+        }
+    }
+    
+    /// Check if a panel is the deepest (actively being searched)
+    func isDeepestPanel(_ panel: PanelState) -> Bool {
+        guard let maxLevel = panelStack.map(\.level).max() else { return false }
+        return panel.level == maxLevel
+    }
+    
+    /// Check if search is currently active
+    var isSearchActive: Bool {
+        !searchText.isEmpty
     }
     
     // MARK: - Provider Update Handler
@@ -297,9 +352,8 @@ class ListPanelManager: ObservableObject {
         providerId: String? = nil,
         contentIdentifier: String? = nil
     ) {
-        if panelStack.isEmpty {
-            searchText = ""  // Only clear if no panel was showing
-        }
+        // Clear search
+        searchText = ""
         
         // Store ring context for cascading
         self.currentAngle = angle
@@ -368,21 +422,29 @@ class ListPanelManager: ObservableObject {
     
     // MARK: - Bounds Calculation
 
-    /// Get the current bounds for a panel (accounting for overlap state)
+    /// Get the current bounds for a panel (accounting for overlap state and filtering)
     func currentBounds(for panel: PanelState) -> NSRect {
         let currentPos = currentPosition(for: panel)
+        let height = currentPanelHeight(for: panel)
         return NSRect(
             x: currentPos.x - PanelState.panelWidth / 2,
-            y: currentPos.y - panel.panelHeight / 2,
+            y: currentPos.y - height / 2,
             width: PanelState.panelWidth,
-            height: panel.panelHeight
+            height: height
         )
+    }
+    
+    /// Get the current panel height (accounting for filtering on deepest panel)
+    func currentPanelHeight(for panel: PanelState) -> CGFloat {
+        let items = filteredItems(for: panel)
+        return panel.panelHeight(forItemCount: items.count)
     }
 
     /// Calculate the screen bounds of a specific row in a panel
-    /// Accounts for scroll offset to return the VISIBLE position of the row
+    /// Uses FILTERED items for the deepest panel
     func rowBounds(forPanel panel: PanelState, rowIndex: Int) -> NSRect? {
-        guard rowIndex >= 0 && rowIndex < panel.items.count else { return nil }
+        let items = filteredItems(for: panel)
+        guard rowIndex >= 0 && rowIndex < items.count else { return nil }
         
         let panelBounds = currentBounds(for: panel)
         
@@ -486,39 +548,63 @@ class ListPanelManager: ObservableObject {
 
     // MARK: - Position Calculation
 
-    /// Get the current position for a panel (accounting for overlap state)
+    /// Get the current position for a panel (accounting for overlap state and resize anchor)
     func currentPosition(for panel: PanelState) -> CGPoint {
-        guard panel.isOverlapping else {
+        var basePosition = panel.position
+        
+        // Handle overlap shifting
+        if panel.isOverlapping {
+            // Panel is overlapping - calculate position relative to parent's CURRENT position
+            if let parentPanel = panelStack.first(where: { $0.level == panel.level - 1 }) {
+                // Get parent's current position (recursive - handles chain of overlaps)
+                let parentCurrentPos = currentPosition(for: parentPanel)
+                
+                // Calculate parent's current left edge
+                let parentCurrentLeftEdge = parentCurrentPos.x - (PanelState.panelWidth / 2)
+                
+                // Overlapping X: parent's current left edge + peekWidth + half panel width
+                let overlappingX = parentCurrentLeftEdge + peekWidth + (PanelState.panelWidth / 2)
+                
+                basePosition = CGPoint(x: overlappingX, y: panel.position.y)
+            }
+        } else if panel.level > 0 {
             // Not overlapping, but ancestors might be shifted - need to adjust
-            if panel.level > 0,
-               let parentPanel = panelStack.first(where: { $0.level == panel.level - 1 }) {
+            if let parentPanel = panelStack.first(where: { $0.level == panel.level - 1 }) {
                 let parentOriginalX = parentPanel.position.x
                 let parentCurrentPos = currentPosition(for: parentPanel)
                 let parentShift = parentCurrentPos.x - parentOriginalX
                 
                 // Only shift if there's actually a difference
                 if abs(parentShift) > 0.1 {
-                    return CGPoint(x: panel.position.x + parentShift, y: panel.position.y)
+                    basePosition = CGPoint(x: panel.position.x + parentShift, y: panel.position.y)
                 }
             }
-            return panel.position
         }
         
-        // Panel is overlapping - calculate position relative to parent's CURRENT position
-        guard let parentPanel = panelStack.first(where: { $0.level == panel.level - 1 }) else {
-            return panel.position
+        // Handle resize anchor adjustment for filtered items
+        if isDeepestPanel(panel) && isSearchActive {
+            let originalHeight = panel.panelHeight
+            let filteredHeight = currentPanelHeight(for: panel)
+            let heightDelta = originalHeight - filteredHeight
+            
+            if abs(heightDelta) > 0.1 {
+                switch panel.resizeAnchor {
+                case .top:
+                    // Anchor top edge: center moves UP as panel shrinks
+                    // In AppKit coords (y=0 at bottom), UP = increase Y
+                    basePosition.y += heightDelta / 2
+                case .bottom:
+                    // Anchor bottom edge: center moves DOWN as panel shrinks
+                    // In AppKit coords, DOWN = decrease Y
+                    basePosition.y -= heightDelta / 2
+                case .sourceRow:
+                    // Child panels shouldn't be the deepest during search, but handle anyway
+                    break
+                }
+            }
         }
         
-        // Get parent's current position (recursive - handles chain of overlaps)
-        let parentCurrentPos = currentPosition(for: parentPanel)
-        
-        // Calculate parent's current left edge
-        let parentCurrentLeftEdge = parentCurrentPos.x - (PanelState.panelWidth / 2)
-        
-        // Overlapping X: parent's current left edge + peekWidth + half panel width
-        let overlappingX = parentCurrentLeftEdge + peekWidth + (PanelState.panelWidth / 2)
-        
-        return CGPoint(x: overlappingX, y: panel.position.y)
+        return basePosition
     }
     
     // MARK: - Push Panel (Cascading)
@@ -548,6 +634,14 @@ class ListPanelManager: ObservableObject {
         
         // Check if parent is armed for child spawning
         guard let sourceIndex = panelStack.firstIndex(where: { $0.level == level }) else { return }
+        
+        // AUTO-ARM when search is active - skip the slide-to-open requirement
+        if isSearchActive {
+            if !panelStack[sourceIndex].areChildrenArmed {
+                panelStack[sourceIndex].areChildrenArmed = true
+                print("📋 [ListPanelManager] Auto-armed panel level \(level) (search active)")
+            }
+        }
         
         if !panelStack[sourceIndex].areChildrenArmed {
             // Not armed yet - store as pending
@@ -597,7 +691,7 @@ class ListPanelManager: ObservableObject {
         popToLevel(level)
         
         // Calculate position: to the right of source panel
-        let sourceBounds = sourcePanel.bounds
+        let sourceBounds = currentBounds(for: sourcePanel)
         let gap: CGFloat = 8
         
         let newPanelWidth = PanelState.panelWidth
@@ -759,7 +853,7 @@ class ListPanelManager: ObservableObject {
     
     /// Check if a point is inside ANY panel
     func contains(point: CGPoint) -> Bool {
-        panelStack.contains { $0.bounds.contains(point) }
+        panelStack.contains { currentBounds(for: $0).contains(point) }
     }
     
     /// Check if point is in the panel zone (any panel OR gaps between)
@@ -772,7 +866,7 @@ class ListPanelManager: ObservableObject {
         var maxY = -CGFloat.infinity
         
         for panel in panelStack {
-            let bounds = panel.bounds
+            let bounds = currentBounds(for: panel)
             minX = min(minX, bounds.minX)
             minY = min(minY, bounds.minY)
             maxX = max(maxX, bounds.maxX)
@@ -801,7 +895,7 @@ class ListPanelManager: ObservableObject {
     
     /// Left edge of leftmost panel (for ring boundary detection)
     var leftmostPanelEdge: CGFloat? {
-        panelStack.first.map { $0.bounds.minX }
+        panelStack.first.map { currentBounds(for: $0).minX }
     }
     
     // MARK: - Right Click Handling
@@ -816,6 +910,7 @@ class ListPanelManager: ObservableObject {
         
         let panel = panelStack[panelIndex]
         let bounds = currentBounds(for: panel)
+        let items = filteredItems(for: panel)
         
         // Calculate which row was clicked (accounting for title and scroll)
         let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
@@ -824,13 +919,13 @@ class ListPanelManager: ObservableObject {
         let scrollAdjustedY = relativeY - panel.scrollOffset
         let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
-        guard rowIndex >= 0 && rowIndex < panel.items.count else {
+        guard rowIndex >= 0 && rowIndex < items.count else {
             print("📋 [Panel] Right-click outside rows")
             panelStack[panelIndex].expandedItemId = nil
             return true
         }
         
-        let clickedItem = panel.items[rowIndex]
+        let clickedItem = items[rowIndex]
         print("📋 [Panel \(level)] Right-click on row \(rowIndex): '\(clickedItem.name)'")
         
         // Toggle expanded state
@@ -853,6 +948,7 @@ class ListPanelManager: ObservableObject {
         
         let panel = panelStack[panelIndex]
         let bounds = currentBounds(for: panel)
+        let items = filteredItems(for: panel)
         
         // Check if click is in title bar area
         let distanceFromTop = bounds.maxY - point.y
@@ -867,11 +963,11 @@ class ListPanelManager: ObservableObject {
         let scrollAdjustedY = relativeY - panel.scrollOffset
         let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
-        guard rowIndex >= 0 && rowIndex < panel.items.count else {
+        guard rowIndex >= 0 && rowIndex < items.count else {
             return nil
         }
         
-        let clickedItem = panel.items[rowIndex]
+        let clickedItem = items[rowIndex]
         
         // NEW: If this row is expanded (showing context actions), let SwiftUI handle the click
         if panel.expandedItemId == clickedItem.id {
@@ -895,6 +991,7 @@ class ListPanelManager: ObservableObject {
         
         let panel = panelStack[panelIndex]
         let bounds = currentBounds(for: panel)
+        let items = filteredItems(for: panel)
         
         // Calculate which row was clicked (accounting for title and scroll)
         let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
@@ -903,11 +1000,11 @@ class ListPanelManager: ObservableObject {
         let scrollAdjustedY = relativeY - panel.scrollOffset
         let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
-        guard rowIndex >= 0 && rowIndex < panel.items.count else {
+        guard rowIndex >= 0 && rowIndex < items.count else {
             return nil
         }
         
-        let node = panel.items[rowIndex]
+        let node = items[rowIndex]
         
         // Check if node is draggable (resolve with current modifiers)
         let behavior = node.onLeftClick.resolve(with: NSEvent.modifierFlags)
@@ -928,7 +1025,7 @@ class ListPanelManager: ObservableObject {
         return true
     }
 
-    /// Filter items for display based on search text
+    /// Filter items for display based on search text (deprecated - use filteredItems(for:) instead)
     func filteredItems(for items: [FunctionNode]) -> [FunctionNode] {
         guard !searchText.isEmpty else { return items }
         
