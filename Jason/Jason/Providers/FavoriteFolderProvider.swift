@@ -121,9 +121,6 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                     print("✂️ [FavoriteFolderProvider] Applying custom limit: \(limit) items")
                     nodes = Array(nodes.prefix(limit))
                 }
-                
-                // Add end spacer
-                nodes.append(createOpenFolderNode(for: folderPath))
                 return nodes
             } else {
                 print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
@@ -173,7 +170,6 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         
         // Add end spacer
         var resultNodes = nodes
-        resultNodes.append(createOpenFolderNode(for: folderPath))
         return resultNodes
     }
     
@@ -430,7 +426,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             childDisplayMode: .panel,
             contextActions: [
                 StandardContextActions.copyFile(url),
-                StandardContextActions.copyFile(url),
+                StandardContextActions.showInFinder(url),
                 StandardContextActions.deleteFile(url) { success in  // UPDATE
                     if success {
                         NotificationCenter.default.postProviderUpdate(
@@ -438,8 +434,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                             folderPath: folderPath
                         )
                     }
-                },
-                StandardContextActions.showInFinder(url)
+                }
             ],
             preferredLayout: .partialSlice,
             previewURL: url,
@@ -603,7 +598,6 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 fileURLs: [path],
                 dragImage: folderIcon,
                 allowedOperations: [.move, .copy],
-//                clickBehavior: .navigate,
                 onDragStarted: {
                     print("📦 Started dragging favorite folder: \(folderEntry.title)")
                 },
@@ -777,29 +771,5 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         }
         
         return IconProvider.shared.getFileIcon(for: url, size: thumbnailSize.width, cornerRadius: cornerRadius)
-    }
-
-    // MARK: - Spacer Creation
-    
-    private func createOpenFolderNode(for folderPath: String) -> FunctionNode {
-        let url = URL(fileURLWithPath: folderPath)
-        let icon = NSImage(systemSymbolName: "arrow.up.forward.square", accessibilityDescription: "Open in Finder")?
-            .withSymbolConfiguration(.init(pointSize: 24, weight: .medium)) ?? NSImage()
-        
-        return FunctionNode(
-            id: "open-folder-\(folderPath)",
-            name: "Open in Finder",
-            type: .action,
-            icon: icon,
-            parentAngleSize: 12.0,
-            showLabel: true,
-            providerId: providerId,
-            onLeftClick: ModifierAwareInteraction(base: .execute {
-                NSWorkspace.shared.open(url)
-            }),
-            onRightClick: ModifierAwareInteraction(base: .doNothing),
-            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
-        )
     }
 }
