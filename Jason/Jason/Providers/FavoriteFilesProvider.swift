@@ -363,7 +363,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 type: .category,
                 icon: providerIcon,
                 children: fileNodes,
-//                childDisplayMode: .panel,
+                childDisplayMode: .panel,
                 preferredLayout: .partialSlice,
                 slicePositioning: .center,
                 providerId: providerId,
@@ -486,7 +486,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 type: .folder,
                 icon: entry.icon,
                 children: nil,  // Will be loaded dynamically
-//                childDisplayMode: .panel,
+                childDisplayMode: .panel,
                 contextActions: contextActions,
                 preferredLayout: .partialSlice,
                 previewURL: entry.filePath.isEmpty ? nil : folderURL,
