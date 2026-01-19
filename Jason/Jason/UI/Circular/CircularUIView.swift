@@ -110,7 +110,9 @@ struct CircularUIView: View {
                         onScrollStateChanged: { isScrolling in
                             listPanelManager.handleScrollStateChanged(isScrolling: isScrolling, forLevel: panelLevel)
                         },
+                        contextActions: panel.contextActions,
                         expandedItemId: expandedItemIdBinding(for: panel.level)
+                        
                     )
                     .position(x: panelLocalX, y: panelSwiftUIY)
                     .transition(panel.level == 0

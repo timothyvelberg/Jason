@@ -368,14 +368,16 @@ class CircularUIManager: ObservableObject {
                 
                 // Check if children already loaded
                 if let children = node.children, !children.isEmpty {
+
                     self.listPanelManager?.pushPanel(
                         title: node.name,
                         items: children,
                         fromPanelAtLevel: level,
                         sourceNodeId: node.id,
                         sourceRowIndex: rowIndex,
-                        providerId: providerId,              // ADD
-                        contentIdentifier: contentIdentifier // ADD
+                        providerId: providerId,
+                        contentIdentifier: contentIdentifier,
+                        contextActions: node.contextActions
                     )
                     return
                 }
@@ -405,8 +407,9 @@ class CircularUIManager: ObservableObject {
                             fromPanelAtLevel: level,
                             sourceNodeId: node.id,
                             sourceRowIndex: rowIndex,
-                            providerId: providerId,              // ADD
-                            contentIdentifier: contentIdentifier // ADD
+                            providerId: providerId,
+                            contentIdentifier: contentIdentifier,
+                            contextActions: node.contextActions
                         )
                     }
                 }
@@ -805,7 +808,8 @@ class CircularUIManager: ObservableObject {
                 title: node.name,
                 items: children,
                 fromPanelAtLevel: level,
-                sourceNodeId: node.id
+                sourceNodeId: node.id,
+                contextActions: node.contextActions
             )
             
         case .launchRing(let configId):
@@ -826,7 +830,8 @@ class CircularUIManager: ObservableObject {
                         title: node.name,
                         items: children,
                         fromPanelAtLevel: level,
-                        sourceNodeId: node.id
+                        sourceNodeId: node.id,
+                        contextActions: node.contextActions
                     )
                 }
             case .none:

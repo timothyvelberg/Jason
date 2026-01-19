@@ -22,6 +22,8 @@ struct ListPanelView: View {
     var onItemHover: ((FunctionNode?, Int?) -> Void)?
     var onScrollOffsetChanged: ((CGFloat) -> Void)?  // Current scroll offset
     var onScrollStateChanged: ((Bool) -> Void)?  // true = scrolling started, false = stopped
+    var contextActions: [FunctionNode]?
+
     
     // Expanded state from manager
     @Binding var expandedItemId: String?
@@ -40,7 +42,7 @@ struct ListPanelView: View {
     @State private var scrollDebounceTask: DispatchWorkItem? = nil
     
     // Computed
-    private var titleHeight: CGFloat { 28 }
+    private var titleHeight: CGFloat { 40 }
     
     private var panelHeight: CGFloat {
         let itemCount = min(items.count, maxVisibleItems)
@@ -52,6 +54,9 @@ struct ListPanelView: View {
     private var needsScroll: Bool {
         items.count > maxVisibleItems
     }
+    
+    
+    
     
     var body: some View {
         ZStack {
@@ -72,10 +77,41 @@ struct ListPanelView: View {
                     Text(title)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.white.opacity(0.7))
+                    
                     Spacer()
+                    
+                    // Context actions for the source folder
+                    if let actions = contextActions, !actions.isEmpty {
+                        HStack(spacing: 8) {
+                            ForEach(actions) { action in
+                                Button {
+                                    onContextAction?(action, NSEvent.modifierFlags)
+                                } label: {
+                                    Image(nsImage: action.icon)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 16, height: 16)
+                                        .opacity(0.85)
+                                }
+                                .buttonStyle(.plain)
+                                .onHover { hovering in
+                                    if hovering {
+                                        NSCursor.pointingHand.push()
+                                    } else {
+                                        NSCursor.pop()
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal, 14)
                 .frame(height: titleHeight)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.18))
+                        .frame(height: 1)
+                }
                 
                 // Item list
                 ScrollView(.vertical, showsIndicators: needsScroll) {
@@ -210,7 +246,7 @@ struct ListPanelRow: View {
             Spacer()
             
             // Context actions (visible when expanded via right-click)
-            if isExpanded && hasContextActions {
+            if isExpanded && hasContextActions && !isFolder {
                 contextActionsView
             }
             

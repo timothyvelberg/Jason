@@ -317,6 +317,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             childDisplayMode: .panel,
             contextActions: [
                 StandardContextActions.copyFile(url),
+                StandardContextActions.showInFinder(url),
                 StandardContextActions.deleteFile(url) { success in
                     if success {
                         NotificationCenter.default.postProviderUpdate(
@@ -324,8 +325,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                             folderPath: folderPath
                         )
                     }
-                },
-                StandardContextActions.showInFinder(url)
+                }
             ],
             preferredLayout: .partialSlice,
             previewURL: url,
@@ -372,6 +372,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             children: nil,
             childDisplayMode: .panel,
             contextActions: [
+                StandardContextActions.copyFile(url),
                 StandardContextActions.showInFinder(url),
                 StandardContextActions.deleteFile(url)
             ],
@@ -428,6 +429,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             icon: icon,
             childDisplayMode: .panel,
             contextActions: [
+                StandardContextActions.copyFile(url),
                 StandardContextActions.copyFile(url),
                 StandardContextActions.deleteFile(url) { success in  // UPDATE
                     if success {
@@ -487,6 +489,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             children: nil,
             childDisplayMode: .panel,
             contextActions: [
+                StandardContextActions.copyFile(url),
                 StandardContextActions.showInFinder(url),
                 StandardContextActions.deleteFile(url) { success in  // UPDATE
                     if success {

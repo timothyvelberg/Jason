@@ -22,6 +22,8 @@ struct PanelState: Identifiable {
     let sourceNodeId: String?         // Which node spawned this panel
     let sourceRowIndex: Int?
     let spawnAngle: Double?
+    let contextActions: [FunctionNode]?
+    
     
     //Identity tracking for updates
     let providerId: String?
@@ -115,7 +117,8 @@ class ListPanelManager: ObservableObject {
         sourceNodeId: String,
         sourceRowIndex: Int?,
         providerId: String?,
-        contentIdentifier: String?
+        contentIdentifier: String?,
+        contextActions: [FunctionNode]?
     )?
     
     
@@ -326,6 +329,7 @@ class ListPanelManager: ObservableObject {
                 sourceNodeId: nil,
                 sourceRowIndex: nil,
                 spawnAngle: angle,
+                contextActions: nil,
                 providerId: providerId,
                 contentIdentifier: contentIdentifier,
                 expandedItemId: nil,
@@ -347,6 +351,7 @@ class ListPanelManager: ObservableObject {
                 sourceNodeId: nil,
                 sourceRowIndex: nil,
                 spawnAngle: nil,
+                contextActions: nil,
                 providerId: nil,
                 contentIdentifier: nil,
                 expandedItemId: nil,
@@ -439,7 +444,8 @@ class ListPanelManager: ObservableObject {
                                 sourceNodeId: p.sourceNodeId,
                                 sourceRowIndex: p.sourceRowIndex,
                                 providerId: p.providerId,
-                                contentIdentifier: p.contentIdentifier
+                                contentIdentifier: p.contentIdentifier,
+                                contextActions: p.contextActions
                             )
                         }
                     }
@@ -520,7 +526,8 @@ class ListPanelManager: ObservableObject {
         sourceNodeId: String,
         sourceRowIndex: Int? = nil,
         providerId: String? = nil,
-        contentIdentifier: String? = nil
+        contentIdentifier: String? = nil,
+        contextActions: [FunctionNode]? = nil
     ) {
         // Check if this is a stale async completion (user has moved to different row)
         if let currentHovered = currentlyHoveredNodeId[level], currentHovered != sourceNodeId {
@@ -540,7 +547,7 @@ class ListPanelManager: ObservableObject {
         if !panelStack[sourceIndex].areChildrenArmed {
             // Not armed yet - store as pending
             if let rowIndex = sourceRowIndex {
-                pendingPanel = (title, items, level, sourceNodeId, rowIndex, providerId, contentIdentifier)
+                pendingPanel = (title, items, level, sourceNodeId, rowIndex, providerId, contentIdentifier, contextActions)
                 print("📋 [ListPanelManager] Panel '\(title)' PENDING - waiting for arming")
             }
             return
@@ -554,7 +561,8 @@ class ListPanelManager: ObservableObject {
             sourceNodeId: sourceNodeId,
             sourceRowIndex: sourceRowIndex,
             providerId: providerId,
-            contentIdentifier: contentIdentifier
+            contentIdentifier: contentIdentifier,
+            contextActions: contextActions
         )
     }
 
@@ -566,7 +574,8 @@ class ListPanelManager: ObservableObject {
         sourceNodeId: String,
         sourceRowIndex: Int? = nil,
         providerId: String? = nil,
-        contentIdentifier: String? = nil
+        contentIdentifier: String? = nil,
+        contextActions: [FunctionNode]? = nil
     ) {
         // Find the source panel
         guard let sourcePanel = panelStack.first(where: { $0.level == level }) else {
@@ -626,6 +635,7 @@ class ListPanelManager: ObservableObject {
             sourceNodeId: sourceNodeId,
             sourceRowIndex: sourceRowIndex,
             spawnAngle: nil,
+            contextActions: contextActions,
             providerId: providerId,
             contentIdentifier: contentIdentifier,
             expandedItemId: nil,
@@ -829,6 +839,12 @@ class ListPanelManager: ObservableObject {
         
         let panel = panelStack[panelIndex]
         let bounds = currentBounds(for: panel)
+        
+        // Check if click is in title bar area
+        let distanceFromTop = bounds.maxY - point.y
+        if distanceFromTop < PanelState.titleHeight + (PanelState.padding / 2) {
+            return nil  // Let SwiftUI handle title bar clicks
+        }
         
         // Calculate which row was clicked (accounting for title and scroll)
         let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight

@@ -1,7 +1,5 @@
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="4.5" y="0.5" width="6" height="12" rx="1.5" fill="#1E1E1E" stroke="white"/>
-<rect x="1.5" y="2.5" width="13" height="13" rx="1.5" fill="#1E1E1E" stroke="white"/>
-<path d="M1.5 4.5H14.5" stroke="white" stroke-linecap="round"/>
-<path d="M6.5 7.5V12.5" stroke="white" stroke-linecap="round"/>
-<path d="M9.5 7.5V12.5" stroke="white" stroke-linecap="round"/>
+<svg width="16" height="17" viewBox="0 0 16 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M9.5 0C10.8807 0 12 1.11929 12 2.5H13C14.1046 2.5 15 3.39543 15 4.5V14.5C15 15.5357 14.2128 16.387 13.2041 16.4893L13 16.5H3L2.7959 16.4893C1.85435 16.3938 1.1062 15.6457 1.01074 14.7041L1 14.5V4.5C1 3.39543 1.89543 2.5 3 2.5H4C4 1.11929 5.11929 0 6.5 0H9.5ZM2 5.5V14.5C2 15.0523 2.44772 15.5 3 15.5H13C13.5523 15.5 14 15.0523 14 14.5V5.5H2ZM3 3.5C2.44772 3.5 2 3.94772 2 4.5H14C14 3.94772 13.5523 3.5 13 3.5H3ZM6.5 1C5.67157 1 5 1.67157 5 2.5H11C11 1.67157 10.3284 1 9.5 1H6.5Z" fill="white"/>
+<path d="M6 13V8C6 7.72386 6.22386 7.5 6.5 7.5C6.77614 7.5 7 7.72386 7 8V13C7 13.2761 6.77614 13.5 6.5 13.5C6.22386 13.5 6 13.2761 6 13Z" fill="white"/>
+<path d="M9 13V8C9 7.72386 9.22386 7.5 9.5 7.5C9.77614 7.5 10 7.72386 10 8V13C10 13.2761 9.77614 13.5 9.5 13.5C9.22386 13.5 9 13.2761 9 13Z" fill="white"/>
 </svg>

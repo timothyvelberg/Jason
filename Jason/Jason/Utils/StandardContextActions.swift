@@ -102,7 +102,7 @@ struct StandardContextActions {
             id: "delete-\(url.path)",
             name: "Delete",
             type: .action,
-            icon: NSImage(systemSymbolName: "trash", accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: "context_actions_delete") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("🗑️ Moving to trash: \(fileName)")
                 NSWorkspace.shared.recycle([url]) { trashedURLs, error in
@@ -137,7 +137,7 @@ struct StandardContextActions {
             id: "copy-\(url.path)",
             name: "Copy",
             type: .action,
-            icon: NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: "context_actions_copy") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute {
                 print("📋 Copying to clipboard: \(fileName)")
                 let pasteboard = NSPasteboard.general
