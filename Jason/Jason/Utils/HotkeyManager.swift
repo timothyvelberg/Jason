@@ -39,6 +39,10 @@ class HotkeyManager {
     private var wasCtrlPressed: Bool = false
     private var requiresReleaseBeforeNextShow: Bool = false  // Prevents re-show while key still held
     
+    /// Called when Escape is pressed while UI is visible
+    /// Return true if handled (e.g., cleared search), false to proceed with hide
+    var onEscapeWhileVisible: (() -> Bool)?
+    
     /// Currently active hold-mode registration (configId, for keyUp handling)
     private var activeHoldRegistration: Int? = nil
     
@@ -743,7 +747,13 @@ class HotkeyManager {
         
         // Escape = Hide UI (only when UI is visible)
         if event.keyCode == 53 && isUIVisible {
-            print("⌨️ [HotkeyManager] Escape pressed")
+            // First, check if there's something to clear (like search)
+            if let handler = onEscapeWhileVisible, handler() {
+                print("⌨️ [HotkeyManager] Escape pressed - handled by callback")
+                return true
+            }
+            // Nothing to clear, proceed with hide
+            print("⌨️ [HotkeyManager] Escape pressed - hiding UI")
             onHide?()
             return true
         }

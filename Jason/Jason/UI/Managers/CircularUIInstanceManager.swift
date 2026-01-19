@@ -85,7 +85,7 @@ class CircularUIInstanceManager: ObservableObject {
     func getInstance(forShortcut shortcut: String) -> CircularUIManager? {
         // Find config with matching shortcut
         guard let config = configurationManager.getConfiguration(forShortcut: shortcut) else {
-            print("⚠️ [InstanceManager] No configuration found for shortcut: \(shortcut)")
+            print("⚠️ [InstanceManager] No configurHahahaation found for shortcut: \(shortcut)")
             return nil
         }
         
@@ -341,6 +341,29 @@ class CircularUIInstanceManager: ObservableObject {
     /// Start monitoring for hotkeys
     func startHotkeyMonitoring() {
         print("🎹 [InstanceManager] Starting hotkey monitoring...")
+        
+        // Wire Escape handling - clear search first, then hide
+        hotkeyManager.onEscapeWhileVisible = { [weak self] in
+            guard let self = self,
+                  let activeId = self.activeInstanceId,
+                  let instance = self.getInstance(forConfigId: activeId),
+                  let panelManager = instance.listPanelManager,
+                  panelManager.isVisible else {
+                return false
+            }
+            return panelManager.clearSearch()
+        }
+        
+        // Wire hide callback
+        hotkeyManager.onHide = { [weak self] in
+            self?.hideActive()
+        }
+        
+        // Wire visibility check
+        hotkeyManager.isUIVisible = { [weak self] in
+            return self?.hasVisibleInstance ?? false
+        }
+        
         hotkeyManager.startMonitoring()
     }
     

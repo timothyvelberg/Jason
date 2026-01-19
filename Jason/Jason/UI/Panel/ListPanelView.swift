@@ -14,7 +14,7 @@ import AppKit
 struct ListPanelView: View {
     let title: String
     let items: [FunctionNode]
-    
+
     // Callbacks for interactions
     var onItemLeftClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onItemRightClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
@@ -27,6 +27,9 @@ struct ListPanelView: View {
     
     // Expanded state from manager
     @Binding var expandedItemId: String?
+    
+    // Search binding
+    @Binding var searchText: String
     
     // Configuration
     var panelWidth: CGFloat = 260
@@ -44,22 +47,33 @@ struct ListPanelView: View {
     // Computed
     private var titleHeight: CGFloat { 40 }
     
+    // Update computed properties to use filteredItems
     private var panelHeight: CGFloat {
-        let itemCount = min(items.count, maxVisibleItems)
+        let itemCount = min(filteredItems.count, maxVisibleItems)
         let contentHeight = CGFloat(itemCount) * rowHeight
         let padding: CGFloat = 8
         return titleHeight + contentHeight + padding
     }
     
     private var needsScroll: Bool {
-        items.count > maxVisibleItems
+        filteredItems.count > maxVisibleItems
     }
     
-    
-    
+    //Computed filtered items
+    private var filteredItems: [FunctionNode] {
+        guard !searchText.isEmpty else { return items }
+        let query = searchText.lowercased()
+        return items.filter { item in
+            if item.name.lowercased().contains(query) { return true }
+            if let fullContent = item.metadata?["fullContent"] as? String,
+               fullContent.lowercased().contains(query) { return true }
+            return false
+        }
+    }
     
     var body: some View {
         ZStack {
+
             // Background layers (matching ring aesthetic)
             RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(Color.black.opacity(0.33))
@@ -72,11 +86,22 @@ struct ListPanelView: View {
             
             // Content
             VStack(spacing: 0) {
-                // Title bar
+                // Title bar - show search text when searching
                 HStack {
-                    Text(title)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
+                    if searchText.isEmpty {
+                        Text(title)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.7))
+                    } else {
+                        HStack(spacing: 4) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 10))
+                                .foregroundColor(.white.opacity(0.5))
+                            Text(searchText)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.9))
+                        }
+                    }
                     
                     Spacer()
                     
@@ -116,7 +141,7 @@ struct ListPanelView: View {
                 // Item list
                 ScrollView(.vertical, showsIndicators: needsScroll) {
                     VStack(spacing: 0) {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                             ListPanelRow(
                                 item: item,
                                 iconSize: iconSize,

@@ -27,22 +27,36 @@ class OverlayWindow: NSWindow {
     // Store which screen the overlay is currently on
     var currentScreen: NSScreen?
     
+    // MARK: - Text Input Forwarding (for Panel Search)
+    
+    /// Called when printable characters are typed (when panel is visible)
+    var onTextInput: ((String) -> Void)?
+    
+    /// Called when backspace/delete is pressed (when panel is visible)
+    var onDeleteBackward: (() -> Void)?
+    
+    /// Called when Escape is pressed. Return true if consumed (search cleared), false to hide UI
+    var onEscapePressed: (() -> Bool)?
+    
+    /// Check if keyboard input should be forwarded to search
+    var shouldForwardKeyboardInput: (() -> Bool)?
+    
     init() {
         // Get the main screen size for fullscreen overlay
         let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
         
         super.init(
-            contentRect: screenFrame,  // Changed from fixed 800x800
+            contentRect: screenFrame,
             styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         
         // Make window behavior suitable for fullscreen overlay
-        self.level = .screenSaver  // High level so it's always on top
+        self.level = .screenSaver
         self.isOpaque = false
         self.backgroundColor = NSColor.clear
-        self.hasShadow = false  // No shadow for fullscreen
+        self.hasShadow = false
         self.isMovable = false
         self.canHide = false
         self.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
@@ -51,16 +65,11 @@ class OverlayWindow: NSWindow {
         self.acceptsMouseMovedEvents = true
         self.ignoresMouseEvents = false
         
-//        print("🪟 [OverlayWindow] Created fullscreen overlay: \(screenFrame.size)")
-        
         // Initially hidden
         self.orderOut(nil)
-        
-//        print("🪟 Overlay window created")
     }
     
     func showOverlay(at mouseLocation: NSPoint) {
-        
         // Find which screen contains the mouse cursor
         let targetScreen = NSScreen.screens.first { screen in
             NSMouseInRect(mouseLocation, screen.frame, false)
@@ -72,14 +81,9 @@ class OverlayWindow: NSWindow {
         }
         
         self.currentScreen = screen
-        
-        // Store the location (in global coordinates)
         self.uiCenterLocation = mouseLocation
-        
-        // Position window to cover the screen containing the mouse
         self.setFrame(screen.frame, display: true)
         
-        // Bring to front and show
         self.makeKeyAndOrderFront(nil)
         self.level = .screenSaver
         
@@ -92,7 +96,6 @@ class OverlayWindow: NSWindow {
         self.orderOut(nil)
     }
     
-    // Allow window to become key to receive keyboard events
     override var canBecomeKey: Bool {
         return true
     }
@@ -101,19 +104,16 @@ class OverlayWindow: NSWindow {
         return true
     }
     
-    // Lower window level (so QuickLook can appear on top)
     func lowerWindowLevel() {
         self.level = .normal
         print("🔽 [OverlayWindow] Lowered window level to .normal")
     }
     
-    //Restore window level to normal overlay level
     func restoreWindowLevel() {
         self.level = normalLevel
         print("🔼 [OverlayWindow] Restored window level to \(normalLevel)")
     }
     
-    // Temporarily ignore focus changes (for app quit/launch operations)
     func ignoreFocusChangesTemporarily(duration: TimeInterval = 0.5) {
         shouldIgnoreFocusChanges = true
         print("🔇 [OverlayWindow] Ignoring focus changes for \(duration)s")
@@ -126,103 +126,97 @@ class OverlayWindow: NSWindow {
     
     // Handle scroll events
     override func scrollWheel(with event: NSEvent) {
-        // Detect device type
         let isTrackpad = event.hasPreciseScrollingDeltas
-        let deviceName = isTrackpad ? "Trackpad" : "Mouse Wheel"
-        
-        // Different thresholds for different devices
         let scrollThreshold: CGFloat = isTrackpad ? 0.9 : 0.1
         
-        print("🎡 [OverlayWindow] \(deviceName) scroll: deltaY=\(event.deltaY), threshold=\(scrollThreshold)")
-        
-        // Ignore trackpad momentum scrolling (inertial scrolling after lifting fingers)
+        // Ignore trackpad momentum scrolling
         if isTrackpad && !event.momentumPhase.isEmpty {
-//            print("⏩ Ignoring trackpad momentum scroll")
             return
         }
         
-        // Scroll down (positive deltaY) = go back/collapse
         if event.deltaY > scrollThreshold {
-            print("🔙 Scroll DOWN (\(deviceName)) - collapsing ring")
             onScrollBack?()
         }
-        // Scroll up (negative deltaY) = could be used for something else
-        else if event.deltaY < -scrollThreshold {
-            print("🔼 Scroll UP (\(deviceName)) - (not implemented)")
-            // Could be used to re-expand collapsed rings or other features
-        }
-        
-        // Don't call super to prevent any default scroll behavior
     }
     
-    //Detect when window loses focus
     override func resignKey() {
         print("🔴 [OverlayWindow] Window lost focus")
         super.resignKey()
         
-        // Don't hide if we're ignoring focus changes (app quit/launch in progress)
         if shouldIgnoreFocusChanges {
             print("   🔇 Ignoring focus change (app operation in progress)")
             return
         }
         
-        // Don't hide if Quick Look is showing - it steals focus but we want to stay visible
         if QuickLookManager.shared.isShowing {
             print("   👁️ Quick Look is visible - keeping UI open")
             return
         }
         
         print("   Triggering hide")
-        // Call the callback to hide the UI
         onLostFocus?()
     }
     
-    // Prevent window from being closed
     override func close() {
         hideOverlay()
     }
     
-    // Handle keyboard events - FIXED: Don't call super to prevent beep
+    // MARK: - Keyboard Event Handling
+    
     override func keyDown(with event: NSEvent) {
-        print("🎯 OverlayWindow received key: \(event.keyCode)")
+        let keyCode = event.keyCode
         
-        let isCtrlPressed = event.modifierFlags.contains(.control)
-        let isShiftPressed = event.modifierFlags.contains(.shift)
-        let isKKey = event.keyCode == 40  // K key
-        
-        // Handle Escape
-        if event.keyCode == 53 { // Escape
+        // Handle Escape - try clearing search first, then hide
+        if keyCode == 53 {
+            if onEscapePressed?() == true {
+                return  // Search was cleared, consume event
+            }
             hideOverlay()
-            return  // Consumed - no beep
+            return
         }
         
-        // Handle our shortcut Ctrl+Shift+K
-        if isCtrlPressed && isShiftPressed && isKKey {
-            // Shortcut is being handled by CircularUIManager
-            // Just consume it here to prevent beep
-            print("🎯 OverlayWindow consuming Ctrl+Shift+K (no beep)")
-            return  // Consumed - no beep
+        // Modifier key combos (Ctrl/Cmd) - let HotkeyManager handle
+        let hasControlOrCommand = event.modifierFlags.contains(.control) || event.modifierFlags.contains(.command)
+        if hasControlOrCommand {
+            return
         }
         
-        // IMPORTANT: Don't call super.keyDown() - this prevents the beep!
-        // All other keys are silently consumed
+        // Forward text input when panel search is active
+        if shouldForwardKeyboardInput?() == true {
+            // Backspace or Delete
+            if keyCode == 51 || keyCode == 117 {
+                onDeleteBackward?()
+                return
+            }
+            
+            // Printable characters (no control/command/option)
+            let blockingModifiers: NSEvent.ModifierFlags = [.control, .command, .option]
+            if event.modifierFlags.intersection(blockingModifiers).isEmpty {
+                if let characters = event.characters, !characters.isEmpty {
+                    let printable = characters.filter { char in
+                        char.isLetter || char.isNumber || char.isPunctuation ||
+                        char.isSymbol || char.isWhitespace
+                    }
+                    
+                    if !printable.isEmpty {
+                        onTextInput?(String(printable))
+                        return
+                    }
+                }
+            }
+        }
+        
+        // All other keys silently consumed (no beep)
     }
     
-    // Override rightMouseDown to ensure it reaches event monitors
     override func rightMouseDown(with event: NSEvent) {
         print("🖱️ [OverlayWindow] rightMouseDown detected at: \(event.locationInWindow)")
-        
-        // CRITICAL: Call super to allow the event to propagate to local monitors
         super.rightMouseDown(with: event)
         
-        // Also manually notify global monitors since NSHostingView might block it
-        // Convert to screen coordinates for our gesture manager
         let screenLocation = NSEvent.mouseLocation
         print("🖱️ [OverlayWindow] Right-click at screen location: \(screenLocation)")
     }
     
-    
-    // Log mouse events for debugging
     override func mouseDown(with event: NSEvent) {
         print("🖱️ [OverlayWindow] mouseDown detected at: \(event.locationInWindow)")
         super.mouseDown(with: event)

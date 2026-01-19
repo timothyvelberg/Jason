@@ -69,6 +69,7 @@ class ListPanelManager: ObservableObject {
     // MARK: - Published State
     
     @Published var panelStack: [PanelState] = []
+    @Published var searchText: String = ""
     
     // MARK: - Sliding Configuration
     
@@ -296,6 +297,10 @@ class ListPanelManager: ObservableObject {
         providerId: String? = nil,
         contentIdentifier: String? = nil
     ) {
+        if panelStack.isEmpty {
+            searchText = ""  // Only clear if no panel was showing
+        }
+        
         // Store ring context for cascading
         self.currentAngle = angle
         self.currentRingCenter = ringCenter
@@ -577,6 +582,11 @@ class ListPanelManager: ObservableObject {
         contentIdentifier: String? = nil,
         contextActions: [FunctionNode]? = nil
     ) {
+        
+        // Clear search when navigating deeper
+        searchText = ""
+        
+        
         // Find the source panel
         guard let sourcePanel = panelStack.first(where: { $0.level == level }) else {
             print("❌ [ListPanelManager] Cannot find panel at level \(level)")
@@ -721,6 +731,10 @@ class ListPanelManager: ObservableObject {
     /// Hide all panels
     func hide() {
         guard isVisible else { return }
+        
+        // Clear search
+        searchText = ""
+    
         print("📋 [ListPanelManager] Hiding all panels")
         panelStack.removeAll()
         pendingPanel = nil
@@ -903,6 +917,34 @@ class ListPanelManager: ObservableObject {
         }
         
         return nil
+    }
+    
+    // MARK: - Search
+
+    /// Clear search text and return true if there was text to clear
+    func clearSearch() -> Bool {
+        guard !searchText.isEmpty else { return false }
+        searchText = ""
+        return true
+    }
+
+    /// Filter items for display based on search text
+    func filteredItems(for items: [FunctionNode]) -> [FunctionNode] {
+        guard !searchText.isEmpty else { return items }
+        
+        let query = searchText.lowercased()
+        return items.filter { item in
+            // Match against name
+            if item.name.lowercased().contains(query) {
+                return true
+            }
+            // Match against full content (for clipboard entries)
+            if let fullContent = item.metadata?["fullContent"] as? String,
+               fullContent.lowercased().contains(query) {
+                return true
+            }
+            return false
+        }
     }
     
     // MARK: - Test Helpers

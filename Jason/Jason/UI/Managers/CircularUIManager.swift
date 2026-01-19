@@ -684,7 +684,6 @@ class CircularUIManager: ObservableObject {
             mouseTracker?.pauseUntilMovement()
         }
     }
-    
     private func handleRightClick(event: GestureManager.GestureEvent) {
         if let panelManager = listPanelManager, panelManager.handleRightClick(at: event.position) {
             print("🖱️ [Right Click] Handled by panel")
@@ -928,6 +927,27 @@ class CircularUIManager: ObservableObject {
             self.hide()
         }
         
+        overlayWindow?.shouldForwardKeyboardInput = { [weak self] in
+            self?.listPanelManager?.isVisible ?? false
+        }
+        
+        overlayWindow?.onTextInput = { [weak self] text in
+            self?.listPanelManager?.searchText.append(text)
+        }
+        
+        overlayWindow?.onDeleteBackward = { [weak self] in
+            guard let manager = self?.listPanelManager, !manager.searchText.isEmpty else { return }
+            manager.searchText.removeLast()
+        }
+        
+        overlayWindow?.onEscapePressed = { [weak self] in
+            guard let manager = self?.listPanelManager, manager.isVisible else {
+                return false
+            }
+            return manager.clearSearch()
+        }
+        
+        // Existing content view setup
         let contentView = CircularUIView(
             circularUI: self,
             functionManager: functionManager,

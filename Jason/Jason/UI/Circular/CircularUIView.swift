@@ -27,6 +27,7 @@ struct CircularUIView: View {
     var body: some View {
         // Wrap everything in ZStack to add drag overlay on top
         ZStack {
+            
             // Existing circular UI content
             GeometryReader { geometry in
                 let window = circularUI.overlayWindow
@@ -92,8 +93,8 @@ struct CircularUIView: View {
                     let panelLocalY = currentPos.y - screenOriginY
                     let panelSwiftUIY = screenHeight - panelLocalY
                     
-                    // Capture panel level for the closure
                     let panelLevel = panel.level
+                        let isDeepestPanel = panel.level == listPanelManager.panelStack.map(\.level).max()
                     
                     ListPanelView(
                         title: panel.title,
@@ -111,7 +112,8 @@ struct CircularUIView: View {
                             listPanelManager.handleScrollStateChanged(isScrolling: isScrolling, forLevel: panelLevel)
                         },
                         contextActions: panel.contextActions,
-                        expandedItemId: expandedItemIdBinding(for: panel.level)
+                        expandedItemId: expandedItemIdBinding(for: panel.level),
+                        searchText: isDeepestPanel ? $listPanelManager.searchText : .constant("")
                         
                     )
                     .position(x: panelLocalX, y: panelSwiftUIY)
