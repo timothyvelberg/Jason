@@ -931,7 +931,14 @@ class CircularUIManager: ObservableObject {
         }
         
         overlayWindow?.onTextInput = { [weak self] text in
-            self?.listPanelManager?.searchText.append(text)
+            guard let manager = self?.listPanelManager else { return }
+            print("🔍 [Search] onTextInput: '\(text)'")
+            print("🔍 [Search] activePanelLevel BEFORE pop: \(manager.activePanelLevel)")
+            print("🔍 [Search] searchText BEFORE: '\(manager.searchText)'")
+            manager.popToLevel(manager.activePanelLevel)
+            print("🔍 [Search] searchText AFTER pop: '\(manager.searchText)'")
+            manager.searchText.append(text)
+            print("🔍 [Search] searchText AFTER append: '\(manager.searchText)'")
         }
         
         overlayWindow?.onDeleteBackward = { [weak self] in

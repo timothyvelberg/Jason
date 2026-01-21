@@ -94,7 +94,6 @@ struct CircularUIView: View {
                     let panelSwiftUIY = screenHeight - panelLocalY
                     
                     let panelLevel = panel.level
-                    let isDeepestPanel = listPanelManager.isDeepestPanel(panel)
                     
                     // Get filtered items from manager (ensures consistency with hit-testing)
                     let filteredItems = listPanelManager.filteredItems(for: panel)
@@ -116,7 +115,7 @@ struct CircularUIView: View {
                         },
                         contextActions: panel.contextActions,
                         expandedItemId: expandedItemIdBinding(for: panel.level),
-                        searchText: (isDeepestPanel && !panel.areChildrenArmed) ? listPanelManager.searchText : panel.frozenSearchText
+                        searchText: listPanelManager.isActivePanel(panel) ? listPanelManager.searchText : panel.frozenSearchText
                     )
                     .position(x: panelLocalX, y: panelSwiftUIY)
                     .transition(panel.level == 0

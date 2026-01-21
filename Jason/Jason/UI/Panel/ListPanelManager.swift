@@ -184,32 +184,35 @@ class ListPanelManager: ObservableObject {
     }
     
     // MARK: - Filtered Items Support
-    
-    /// Get filtered items for a panel (applies search to deepest panel, frozen search to parents)
+
     func filteredItems(for panel: PanelState) -> [FunctionNode] {
-        // Determine which search text to use
-        // Panel receives live search only if it's deepest AND not armed for children
+        let isActive = isActivePanel(panel)
         let effectiveSearchText: String
-        if isDeepestPanel(panel) && !panel.areChildrenArmed {
-            // Deepest panel uses live search (and not waiting for child to open)
+        if isActive {
             effectiveSearchText = searchText
         } else {
-            // Parent panels (or armed panels) use their frozen search state
             effectiveSearchText = panel.frozenSearchText
         }
         
+        print("🔍 [Filter] Panel '\(panel.title)' level=\(panel.level) isActive=\(isActive) effectiveSearch='\(effectiveSearchText)' items=\(panel.items.count)")
+        
         guard !effectiveSearchText.isEmpty else {
+            print("🔍 [Filter] No search text - returning all \(panel.items.count) items")
             return panel.items
         }
         
         let query = effectiveSearchText.lowercased()
-        return panel.items.filter { item in
+        let filtered = panel.items.filter { item in
             if item.name.lowercased().contains(query) { return true }
             if let fullContent = item.metadata?["fullContent"] as? String,
                fullContent.lowercased().contains(query) { return true }
             return false
         }
+        
+        print("🔍 [Filter] Filtered to \(filtered.count) items")
+        return filtered
     }
+    
     
     /// Check if a panel is the deepest (actively being searched)
     func isDeepestPanel(_ panel: PanelState) -> Bool {
@@ -221,6 +224,28 @@ class ListPanelManager: ObservableObject {
     var isSearchActive: Bool {
         !searchText.isEmpty
     }
+    
+    // MARK: - Active Panel (for search)
+
+    /// The active panel level - receives live search input
+    /// Rule: deepest panel that is overlapping, or level 0 if none are overlapping
+    var activePanelLevel: Int {
+        // Find the deepest panel that is overlapping
+        for panel in panelStack.reversed() {
+            if panel.isOverlapping {
+                return panel.level
+            }
+        }
+        // No panel is overlapping - level 0 is active
+        return 0
+    }
+
+    /// Check if a panel is the active one (receives live search)
+    func isActivePanel(_ panel: PanelState) -> Bool {
+         let result = panel.level == activePanelLevel
+         print("🔍 [Active] panel.level=\(panel.level) activePanelLevel=\(activePanelLevel) isActive=\(result)")
+         return result
+     }
     
     // MARK: - Provider Update Handler
 
@@ -593,9 +618,7 @@ class ListPanelManager: ObservableObject {
         
         // Handle resize anchor adjustment for filtered items
         // Check if this panel has an active search (live or frozen)
-        // Panel uses live search only if deepest AND not armed
-        let canReceiveLiveSearch = isDeepestPanel(panel) && !panel.areChildrenArmed
-        let hasActiveSearch = canReceiveLiveSearch ? isSearchActive : !panel.frozenSearchText.isEmpty
+        let hasActiveSearch = isActivePanel(panel) ? isSearchActive : !panel.frozenSearchText.isEmpty
         
         if hasActiveSearch {
             let originalHeight = panel.panelHeight
@@ -943,7 +966,7 @@ class ListPanelManager: ObservableObject {
         let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
         
         // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
-        let scrollAdjustedY = relativeY - panel.scrollOffset
+        let scrollAdjustedY = relativeY + panel.scrollOffset
         let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < items.count else {
@@ -987,7 +1010,7 @@ class ListPanelManager: ObservableObject {
         let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
         
         // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
-        let scrollAdjustedY = relativeY - panel.scrollOffset
+        let scrollAdjustedY = relativeY + panel.scrollOffset
         let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < items.count else {
@@ -1024,7 +1047,7 @@ class ListPanelManager: ObservableObject {
         let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
         
         // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
-        let scrollAdjustedY = relativeY - panel.scrollOffset
+        let scrollAdjustedY = relativeY + panel.scrollOffset
         let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < items.count else {
@@ -1050,25 +1073,6 @@ class ListPanelManager: ObservableObject {
         guard !searchText.isEmpty else { return false }
         searchText = ""
         return true
-    }
-
-    /// Filter items for display based on search text (deprecated - use filteredItems(for:) instead)
-    func filteredItems(for items: [FunctionNode]) -> [FunctionNode] {
-        guard !searchText.isEmpty else { return items }
-        
-        let query = searchText.lowercased()
-        return items.filter { item in
-            // Match against name
-            if item.name.lowercased().contains(query) {
-                return true
-            }
-            // Match against full content (for clipboard entries)
-            if let fullContent = item.metadata?["fullContent"] as? String,
-               fullContent.lowercased().contains(query) {
-                return true
-            }
-            return false
-        }
     }
     
     // MARK: - Test Helpers
