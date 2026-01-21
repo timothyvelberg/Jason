@@ -446,7 +446,7 @@ class ListPanelManager: ObservableObject {
         // DEBUG
         for panel in panelStack {
             let bounds = currentBounds(for: panel)
-            print("🔍 [Hover] Panel \(panel.level) isOverlapping:\(panel.isOverlapping) bounds: x=\(Int(bounds.minX))-\(Int(bounds.maxX)) | mouse.x=\(Int(point.x))")
+            print("🔍 [Hover] Panel \(panel.level) isOverlapping:\(panel.isOverlapping) bounds: x=\(Int(bounds.minX))-\(Int(bounds.maxX)) y=\(Int(bounds.minY))-\(Int(bounds.maxY)) | mouse: x=\(Int(point.x)) y=\(Int(point.y))")
         }
         
         // Track hover state for each panel (check topmost first)
@@ -832,25 +832,16 @@ class ListPanelManager: ObservableObject {
         panelStack.contains { currentBounds(for: $0).contains(point) }
     }
     
-    /// Check if point is in the panel zone (any panel OR gaps between)
+    /// Check if point is in the panel zone (inside any actual panel)
     func isInPanelZone(point: CGPoint) -> Bool {
         guard !panelStack.isEmpty else { return false }
         
-        var minX = CGFloat.infinity
-        var minY = CGFloat.infinity
-        var maxX = -CGFloat.infinity
-        var maxY = -CGFloat.infinity
-        
-        for panel in panelStack {
-            let bounds = currentBounds(for: panel)  // ← Changed from panel.bounds
-            minX = min(minX, bounds.minX)
-            minY = min(minY, bounds.minY)
-            maxX = max(maxX, bounds.maxX)
-            maxY = max(maxY, bounds.maxY)
+        // Check if point is inside any actual panel
+        if let matchingPanel = panelStack.first(where: { currentBounds(for: $0).contains(point) }) {
+            return true
         }
         
-        let combinedBounds = NSRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
-        return combinedBounds.contains(point)
+        return false
     }
     
     /// Find which panel level contains the point (nil if none)
