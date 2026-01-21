@@ -39,7 +39,7 @@ struct PanelState: Identifiable {
     // Panel dimensions (constants for now, could be configurable)
     static let panelWidth: CGFloat = 260
     static let rowHeight: CGFloat = 32
-    static let titleHeight: CGFloat = 28
+    static let titleHeight: CGFloat = 40
     static let maxVisibleItems: Int = 10
     static let padding: CGFloat = 8
     static let cascadeSlideDistance: CGFloat = 30
@@ -266,6 +266,33 @@ class ListPanelManager: ObservableObject {
             // Scrolling stopped - re-enable hover
             scrollingPanels.remove(level)
             print("📜 [Scroll] Level \(level) scroll stopped - hover re-enabled")
+        }
+    }
+    
+    /// Handle hover over panel header - clears child state
+    func handleHeaderHover(level: Int) {
+        // Clear hover tracking for this level
+        currentlyHoveredNodeId.removeValue(forKey: level)
+        
+        // Clear pending panel if it was for this level
+        if let pending = pendingPanel, pending.fromLevel == level {
+            pendingPanel = nil
+            print("📋 [Header] Cleared pending panel for level \(level)")
+        }
+        
+        // Reset arming for this panel
+        if let index = panelStack.firstIndex(where: { $0.level == level }) {
+            if panelStack[index].areChildrenArmed {
+                panelStack[index].areChildrenArmed = false
+                print("📋 [Header] Reset arming for level \(level)")
+            }
+        }
+        
+        // Close any child panels
+        let childCount = panelStack.filter { $0.level > level }.count
+        if childCount > 0 {
+            popToLevel(level)
+            print("📋 [Header] Closed \(childCount) child panel(s)")
         }
     }
     

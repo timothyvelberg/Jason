@@ -104,6 +104,9 @@ struct CircularUIView: View {
                         onItemHover: { node, rowIndex in
                             listPanelManager.handleItemHover(node: node, level: panelLevel, rowIndex: rowIndex)
                         },
+                        onHeaderHover: {
+                            listPanelManager.handleHeaderHover(level: panelLevel)
+                        },
                         onScrollOffsetChanged: { offset in
                             listPanelManager.updateScrollOffset(offset, forLevel: panelLevel)
                         },

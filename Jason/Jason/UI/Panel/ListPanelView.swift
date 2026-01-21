@@ -20,6 +20,7 @@ struct ListPanelView: View {
     var onItemRightClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onContextAction: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onItemHover: ((FunctionNode?, Int?) -> Void)?
+    var onHeaderHover: (() -> Void)?
     var onScrollOffsetChanged: ((CGFloat) -> Void)?  // Current scroll offset
     var onScrollStateChanged: ((Bool) -> Void)?  // true = scrolling started, false = stopped
     var contextActions: [FunctionNode]?
@@ -111,6 +112,12 @@ struct ListPanelView: View {
                     Rectangle()
                         .fill(Color.white.opacity(0.18))
                         .frame(height: 1)
+                }
+                .onHover { hovering in
+                    if hovering {
+                        hoveredItemId = nil
+                        onHeaderHover?()
+                    }
                 }
                 
                 // Item list
