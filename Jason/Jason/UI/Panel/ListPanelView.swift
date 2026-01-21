@@ -120,6 +120,13 @@ struct ListPanelView: View {
                 }
                 .padding(.horizontal, 14)
                 .frame(height: titleHeight)
+                .contentShape(Rectangle())
+                .onHover { hovering in
+                    if hovering {
+                        // Hovering title bar - close any child panels
+                        onItemHover?(nil, nil)
+                    }
+                }
                 .overlay(alignment: .bottom) {
                     Rectangle()
                         .fill(Color.white.opacity(0.18))

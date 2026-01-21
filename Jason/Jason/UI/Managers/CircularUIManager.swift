@@ -344,76 +344,75 @@ class CircularUIManager: ObservableObject {
                 self?.handlePanelContextAction(actionNode: actionNode, modifiers: modifiers)
             }
             
-            listPanelManager?.onItemHover = { [weak self] node, level, rowIndex in
-                guard let self = self, let node = node else {
-                    return
-                }
-                
-                // Only cascade for folders
-                guard node.type == .folder else {
-                    self.listPanelManager?.popToLevel(level)
-                    return
-                }
-                
-                // Check if this node's panel is already showing at level+1
-                if let existingPanel = self.listPanelManager?.panel(at: level + 1),
-                   existingPanel.sourceNodeId == node.id {
-                    self.listPanelManager?.popToLevel(level + 1)
-                    return
-                }
-                
-                // Extract identity from node
-                let providerId = node.providerId
-                let contentIdentifier = node.metadata?["folderURL"] as? String ?? node.previewURL?.path
-                
-                // Check if children already loaded
-                if let children = node.children, !children.isEmpty {
-
-                    self.listPanelManager?.pushPanel(
-                        title: node.name,
-                        items: children,
-                        fromPanelAtLevel: level,
-                        sourceNodeId: node.id,
-                        sourceRowIndex: rowIndex,
-                        providerId: providerId,
-                        contentIdentifier: contentIdentifier,
-                        contextActions: node.contextActions
-                    )
-                    return
-                }
-                
-                // Children not loaded - check if we can load dynamically
-                guard node.needsDynamicLoading,
-                      let providerId = node.providerId,
-                      let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) else {
-                    self.listPanelManager?.popToLevel(level)
-                    return
-                }
-                
-                // Load children asynchronously
-                Task {
-                    let children = await provider.loadChildren(for: node)
-                    
-                    guard !children.isEmpty else {
-                        print("📋 [Panel] No children loaded for: \(node.name)")
-                        return
-                    }
-                    
-                    // Push panel on main thread
-                    await MainActor.run {
-                        self.listPanelManager?.pushPanel(
-                            title: node.name,
-                            items: children,
-                            fromPanelAtLevel: level,
-                            sourceNodeId: node.id,
-                            sourceRowIndex: rowIndex,
-                            providerId: providerId,
-                            contentIdentifier: contentIdentifier,
-                            contextActions: node.contextActions
-                        )
-                    }
-                }
-            }
+            listPanelManager?.onItemHover = { [weak self] (node: FunctionNode?, level: Int, rowIndex: Int?) in
+                  guard let self = self else { return }
+                  
+                  // If node is nil (hovering title bar), close child panels
+                  guard let node = node else {
+                      self.listPanelManager?.popToLevel(level)
+                      return
+                  }
+                  
+                  // Only cascade for folders
+                  guard node.type == .folder else {
+                      self.listPanelManager?.popToLevel(level)
+                      return
+                  }
+                  
+                  // Check if this node's panel is already showing at level+1
+                  if let existingPanel = self.listPanelManager?.panel(at: level + 1),
+                     existingPanel.sourceNodeId == node.id {
+                      self.listPanelManager?.popToLevel(level + 1)
+                      return
+                  }
+                  
+                  // Extract identity from node
+                  let providerId = node.providerId
+                  let contentIdentifier = node.metadata?["folderURL"] as? String ?? node.previewURL?.path
+                  
+                  // Check if children already loaded
+                  if let children = node.children, !children.isEmpty {
+                      self.listPanelManager?.pushPanel(
+                          title: node.name,
+                          items: children,
+                          fromPanelAtLevel: level,
+                          sourceNodeId: node.id,
+                          sourceRowIndex: rowIndex,
+                          providerId: providerId,
+                          contentIdentifier: contentIdentifier,
+                          contextActions: node.contextActions
+                      )
+                      return
+                  }
+                  
+                  // Children not loaded - check if we can load dynamically
+                  guard node.needsDynamicLoading,
+                        let providerId = node.providerId,
+                        let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) else {
+                      self.listPanelManager?.popToLevel(level)
+                      return
+                  }
+                  
+                  // Load children asynchronously
+                  Task {
+                      let children = await provider.loadChildren(for: node)
+                      
+                      guard !children.isEmpty else { return }
+                      
+                      await MainActor.run {
+                          self.listPanelManager?.pushPanel(
+                              title: node.name,
+                              items: children,
+                              fromPanelAtLevel: level,
+                              sourceNodeId: node.id,
+                              sourceRowIndex: rowIndex,
+                              providerId: providerId,
+                              contentIdentifier: contentIdentifier,
+                              contextActions: node.contextActions
+                          )
+                      }
+                  }
+              }
             
             // Wire panel content reload callback
             listPanelManager?.onReloadContent = { [weak self] providerId, contentIdentifier in

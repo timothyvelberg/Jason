@@ -116,7 +116,7 @@ struct CircularUIView: View {
                         },
                         contextActions: panel.contextActions,
                         expandedItemId: expandedItemIdBinding(for: panel.level),
-                        searchText: isDeepestPanel ? listPanelManager.searchText : ""
+                        searchText: (isDeepestPanel && !panel.areChildrenArmed) ? listPanelManager.searchText : panel.frozenSearchText
                     )
                     .position(x: panelLocalX, y: panelSwiftUIY)
                     .transition(panel.level == 0

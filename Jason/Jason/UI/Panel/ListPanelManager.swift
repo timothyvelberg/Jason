@@ -41,6 +41,7 @@ struct PanelState: Identifiable {
     var areChildrenArmed: Bool = false
     var isOverlapping: Bool = false
     var scrollOffset: CGFloat = 0     // Track scroll position for accurate row positioning
+    var frozenSearchText: String = "" // Search state frozen when child panel opened
     
    
     
@@ -184,14 +185,24 @@ class ListPanelManager: ObservableObject {
     
     // MARK: - Filtered Items Support
     
-    /// Get filtered items for a panel (applies search to deepest panel only)
+    /// Get filtered items for a panel (applies search to deepest panel, frozen search to parents)
     func filteredItems(for panel: PanelState) -> [FunctionNode] {
-        // Only filter the deepest panel
-        guard isDeepestPanel(panel), !searchText.isEmpty else {
+        // Determine which search text to use
+        // Panel receives live search only if it's deepest AND not armed for children
+        let effectiveSearchText: String
+        if isDeepestPanel(panel) && !panel.areChildrenArmed {
+            // Deepest panel uses live search (and not waiting for child to open)
+            effectiveSearchText = searchText
+        } else {
+            // Parent panels (or armed panels) use their frozen search state
+            effectiveSearchText = panel.frozenSearchText
+        }
+        
+        guard !effectiveSearchText.isEmpty else {
             return panel.items
         }
         
-        let query = searchText.lowercased()
+        let query = effectiveSearchText.lowercased()
         return panel.items.filter { item in
             if item.name.lowercased().contains(query) { return true }
             if let fullContent = item.metadata?["fullContent"] as? String,
@@ -295,7 +306,6 @@ class ListPanelManager: ObservableObject {
     func handleItemHover(node: FunctionNode?, level: Int, rowIndex: Int?) {
         // Suppress hover events while panel is scrolling
         if isPanelScrolling(level) {
-            print("📜 [Hover] Suppressed - panel \(level) is scrolling")
             return
         }
         
@@ -582,7 +592,12 @@ class ListPanelManager: ObservableObject {
         }
         
         // Handle resize anchor adjustment for filtered items
-        if isDeepestPanel(panel) && isSearchActive {
+        // Check if this panel has an active search (live or frozen)
+        // Panel uses live search only if deepest AND not armed
+        let canReceiveLiveSearch = isDeepestPanel(panel) && !panel.areChildrenArmed
+        let hasActiveSearch = canReceiveLiveSearch ? isSearchActive : !panel.frozenSearchText.isEmpty
+        
+        if hasActiveSearch {
             let originalHeight = panel.panelHeight
             let filteredHeight = currentPanelHeight(for: panel)
             let heightDelta = originalHeight - filteredHeight
@@ -598,8 +613,9 @@ class ListPanelManager: ObservableObject {
                     // In AppKit coords, DOWN = decrease Y
                     basePosition.y -= heightDelta / 2
                 case .sourceRow:
-                    // Child panels shouldn't be the deepest during search, but handle anyway
-                    break
+                    // Child panels anchor to their source row connection point (top of panel)
+                    // As panel shrinks, center moves UP to keep top fixed
+                    basePosition.y += heightDelta / 2
                 }
             }
         }
@@ -677,21 +693,27 @@ class ListPanelManager: ObservableObject {
         contextActions: [FunctionNode]? = nil
     ) {
         
-        // Clear search when navigating deeper
-        searchText = ""
-        
-        
         // Find the source panel
         guard let sourcePanel = panelStack.first(where: { $0.level == level }) else {
             print("❌ [ListPanelManager] Cannot find panel at level \(level)")
             return
         }
         
+        // Freeze the parent panel's search state before clearing
+        if let sourceIndex = panelStack.firstIndex(where: { $0.level == level }) {
+            panelStack[sourceIndex].frozenSearchText = searchText
+        }
+        
+        // Clear search for the new child panel
+        searchText = ""
+        
         // Pop any panels above this level first
         popToLevel(level)
         
-        // Calculate position: to the right of source panel
-        let sourceBounds = currentBounds(for: sourcePanel)
+        // Calculate position: to the right of source panel's STORED position
+        // IMPORTANT: Use stored bounds, not currentBounds, to avoid double-shifting
+        // when parent is overlapping. The shift will be applied by currentPosition() during rendering.
+        let sourceBounds = sourcePanel.bounds
         let gap: CGFloat = 8
         
         let newPanelWidth = PanelState.panelWidth
@@ -771,6 +793,11 @@ class ListPanelManager: ObservableObject {
         let removed = before - panelStack.count
         if removed > 0 {
             print("📋 [ListPanelManager] Popped \(removed) panel(s), now at level \(level)")
+            
+            // Restore search state from the panel we're returning to
+            if let returningPanel = panelStack.first(where: { $0.level == level }) {
+                searchText = returningPanel.frozenSearchText
+            }
         }
         
         // Clear pending if it was for a level we're popping
