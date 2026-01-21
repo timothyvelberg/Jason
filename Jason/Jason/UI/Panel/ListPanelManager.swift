@@ -807,7 +807,7 @@ class ListPanelManager: ObservableObject {
         let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
         
         // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
-        let scrollAdjustedY = relativeY - panel.scrollOffset
+        let scrollAdjustedY = relativeY + panel.scrollOffset
         let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < panel.items.count else {
@@ -850,7 +850,7 @@ class ListPanelManager: ObservableObject {
         let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
         
         // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
-        let scrollAdjustedY = relativeY - panel.scrollOffset
+        let scrollAdjustedY = relativeY + panel.scrollOffset
         let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < panel.items.count else {
@@ -886,7 +886,7 @@ class ListPanelManager: ObservableObject {
         let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
         
         // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
-        let scrollAdjustedY = relativeY - panel.scrollOffset
+        let scrollAdjustedY = relativeY + panel.scrollOffset
         let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < panel.items.count else {
