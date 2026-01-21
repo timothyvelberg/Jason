@@ -28,6 +28,7 @@ struct ListPanelView: View {
     
     // Expanded state from manager
     @Binding var expandedItemId: String?
+    var hoveredRowIndex: Int?
     
     // Configuration
     var panelWidth: CGFloat = 260
@@ -37,7 +38,6 @@ struct ListPanelView: View {
     var maxVisibleItems: Int = 10
     
     // State
-    @State private var hoveredItemId: String? = nil
     @State private var isScrolling: Bool = false
     @State private var lastScrollOffset: CGFloat = 0
     @State private var scrollDebounceTask: DispatchWorkItem? = nil
@@ -113,12 +113,6 @@ struct ListPanelView: View {
                         .fill(Color.white.opacity(0.18))
                         .frame(height: 1)
                 }
-                .onHover { hovering in
-                    if hovering {
-                        hoveredItemId = nil
-                        onHeaderHover?()
-                    }
-                }
                 
                 // Item list
                 ScrollView(.vertical, showsIndicators: needsScroll) {
@@ -128,7 +122,7 @@ struct ListPanelView: View {
                                 item: item,
                                 iconSize: iconSize,
                                 rowHeight: rowHeight,
-                                isHovered: !isScrolling && hoveredItemId == item.id,
+                                isHovered: !isScrolling && hoveredRowIndex == index,
                                 isExpanded: expandedItemId == item.id,
                                 onLeftClick: { modifiers in
                                     expandedItemId = nil
@@ -142,21 +136,6 @@ struct ListPanelView: View {
                                     onContextAction?(action, modifiers)
                                 }
                             )
-                            .onHover { hovering in
-                                if hovering {
-                                    if expandedItemId != nil && expandedItemId != item.id {
-                                        expandedItemId = nil
-                                    }
-                                    hoveredItemId = item.id
-                                    
-                                    // Only fire hover callback if not scrolling
-                                    if !isScrolling {
-                                        onItemHover?(item, index)
-                                    }
-                                } else {
-                                    hoveredItemId = nil
-                                }
-                            }
                         }
                     }
                     .background(
@@ -191,7 +170,6 @@ struct ListPanelView: View {
         // Start scrolling if not already
         if !isScrolling {
             isScrolling = true
-            hoveredItemId = nil  // Clear hover during scroll
             onScrollStateChanged?(true)
             print("📜 [View] '\(title)' scroll STARTED")
         }

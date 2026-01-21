@@ -88,6 +88,9 @@ struct CircularUIView: View {
                     
                     // Use currentPosition which accounts for overlap state
                     let currentPos = listPanelManager.currentPosition(for: panel)
+                    
+                    let _ = print("🖼️ [View] Panel \(panel.level) isOverlapping:\(panel.isOverlapping) rendered at x=\(Int(currentPos.x))")
+
                     let panelLocalX = currentPos.x - screenOriginX
                     let panelLocalY = currentPos.y - screenOriginY
                     let panelSwiftUIY = screenHeight - panelLocalY
@@ -114,14 +117,17 @@ struct CircularUIView: View {
                             listPanelManager.handleScrollStateChanged(isScrolling: isScrolling, forLevel: panelLevel)
                         },
                         contextActions: panel.contextActions,
-                        expandedItemId: expandedItemIdBinding(for: panel.level)
+                        expandedItemId: expandedItemIdBinding(for: panel.level),
+                        hoveredRowIndex: listPanelManager.hoveredRow[panelLevel]
                         
                     )
                     .position(x: panelLocalX, y: panelSwiftUIY)
+                        
                     .transition(panel.level == 0
-                        ? .slideFromAngle(angle: panel.spawnAngle ?? 0, distance: PanelState.cascadeSlideDistance)
-                        : .slideFromLeft(distance: PanelState.cascadeSlideDistance))    
-                    .animation(.easeInOut(duration: 0.2), value: panel.isOverlapping)             }
+                                ? .slideFromAngle(angle: panel.spawnAngle ?? 0, distance: PanelState.cascadeSlideDistance)
+                                : .slideFromLeft(distance: PanelState.cascadeSlideDistance))
+                    .animation(.easeInOut(duration: 0.2), value: panel.isOverlapping)
+                }
             }
             .animation(.easeOut(duration: 0.1), value: listPanelManager.panelStack.count)
             .ignoresSafeArea()

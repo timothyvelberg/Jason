@@ -69,6 +69,7 @@ class ListPanelManager: ObservableObject {
     // MARK: - Published State
     
     @Published var panelStack: [PanelState] = []
+    @Published var hoveredRow: [Int: Int] = [:]
     
     // MARK: - Sliding Configuration
     
@@ -441,8 +442,64 @@ class ListPanelManager: ObservableObject {
     
     // MARK: - Mouse Movement Tracking
 
-    /// Handle mouse movement to trigger panel sliding
     func handleMouseMove(at point: CGPoint) {
+        // DEBUG
+        for panel in panelStack {
+            let bounds = currentBounds(for: panel)
+            print("🔍 [Hover] Panel \(panel.level) isOverlapping:\(panel.isOverlapping) bounds: x=\(Int(bounds.minX))-\(Int(bounds.maxX)) | mouse.x=\(Int(point.x))")
+        }
+        
+        // Track hover state for each panel (check topmost first)
+        var pointHandled = false
+        for panel in panelStack.reversed() {
+            let level = panel.level
+            let panelBounds = currentBounds(for: panel)
+            
+            // Check if mouse is in this panel
+            if !pointHandled && panelBounds.contains(point) {
+                pointHandled = true
+                
+                // Check if in header area
+                let distanceFromTop = panelBounds.maxY - point.y
+                if distanceFromTop < PanelState.titleHeight + (PanelState.padding / 2) {
+                    // In header - clear hover for this level
+                    if hoveredRow[level] != nil {
+                        hoveredRow[level] = nil
+                    }
+                    continue
+                }
+                
+                // Calculate which row (if any)
+                let relativeY = panelBounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
+                let scrollAdjustedY = relativeY + panel.scrollOffset
+                let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
+                
+                if rowIndex >= 0 && rowIndex < panel.items.count {
+                    // Valid row - update hover if changed
+                    if hoveredRow[level] != rowIndex {
+                        hoveredRow[level] = rowIndex
+                        
+                        // Suppress hover callback while scrolling
+                        if !isPanelScrolling(level) {
+                            let node = panel.items[rowIndex]
+                            currentlyHoveredNodeId[level] = node.id
+                            onItemHover?(node, level, rowIndex)
+                        }
+                    }
+                } else {
+                    // Outside rows (e.g., padding area)
+                    if hoveredRow[level] != nil {
+                        hoveredRow[level] = nil
+                    }
+                }
+            } else {
+                // Mouse not in this panel (or handled by panel on top) - clear hover
+                if hoveredRow[level] != nil {
+                    hoveredRow[level] = nil
+                }
+            }
+        }
+        
         // Check for arming on panels that might have pending children
         for index in panelStack.indices {
             let panel = panelStack[index]
@@ -772,7 +829,7 @@ class ListPanelManager: ObservableObject {
     
     /// Check if a point is inside ANY panel
     func contains(point: CGPoint) -> Bool {
-        panelStack.contains { $0.bounds.contains(point) }
+        panelStack.contains { currentBounds(for: $0).contains(point) }
     }
     
     /// Check if point is in the panel zone (any panel OR gaps between)
@@ -785,7 +842,7 @@ class ListPanelManager: ObservableObject {
         var maxY = -CGFloat.infinity
         
         for panel in panelStack {
-            let bounds = panel.bounds
+            let bounds = currentBounds(for: panel)  // ← Changed from panel.bounds
             minX = min(minX, bounds.minX)
             minY = min(minY, bounds.minY)
             maxX = max(maxX, bounds.maxX)
