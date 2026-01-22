@@ -542,6 +542,15 @@ struct EditFavoriteAppView: View {
     }
 }
 
+struct ProviderConfig: Identifiable {
+    let id = UUID()
+    let type: String
+    let name: String
+    let description: String
+    var isEnabled: Bool
+    var displayMode: ProviderDisplayMode
+}
+
 // MARK: - Preview
 
 #Preview {

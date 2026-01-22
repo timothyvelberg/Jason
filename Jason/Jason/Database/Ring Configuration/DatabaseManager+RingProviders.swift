@@ -347,4 +347,79 @@ extension DatabaseManager {
         return success
     }
     
+    /// Reorder all providers in a ring based on array position
+    /// - Parameters:
+    ///   - ringId: The ring configuration ID
+    ///   - providerIds: Array of provider IDs in desired order (index 0 = order 0, etc.)
+    /// - Returns: true if reorder succeeded, false otherwise
+    func reorderProviders(ringId: Int, providerIds: [Int]) -> Bool {
+        guard let db = db else { return false }
+        
+        var success = false
+        
+        queue.sync {
+            // Begin transaction - all or nothing
+            if sqlite3_exec(db, "BEGIN TRANSACTION;", nil, nil, nil) != SQLITE_OK {
+                print("❌ [DatabaseManager] Failed to begin transaction for reorder")
+                return
+            }
+            
+            // Step 1: Set all to temporary negative values to avoid unique constraint
+            for (index, providerId) in providerIds.enumerated() {
+                let tempOrder = -(index + 1)  // -1, -2, -3, etc.
+                let sql = "UPDATE ring_providers SET provider_order = ? WHERE id = ? AND ring_id = ?;"
+                var statement: OpaquePointer?
+                
+                if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                    sqlite3_bind_int(statement, 1, Int32(tempOrder))
+                    sqlite3_bind_int(statement, 2, Int32(providerId))
+                    sqlite3_bind_int(statement, 3, Int32(ringId))
+                    
+                    if sqlite3_step(statement) != SQLITE_DONE {
+                        if let error = sqlite3_errmsg(db) {
+                            print("❌ [DatabaseManager] Failed to set temp order for provider \(providerId): \(String(cString: error))")
+                        }
+                        sqlite3_finalize(statement)
+                        sqlite3_exec(db, "ROLLBACK;", nil, nil, nil)
+                        return
+                    }
+                }
+                sqlite3_finalize(statement)
+            }
+            
+            // Step 2: Set final positive values
+            for (index, providerId) in providerIds.enumerated() {
+                let sql = "UPDATE ring_providers SET provider_order = ? WHERE id = ? AND ring_id = ?;"
+                var statement: OpaquePointer?
+                
+                if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                    sqlite3_bind_int(statement, 1, Int32(index))
+                    sqlite3_bind_int(statement, 2, Int32(providerId))
+                    sqlite3_bind_int(statement, 3, Int32(ringId))
+                    
+                    if sqlite3_step(statement) != SQLITE_DONE {
+                        if let error = sqlite3_errmsg(db) {
+                            print("❌ [DatabaseManager] Failed to set final order for provider \(providerId): \(String(cString: error))")
+                        }
+                        sqlite3_finalize(statement)
+                        sqlite3_exec(db, "ROLLBACK;", nil, nil, nil)
+                        return
+                    }
+                }
+                sqlite3_finalize(statement)
+            }
+            
+            // Commit transaction
+            if sqlite3_exec(db, "COMMIT;", nil, nil, nil) == SQLITE_OK {
+                print("✅ [DatabaseManager] Reordered \(providerIds.count) providers in ring \(ringId)")
+                success = true
+            } else {
+                print("❌ [DatabaseManager] Failed to commit reorder transaction")
+                sqlite3_exec(db, "ROLLBACK;", nil, nil, nil)
+            }
+        }
+        
+        return success
+    }
+    
 }

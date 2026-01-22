@@ -8,6 +8,21 @@
 import SwiftUI
 import AppKit
 
+// MARK: - Provider Config
+
+struct RingProviderConfig: Identifiable, Equatable {
+    let id = UUID()
+    let type: String
+    let name: String
+    let description: String
+    var isEnabled: Bool
+    var displayMode: ProviderDisplayMode
+    
+    static func == (lhs: RingProviderConfig, rhs: RingProviderConfig) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
 struct EditRingView: View {
     @Environment(\.dismiss) var dismiss
     
@@ -31,28 +46,26 @@ struct EditRingView: View {
     @State private var iconSize: String = "32"
     @State private var startAngle: Double = 0.0
     @State private var isActive: Bool = true
-    @State private var includeClipboardHistory: Bool = false
-    @State private var clipboardHistoryMode: ProviderDisplayMode = .parent
     
-    // Provider selection
-    @State private var includeCombinedApps: Bool = true
-    @State private var combinedAppsMode: ProviderDisplayMode = .parent
-    @State private var includeFavoriteFiles: Bool = false
-    @State private var favoriteFilesMode: ProviderDisplayMode = .parent
-    @State private var includeFavoriteFolderProvider: Bool = false
-    @State private var finderLogicMode: ProviderDisplayMode = .parent
-    @State private var includeSystemActions: Bool = false
-    @State private var systemActionsMode: ProviderDisplayMode = .parent
-    @State private var includeWindowManagement: Bool = false
-    @State private var windowManagementMode: ProviderDisplayMode = .parent
-    @State private var includeShortcutExecute: Bool = false
-    @State private var shortcutExecuteMode: ProviderDisplayMode = .parent
+    // Provider selection - ordered array
+    @State private var providers: [ProviderConfig] = []
     
     @State private var errorMessage: String?
     
     var isCreating: Bool {
         configuration == nil
     }
+    
+    // Default provider definitions
+    private static let defaultProviders: [ProviderConfig] = [
+        ProviderConfig(type: "CombinedAppsProvider", name: "Combined Apps", description: "Running and favorite applications", isEnabled: true, displayMode: .parent),
+        ProviderConfig(type: "FavoriteFilesProvider", name: "Favorite Files", description: "Quick access to favorite files", isEnabled: false, displayMode: .parent),
+        ProviderConfig(type: "FavoriteFolderProvider", name: "Finder Logic", description: "Browse folders and recent locations", isEnabled: false, displayMode: .parent),
+        ProviderConfig(type: "SystemActionsProvider", name: "System Actions", description: "Lock, Sleep, Logout, etc.", isEnabled: false, displayMode: .parent),
+        ProviderConfig(type: "WindowManagementProvider", name: "Window Management", description: "Resize and position windows", isEnabled: false, displayMode: .parent),
+        ProviderConfig(type: "ShortcutExecuteProvider", name: "Keyboard Shortcuts", description: "Execute keyboard shortcuts (Copy, Paste, etc.)", isEnabled: false, displayMode: .parent),
+        ProviderConfig(type: "ClipboardHistoryProvider", name: "Clipboard History", description: "Access previously copied text", isEnabled: false, displayMode: .parent)
+    ]
     
     var body: some View {
         VStack(spacing: 0) {
@@ -198,58 +211,27 @@ struct EditRingView: View {
                     
                     // Providers
                     GroupBox(label: Label("Content Providers", systemImage: "square.stack.3d.up.fill")) {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Select which content sources to include in this ring:")
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Select and reorder content sources for this ring:")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
-                            ProviderRow(
-                                name: "Combined Apps",
-                                description: "Running and favorite applications",
-                                isIncluded: $includeCombinedApps,
-                                displayMode: $combinedAppsMode
-                            )
+                            Text("Drag to reorder • Enabled providers appear in ring order")
+                                .font(.caption2)
+                                .foregroundColor(.secondary.opacity(0.8))
                             
-                            ProviderRow(
-                                name: "Favorite Files",
-                                description: "Quick access to favorite files",
-                                isIncluded: $includeFavoriteFiles,
-                                displayMode: $favoriteFilesMode
-                            )
-                            
-                            ProviderRow(
-                                name: "Finder Logic",
-                                description: "Browse folders and recent locations",
-                                isIncluded: $includeFavoriteFolderProvider,
-                                displayMode: $finderLogicMode
-                            )
-                            
-                            ProviderRow(
-                                name: "System Actions",
-                                description: "Lock, Sleep, Logout, etc.",
-                                isIncluded: $includeSystemActions,
-                                displayMode: $systemActionsMode
-                            )
-                            
-                            ProviderRow(
-                                name: "Window Management",
-                                description: "Resize and position windows",
-                                isIncluded: $includeWindowManagement,
-                                displayMode: $windowManagementMode
-                            )
-                            
-                            ProviderRow(
-                                name: "Keyboard Shortcuts",
-                                description: "Execute keyboard shortcuts (Copy, Paste, etc.)",
-                                isIncluded: $includeShortcutExecute,
-                                displayMode: $shortcutExecuteMode
-                            )
-                            ProviderRow(
-                                name: "Clipboard History",
-                                description: "Access previously copied text",
-                                isIncluded: $includeClipboardHistory,
-                                displayMode: $clipboardHistoryMode
-                            )
+                            List {
+                                ForEach($providers) { $provider in
+                                    ProviderRowReorderable(provider: $provider)
+                                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                                        .listRowSeparator(.hidden)
+                                }
+                                .onMove(perform: moveProvider)
+                            }
+                            .listStyle(.plain)
+                            .frame(height: CGFloat(providers.count) * 70 + 16)
+                            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                            .cornerRadius(8)
                         }
                         .padding(12)
                     }
@@ -284,10 +266,16 @@ struct EditRingView: View {
             }
             .padding()
         }
-        .frame(width: 600, height: 700)
+        .frame(width: 600, height: 800)
         .onAppear {
             loadConfiguration()
         }
+    }
+    
+    // MARK: - Provider Reordering
+    
+    private func moveProvider(from source: IndexSet, to destination: Int) {
+        providers.move(fromOffsets: source, toOffset: destination)
     }
     
     // MARK: - Validation
@@ -312,71 +300,79 @@ struct EditRingView: View {
     }
     
     private var hasAtLeastOneProvider: Bool {
-        includeCombinedApps || includeFavoriteFiles || includeFavoriteFolderProvider || includeSystemActions || includeWindowManagement || includeShortcutExecute || includeClipboardHistory
+        providers.contains { $0.isEnabled }
     }
     
     // MARK: - Actions
     
     private func loadConfiguration() {
-        guard let config = configuration else { return }
-        
-        // Load existing configuration for editing
-        name = config.name
-        ringRadius = String(Int(config.ringRadius))
-        centerHoleRadius = String(Int(config.centerHoleRadius))
-        iconSize = String(Int(config.iconSize))
-        startAngle = config.startAngle
-        isActive = config.isActive
-        
-        // Load trigger based on type
-        if config.triggerType == "keyboard" {
-            triggerType = .keyboard
-            recordedKeyCode = config.keyCode
-            recordedModifierFlags = config.modifierFlags
-        } else if config.triggerType == "mouse" {
-            triggerType = .mouse
-            recordedButtonNumber = config.buttonNumber
-            recordedModifierFlags = config.modifierFlags
-        } else if config.triggerType == "trackpad" || config.triggerType == "swipe" {
-            // Support both "trackpad" (new) and "swipe" (legacy)
-            triggerType = .trackpad
-            if let dir = config.swipeDirection {
-                swipeDirection = SwipeDirection(rawValue: dir) ?? .up
+        if let config = configuration {
+            // Load existing configuration for editing
+            name = config.name
+            ringRadius = String(Int(config.ringRadius))
+            centerHoleRadius = String(Int(config.centerHoleRadius))
+            iconSize = String(Int(config.iconSize))
+            startAngle = config.startAngle
+            isActive = config.isActive
+            
+            // Load trigger based on type
+            if config.triggerType == "keyboard" {
+                triggerType = .keyboard
+                recordedKeyCode = config.keyCode
+                recordedModifierFlags = config.modifierFlags
+            } else if config.triggerType == "mouse" {
+                triggerType = .mouse
+                recordedButtonNumber = config.buttonNumber
+                recordedModifierFlags = config.modifierFlags
+            } else if config.triggerType == "trackpad" || config.triggerType == "swipe" {
+                // Support both "trackpad" (new) and "swipe" (legacy)
+                triggerType = .trackpad
+                if let dir = config.swipeDirection {
+                    swipeDirection = SwipeDirection(rawValue: dir) ?? .up
+                }
+                fingerCount = config.fingerCount ?? 3  // Default to 3 for legacy data
+                swipeModifierFlags = config.modifierFlags ?? 0
             }
-            fingerCount = config.fingerCount ?? 3  // Default to 3 for legacy data
-            swipeModifierFlags = config.modifierFlags ?? 0
-        }
-        
-        isHoldMode = config.isHoldMode
-        autoExecuteOnRelease = config.autoExecuteOnRelease
-        
-        // Load providers
-        for provider in config.providers {
-            switch provider.providerType {
-            case "CombinedAppsProvider":
-                includeCombinedApps = true
-                combinedAppsMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
-            case "FavoriteFilesProvider":
-                includeFavoriteFiles = true
-                favoriteFilesMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
-            case "FavoriteFolderProvider":
-                includeFavoriteFolderProvider = true
-                finderLogicMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
-            case "SystemActionsProvider":
-                includeSystemActions = true
-                systemActionsMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
-            case "WindowManagementProvider":
-                includeWindowManagement = true
-                windowManagementMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
-            case "ShortcutExecuteProvider":
-                includeShortcutExecute = true
-                shortcutExecuteMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
-            case "ClipboardHistoryProvider":
-                includeClipboardHistory = true
-                clipboardHistoryMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
-            default:
-                break
+            
+            isHoldMode = config.isHoldMode
+            autoExecuteOnRelease = config.autoExecuteOnRelease
+            
+            // Build providers array from saved config
+            // First, create a map of saved providers by type
+            var savedProvidersByType: [String: (order: Int, displayMode: ProviderDisplayMode)] = [:]
+            for provider in config.providers {
+                let displayMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
+                savedProvidersByType[provider.providerType] = (provider.order, displayMode)
             }
+            
+            // Build providers list: enabled ones first (in saved order), then disabled ones
+            var enabledProviders: [(ProviderConfig, Int)] = []
+            var disabledProviders: [ProviderConfig] = []
+            
+            for defaultProvider in Self.defaultProviders {
+                if let saved = savedProvidersByType[defaultProvider.type] {
+                    // Provider was enabled - preserve its order and displayMode
+                    var provider = defaultProvider
+                    provider.isEnabled = true
+                    provider.displayMode = saved.displayMode
+                    enabledProviders.append((provider, saved.order))
+                } else {
+                    // Provider was not enabled
+                    var provider = defaultProvider
+                    provider.isEnabled = false
+                    disabledProviders.append(provider)
+                }
+            }
+            
+            // Sort enabled providers by their saved order
+            enabledProviders.sort { $0.1 < $1.1 }
+            
+            // Combine: enabled first (in order), then disabled
+            providers = enabledProviders.map { $0.0 } + disabledProviders
+            
+        } else {
+            // New ring - use defaults
+            providers = Self.defaultProviders
         }
     }
     
@@ -400,8 +396,8 @@ struct EditRingView: View {
         case "add": directionSymbol = "\(fingerCount)-Finger Add"
         case "circleclockwise": directionSymbol = "↻ \(fingerCount)-Finger Circle Clockwise"
         case "circlecounterclockwise": directionSymbol = "↺ \(fingerCount)-Finger Circle Counter-Clockwise"
-        case "twofingertapleft": directionSymbol = "👆← Two-Finger Tap Left"      // NEW
-        case "twofingertapright": directionSymbol = "→👆 Two-Finger Tap Right"    // NEW
+        case "twofingertapleft": directionSymbol = "👆← Two-Finger Tap Left"
+        case "twofingertapright": directionSymbol = "→👆 Two-Finger Tap Right"
         default: directionSymbol = "\(fingerCount)-Finger Swipe \(direction)"
         }
         
@@ -468,41 +464,12 @@ struct EditRingView: View {
             shortcutDisplay = formatTrackpadGesture(direction: swipeDirection.rawValue, fingerCount: fingerCount, modifiers: swipeModifierFlags)
         }
         
-        // Build providers array
-        var providers: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
+        // Build providers array from ordered, enabled providers
+        var providerData: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
         var order = 1
         
-        if includeCombinedApps {
-            providers.append(("CombinedAppsProvider", order, combinedAppsMode.rawValue, nil))
-            order += 1
-        }
-        
-        if includeFavoriteFiles {
-            providers.append(("FavoriteFilesProvider", order, favoriteFilesMode.rawValue, nil))
-            order += 1
-        }
-        
-        if includeFavoriteFolderProvider {
-            providers.append(("FavoriteFolderProvider", order, finderLogicMode.rawValue, nil))
-            order += 1
-        }
-        
-        if includeSystemActions {
-            providers.append(("SystemActionsProvider", order, systemActionsMode.rawValue, nil))
-            order += 1
-        }
-        
-        if includeWindowManagement {
-            providers.append(("WindowManagementProvider", order, windowManagementMode.rawValue, nil))
-            order += 1
-        }
-        
-        if includeShortcutExecute {
-            providers.append(("ShortcutExecuteProvider", order, shortcutExecuteMode.rawValue, nil))
-            order += 1
-        }
-        if includeClipboardHistory {
-            providers.append(("ClipboardHistoryProvider", order, clipboardHistoryMode.rawValue, nil))
+        for provider in providers where provider.isEnabled {
+            providerData.append((provider.type, order, provider.displayMode.rawValue, nil))
             order += 1
         }
         
@@ -527,11 +494,8 @@ struct EditRingView: View {
                     fingerCount: triggerType == .trackpad ? fingerCount : nil,
                     isHoldMode: isHoldMode,
                     autoExecuteOnRelease: autoExecuteOnRelease,
-                    providers: providers
+                    providers: providerData
                 )
-                
-                // Note: New configurations are active by default
-                // TODO: Add toggle active/inactive functionality in management view
                 
                 print("✅ [EditRing] Created new ring: '\(newConfig.name)' (active: \(newConfig.isActive))")
             } else {
@@ -565,8 +529,8 @@ struct EditRingView: View {
                     try configManager.removeProvider(id: provider.id)
                 }
                 
-                // Step 3: Add new providers
-                for provider in providers {
+                // Step 3: Add new providers in order
+                for provider in providerData {
                     // Build config dictionary for displayMode
                     var providerConfig: [String: Any]? = nil
                     if let displayMode = provider.displayMode {
@@ -595,45 +559,55 @@ struct EditRingView: View {
     }
 }
 
-// MARK: - Provider Row
+// MARK: - Provider Row (Reorderable)
 
-struct ProviderRow: View {
-    let name: String
-    let description: String
-    @Binding var isIncluded: Bool
-    @Binding var displayMode: ProviderDisplayMode
+struct ProviderRowReorderable: View {
+    @Binding var provider: ProviderConfig
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Toggle(isOn: $isIncluded) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.body)
-                        .fontWeight(.medium)
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+        HStack(spacing: 12) {
+            // Drag indicator
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 14))
+                .foregroundColor(.secondary.opacity(0.5))
+                .help("Drag to reorder")
+            
+            // Enable toggle
+            Toggle("", isOn: $provider.isEnabled)
+                .labelsHidden()
+                .toggleStyle(.checkbox)
+            
+            // Provider info
+            VStack(alignment: .leading, spacing: 2) {
+                Text(provider.name)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .foregroundColor(provider.isEnabled ? .primary : .secondary)
+                
+                Text(provider.description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
             
-            if isIncluded {
-                HStack {
-                    Text("Display Mode:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 90, alignment: .leading)
-                    
-                    Picker("", selection: $displayMode) {
-                        ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
-                            Text(mode.displayName).tag(mode)
-                        }
+            Spacer()
+            
+            // Display mode picker (only when enabled)
+            if provider.isEnabled {
+                Picker("", selection: $provider.displayMode) {
+                    ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
                     }
-                    .pickerStyle(.segmented)
-                    .frame(width: 200)
                 }
-                .padding(.leading, 20)
+                .pickerStyle(.segmented)
+                .frame(width: 140)
             }
         }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(provider.isEnabled ? Color.blue.opacity(0.05) : Color.clear)
+        )
     }
 }
 
@@ -1076,9 +1050,6 @@ struct MouseButtonRecorder: View {
 }
 
 
-// MARK: - Swipe Gesture Picker
-
-
 // MARK: - Mouse Button Recorder Handler
 
 class MouseButtonRecorderHandler {
@@ -1120,4 +1091,3 @@ class MouseButtonRecorderHandler {
         }
     }
 }
-
