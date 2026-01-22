@@ -334,7 +334,8 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 allowedOperations: .move,
                 onClick: {
                     print("📂 Opening file: \(fileName)")
-                    NSWorkspace.shared.open(url)
+                    NSWorkspace.shared.openAndActivate(url)
+
                 },
                 onDragStarted: {
                     print("📦 Started dragging: \(fileName)")
@@ -350,7 +351,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("🖱️ Middle-click opening: \(fileName)")
-                NSWorkspace.shared.open(url)
+                NSWorkspace.shared.openAndActivate(url)
             }),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
@@ -397,7 +398,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("📂 Middle-click opening folder: \(folderName)")
-                NSWorkspace.shared.open(url)
+                NSWorkspace.shared.openAndActivate(url)
             }),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
@@ -447,7 +448,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 allowedOperations: .move,
                 onClick: {
                     print("📂 Opening file: \(fileName)")
-                    NSWorkspace.shared.open(url)
+                    NSWorkspace.shared.openAndActivate(url)
                 },
                 onDragStarted: {
                     print("📦 Started dragging: \(fileName)")
@@ -463,7 +464,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("🖱️ Middle-click opening: \(fileName)")
-                NSWorkspace.shared.open(url)
+                NSWorkspace.shared.openAndActivate(url)
             }),
             onBoundaryCross: ModifierAwareInteraction(base: .navigateInto)
         )
@@ -520,7 +521,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 print("📂 Middle-click opening folder: \(folderName)")
-                NSWorkspace.shared.open(url)
+                NSWorkspace.shared.openAndActivate(url)
             }),
             onBoundaryCross: ModifierAwareInteraction(base: .navigateInto)
         )
@@ -612,7 +613,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
                 DatabaseManager.shared.updateFolderAccess(path: path.path)
-                NSWorkspace.shared.open(path)
+                NSWorkspace.shared.openAndActivate(path)
             }),
             onBoundaryCross: ModifierAwareInteraction(base: .navigateInto)
         )

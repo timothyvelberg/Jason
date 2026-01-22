@@ -75,8 +75,8 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
                 preferredLayout: .partialSlice,
                 slicePositioning: .center,
                 providerId: providerId,
-                onLeftClick: ModifierAwareInteraction(base: .expand),
-                onRightClick: ModifierAwareInteraction(base: .expand),
+                onLeftClick: ModifierAwareInteraction(base: .doNothing),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onBoundaryCross: ModifierAwareInteraction(base: .expand)
             )
         ]

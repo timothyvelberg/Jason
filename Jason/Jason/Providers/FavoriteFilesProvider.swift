@@ -512,7 +512,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 ))),
                 onRightClick: ModifierAwareInteraction(base: contextActions.isEmpty ? .doNothing : .expand),
                 onMiddleClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .executeKeepOpen { [weak self] in
-                    self?.openFile(path: entry.filePath, entry: entry)
+                    NSWorkspace.shared.openAndActivate(folderURL)
                 }),
                 onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             )
@@ -533,7 +533,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                     dragImage: entry.icon,
                     allowedOperations: [.move, .copy],
                     onClick: { [weak self] in
-                        self?.openFile(path: entry.filePath, entry: entry)
+                        NSWorkspace.shared.openAndActivate(URL(fileURLWithPath: entry.filePath))
                     },
                     onDragStarted: {
                         print("📦 Started dragging: \(entry.displayName)")

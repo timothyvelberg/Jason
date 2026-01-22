@@ -87,10 +87,10 @@ struct StandardContextActions {
             type: .action,
             icon: NSImage(named: "context_actions_folder") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute {
-                NSWorkspace.shared.activateFileViewerSelecting([url])
+                NSWorkspace.shared.selectFileAndActivate(url)
             }),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
-                NSWorkspace.shared.activateFileViewerSelecting([url])
+                NSWorkspace.shared.selectFileAndActivate(url)
             })
         )
     }
@@ -153,5 +153,29 @@ struct StandardContextActions {
                 print("✅ File copied to clipboard: \(fileName)")
             })
         )
+    }
+}
+
+extension NSWorkspace {
+    /// Opens a URL and ensures the handling app activates (comes to front)
+    func openAndActivate(_ url: URL) {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        
+        self.open(url, configuration: configuration) { app, error in
+            if let error = error {
+                print("❌ Failed to open \(url.lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Reveals file in Finder and ensures Finder activates (comes to front)
+    func selectFileAndActivate(_ url: URL) {
+        self.activateFileViewerSelecting([url])
+        
+        // Explicitly bring Finder to front
+        if let finder = self.runningApplications.first(where: { $0.bundleIdentifier == "com.apple.finder" }) {
+            finder.activate()
+        }
     }
 }
