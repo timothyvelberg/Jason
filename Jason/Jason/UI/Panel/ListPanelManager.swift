@@ -27,8 +27,9 @@ struct PanelState: Identifiable {
     
     //Identity tracking for updates
     let providerId: String?
-    let contentIdentifier: String?    // Folder path for folder content
     
+    
+    let contentIdentifier: String?    // Folder path for folder content
     var expandedItemId: String?       // Which row has context actions showing
     var areChildrenArmed: Bool = false
     var isOverlapping: Bool = false
@@ -108,6 +109,8 @@ class ListPanelManager: ObservableObject {
     private(set) var currentRingCenter: CGPoint = .zero
     private(set) var currentRingOuterRadius: CGFloat = 0
     private(set) var currentAngle: Double = 0
+    private var currentScreen: NSScreen?
+
     
     // MARK: - Pending Panel (waiting for arming)
 
@@ -322,12 +325,14 @@ class ListPanelManager: ObservableObject {
         angle: Double,
         panelWidth: CGFloat = PanelState.panelWidth,
         providerId: String? = nil,
-        contentIdentifier: String? = nil
+        contentIdentifier: String? = nil,
+        screen: NSScreen? = nil
     ) {
         // Store ring context for cascading
         self.currentAngle = angle
         self.currentRingCenter = ringCenter
         self.currentRingOuterRadius = ringOuterRadius
+        self.currentScreen = screen ?? NSScreen.main
         
         // Calculate position
         let position = calculatePanelPosition(
@@ -809,6 +814,9 @@ class ListPanelManager: ObservableObject {
         panelStack.removeAll()
         pendingPanel = nil
         
+        // Clean up screen reference
+        currentScreen = nil
+        
         // Clean up scroll state
         for (_, timer) in scrollDebounceTimers {
             timer.cancel()
@@ -1044,8 +1052,8 @@ class ListPanelManager: ObservableObject {
 
     /// Constrain panel position to screen boundaries (left, top, bottom only - NOT right)
     private func constrainToScreenBounds(position: CGPoint, panelWidth: CGFloat, panelHeight: CGFloat) -> CGPoint {
-        // Get current screen (use main screen as fallback)
-        let screen = NSScreen.main ?? NSScreen.screens.first
+        // Use the screen where panels are being displayed (set in show())
+        let screen = currentScreen ?? NSScreen.main ?? NSScreen.screens.first
         guard let visibleFrame = screen?.visibleFrame else {
             return position
         }

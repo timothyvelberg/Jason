@@ -291,8 +291,9 @@ class CircularUIManager: ObservableObject {
                         ringCenter: ringCenter,
                         ringOuterRadius: ringOuterRadius,
                         angle: angle,
-                        providerId: providerId,                 // ADD
-                        contentIdentifier: contentIdentifier    // ADD
+                        providerId: providerId,
+                        contentIdentifier: contentIdentifier,
+                        screen: self.overlayWindow?.currentScreen
                     )
                     self.mouseTracker?.pauseUntilMovement()
                     return
@@ -323,8 +324,9 @@ class CircularUIManager: ObservableObject {
                             ringCenter: ringCenter,
                             ringOuterRadius: ringOuterRadius,
                             angle: angle,
-                            providerId: providerId,              // ADD
-                            contentIdentifier: contentIdentifier // ADD
+                            providerId: providerId,
+                            contentIdentifier: contentIdentifier,
+                            screen: self.overlayWindow?.currentScreen
                         )
                         self.mouseTracker?.pauseUntilMovement()
                     }
@@ -892,7 +894,8 @@ class CircularUIManager: ObservableObject {
                         items: contextActions,
                         ringCenter: manager.currentRingCenter,
                         ringOuterRadius: manager.currentRingOuterRadius,
-                        angle: manager.currentAngle
+                        angle: manager.currentAngle,
+                        screen: self.overlayWindow?.currentScreen
                     )
                 }
             }
