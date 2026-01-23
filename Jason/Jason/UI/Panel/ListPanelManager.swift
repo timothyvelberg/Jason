@@ -74,7 +74,11 @@ class ListPanelManager: ObservableObject {
     
     // MARK: - Keyboard Navigation State
 
-    /// Keyboard-selected row per panel level (nil = no keyboard selection)
+    /// Which panel level is currently active (has keyboard focus)
+    /// Active panel shows selection, responds to arrows
+    @Published var activePanelLevel: Int = 0
+
+    /// Keyboard-selected row per panel level
     @Published var keyboardSelectedRow: [Int: Int] = [:]
 
     /// Whether keyboard is currently driving selection (vs mouse)
@@ -310,9 +314,86 @@ class ListPanelManager: ObservableObject {
     
     // MARK: - Keyboard Navigation
 
+    
+    /// Enter the preview panel (→ arrow) - make it active
+    func enterPreviewPanel() {
+        let previewLevel = activePanelLevel + 1
+        
+        // Check if preview panel exists
+        guard let previewIndex = panelStack.firstIndex(where: { $0.level == previewLevel }) else {
+            print("⌨️ [Keyboard] No preview panel to enter")
+            return
+        }
+        
+        // Set parent panel(s) to overlapping
+        for i in panelStack.indices where panelStack[i].level <= activePanelLevel {
+            panelStack[i].isOverlapping = true
+        }
+        
+        // Move focus to preview (now becomes active)
+        activePanelLevel = previewLevel
+        
+        // Select first row in new active panel
+        keyboardSelectedRow[activePanelLevel] = 0
+        
+        // Arm the new active panel for its children
+        panelStack[previewIndex].areChildrenArmed = true
+        
+        print("⌨️ [Keyboard] ENTERED → active panel now level \(activePanelLevel)")
+        
+        // Trigger hover for first item to spawn next preview if it's a folder
+        let activePanel = panelStack[previewIndex]
+        if !activePanel.items.isEmpty {
+            let firstNode = activePanel.items[0]
+            currentlyHoveredNodeId[activePanelLevel] = firstNode.id
+            onItemHover?(firstNode, activePanelLevel, 0)
+        }
+    }
+
+    /// Exit to parent panel (← arrow) - close current active, parent becomes active
+    func exitToParentPanel() {
+        guard activePanelLevel > 0 else {
+            print("⌨️ [Keyboard] Already at root panel - cannot exit")
+            return
+        }
+        
+        let parentLevel = activePanelLevel - 1
+        
+        // Pop all panels above parent (including current active)
+        popToLevel(parentLevel)
+        
+        // Move focus back to parent
+        activePanelLevel = parentLevel
+        
+        // Un-overlap the parent (it's now active, not background)
+        if let parentIndex = panelStack.firstIndex(where: { $0.level == parentLevel }) {
+            panelStack[parentIndex].isOverlapping = false
+        }
+        
+        // Clear keyboard selection in old level
+        keyboardSelectedRow.removeValue(forKey: parentLevel + 1)
+        
+        print("⌨️ [Keyboard] EXITED ← active panel now level \(activePanelLevel)")
+        
+        // Re-trigger preview for currently selected item in parent
+        if let selection = keyboardSelectedRow[parentLevel],
+           let panel = panelStack.first(where: { $0.level == parentLevel }),
+           selection < panel.items.count {
+            let selectedNode = panel.items[selection]
+            currentlyHoveredNodeId[parentLevel] = selectedNode.id
+            onItemHover?(selectedNode, parentLevel, selection)
+        }
+    }
+    
+    
     /// Get the effective selected row for a panel level
-    /// Returns keyboard selection if keyboard is driving, otherwise mouse hover
+    /// Only the ACTIVE panel shows selection highlight
     func effectiveSelectedRow(for level: Int) -> Int? {
+        // Only show selection in the active panel
+        guard level == activePanelLevel else {
+            return nil
+        }
+        
         if isKeyboardDriven {
             return keyboardSelectedRow[level]
         } else {
@@ -320,34 +401,92 @@ class ListPanelManager: ObservableObject {
         }
     }
 
-    /// Move selection down in the specified panel level
+    /// Move selection down in the active panel
     func moveSelectionDown(in level: Int) {
+        // Only allow navigation in the active panel
+        guard level == activePanelLevel else {
+            print("⌨️ [Keyboard] Ignoring - level \(level) is not active (\(activePanelLevel))")
+            return
+        }
+        
         guard let panel = panelStack.first(where: { $0.level == level }) else { return }
         
         let maxIndex = panel.items.count - 1
         guard maxIndex >= 0 else { return }
         
-        isKeyboardDriven = true
+        // Calculate new selection
+        let currentSelection: Int
+        if isKeyboardDriven, let existing = keyboardSelectedRow[level] {
+            currentSelection = existing
+        } else if let hovered = hoveredRow[level] {
+            currentSelection = hovered
+        } else {
+            currentSelection = -1  // Will become 0
+        }
         
-        let currentSelection = keyboardSelectedRow[level] ?? hoveredRow[level] ?? -1
         let newSelection = min(currentSelection + 1, maxIndex)
         
+        // Update state
+        isKeyboardDriven = true
         keyboardSelectedRow[level] = newSelection
+        
         print("⌨️ [Keyboard] Selection DOWN in level \(level): \(newSelection)")
+        
+        // Auto-arm for keyboard (no threshold needed)
+        if let panelIndex = panelStack.firstIndex(where: { $0.level == level }) {
+            panelStack[panelIndex].areChildrenArmed = true
+        }
+        
+        // Close any existing preview (child panel)
+        popToLevel(level)
+        
+        // Trigger hover to spawn preview if selected item is a folder
+        let selectedNode = panel.items[newSelection]
+        currentlyHoveredNodeId[level] = selectedNode.id
+        onItemHover?(selectedNode, level, newSelection)
     }
-
-    /// Move selection up in the specified panel level
+    
+    /// Move selection up in the active panel
     func moveSelectionUp(in level: Int) {
+        // Only allow navigation in the active panel
+        guard level == activePanelLevel else {
+            print("⌨️ [Keyboard] Ignoring - level \(level) is not active (\(activePanelLevel))")
+            return
+        }
+        
         guard let panel = panelStack.first(where: { $0.level == level }) else { return }
         guard !panel.items.isEmpty else { return }
         
-        isKeyboardDriven = true
+        // Calculate new selection
+        let currentSelection: Int
+        if isKeyboardDriven, let existing = keyboardSelectedRow[level] {
+            currentSelection = existing
+        } else if let hovered = hoveredRow[level] {
+            currentSelection = hovered
+        } else {
+            currentSelection = 0  // Will stay 0
+        }
         
-        let currentSelection = keyboardSelectedRow[level] ?? hoveredRow[level] ?? 0
         let newSelection = max(currentSelection - 1, 0)
         
+        // Update state
+        isKeyboardDriven = true
         keyboardSelectedRow[level] = newSelection
+        
         print("⌨️ [Keyboard] Selection UP in level \(level): \(newSelection)")
+        
+        // Auto-arm for keyboard (no threshold needed)
+        if let panelIndex = panelStack.firstIndex(where: { $0.level == level }) {
+            panelStack[panelIndex].areChildrenArmed = true
+        }
+        
+        // Close any existing preview (child panel)
+        popToLevel(level)
+        
+        // Trigger hover to spawn preview if selected item is a folder
+        let selectedNode = panel.items[newSelection]
+        currentlyHoveredNodeId[level] = selectedNode.id
+        onItemHover?(selectedNode, level, newSelection)
     }
 
     /// Reset to mouse-driven mode (called when mouse moves)
@@ -870,6 +1009,12 @@ class ListPanelManager: ObservableObject {
         panelStack.removeAll()
         pendingPanel = nil
         
+        // Reset keyboard navigation state
+        activePanelLevel = 0
+        keyboardSelectedRow.removeAll()
+        isKeyboardDriven = false
+        currentlyHoveredNodeId.removeAll()
+        
         // Clean up screen reference
         currentScreen = nil
         
@@ -882,6 +1027,9 @@ class ListPanelManager: ObservableObject {
         
         // Clean up hover tracking
         currentlyHoveredNodeId.removeAll()
+        
+        keyboardSelectedRow.removeAll()
+        isKeyboardDriven = false
     }
     
     /// Alias for hide (clearer intent)

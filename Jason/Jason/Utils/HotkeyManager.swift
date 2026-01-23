@@ -34,6 +34,12 @@ class HotkeyManager {
     /// Called when Down arrow is pressed while UI is visible
     var onArrowDown: (() -> Void)?
     
+    /// Called when Left arrow is pressed while UI is visible
+    var onArrowLeft: (() -> Void)?
+
+    /// Called when Right arrow is pressed while UI is visible
+    var onArrowRight: (() -> Void)?
+    
     // MARK: - Configuration
     
     /// Key code for hold-to-show functionality (nil = disabled)
@@ -321,6 +327,8 @@ class HotkeyManager {
         registeredShortcuts.removeAll()
         print("[HotkeyManager] Unregistered all \(count) shortcut(s)")
     }
+    
+    
     
     // MARK: - Mouse Button Registration
     
@@ -762,6 +770,14 @@ class HotkeyManager {
             case 126:  // Up arrow
                 print("⌨️ [HotkeyManager] Up arrow pressed")
                 onArrowUp?()
+                return true
+            case 123:  // Left arrow
+                print("⌨️ [HotkeyManager] Left arrow pressed")
+                onArrowLeft?()
+                return true
+            case 124:  // Right arrow
+                print("⌨️ [HotkeyManager] Right arrow pressed")
+                onArrowRight?()
                 return true
             default:
                 break

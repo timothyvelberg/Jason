@@ -353,27 +353,36 @@ class CircularUIInstanceManager: ObservableObject {
             self?.hideActive()
         }
         
-        // Wire up arrow key callbacks for panel navigation
         hotkeyManager.onArrowDown = { [weak self] in
             guard let instance = self?.getActiveInstance(),
                   let panelManager = instance.listPanelManager,
                   panelManager.isVisible else { return }
             
-            // Navigate in the topmost panel (highest level)
-            if let topmostPanel = panelManager.panelStack.last {
-                panelManager.moveSelectionDown(in: topmostPanel.level)
-            }
+            panelManager.moveSelectionDown(in: panelManager.activePanelLevel)
         }
-        
+
         hotkeyManager.onArrowUp = { [weak self] in
             guard let instance = self?.getActiveInstance(),
                   let panelManager = instance.listPanelManager,
                   panelManager.isVisible else { return }
             
-            // Navigate in the topmost panel (highest level)
-            if let topmostPanel = panelManager.panelStack.last {
-                panelManager.moveSelectionUp(in: topmostPanel.level)
-            }
+            panelManager.moveSelectionUp(in: panelManager.activePanelLevel)
+        }
+
+        hotkeyManager.onArrowRight = { [weak self] in
+            guard let instance = self?.getActiveInstance(),
+                  let panelManager = instance.listPanelManager,
+                  panelManager.isVisible else { return }
+            
+            panelManager.enterPreviewPanel()
+        }
+
+        hotkeyManager.onArrowLeft = { [weak self] in
+            guard let instance = self?.getActiveInstance(),
+                  let panelManager = instance.listPanelManager,
+                  panelManager.isVisible else { return }
+            
+            panelManager.exitToParentPanel()
         }
         
         hotkeyManager.startMonitoring()
