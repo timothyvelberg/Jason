@@ -326,7 +326,7 @@ class ListPanelManager: ObservableObject {
         }
         
         // Set parent panel(s) to overlapping
-        for i in panelStack.indices where panelStack[i].level <= activePanelLevel {
+        for i in panelStack.indices where panelStack[i].level <= previewLevel {
             panelStack[i].isOverlapping = true
         }
         
