@@ -504,20 +504,32 @@ class ListPanelManager: ObservableObject {
     /// Get the effective selected row for a panel level
     /// Only the ACTIVE panel shows selection highlight
     func effectiveSelectedRow(for level: Int) -> Int? {
+        print("🔍 [EffectiveRow] level=\(level), activePanelLevel=\(activePanelLevel), isKeyboardDriven=\(isKeyboardDriven), hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
         
-        print("🔍 [EffectiveRow] level=\(level), activePanelLevel=\(activePanelLevel), isKeyboardDriven=\(isKeyboardDriven), keyboardSelectedRow[\(level)]=\(keyboardSelectedRow[level] ?? -999)")
-
-        
-        // Only show selection in the active panel
         guard level == activePanelLevel else {
             return nil
         }
         
         if isKeyboardDriven {
+            print("🔍 [EffectiveRow] Returning keyboardSelectedRow[\(level)]=\(keyboardSelectedRow[level] ?? -999)")
             return keyboardSelectedRow[level]
-        } else {
-            return hoveredRow[level]
         }
+        
+        // If this panel has a preview child, highlight the source row
+        if let previewPanel = panelStack.first(where: { $0.level == level + 1 }),
+           !previewPanel.isOverlapping,
+           let sourceRow = previewPanel.sourceRowIndex {
+            // Return source row if:
+            // 1. hoveredRow matches (mouse on source row), OR
+            // 2. hoveredRow is nil (transition state - assume still on source row)
+            if hoveredRow[level] == sourceRow || hoveredRow[level] == nil {
+                print("🔍 [EffectiveRow] Returning source row \(sourceRow) from preview child (hover matches or nil)")
+                return sourceRow
+            }
+        }
+        
+        print("🔍 [EffectiveRow] Returning hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
+        return hoveredRow[level]
     }
 
     /// Move selection down in the active panel
@@ -879,11 +891,13 @@ class ListPanelManager: ObservableObject {
                     
                     if shouldOverlap {
                         activePanelLevel = panelStack[childIndex].level
-                        print("📋 [Slide] Active panel now level \(activePanelLevel)")
+                        if hoveredRow[activePanelLevel] == nil {
+                            hoveredRow[activePanelLevel] = 0
+                        }
                     } else {
-                        activePanelLevel = panel.level  // Parent becomes active again
-                        print("📋 [Slide] Active panel now level \(activePanelLevel)")
+                        activePanelLevel = panel.level  // THIS IS THE KEY LINE
                     }
+                    print("📋 [Slide] Active panel now level \(activePanelLevel)")
                 }
             }
         }
@@ -1071,12 +1085,19 @@ class ListPanelManager: ObservableObject {
             scrollDebounceTimers.removeValue(forKey: panel.level)
             scrollingPanels.remove(panel.level)
             currentlyHoveredNodeId.removeValue(forKey: panel.level)
+            hoveredRow.removeValue(forKey: panel.level)  // Also clear hover
         }
         
         panelStack.removeAll { $0.level > level }
         let removed = before - panelStack.count
         if removed > 0 {
             print("📋 [ListPanelManager] Popped \(removed) panel(s), now at level \(level)")
+            
+            // Reset activePanelLevel if we popped below it
+            if activePanelLevel > level {
+                activePanelLevel = level
+                print("📋 [ListPanelManager] Reset activePanelLevel to \(level)")
+            }
         }
         
         // Clear pending if it was for a level we're popping
