@@ -40,6 +40,9 @@ class HotkeyManager {
     /// Called when Right arrow is pressed while UI is visible
     var onArrowRight: (() -> Void)?
     
+    /// Called when a letter key is pressed while UI is visible
+    var onCharacterInput: ((String) -> Void)?
+    
     // MARK: - Configuration
     
     /// Key code for hold-to-show functionality (nil = disabled)
@@ -782,6 +785,20 @@ class HotkeyManager {
             default:
                 break
             }
+            
+            // Letter keys for type-ahead search (only when UI is visible)
+            // Allow only if no command/control/option modifiers (shift is ok for typing capitals)
+            let hasBlockingModifiers = !event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+            
+            if !hasBlockingModifiers,
+               let characters = event.charactersIgnoringModifiers?.lowercased(),
+               characters.count == 1,
+               let char = characters.first,
+               char.isLetter {
+                print("⌨️ [HotkeyManager] Letter key pressed: '\(characters)'")
+                onCharacterInput?(characters)
+                return true
+            }
         }
         
         // Find all registrations matching this keyCode
@@ -844,7 +861,6 @@ class HotkeyManager {
             return true
         }
     }
-    
     private func handleKeyUpEvent(_ event: NSEvent) {
         // Check if we have an active hold registration for this key
         guard let activeConfigId = activeHoldRegistration,
