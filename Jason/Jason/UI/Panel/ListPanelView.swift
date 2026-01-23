@@ -29,6 +29,8 @@ struct ListPanelView: View {
     // Expanded state from manager
     @Binding var expandedItemId: String?
     var hoveredRowIndex: Int?
+    var isKeyboardDriven: Bool = false
+
     
     // Configuration
     var panelWidth: CGFloat = 260
@@ -114,44 +116,67 @@ struct ListPanelView: View {
                         .frame(height: 1)
                 }
                 
-                // Item list
-                ScrollView(.vertical, showsIndicators: needsScroll) {
-                    VStack(spacing: 0) {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            ListPanelRow(
-                                item: item,
-                                iconSize: iconSize,
-                                rowHeight: rowHeight,
-                                isHovered: !isScrolling && hoveredRowIndex == index,
-                                isExpanded: expandedItemId == item.id,
-                                onLeftClick: { modifiers in
-                                    expandedItemId = nil
-                                    onItemLeftClick?(item, modifiers)
-                                },
-                                onRightClick: { modifiers in
-                                    onItemRightClick?(item, modifiers)
-                                },
-                                onContextAction: { action, modifiers in
-                                    expandedItemId = nil
-                                    onContextAction?(action, modifiers)
-                                }
-                            )
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: needsScroll) {
+                        VStack(spacing: 0) {
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                ListPanelRow(
+                                    item: item,
+                                    iconSize: iconSize,
+                                    rowHeight: rowHeight,
+                                    isHovered: !isScrolling && hoveredRowIndex == index,
+                                    isExpanded: expandedItemId == item.id,
+                                    onLeftClick: { modifiers in
+                                        expandedItemId = nil
+                                        onItemLeftClick?(item, modifiers)
+                                    },
+                                    onRightClick: { modifiers in
+                                        onItemRightClick?(item, modifiers)
+                                    },
+                                    onContextAction: { action, modifiers in
+                                        expandedItemId = nil
+                                        onContextAction?(action, modifiers)
+                                    }
+                                )
+                                .id(index)  // Add ID for ScrollViewReader
+                            }
+                        }
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear
+                                    .onChange(of: geo.frame(in: .named("panelScroll")).minY) { _, newValue in
+                                        handleScrollChange(-newValue)
+                                    }
+                            }
+                        )
+                    }
+                    .coordinateSpace(name: "panelScroll")
+                    .frame(maxHeight: CGFloat(maxVisibleItems) * rowHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 2))
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 4)
+                    .onChange(of: hoveredRowIndex) { oldIndex, newIndex in
+                        // Auto-scroll only when KEYBOARD navigates outside visible area
+                        guard isKeyboardDriven, let index = newIndex else { return }
+                        
+                        // Calculate which rows are currently visible
+                        let firstVisibleRow = Int(lastScrollOffset / rowHeight)
+                        let lastVisibleRow = firstVisibleRow + maxVisibleItems - 1
+                        
+                        // Only scroll if selection is outside visible range
+                        if index < firstVisibleRow {
+                            // Selection went above visible area - scroll up
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                proxy.scrollTo(index, anchor: .top)
+                            }
+                        } else if index > lastVisibleRow {
+                            // Selection went below visible area - scroll down
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                proxy.scrollTo(index, anchor: .bottom)
+                            }
                         }
                     }
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear
-                                .onChange(of: geo.frame(in: .named("panelScroll")).minY) { newValue in
-                                    handleScrollChange(-newValue)
-                                }
-                        }
-                    )
                 }
-                .coordinateSpace(name: "panelScroll")
-                .frame(maxHeight: CGFloat(maxVisibleItems) * rowHeight)
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 2))
-                .padding(.horizontal, 4)
-                .padding(.bottom, 4)
             }
         }
         .frame(width: panelWidth, height: panelHeight)

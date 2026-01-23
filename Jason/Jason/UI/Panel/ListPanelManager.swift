@@ -72,6 +72,14 @@ class ListPanelManager: ObservableObject {
     @Published var panelStack: [PanelState] = []
     @Published var hoveredRow: [Int: Int] = [:]
     
+    // MARK: - Keyboard Navigation State
+
+    /// Keyboard-selected row per panel level (nil = no keyboard selection)
+    @Published var keyboardSelectedRow: [Int: Int] = [:]
+
+    /// Whether keyboard is currently driving selection (vs mouse)
+    @Published var isKeyboardDriven: Bool = false
+    
     // MARK: - Sliding Configuration
     
     /// How much of the previous panel stays visible when overlapped
@@ -300,6 +308,57 @@ class ListPanelManager: ObservableObject {
         }
     }
     
+    // MARK: - Keyboard Navigation
+
+    /// Get the effective selected row for a panel level
+    /// Returns keyboard selection if keyboard is driving, otherwise mouse hover
+    func effectiveSelectedRow(for level: Int) -> Int? {
+        if isKeyboardDriven {
+            return keyboardSelectedRow[level]
+        } else {
+            return hoveredRow[level]
+        }
+    }
+
+    /// Move selection down in the specified panel level
+    func moveSelectionDown(in level: Int) {
+        guard let panel = panelStack.first(where: { $0.level == level }) else { return }
+        
+        let maxIndex = panel.items.count - 1
+        guard maxIndex >= 0 else { return }
+        
+        isKeyboardDriven = true
+        
+        let currentSelection = keyboardSelectedRow[level] ?? hoveredRow[level] ?? -1
+        let newSelection = min(currentSelection + 1, maxIndex)
+        
+        keyboardSelectedRow[level] = newSelection
+        print("⌨️ [Keyboard] Selection DOWN in level \(level): \(newSelection)")
+    }
+
+    /// Move selection up in the specified panel level
+    func moveSelectionUp(in level: Int) {
+        guard let panel = panelStack.first(where: { $0.level == level }) else { return }
+        guard !panel.items.isEmpty else { return }
+        
+        isKeyboardDriven = true
+        
+        let currentSelection = keyboardSelectedRow[level] ?? hoveredRow[level] ?? 0
+        let newSelection = max(currentSelection - 1, 0)
+        
+        keyboardSelectedRow[level] = newSelection
+        print("⌨️ [Keyboard] Selection UP in level \(level): \(newSelection)")
+    }
+
+    /// Reset to mouse-driven mode (called when mouse moves)
+    func resetToMouseMode() {
+        guard isKeyboardDriven else { return }
+        
+        isKeyboardDriven = false
+        keyboardSelectedRow.removeAll()
+        print("🖱️ [Keyboard] Reset to mouse mode")
+    }
+    
     // MARK: - Scroll Offset Updates
     
     /// Update scroll offset for a panel at the given level
@@ -448,11 +507,8 @@ class ListPanelManager: ObservableObject {
     // MARK: - Mouse Movement Tracking
 
     func handleMouseMove(at point: CGPoint) {
-        // DEBUG
-        for panel in panelStack {
-            let bounds = currentBounds(for: panel)
-            print("🔍 [Hover] Panel \(panel.level) isOverlapping:\(panel.isOverlapping) bounds: x=\(Int(bounds.minX))-\(Int(bounds.maxX)) y=\(Int(bounds.minY))-\(Int(bounds.maxY)) | mouse: x=\(Int(point.x)) y=\(Int(point.y))")
-        }
+        // Reset to mouse-driven selection when mouse moves
+        resetToMouseMode()
         
         // Track hover state for each panel (check topmost first)
         var pointHandled = false

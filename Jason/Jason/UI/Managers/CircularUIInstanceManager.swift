@@ -338,9 +338,44 @@ class CircularUIInstanceManager: ObservableObject {
         print("[InstanceManager] Registration complete!")
     }
     
-    /// Start monitoring for hotkeys
+    
+    
     func startHotkeyMonitoring() {
         print("🎹 [InstanceManager] Starting hotkey monitoring...")
+        
+        // Wire up UI visibility check
+        hotkeyManager.isUIVisible = { [weak self] in
+            return self?.hasVisibleInstance ?? false
+        }
+        
+        // Wire up hide callback (for Escape key)
+        hotkeyManager.onHide = { [weak self] in
+            self?.hideActive()
+        }
+        
+        // Wire up arrow key callbacks for panel navigation
+        hotkeyManager.onArrowDown = { [weak self] in
+            guard let instance = self?.getActiveInstance(),
+                  let panelManager = instance.listPanelManager,
+                  panelManager.isVisible else { return }
+            
+            // Navigate in the topmost panel (highest level)
+            if let topmostPanel = panelManager.panelStack.last {
+                panelManager.moveSelectionDown(in: topmostPanel.level)
+            }
+        }
+        
+        hotkeyManager.onArrowUp = { [weak self] in
+            guard let instance = self?.getActiveInstance(),
+                  let panelManager = instance.listPanelManager,
+                  panelManager.isVisible else { return }
+            
+            // Navigate in the topmost panel (highest level)
+            if let topmostPanel = panelManager.panelStack.last {
+                panelManager.moveSelectionUp(in: topmostPanel.level)
+            }
+        }
+        
         hotkeyManager.startMonitoring()
     }
     

@@ -118,8 +118,8 @@ struct CircularUIView: View {
                         },
                         contextActions: panel.contextActions,
                         expandedItemId: expandedItemIdBinding(for: panel.level),
-                        hoveredRowIndex: listPanelManager.hoveredRow[panelLevel]
-                        
+                        hoveredRowIndex: listPanelManager.effectiveSelectedRow(for: panelLevel),
+                        isKeyboardDriven: listPanelManager.isKeyboardDriven 
                     )
                     .position(x: panelLocalX, y: panelSwiftUIY)
                         

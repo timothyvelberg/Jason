@@ -28,6 +28,12 @@ class HotkeyManager {
     /// Query function to check if in app switcher mode
     var isInAppSwitcherMode: (() -> Bool)?
     
+    /// Called when Up arrow is pressed while UI is visible
+    var onArrowUp: (() -> Void)?
+
+    /// Called when Down arrow is pressed while UI is visible
+    var onArrowDown: (() -> Void)?
+    
     // MARK: - Configuration
     
     /// Key code for hold-to-show functionality (nil = disabled)
@@ -38,8 +44,6 @@ class HotkeyManager {
     private var wasShiftPressed: Bool = false
     private var wasCtrlPressed: Bool = false
     private var requiresReleaseBeforeNextShow: Bool = false  // Prevents re-show while key still held
-    
-    /// Currently active hold-mode registration (configId, for keyUp handling)
     private var activeHoldRegistration: Int? = nil
     
     // MARK: - Dynamic Shortcuts
@@ -49,7 +53,6 @@ class HotkeyManager {
     
     /// Registered trackpad gestures: [configId: (direction, fingerCount, modifierFlags, callback)]
     private var registeredSwipes: [Int: (direction: String, fingerCount: Int, modifierFlags: UInt, callback: () -> Void)] = [:]
-    
     private var registeredShortcuts: [Int: KeyboardRegistration] = [:]
 
     struct KeyboardRegistration {
@@ -95,6 +98,7 @@ class HotkeyManager {
         stopMonitoring()
         print("[HotkeyManager] Deallocated")
     }
+    
     
     // MARK: - Public Interface
     
@@ -746,6 +750,22 @@ class HotkeyManager {
             print("⌨️ [HotkeyManager] Escape pressed")
             onHide?()
             return true
+        }
+        
+        // Arrow keys (only when UI is visible)
+        if isUIVisible {
+            switch event.keyCode {
+            case 125:  // Down arrow
+                print("⌨️ [HotkeyManager] Down arrow pressed")
+                onArrowDown?()
+                return true
+            case 126:  // Up arrow
+                print("⌨️ [HotkeyManager] Up arrow pressed")
+                onArrowUp?()
+                return true
+            default:
+                break
+            }
         }
         
         // Find all registrations matching this keyCode
