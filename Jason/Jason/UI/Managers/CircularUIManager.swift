@@ -255,17 +255,27 @@ class CircularUIManager: ObservableObject {
                 self?.hide()
             }
             
-            mouseTracker?.onPieHover = { [weak functionManager] pieIndex in
+            mouseTracker?.onPieHover = { [weak self, weak functionManager] pieIndex in
+                guard let self = self else { return }
+                if self.shouldIgnoreRingMouseEvents() { return }
+                
                 if let functionManager = functionManager, let pieIndex = pieIndex {
                     functionManager.hoverNode(ringLevel: functionManager.activeRingLevel, index: pieIndex)
                 }
             }
+            
             mouseTracker?.onCollapse = { [weak self] in
-                self?.listPanelManager?.hide()
+                guard let self = self else { return }
+                if self.shouldIgnoreRingMouseEvents() { return }
+                
+                self.listPanelManager?.hide()
             }
             
             mouseTracker?.onReturnedInsideBoundary = { [weak self] in
-                self?.listPanelManager?.hide()
+                guard let self = self else { return }
+                if self.shouldIgnoreRingMouseEvents() { return }
+                
+                self.listPanelManager?.hide()
             }
             
             mouseTracker?.isMouseInPanel = { [weak self] in
@@ -276,6 +286,7 @@ class CircularUIManager: ObservableObject {
             
             mouseTracker?.onExpandToPanel = { [weak self] node, angle, ringCenter, ringOuterRadius in
                 guard let self = self else { return }
+                if self.shouldIgnoreRingMouseEvents() { return }
                 
                 // Extract identity from node
                 let providerId = node.providerId
@@ -482,6 +493,12 @@ class CircularUIManager: ObservableObject {
     }
     
     // MARK: - Gesture Handlers (Click, Drag, Scroll)
+    
+    private func shouldIgnoreRingMouseEvents() -> Bool {
+        guard let panelManager = listPanelManager else { return false }
+        return panelManager.isVisible && panelManager.isKeyboardDriven
+    }
+    
     
     private func handleLeftClick(event: GestureManager.GestureEvent) {
         // Check if click is inside the panel
