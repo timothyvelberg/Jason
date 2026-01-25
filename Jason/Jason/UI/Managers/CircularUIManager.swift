@@ -35,6 +35,7 @@ class CircularUIManager: ObservableObject {
     
     var isInAppSwitcherMode: Bool = false
     var isInHoldMode: Bool = false
+    var inputCoordinator: InputCoordinator?
     
     var listPanelManager: ListPanelManager?
     
@@ -190,6 +191,10 @@ class CircularUIManager: ObservableObject {
         self.listPanelManager = ListPanelManager()
         print("   ListPanelManager initialized")
         
+        // Create InputCoordinator
+        self.inputCoordinator = InputCoordinator()
+        print("   InputCoordinator initialized")
+        
         // Create provider factory
         let factory = ProviderFactory(
             circularUIManager: self,
@@ -251,6 +256,9 @@ class CircularUIManager: ObservableObject {
         if let functionManager = functionManager {
             self.mouseTracker = MouseTracker(functionManager: functionManager)
             
+            mouseTracker?.inputCoordinator = inputCoordinator
+            listPanelManager?.inputCoordinator = inputCoordinator
+            
             mouseTracker?.onExecuteAction = { [weak self] in
                 self?.hide()
             }
@@ -304,6 +312,7 @@ class CircularUIManager: ObservableObject {
                         contentIdentifier: contentIdentifier,
                         screen: self.overlayWindow?.currentScreen
                     )
+                    self.inputCoordinator?.focusPanel(level: 0)
                     self.mouseTracker?.pauseUntilMovement()
                     return
                 }
@@ -337,6 +346,7 @@ class CircularUIManager: ObservableObject {
                             contentIdentifier: contentIdentifier,
                             screen: self.overlayWindow?.currentScreen
                         )
+                        self.inputCoordinator?.focusPanel(level: 0)
                         self.mouseTracker?.pauseUntilMovement()
                     }
                 }
@@ -453,6 +463,18 @@ class CircularUIManager: ObservableObject {
                 print("[Panel Reload] Got \(freshChildren.count) items")
                 
                 return freshChildren
+            }
+            
+            listPanelManager?.onExitToRing = { [weak self] in
+                guard let self = self, let functionManager = self.functionManager else { return }
+                
+                // Clear panels
+                self.listPanelManager?.hide()
+                
+                // Set focus back to ring
+                self.inputCoordinator?.focusRing(level: functionManager.activeRingLevel)
+                
+                print("[CircularUIManager] Keyboard exit to ring level \(functionManager.activeRingLevel)")
             }
 
             self.gestureManager = GestureManager()
@@ -1172,6 +1194,9 @@ class CircularUIManager: ObservableObject {
         mouseTracker?.startTrackingMouse()
         gestureManager?.startMonitoring()
         
+        // Set initial focus to ring
+        inputCoordinator?.focusRing(level: functionManager.activeRingLevel)
+        
         if let providerId = providerId {
             print("   Expanded to category: \(providerId)")
         }
@@ -1218,6 +1243,8 @@ class CircularUIManager: ObservableObject {
         // Reset all state for clean slate on next show
         functionManager?.reset()
         listPanelManager?.hide()
+        inputCoordinator?.reset()
+
         
         // Close any open preview
         QuickLookManager.shared.hidePreview()

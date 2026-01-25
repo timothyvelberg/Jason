@@ -18,7 +18,8 @@ class MouseTracker {
     internal var ringLevelAtPause: Int?
     private var lastExecutedNodeId: String?
     private var wasOutsideBoundary: Bool = false
-
+    
+    weak var inputCoordinator: InputCoordinator?
     
     var onPieHover: ((Int?) -> Void)?
     var onCollapse: (() -> Void)?
@@ -28,7 +29,6 @@ class MouseTracker {
     private var functionManager: FunctionManager
 
     var mouseAngleOffset: CGFloat = 0
-    
     var onExpandToPanel: ((_ node: FunctionNode, _ angle: Double, _ ringCenter: CGPoint, _ ringOuterRadius: CGFloat) -> Void)?
 
     init(functionManager: FunctionManager) {
@@ -93,9 +93,20 @@ class MouseTracker {
     }
 
     private func trackMousePosition(distance: CGFloat) {
+        
         guard let start = trackingStartPoint else { return }
 
         let current = NSEvent.mouseLocation
+        
+        // Report movement to InputCoordinator (may switch from keyboard to mouse mode)
+        if let coordinator = inputCoordinator {
+            coordinator.handleMouseMoved(to: current)
+            
+            // If still in keyboard mode after reporting, don't process
+            if !coordinator.isMouseTrackingEnabled() {
+                return
+            }
+        }
         
         // Skip ALL tracking if mouse is inside a panel
         if let inPanel = isMouseInPanel, inPanel() {

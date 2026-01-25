@@ -24,7 +24,6 @@ struct PanelState: Identifiable {
     let spawnAngle: Double?
     let contextActions: [FunctionNode]?
     
-    
     //Identity tracking for updates
     let providerId: String?
     
@@ -82,7 +81,9 @@ class ListPanelManager: ObservableObject {
     @Published var keyboardSelectedRow: [Int: Int] = [:]
 
     /// Whether keyboard is currently driving selection (vs mouse)
-    @Published var isKeyboardDriven: Bool = false
+    var isKeyboardDriven: Bool {
+        inputCoordinator?.inputMode == .keyboard
+    }
     
     
     // MARK: - Type-Ahead Search State
@@ -134,8 +135,9 @@ class ListPanelManager: ObservableObject {
     private(set) var currentRingOuterRadius: CGFloat = 0
     private(set) var currentAngle: Double = 0
     private var currentScreen: NSScreen?
-
     
+    weak var inputCoordinator: InputCoordinator?
+
     // MARK: - Pending Panel (waiting for arming)
 
     private var pendingPanel: (
@@ -163,6 +165,9 @@ class ListPanelManager: ObservableObject {
     
     /// Callback to reload content for a panel
     var onReloadContent: ((String, String?) async -> [FunctionNode])?
+    
+    /// Callback when user exits beyond panel level 0 (back to ring)
+    var onExitToRing: (() -> Void)?
     
     
     // MARK: - Initialization
@@ -342,7 +347,7 @@ class ListPanelManager: ObservableObject {
             print("[TypeAhead] Found match at index \(index): '\(items[index].name)'")
             
             // Update selection
-            isKeyboardDriven = true
+            inputCoordinator?.switchToKeyboard()
             keyboardSelectedRow[activePanelLevel] = index
             
             // Close any existing preview
@@ -438,7 +443,8 @@ class ListPanelManager: ObservableObject {
         
         // Move focus to preview (now becomes active)
         activePanelLevel = previewLevel
-        isKeyboardDriven = true
+        inputCoordinator?.switchToKeyboard()
+        inputCoordinator?.focusPanel(level: previewLevel)
         
         // Select first row in new active panel
         keyboardSelectedRow[activePanelLevel] = 0
@@ -460,7 +466,9 @@ class ListPanelManager: ObservableObject {
     /// Exit to parent panel (← arrow) - close current active, parent becomes active
     func exitToParentPanel() {
         guard activePanelLevel > 0 else {
-            print("[Keyboard] Already at root panel - cannot exit")
+            print("[Keyboard] At root panel - exiting to ring")
+            inputCoordinator?.switchToKeyboard()
+            onExitToRing?()
             return
         }
         
@@ -471,7 +479,8 @@ class ListPanelManager: ObservableObject {
         
         // Move focus back to parent
         activePanelLevel = parentLevel
-        isKeyboardDriven = true
+        inputCoordinator?.switchToKeyboard()
+        inputCoordinator?.focusPanel(level: parentLevel)
         
         // Un-overlap the parent (it's now active, not background)
         if let parentIndex = panelStack.firstIndex(where: { $0.level == parentLevel }) {
@@ -555,7 +564,7 @@ class ListPanelManager: ObservableObject {
         let newSelection = min(currentSelection + 1, maxIndex)
         
         // Update state
-        isKeyboardDriven = true
+        inputCoordinator?.switchToKeyboard()
         keyboardSelectedRow[level] = newSelection
         
         print("[Keyboard] Selection DOWN in level \(level): \(newSelection)")
@@ -576,6 +585,7 @@ class ListPanelManager: ObservableObject {
     
     /// Move selection up in the active panel
     func moveSelectionUp(in level: Int) {
+        print("[DEBUG] inputCoordinator is \(inputCoordinator == nil ? "nil" : "set")")
         // Only allow navigation in the active panel
         guard level == activePanelLevel else {
             print("[Keyboard] Ignoring - level \(level) is not active (\(activePanelLevel))")
@@ -598,7 +608,7 @@ class ListPanelManager: ObservableObject {
         let newSelection = max(currentSelection - 1, 0)
         
         // Update state
-        isKeyboardDriven = true
+        inputCoordinator?.switchToKeyboard()
         keyboardSelectedRow[level] = newSelection
         
         print("[Keyboard] Selection UP in level \(level): \(newSelection)")
@@ -617,11 +627,10 @@ class ListPanelManager: ObservableObject {
         onItemHover?(selectedNode, level, newSelection)
     }
 
-    /// Reset to mouse-driven mode (called when mouse moves)
+    /// Clear keyboard selection state (called when switching to mouse mode)
     func resetToMouseMode() {
         guard isKeyboardDriven else { return }
         
-        isKeyboardDriven = false
         keyboardSelectedRow.removeAll()
         print("[Keyboard] Reset to mouse mode")
     }
@@ -774,8 +783,19 @@ class ListPanelManager: ObservableObject {
     // MARK: - Mouse Movement Tracking
 
     func handleMouseMove(at point: CGPoint) {
-        // Reset to mouse-driven selection when mouse moves
-        resetToMouseMode()
+        // Let InputCoordinator decide if this movement should switch to mouse mode
+        if let coordinator = inputCoordinator {
+            let didSwitch = coordinator.handleMouseMoved(to: point)
+            if didSwitch {
+                resetToMouseMode()
+            } else if coordinator.inputMode == .keyboard {
+                // Still in keyboard mode - don't process mouse hover
+                return
+            }
+        } else {
+            // Fallback: old behavior if no coordinator
+            resetToMouseMode()
+        }
         
         // Track hover state for each panel (check topmost first)
         var pointHandled = false
@@ -1153,7 +1173,6 @@ class ListPanelManager: ObservableObject {
         // Reset keyboard navigation state
         activePanelLevel = 0
         keyboardSelectedRow.removeAll()
-        isKeyboardDriven = false
         currentlyHoveredNodeId.removeAll()
         
         resetTypeAheadSearch()
@@ -1172,7 +1191,6 @@ class ListPanelManager: ObservableObject {
         currentlyHoveredNodeId.removeAll()
         
         keyboardSelectedRow.removeAll()
-        isKeyboardDriven = false
     }
     
     /// Alias for hide (clearer intent)
