@@ -136,11 +136,6 @@ class RingConfigurationCalculator {
         let ringMargin: CGFloat = 2
         var currentRadius = centerHoleRadius
         
-        print("   Base configuration:")
-        print("      centerHoleRadius: \(centerHoleRadius)")
-        print("      ringThickness: \(ringThickness)")
-        print("      iconSize: \(iconSize)")
-        
         for (index, ringState) in rings.enumerated() {
             print("🔧 [Ring \(index)] Processing ring with \(ringState.nodes.count) node(s), collapsed: \(ringState.isCollapsed)")
             
@@ -156,7 +151,7 @@ class RingConfigurationCalculator {
             if ringState.isCollapsed {
                 thisRingThickness = collapsedRingThickness
                 thisIconSize = collapsedIconSize
-                print("📦 Ring \(index) is COLLAPSED: thickness=\(thisRingThickness), iconSize=\(thisIconSize)")
+                print("Ring \(index) is COLLAPSED: thickness=\(thisRingThickness), iconSize=\(thisIconSize)")
                 
                 if let existingSliceConfig = ringState.sliceConfig,
                    existingSliceConfig.itemCount == nodes.count {
@@ -272,12 +267,6 @@ class RingConfigurationCalculator {
             ))
             currentRadius += thisRingThickness + ringMargin
         }
-        
-        print("🔧 [calculateRingConfigurations] COMPLETE - Generated \(configs.count) ring configuration(s)")
-        for (idx, config) in configs.enumerated() {
-            print("   Ring \(idx): startRadius=\(String(format: "%.0f", config.startRadius)), thickness=\(String(format: "%.0f", config.thickness)), nodes=\(config.nodes.count)")
-        }
-        
         return configs
     }
     

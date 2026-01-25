@@ -69,10 +69,6 @@ class FunctionManager: ObservableObject {
         self.providers = []
         let appsProvider = FavoriteAppsProvider()
         self.favoriteAppsProvider = appsProvider
-        
-        print("🎯 [FunctionManager] Initialized with:")
-        print("   - Ring Thickness: \(ringThickness)px")
-        print("   - Icon Size: \(iconSize)px")
     }
     
     // MARK: - Computed Properties for UI

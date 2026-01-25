@@ -35,7 +35,7 @@ struct ContentView: View {
     }
     
     private func setupApplication() {
-        print("🚀 [ContentView] Application setup starting...")
+        print("[ContentView] Application setup starting...")
         
         // Step 1: Ensure default configuration exists (first launch)
         FirstLaunchConfiguration.ensureDefaultConfiguration()
@@ -61,7 +61,7 @@ struct ContentView: View {
             instance.setup()
         }
         
-        print("   ✅ Setup complete - \(instanceManager.instances.count) instance(s) ready")
+        print("   Setup complete - \(instanceManager.instances.count) instance(s) ready")
         
         // Mark setup as complete
         isSetupComplete = true

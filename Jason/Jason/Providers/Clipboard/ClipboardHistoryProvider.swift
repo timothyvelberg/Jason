@@ -32,7 +32,7 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
     // MARK: - Initialization
     
     init() {
-        print("📋 [ClipboardHistoryProvider] Initialized")
+        print("[ClipboardHistoryProvider] Initialized")
     }
     
     // MARK: - FunctionProvider Methods

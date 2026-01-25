@@ -33,7 +33,7 @@ class CircularUIInstanceManager: ObservableObject {
     // MARK: - Initialization
     
     private init() {
-        print("🎛️ [InstanceManager] Initialized")
+        print("[Circular InstanceManager] Initialized")
     }
     
     // MARK: - Instance Creation
@@ -67,7 +67,7 @@ class CircularUIInstanceManager: ObservableObject {
         
         // Setup the instance so it's ready to use immediately
         instance.setup()
-        print("   ✅ Instance created and setup complete")
+        print("   Instance created and setup complete")
     }
     
     // MARK: - Instance Retrieval
@@ -194,7 +194,7 @@ class CircularUIInstanceManager: ObservableObject {
 
     /// Register keyboard shortcuts and mouse buttons for all active instances
     func registerInputTriggers() {
-        print("⌨️ [InstanceManager] Registering input triggers for all instances...")
+        print("[InstanceManager] Registering input triggers for all instances...")
         
         // Unregister existing first
         hotkeyManager.unregisterAllShortcuts()
@@ -331,7 +331,7 @@ class CircularUIInstanceManager: ObservableObject {
             
             // Only skip if NO triggers are configured
             if !hasKeyboardShortcut && !hasMouseButton {
-                print("   ⏭️ Skipping '\(config.name)' - no triggers configured")
+                print("   Skipping '\(config.name)' - no triggers configured")
             }
         }
         
@@ -341,7 +341,7 @@ class CircularUIInstanceManager: ObservableObject {
     
     
     func startHotkeyMonitoring() {
-        print("🎹 [InstanceManager] Starting hotkey monitoring...")
+        print("[InstanceManager] Starting hotkey monitoring...")
         
         // Wire up UI visibility check
         hotkeyManager.isUIVisible = { [weak self] in

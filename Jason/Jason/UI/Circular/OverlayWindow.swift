@@ -133,17 +133,13 @@ class OverlayWindow: NSWindow {
         // Different thresholds for different devices
         let scrollThreshold: CGFloat = isTrackpad ? 0.9 : 0.1
         
-        print("🎡 [OverlayWindow] \(deviceName) scroll: deltaY=\(event.deltaY), threshold=\(scrollThreshold)")
-        
         // Ignore trackpad momentum scrolling (inertial scrolling after lifting fingers)
         if isTrackpad && !event.momentumPhase.isEmpty {
-//            print("⏩ Ignoring trackpad momentum scroll")
             return
         }
         
         // Scroll down (positive deltaY) = go back/collapse
         if event.deltaY > scrollThreshold {
-            print("🔙 Scroll DOWN (\(deviceName)) - collapsing ring")
             onScrollBack?()
         }
         // Scroll up (negative deltaY) = could be used for something else
@@ -157,18 +153,18 @@ class OverlayWindow: NSWindow {
     
     //Detect when window loses focus
     override func resignKey() {
-        print("🔴 [OverlayWindow] Window lost focus")
+        print("[OverlayWindow] Window lost focus")
         super.resignKey()
         
         // Don't hide if we're ignoring focus changes (app quit/launch in progress)
         if shouldIgnoreFocusChanges {
-            print("   🔇 Ignoring focus change (app operation in progress)")
+            print("   Ignoring focus change (app operation in progress)")
             return
         }
         
         // Don't hide if Quick Look is showing - it steals focus but we want to stay visible
         if QuickLookManager.shared.isShowing {
-            print("   👁️ Quick Look is visible - keeping UI open")
+            print("   Quick Look is visible - keeping UI open")
             return
         }
         
@@ -184,7 +180,7 @@ class OverlayWindow: NSWindow {
     
     // Handle keyboard events - FIXED: Don't call super to prevent beep
     override func keyDown(with event: NSEvent) {
-        print("🎯 OverlayWindow received key: \(event.keyCode)")
+        print("OverlayWindow received key: \(event.keyCode)")
         
         let isCtrlPressed = event.modifierFlags.contains(.control)
         let isShiftPressed = event.modifierFlags.contains(.shift)
@@ -200,7 +196,7 @@ class OverlayWindow: NSWindow {
         if isCtrlPressed && isShiftPressed && isKKey {
             // Shortcut is being handled by CircularUIManager
             // Just consume it here to prevent beep
-            print("🎯 OverlayWindow consuming Ctrl+Shift+K (no beep)")
+            print("OverlayWindow consuming Ctrl+Shift+K (no beep)")
             return  // Consumed - no beep
         }
         
@@ -210,7 +206,7 @@ class OverlayWindow: NSWindow {
     
     // Override rightMouseDown to ensure it reaches event monitors
     override func rightMouseDown(with event: NSEvent) {
-        print("🖱️ [OverlayWindow] rightMouseDown detected at: \(event.locationInWindow)")
+        print("[OverlayWindow] rightMouseDown detected at: \(event.locationInWindow)")
         
         // CRITICAL: Call super to allow the event to propagate to local monitors
         super.rightMouseDown(with: event)
@@ -218,13 +214,13 @@ class OverlayWindow: NSWindow {
         // Also manually notify global monitors since NSHostingView might block it
         // Convert to screen coordinates for our gesture manager
         let screenLocation = NSEvent.mouseLocation
-        print("🖱️ [OverlayWindow] Right-click at screen location: \(screenLocation)")
+        print("[OverlayWindow] Right-click at screen location: \(screenLocation)")
     }
     
     
     // Log mouse events for debugging
     override func mouseDown(with event: NSEvent) {
-        print("🖱️ [OverlayWindow] mouseDown detected at: \(event.locationInWindow)")
+        print("[OverlayWindow] mouseDown detected at: \(event.locationInWindow)")
         super.mouseDown(with: event)
     }
 }

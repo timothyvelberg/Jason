@@ -60,7 +60,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     // MARK: - Initialization
     
     init() {
-        print("🔄 CombinedAppsProvider initialized")
+        print("CombinedAppsProvider initialized")
         loadApps()
     }
     
@@ -157,9 +157,6 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         let runningCount = entries.filter { $0.isRunning }.count
         
         print("[CombinedApps] Total apps: \(appEntries.count)")
-        print("   Favorites: \(favoriteCount)")
-        print("   Running: \(runningCount)")
-        print("   Display order maintained: \(displayedBundleIds.count) items")
     }
     
     private func createAppEntry(

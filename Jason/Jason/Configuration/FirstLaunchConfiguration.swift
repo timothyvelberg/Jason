@@ -59,11 +59,11 @@ class FirstLaunchConfiguration {
         
         // If any configurations exist, we're done
         guard existingConfigs.isEmpty else {
-            print("✅ [FirstLaunch] Configurations already exist (\(existingConfigs.count))")
+            print("[FirstLaunch] Configurations already exist (\(existingConfigs.count))")
             return
         }
         
-        print("🆕 [FirstLaunch] No configurations found - creating default 'Everything' ring")
+        print("[FirstLaunch] No configurations found - creating default 'Everything' ring")
         
         // Create default "Everything" ring with Cmd+Shift+SpaceCmd+Shift+SpaceCmd+Shift+SpaceCmd+Shift+Space
         do {
@@ -98,10 +98,10 @@ class FirstLaunchConfiguration {
             )
             
             print("   Created '\(appsDirectRing.name)' - \(appsDirectRing.shortcutDescription)")
-            print("   ✅ Created default configurations")
+            print("   Created default configurations")
             
         } catch {
-            print("   ❌ Failed to create default configuration: \(error)")
+            print("   Failed to create default configuration: \(error)")
             
             // This is a critical error - app can't function without at least one ring
             fatalError("Failed to create default ring configuration: \(error)")
@@ -114,7 +114,7 @@ class FirstLaunchConfiguration {
     static func createExampleConfigurations() {
         let configManager = RingConfigurationManager.shared
         
-        print("🎨 [FirstLaunch] Creating example configurations...")
+        print("[FirstLaunch] Creating example configurations...")
         
         do {
             let folderRing = try configManager.createConfiguration(
@@ -129,7 +129,7 @@ class FirstLaunchConfiguration {
                     (type: "FavoriteFolderProvider", order: 1, displayMode: "direct", angle: nil)
                 ]
             )
-            print("   ✅ Created '\(folderRing.name)' - \(folderRing.shortcutDescription)")
+            print("   Created '\(folderRing.name)' - \(folderRing.shortcutDescription)")
 
             
             let filesRing = try configManager.createConfiguration(
@@ -144,7 +144,7 @@ class FirstLaunchConfiguration {
                     (type: "FavoriteFilesProvider", order: 1, displayMode: "direct", angle: nil)
                 ]
             )
-            print("   ✅ Created '\(filesRing.name)' - \(filesRing.shortcutDescription)")
+            print("   Created '\(filesRing.name)' - \(filesRing.shortcutDescription)")
   
             let everythingDirectRing = try configManager.createConfiguration(
                 name: "Everything Direct",
@@ -159,26 +159,21 @@ class FirstLaunchConfiguration {
                     (type: "FavoriteFolderProvider", order: 2, displayMode: "direct", nil)
                 ]
             )
-            print("   ✅ Created '\(everythingDirectRing.name)' - \(everythingDirectRing.shortcutDescription)")
-
-            
             // Reload configurations after all database updates
             // This ensures the in-memory configs reflect all displayMode changes
             configManager.loadConfigurations()
             
-            print("   example configurations")
         } catch {
-            print("   ⚠️ Failed to create some example configurations: \(error)")
+            print("   Failed to create some example configurations: \(error)")
         }
     }
     
     /// Reset all configurations and recreate defaults
-    /// ⚠️ WARNING: This deletes ALL existing configurations!
     @MainActor
     static func resetToDefaults() {
         let configManager = RingConfigurationManager.shared
         
-        print("🔄 [FirstLaunch] Resetting to default configuration...")
+        print("[FirstLaunch] Resetting to default configuration...")
         
         // Load all existing configs
         configManager.loadConfigurations()
@@ -188,15 +183,15 @@ class FirstLaunchConfiguration {
         for config in existingConfigs {
             do {
                 try configManager.deleteConfiguration(id: config.id)
-                print("   🗑️ Deleted configuration: \(config.name)")
+                print("   Deleted configuration: \(config.name)")
             } catch {
-                print("   ❌ Failed to delete \(config.name): \(error)")
+                print("   Failed to delete \(config.name): \(error)")
             }
         }
         
         // Recreate default
         ensureDefaultConfiguration()
         
-        print("   ✅ Reset complete")
+        print("   Reset complete")
     }
 }

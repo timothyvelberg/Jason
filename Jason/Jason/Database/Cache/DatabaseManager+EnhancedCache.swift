@@ -65,7 +65,7 @@ extension DatabaseManager {
             return
         }
         
-        print("✅ [EnhancedCache] Database pointer is valid: \(db)")
+        print("[EnhancedCache] Database pointer is valid: \(db)")
         
         // Enhanced folder contents table
         let createEnhancedContentsTable = """
@@ -92,10 +92,10 @@ extension DatabaseManager {
         """
         
         if sqlite3_exec(db, createEnhancedContentsTable, nil, nil, nil) == SQLITE_OK {
-            print("[EnhancedCache] ✅ Created folder_contents_enhanced table")
+            print("[EnhancedCache]Created folder_contents_enhanced table")
         } else {
             let error = String(cString: sqlite3_errmsg(db))
-            print("[EnhancedCache] ❌ Failed to create table: \(error)")
+            print("[EnhancedCache]Failed to create table: \(error)")
         }
         
         // Create indexes for fast lookups
@@ -105,13 +105,13 @@ extension DatabaseManager {
         """
         
         if sqlite3_exec(db, createIndexes, nil, nil, nil) == SQLITE_OK {
-            print("[EnhancedCache] ✅ Created indexes")
+            print("[EnhancedCache] Created indexes")
         } else {
             let error = String(cString: sqlite3_errmsg(db))
-            print("[EnhancedCache] ❌ Failed to create indexes: \(error)")
+            print("[EnhancedCache] Failed to create indexes: \(error)")
         }
         
-        print("[EnhancedCache] 🎉 Enhanced cache tables ready!")
+        print("[EnhancedCache] Enhanced cache tables ready!")
     }
     
     // MARK: - Save Enhanced Cache
@@ -119,7 +119,7 @@ extension DatabaseManager {
     /// Save folder contents with thumbnails to enhanced cache
     func saveEnhancedFolderContents(folderPath: String, items: [EnhancedFolderItem]) {
         guard let db = db else {
-            print("❌ [EnhancedCache] Database not initialized")
+            print("[EnhancedCache] Database not initialized")
             return
         }
         
@@ -134,10 +134,10 @@ extension DatabaseManager {
                 sqlite3_bind_text(deleteStmt, 1, (folderPath as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(deleteStmt) == SQLITE_DONE {
-                    print("[EnhancedCache] 🗑️ Cleared old cache for: \(folderPath)")
+                    print("[EnhancedCache] Cleared old cache for: \(folderPath)")
                 } else {
                     let error = String(cString: sqlite3_errmsg(db))
-                    print("[EnhancedCache] ⚠️ Failed to clear old cache: \(error)")
+                    print("[EnhancedCache] Failed to clear old cache: \(error)")
                 }
             }
             sqlite3_finalize(deleteStmt)
@@ -154,7 +154,7 @@ extension DatabaseManager {
             var insertStmt: OpaquePointer?
             if sqlite3_prepare_v2(db, insertSQL, -1, &insertStmt, nil) != SQLITE_OK {
                 let error = String(cString: sqlite3_errmsg(db))
-                print("[EnhancedCache] ❌ Failed to prepare insert: \(error)")
+                print("[EnhancedCache] Failed to prepare insert: \(error)")
                 return
             }
             
@@ -199,7 +199,7 @@ extension DatabaseManager {
                     savedCount += 1
                 } else {
                     let error = String(cString: sqlite3_errmsg(db))
-                    print("[EnhancedCache] ⚠️ Failed to insert item '\(item.name)': \(error)")
+                    print("[EnhancedCache] Failed to insert item '\(item.name)': \(error)")
                 }
             }
             
@@ -212,13 +212,13 @@ extension DatabaseManager {
             
             sqlite3_finalize(insertStmt)
             
-            print("[EnhancedCache] 💾 Cached \(savedCount) items (\(thumbnailCount) with thumbnails) for: \(folderPath)")
+            print("[EnhancedCache] Cached \(savedCount) items (\(thumbnailCount) with thumbnails) for: \(folderPath)")
             DispatchQueue.main.async {
                 NotificationCenter.default.postProviderUpdate(
                     providerId: "finder-logic",
                     folderPath: folderPath
                 )
-                print("📢 Posted update notification for folder: \(folderPath)")
+                print("Posted update notification for folder: \(folderPath)")
             }
         }
     }
@@ -227,7 +227,7 @@ extension DatabaseManager {
     /// Get cached folder contents with thumbnails
     func getEnhancedCachedFolderContents(folderPath: String) -> [EnhancedFolderItem]? {
         guard let db = db else {
-            print("❌ [EnhancedCache] Database not initialized")
+            print("[EnhancedCache] Database not initialized")
             return nil
         }
         
@@ -244,7 +244,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
                 let error = String(cString: sqlite3_errmsg(db))
-                print("[EnhancedCache] ❌ Failed to prepare query: \(error)")
+                print("[EnhancedCache] Failed to prepare query: \(error)")
                 return nil
             }
             
@@ -298,7 +298,7 @@ extension DatabaseManager {
                 return nil
             }
             
-            print("[EnhancedCache] ⚡ Loaded \(items.count) items from enhanced cache")
+            print("[EnhancedCache] Loaded \(items.count) items from enhanced cache")
             return items
         }
     }
@@ -335,7 +335,7 @@ extension DatabaseManager {
             
             guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
                 let error = String(cString: sqlite3_errmsg(db))
-                print("[EnhancedCache] ❌ Failed to prepare timestamp query: \(error)")
+                print("[EnhancedCache] Failed to prepare timestamp query: \(error)")
                 return nil
             }
             
@@ -372,7 +372,7 @@ extension DatabaseManager {
             }
             sqlite3_finalize(countStmt)
             
-            print("[EnhancedCache] 🔍 Before DELETE: \(beforeCount) rows for '\(folderPath)'")
+            print("[EnhancedCache] Before DELETE: \(beforeCount) rows for '\(folderPath)'")
             
             // Now delete
             let sql = "DELETE FROM folder_contents_enhanced WHERE folder_path = ?;"
@@ -383,20 +383,20 @@ extension DatabaseManager {
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     let deletedRows = sqlite3_changes(db)
-                    print("[EnhancedCache] 🗑️ Invalidated cache for: \(folderPath)")
-                    print("[EnhancedCache] 🗑️ Deleted \(deletedRows) rows (expected \(beforeCount))")
+                    print("[EnhancedCache] Invalidated cache for: \(folderPath)")
+                    print("[EnhancedCache] Deleted \(deletedRows) rows (expected \(beforeCount))")
                     
                     // Verify deletion
                     if deletedRows == 0 && beforeCount > 0 {
-                        print("[EnhancedCache] ⚠️ WARNING: DELETE didn't remove any rows, but \(beforeCount) existed!")
+                        print("[EnhancedCache] WARNING: DELETE didn't remove any rows, but \(beforeCount) existed!")
                     }
                 } else {
                     let error = String(cString: sqlite3_errmsg(db))
-                    print("[EnhancedCache] ⚠️ Failed to invalidate: \(error)")
+                    print("[EnhancedCache] Failed to invalidate: \(error)")
                 }
             } else {
                 let error = String(cString: sqlite3_errmsg(db))
-                print("[EnhancedCache] ⚠️ Failed to prepare DELETE: \(error)")
+                print("[EnhancedCache] Failed to prepare DELETE: \(error)")
             }
             
             sqlite3_finalize(statement)
@@ -412,7 +412,7 @@ extension DatabaseManager {
             }
             sqlite3_finalize(afterStmt)
             
-            print("[EnhancedCache] ✅ After DELETE: \(afterCount) rows remaining")
+            print("[EnhancedCache] After DELETE: \(afterCount) rows remaining")
         }
     }
     

@@ -55,12 +55,12 @@ class MultitouchCoordinator {
             self?.processTouchFrame(frame)
         }
         
-        print("🎛️ [MultitouchCoordinator] Initialized")
+        print("[MultitouchCoordinator] Initialized")
     }
     
     deinit {
         stopMonitoring()
-        print("🎛️ [MultitouchCoordinator] Deallocated")
+        print("[MultitouchCoordinator] Deallocated")
     }
     
     // MARK: - Recognizer Management
@@ -79,13 +79,13 @@ class MultitouchCoordinator {
         }
         
         recognizers.append(recognizer)
-        print("🎛️ [MultitouchCoordinator] Added recognizer: \(recognizer.identifier)")
+        print("[MultitouchCoordinator] Added recognizer: \(recognizer.identifier)")
     }
     
     /// Remove a gesture recognizer by identifier
     func removeRecognizer(identifier: String) {
         recognizers.removeAll { $0.identifier == identifier }
-        print("🎛️ [MultitouchCoordinator] Removed recognizer: \(identifier)")
+        print("[MultitouchCoordinator] Removed recognizer: \(identifier)")
     }
     
     /// Get a recognizer by identifier
@@ -97,7 +97,7 @@ class MultitouchCoordinator {
     
     /// Start monitoring for gestures
     func startMonitoring() {
-        print("🎛️ [MultitouchCoordinator] Starting with \(recognizers.count) recognizer(s)...")
+        print("[MultitouchCoordinator] Starting with \(recognizers.count) recognizer(s)...")
         source.startMonitoring()
     }
     
@@ -105,7 +105,7 @@ class MultitouchCoordinator {
     func stopMonitoring() {
         source.stopMonitoring()
         resetAllRecognizers()
-        print("🎛️ [MultitouchCoordinator] Stopped")
+        print("[MultitouchCoordinator] Stopped")
     }
     
     /// Prepare for system sleep
@@ -130,7 +130,7 @@ class MultitouchCoordinator {
     
     private func handleGestureEvent(_ event: GestureEvent, from recognizer: GestureRecognizer) {
         if debugLogging {
-            print("🎛️ [MultitouchCoordinator] Gesture from \(recognizer.identifier): \(event.description)")
+            print("[MultitouchCoordinator] Gesture from \(recognizer.identifier): \(event.description)")
         }
         
         // Forward to unified callback

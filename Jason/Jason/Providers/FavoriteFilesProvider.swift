@@ -49,7 +49,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
     // MARK: - Initialization
     
     init() {
-        print("📁 FavoriteFilesProvider initialized")
+        print("FavoriteFilesProvider initialized")
 //        loadFiles()
     }
     

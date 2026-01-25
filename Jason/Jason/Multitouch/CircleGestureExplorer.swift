@@ -65,7 +65,7 @@ class CircleGestureExplorer {
             return
         }
         
-        print("🚀 [CircleExplorer] Starting monitoring...")
+        print("[CircleExplorer] Starting monitoring...")
         
         guard let deviceList = MTDeviceCreateList() else {
             print("❌ [CircleExplorer] Failed to get device list")

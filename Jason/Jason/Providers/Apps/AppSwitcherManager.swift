@@ -38,7 +38,7 @@ class AppSwitcherManager: ObservableObject {
     private var appUsageHistory: [pid_t] = [] // Track PIDs in MRU order
     
     private init() {
-        print("🔧 [AppSwitcherManager] Initializing SHARED instance")
+        print("[AppSwitcherManager] Initializing SHARED instance")
         checkAccessibilityPermission()
         setupServices()
         
@@ -57,7 +57,7 @@ class AppSwitcherManager: ObservableObject {
             object: nil
         )
         
-        print("✅ [AppSwitcherManager] Monitoring NSWorkspace for app changes")
+        print("[AppSwitcherManager] Monitoring NSWorkspace for app changes")
         
         // 🆕 ADDED: Start polling as backup (detects changes if notifications miss anything)
         startAutoRefresh()
@@ -69,7 +69,7 @@ class AppSwitcherManager: ObservableObject {
         let trusted = AXIsProcessTrusted()
         hasAccessibilityPermission = trusted
         
-        print("🔐 Accessibility permission check: \(trusted ? "✅ GRANTED" : "❌ DENIED")")
+        print("Accessibility permission check: \(trusted ? "GRANTED" : "DENIED")")
         
         if trusted {
             setupServices()
@@ -116,19 +116,19 @@ class AppSwitcherManager: ObservableObject {
             self?.loadRunningApplications()
         }
         
-        print("✅ Auto-refresh timer started (5 second backup polling)")
+        print("Auto-refresh timer started (5 second backup polling)")
     }
     
     public func stopAutoRefresh() {
         refreshTimer?.invalidate()
         refreshTimer = nil
-        print("🛑 Auto-refresh timer stopped")
+        print("Auto-refresh timer stopped")
     }
     
     func loadRunningApplications() {
         // Prevent re-entrant updates (race condition protection)
         guard !isUpdating else {
-            print("⏭️ [AppSwitcher] Update already in progress - skipping")
+            print("[AppSwitcher] Update already in progress - skipping")
             return
         }
         
@@ -213,13 +213,8 @@ class AppSwitcherManager: ObservableObject {
             // Post notifications for both AppSwitcher and CombinedApps providers
             DispatchQueue.main.async {
                 NotificationCenter.default.postProviderUpdate(providerId: "app-switcher")
-                print("📢 Posted update notification for app-switcher")
-                
                 NotificationCenter.default.postProviderUpdate(providerId: "combined-apps")
-                print("📢 Posted update notification for combined-apps")
             }
-            print("Applications changed: \(oldCount) → \(newCount)")
-            print("MRU Order: \(runningApps.prefix(5).map { $0.localizedName ?? "Unknown" }.joined(separator: " → "))")
         }
     }
     
@@ -232,7 +227,7 @@ class AppSwitcherManager: ObservableObject {
             return
         }
         
-        print("🚀 [AppSwitcherManager] App launched: \(app.localizedName ?? "Unknown")")
+        print("[AppSwitcherManager] App launched: \(app.localizedName ?? "Unknown")")
         
         // 🆕 Refresh badge cache (new app might have badges)
         DockBadgeReader.shared.forceRefresh()
@@ -246,7 +241,7 @@ class AppSwitcherManager: ObservableObject {
             return
         }
         
-        print("🛑 [AppSwitcherManager] App terminated: \(app.localizedName ?? "Unknown")")
+        print("[AppSwitcherManager] App terminated: \(app.localizedName ?? "Unknown")")
         
         // 🆕 Refresh badge cache (removes terminated app's badge)
         DockBadgeReader.shared.forceRefresh()
@@ -259,7 +254,6 @@ class AppSwitcherManager: ObservableObject {
     
     private func sortAppsByMRU(_ apps: [NSRunningApplication]) -> [NSRunningApplication] {
         // Note: This function now only gets called when there's an actual change
-        // So logging here is appropriate (won't spam console)
         print("Sorting apps by MRU. Usage history: \(appUsageHistory)")
         
         // Apps are already deduplicated by caller, but we still filter invalid PIDs
@@ -290,7 +284,7 @@ class AppSwitcherManager: ObservableObject {
         
         sortedApps.append(contentsOf: newApps)
         
-        print("🏁 Final sorted order: \(sortedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: " → "))")
+        print("Final sorted order: \(sortedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: " → "))")
         
         return sortedApps
     }
@@ -298,7 +292,7 @@ class AppSwitcherManager: ObservableObject {
     private func addToUsageHistory(_ pid: pid_t) {
         // Don't track invalid PIDs (safety check)
         guard pid > 0 else {
-            print("⚠️ Ignoring invalid PID in usage history")
+            print("Ignoring invalid PID in usage history")
             return
         }
         // Remove if already exists
@@ -321,7 +315,7 @@ class AppSwitcherManager: ObservableObject {
         
         // Don't record apps with invalid process IDs
         guard app.processIdentifier > 0 else {
-            print("⚠️ Skipping usage record for app with invalid PID")
+            print("Skipping usage record for app with invalid PID")
             return
         }
         
@@ -412,9 +406,9 @@ class AppSwitcherManager: ObservableObject {
         
         // Check if we have an active UI manager
         if activeCircularUIManager == nil {
-            print("⚠️ activeCircularUIManager is NIL! Cannot hide UI properly")
+            print("activeCircularUIManager is NIL! Cannot hide UI properly")
         } else {
-            print("✅ Calling hideAndSwitchTo on active instance...")
+            print("Calling hideAndSwitchTo on active instance...")
         }
         
         // Hide the circular UI and activate the selected app

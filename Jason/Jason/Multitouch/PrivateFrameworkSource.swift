@@ -28,12 +28,12 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
     // MARK: - Lifecycle
     
     init() {
-        print("🔌 [PrivateFrameworkSource] Initialized")
+        print("[PrivateFrameworkSource] Initialized")
     }
     
     deinit {
         stopMonitoring()
-        print("🔌 [PrivateFrameworkSource] Deallocated")
+        print("[PrivateFrameworkSource] Deallocated")
     }
     
     // MARK: - Protocol Methods
@@ -43,14 +43,14 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
         defer { deviceLock.unlock() }
         
         guard !isMonitoring else {
-            print("⚠️ [PrivateFrameworkSource] Already monitoring")
+            print("[PrivateFrameworkSource] Already monitoring")
             return
         }
         
-        print("🚀 [PrivateFrameworkSource] Starting...")
+        print("[PrivateFrameworkSource] Starting...")
         
         guard let deviceList = MTDeviceCreateList() else {
-            print("❌ [PrivateFrameworkSource] Failed to get device list")
+            print("[PrivateFrameworkSource] Failed to get device list")
             return
         }
         
@@ -70,15 +70,15 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
             MTDeviceStart(device, 0)
             
             devices.append(device)
-            print("   ✅ Registered \(deviceType) trackpad")
+            print("   Registered \(deviceType) trackpad")
         }
         
         if devices.isEmpty {
-            print("❌ [PrivateFrameworkSource] No devices found")
+            print("[PrivateFrameworkSource] No devices found")
         } else {
             isMonitoring = true
             PrivateFrameworkSource.shared = self
-            print("✅ [PrivateFrameworkSource] Monitoring started")
+            print("[PrivateFrameworkSource] Monitoring started")
         }
     }
     
@@ -88,7 +88,7 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
         
         guard isMonitoring else { return }
         
-        print("🛑 [PrivateFrameworkSource] Stopping...")
+        print("[PrivateFrameworkSource] Stopping...")
         
         for device in devices {
             MTUnregisterContactFrameCallback(device, privateFrameworkTouchCallback)
@@ -99,16 +99,16 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
         isMonitoring = false
         PrivateFrameworkSource.shared = nil
         
-        print("✅ [PrivateFrameworkSource] Stopped")
+        print("[PrivateFrameworkSource] Stopped")
     }
     
     func prepareForSleep() {
-        print("💤 [PrivateFrameworkSource] Preparing for sleep...")
+        print("[PrivateFrameworkSource] Preparing for sleep...")
         stopMonitoring()
     }
     
     func restartAfterWake() {
-        print("☀️ [PrivateFrameworkSource] Restarting after wake...")
+        print("[PrivateFrameworkSource] Restarting after wake...")
         
         deviceLock.lock()
         PrivateFrameworkSource.shared = nil

@@ -28,7 +28,7 @@ class ProviderFactory {
         
         // Log which AppSwitcherManager we're using
         if let manager = appSwitcherManager {
-            print("   [ProviderFactory] Using AppSwitcherManager: \(manager === AppSwitcherManager.shared ? "SHARED ✅" : "INSTANCE ⚠️")")
+            print("   [ProviderFactory] Using AppSwitcherManager: \(manager === AppSwitcherManager.shared ? "SHARED" : "INSTANCE")")
         }
     }
     
@@ -38,8 +38,6 @@ class ProviderFactory {
     /// - Parameter config: The provider configuration from the database
     /// - Returns: A provider instance conforming to FunctionProvider, or nil if type is unknown
     func createProvider(from config: ProviderConfiguration) -> (any FunctionProvider)? {
-        print("[ProviderFactory] Creating provider: \(config.providerType)")
-        
         let provider: (any FunctionProvider)?
         
         switch config.providerType {
@@ -65,14 +63,13 @@ class ProviderFactory {
             provider = createClipboardHistoryProvider(config: config)
             
         default:
-            print("⚠️ [ProviderFactory] Unknown provider type: \(config.providerType)")
             return nil
         }
         
         if provider != nil {
             print("   [ProviderFactory] created \(config.providerType)")
         } else {
-            print("   ❌ Failed to create \(config.providerType)")
+            print("   Failed to create \(config.providerType)")
         }
         
         return provider
@@ -82,14 +79,9 @@ class ProviderFactory {
     /// - Parameter configs: Array of provider configurations
     /// - Returns: Array of successfully created providers
     func createProviders(from configs: [ProviderConfiguration]) -> [any FunctionProvider] {
-        print("[ProviderFactory] Creating \(configs.count) provider(s)")
-        
         let providers = configs.compactMap { config -> (any FunctionProvider)? in
             return createProvider(from: config)
         }
-        
-        print("   Successfully created \(providers.count)/\(configs.count) provider(s)")
-        
         return providers
     }
     
@@ -101,25 +93,12 @@ class ProviderFactory {
         // Wire up dependencies
         provider.circularUIManager = circularUIManager
         provider.appSwitcherManager = appSwitcherManager  //This is now the shared instance
-        
-        // TODO: Apply parentItemAngle from config when provider supports it
-        // if let angle = config.parentItemAngle {
-        //     provider.parentItemAngle = angle
-        // }
-        
-        // TODO: Apply additional config parameters if needed
-        // if let customConfig = config.config {
-        //     // Apply provider-specific configuration
-        // }
-        
+    
         return provider
     }
     
     private func createClipboardHistoryProvider(config: ProviderConfiguration) -> ClipboardHistoryProvider? {
         let provider = ClipboardHistoryProvider()
-        
-        // ClipboardHistoryProvider doesn't need external dependencies
-        // ClipboardManager.shared is accessed internally
         
         return provider
     }
@@ -130,30 +109,17 @@ class ProviderFactory {
         // Wire up dependencies
         provider.circularUIManager = circularUIManager
         
-        // TODO: Apply parentItemAngle from config when provider supports it
-        // TODO: Apply additional config parameters if needed
-        
         return provider
     }
     
     private func createSystemActionsProvider(config: ProviderConfiguration) -> SystemActionsProvider? {
         let provider = SystemActionsProvider()
         
-        // SystemActionsProvider typically doesn't need dependencies
-        
-        // TODO: Apply parentItemAngle from config when provider supports it
-        // TODO: Apply additional config parameters if needed
-        
         return provider
     }
     
     private func createFavoriteFolderProvider(config: ProviderConfiguration) -> FavoriteFolderProvider? {
         let provider = FavoriteFolderProvider()
-        
-        // FavoriteFolderProvider typically doesn't need dependencies
-        
-        // TODO: Apply parentItemAngle from config when provider supports it
-        // TODO: Apply additional config parameters if needed
         
         return provider
     }
@@ -164,28 +130,16 @@ class ProviderFactory {
         // Wire up dependencies
         provider.circularUIManager = circularUIManager
         
-        // TODO: Apply parentItemAngle from config when provider supports it
-        // TODO: Apply additional config parameters if needed
-        
         return provider
     }
     
     private func createShortcutExecuteProvider(config: ProviderConfiguration) -> ShortcutExecuteProvider? {
         let provider = ShortcutExecuteProvider()
         
-        // ShortcutExecuteProvider doesn't need external dependencies
-        
-        // TODO: Apply parentItemAngle from config when provider supports it
-        // TODO: Load shortcuts from database when persistence is implemented
-        
         return provider
     }
     
     // MARK: - Provider Type Validation
-    
-    /// Check if a provider type is supported by the factory
-    /// - Parameter type: The provider type string
-    /// - Returns: True if the factory can create this provider type
     static func isProviderTypeSupported(_ type: String) -> Bool {
         return supportedProviderTypes().contains(type)
     }

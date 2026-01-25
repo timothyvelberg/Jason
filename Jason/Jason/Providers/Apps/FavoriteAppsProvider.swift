@@ -45,7 +45,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
     // MARK: - Initialization
     
     init() {
-        print("🌟 FavoriteAppsProvider initialized")
+        print("FavoriteAppsProvider initialized")
         loadFavoriteApps()
     }
     
@@ -57,7 +57,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         // Load favorite apps from database
         let favorites = DatabaseManager.shared.getFavoriteApps()
         
-        print("📋 [FavoriteAppsProvider] Loaded \(favorites.count) favorite apps from database")
+        print("[FavoriteAppsProvider] Loaded \(favorites.count) favorite apps from database")
         
         for favorite in favorites {
             if let appInfo = findApp(
@@ -72,7 +72,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
             }
         }
         
-        print("🌟 [FavoriteAppsProvider] Resolved \(resolvedApps.count) favorite apps")
+        print("[FavoriteAppsProvider] Resolved \(resolvedApps.count) favorite apps")
     }
     
     private func findApp(bundleIdentifier: String, customName: String?, iconOverride: String?) -> AppInfo? {

@@ -125,10 +125,6 @@ class MultiFingerGestureRecognizer: GestureRecognizer {
             isAnchorEligible = true
             stableFingerCount = currentCount
             hasFiredAddGesture = false
-            
-            if debugLogging {
-                print("🖐️ [MultiFingerGesture] First touch - starting build-up")
-            }
         }
         
         // === FINGER COUNT INCREASED ===
@@ -154,13 +150,13 @@ class MultiFingerGestureRecognizer: GestureRecognizer {
                 currentPosition = primaryTouch.position
                 
                 if debugLogging {
-                    print("🖐️ [MultiFingerGesture] Started tracking \(currentCount)-finger gesture (build-up: \(String(format: "%.0f", buildUpTime * 1000))ms)")
+                    print("[MultiFingerGesture] Started tracking \(currentCount)-finger gesture (build-up: \(String(format: "%.0f", buildUpTime * 1000))ms)")
                 }
             } else {
                 // Took too long to get fingers down - not a deliberate gesture
                 phase = .completed
                 if debugLogging {
-                    print("🖐️ [MultiFingerGesture] Build-up too slow (\(String(format: "%.0f", buildUpTime * 1000))ms) - ignoring")
+                    print("[MultiFingerGesture] Build-up too slow (\(String(format: "%.0f", buildUpTime * 1000))ms) - ignoring")
                 }
             }
         }
@@ -214,10 +210,6 @@ class MultiFingerGestureRecognizer: GestureRecognizer {
                                      timeSinceAnchor <= config.addGestureMaxDelay
                 
                 if isInTimeWindow {
-                    if debugLogging {
-                        print("✅ [MultiFingerGesture] ADD detected: \(oldCount)→\(newCount) fingers (delay: \(String(format: "%.0f", timeSinceAnchor * 1000))ms)")
-                    }
-                    
                     hasFiredAddGesture = true
                     let event = GestureEvent.fingerAdd(fromCount: oldCount, toCount: newCount)
                     

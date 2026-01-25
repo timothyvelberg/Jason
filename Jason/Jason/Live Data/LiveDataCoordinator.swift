@@ -35,13 +35,13 @@ class LiveDataCoordinator {
     // MARK: - Initialization
     
     private init() {
-        print("🎛️ [LiveDataCoordinator] Initialized")
+        print("[LiveDataCoordinator] Initialized")
         setupSystemObservers()
     }
     
     deinit {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
-        print("🎛️ [LiveDataCoordinator] Deallocated")
+        print("[LiveDataCoordinator] Deallocated")
     }
     
     // MARK: - Stream Registration
@@ -50,16 +50,16 @@ class LiveDataCoordinator {
     func register(_ stream: LiveDataStream) {
         // Avoid duplicate registration
         guard !streams.contains(where: { $0.streamId == stream.streamId }) else {
-            print("⚠️ [LiveDataCoordinator] Stream '\(stream.streamId)' already registered")
+            print("[LiveDataCoordinator] Stream '\(stream.streamId)' already registered")
             return
         }
         
         streams.append(stream)
-        print("✅ [LiveDataCoordinator] Registered stream: \(stream.streamId)")
+        print("[LiveDataCoordinator] Registered stream: \(stream.streamId)")
         
         // If coordinator is already running, start this stream immediately
         if isRunning && !stream.isMonitoring {
-            print("   ▶️ Auto-starting (coordinator already running)")
+            print("   Auto-starting (coordinator already running)")
             stream.startMonitoring()
         }
     }
@@ -67,7 +67,7 @@ class LiveDataCoordinator {
     /// Unregister a stream
     func unregister(_ stream: LiveDataStream) {
         streams.removeAll { $0.streamId == stream.streamId }
-        print("🗑️ [LiveDataCoordinator] Unregistered stream: \(stream.streamId)")
+        print("[LiveDataCoordinator] Unregistered stream: \(stream.streamId)")
     }
     
     // MARK: - Lifecycle Control
@@ -75,18 +75,18 @@ class LiveDataCoordinator {
     /// Start all registered streams
     func startAll() {
         guard !isRunning else {
-            print("⚠️ [LiveDataCoordinator] Already running")
+            print("[LiveDataCoordinator] Already running")
             return
         }
         
-        print("🚀 [LiveDataCoordinator] Starting all streams...")
+        print("[LiveDataCoordinator] Starting all streams...")
         isRunning = true
         
         for stream in streams {
             if !stream.isMonitoring {
                 stream.startMonitoring()
             } else {
-                print("   ⏭️ \(stream.streamId) already monitoring")
+                print("   \(stream.streamId) already monitoring")
             }
         }
         
@@ -96,11 +96,11 @@ class LiveDataCoordinator {
     /// Stop all registered streams
     func stopAll() {
         guard isRunning else {
-            print("⚠️ [LiveDataCoordinator] Not running")
+            print("[LiveDataCoordinator] Not running")
             return
         }
         
-        print("🛑 [LiveDataCoordinator] Stopping all streams...")
+        print("[LiveDataCoordinator] Stopping all streams...")
         isRunning = false
         
         for stream in streams {
@@ -114,7 +114,7 @@ class LiveDataCoordinator {
     
     /// Restart all streams (used after sleep/wake)
     func restartAll() {
-        print("🔄 [LiveDataCoordinator] Restarting all streams...")
+        print("[LiveDataCoordinator] Restarting all streams...")
         
         for stream in streams {
             stream.restartMonitoring()
@@ -144,11 +144,11 @@ class LiveDataCoordinator {
             object: nil
         )
         
-        print("🎛️ [LiveDataCoordinator] Sleep/wake observers registered")
+        print("[LiveDataCoordinator] Sleep/wake observers registered")
     }
     
     @objc private func handleSleep() {
-        print("💤 [LiveDataCoordinator] System going to sleep...")
+        print("[LiveDataCoordinator] System going to sleep...")
         
         // Log which streams are currently active
         let activeStreams = streams.filter { $0.isMonitoring }
@@ -165,20 +165,20 @@ class LiveDataCoordinator {
     }
     
     @objc private func handleWake() {
-        print("☀️ [LiveDataCoordinator] System woke up")
+        print("[LiveDataCoordinator] System woke up")
         
         guard isRunning else {
-            print("   ⏭️ Coordinator not running - skipping restart")
+            print("   Coordinator not running - skipping restart")
             return
         }
         
         // Delay restart to allow hardware to reinitialize
-        print("   ⏳ Waiting \(wakeRestartDelay)s for hardware to reinitialize...")
+        print("   Waiting \(wakeRestartDelay)s for hardware to reinitialize...")
         
         DispatchQueue.main.asyncAfter(deadline: .now() + wakeRestartDelay) { [weak self] in
             guard let self = self else { return }
             
-            print("☀️ [LiveDataCoordinator] Restarting streams after wake...")
+            print("[LiveDataCoordinator] Restarting streams after wake...")
             self.restartAll()
         }
     }
@@ -187,13 +187,13 @@ class LiveDataCoordinator {
     
     /// Print current status of all streams
     func printStatus() {
-        print("📊 [LiveDataCoordinator] Status:")
+        print("[LiveDataCoordinator] Status:")
         print("   Running: \(isRunning)")
         print("   Registered streams: \(streams.count)")
         
         for stream in streams {
-            let status = stream.isMonitoring ? "✅ monitoring" : "⏸️ stopped"
-            print("   • \(stream.streamId): \(status)")
+            let status = stream.isMonitoring ? "monitoring" : "stopped"
+            print("   \(stream.streamId): \(status)")
         }
     }
     

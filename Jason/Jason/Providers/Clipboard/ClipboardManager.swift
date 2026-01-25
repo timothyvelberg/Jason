@@ -49,12 +49,12 @@ class ClipboardManager: ObservableObject {
     private init() {
         // Capture initial state without adding to history
         lastChangeCount = NSPasteboard.general.changeCount
-        print("📋 [ClipboardManager] Initialized with changeCount: \(lastChangeCount)")
+        print("[ClipboardManager] Initialized with changeCount: \(lastChangeCount)")
     }
     
     deinit {
         stopMonitoring()
-        print("📋 [ClipboardManager] Deallocated")
+        print("[ClipboardManager] Deallocated")
     }
     
     // MARK: - Public Interface
@@ -62,7 +62,7 @@ class ClipboardManager: ObservableObject {
     /// Start monitoring the clipboard for changes
     func startMonitoring() {
         guard pollTimer == nil else {
-            print("📋 [ClipboardManager] Already monitoring")
+            print("[ClipboardManager] Already monitoring")
             return
         }
         
@@ -70,14 +70,14 @@ class ClipboardManager: ObservableObject {
             self?.checkForChanges()
         }
         
-        print("📋 [ClipboardManager] Started monitoring (interval: \(pollInterval)s)")
+        print("[ClipboardManager] Started monitoring (interval: \(pollInterval)s)")
     }
     
     /// Stop monitoring the clipboard
     func stopMonitoring() {
         pollTimer?.invalidate()
         pollTimer = nil
-        print("📋 [ClipboardManager] Stopped monitoring")
+        print("[ClipboardManager] Stopped monitoring")
     }
     
     /// Get the current history count
@@ -88,7 +88,7 @@ class ClipboardManager: ObservableObject {
     /// Clear all history
     func clearHistory() {
         history.removeAll()
-        print("📋 [ClipboardManager] History cleared")
+        print("[ClipboardManager] History cleared")
     }
     
     /// Paste a specific entry (writes to clipboard, then simulates Cmd+V)
@@ -101,7 +101,7 @@ class ClipboardManager: ObservableObject {
         // Update our changeCount so we don't re-capture this as a new entry
         lastChangeCount = pasteboard.changeCount
         
-        print("📋 [ClipboardManager] Pasting entry: \"\(entry.content.prefix(30))...\"")
+        print("[ClipboardManager] Pasting entry: \"\(entry.content.prefix(30))...\"")
         
         // Execute Cmd+V via ShortcutExecutor
         ShortcutExecutor.execute(keyCode: 9, modifierFlags: NSEvent.ModifierFlags.command.rawValue)
@@ -121,7 +121,7 @@ class ClipboardManager: ObservableObject {
         // Read string content from clipboard
         guard let content = NSPasteboard.general.string(forType: .string),
               !content.isEmpty else {
-            print("📋 [ClipboardManager] Change detected but no string content")
+            print("[ClipboardManager] Change detected but no string content")
             return
         }
         
@@ -133,19 +133,19 @@ class ClipboardManager: ObservableObject {
         if let existingIndex = history.firstIndex(where: { $0.content == content }) {
             // Remove the old entry
             let existing = history.remove(at: existingIndex)
-            print("📋 [ClipboardManager] Dedup: moving existing entry to top")
+            print("[ClipboardManager] Dedup: moving existing entry to top")
             
             // Create new entry with fresh timestamp and insert at top
             let newEntry = ClipboardEntry(content: content)
             history.insert(newEntry, at: 0)
             
-            print("📋 [ClipboardManager] Entry moved to top: \"\(content.prefix(30))...\" (was at index \(existingIndex))")
+            print("[ClipboardManager] Entry moved to top: \"\(content.prefix(30))...\" (was at index \(existingIndex))")
         } else {
             // New entry - insert at top
             let entry = ClipboardEntry(content: content)
             history.insert(entry, at: 0)
             
-            print("📋 [ClipboardManager] New entry added: \"\(content.prefix(30))...\" (total: \(history.count))")
+            print("[ClipboardManager] New entry added: \"\(content.prefix(30))...\" (total: \(history.count))")
         }
     }
 }

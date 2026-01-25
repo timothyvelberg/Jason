@@ -57,31 +57,19 @@ class FolderWatcherManager: LiveDataStream {
     
     /// Start watching all favorite heavy folders
     func startWatchingFavorites() {
-//        print("🔍 [FolderWatcher] ========== Starting Favorite Watchers ==========")
         
         // Get all database data on MAIN thread FIRST (avoid threading issues)
         let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
-//        print("🔍 [FolderWatcher] Found \(favoriteFolders.count) favorite folders total")
         
         // Build list of folders to watch (also check heavy status on main thread)
         var foldersToWatch: [(path: String, name: String)] = []
         for (folder, _) in favoriteFolders {
-//            print("🔍 [FolderWatcher] Checking: '\(folder.title)'")
-//            print("   📂 Path: \(folder.path)")
             
             let isHeavy = DatabaseManager.shared.isHeavyFolder(path: folder.path)
-//            print("   ⚖️ Is heavy: \(isHeavy)")
-            
             if isHeavy {
                 foldersToWatch.append((path: folder.path, name: folder.title))
-//                print("   ✅ Will watch this folder")
-            } else {
-//                print("   ⭕️ Skipping (not marked as heavy)")
             }
         }
-        
-//        print("🔍 [FolderWatcher] Total folders to watch: \(foldersToWatch.count)")
-//        print("🔍 [FolderWatcher] ===============================================")
         
         // Now dispatch to background thread with the data we already fetched
         watcherQueue.async { [weak self] in
@@ -92,22 +80,19 @@ class FolderWatcherManager: LiveDataStream {
                 self.startWatching(path: folder.path, itemName: folder.name)
                 watchedCount += 1
             }
-            
-//            print("[FolderWatcher] 👀 Started watching \(watchedCount) favorite heavy folders")
         }
     }
     
     /// Start watching folders used by dynamic files (that aren't already watched)
     func startWatchingDynamicFileFolders() {
-        print("🔍 [FolderWatcher] ========== Starting Dynamic File Folder Watchers ==========")
         
         // Get all dynamic files
         let dynamicFiles = DatabaseManager.shared.getFavoriteDynamicFiles()
-        print("🔍 [FolderWatcher] Found \(dynamicFiles.count) dynamic files total")
+        print("[FolderWatcher] Found \(dynamicFiles.count) dynamic files total")
         
         // Get unique folder paths
         let uniqueFolderPaths = Set(dynamicFiles.map { $0.folderPath })
-        print("🔍 [FolderWatcher] Unique source folders: \(uniqueFolderPaths.count)")
+        print("[FolderWatcher] Unique source folders: \(uniqueFolderPaths.count)")
         
         // Build list of folders to watch
         var foldersToWatch: [(path: String, name: String)] = []
@@ -115,7 +100,6 @@ class FolderWatcherManager: LiveDataStream {
         for folderPath in uniqueFolderPaths {
             // Skip if already being watched (e.g., it's also a favorite folder)
             if watchers[folderPath] != nil {
-                print("   ⏭️ Already watching: \(folderPath)")
                 continue
             }
             
@@ -123,7 +107,7 @@ class FolderWatcherManager: LiveDataStream {
             var isDirectory: ObjCBool = false
             guard FileManager.default.fileExists(atPath: folderPath, isDirectory: &isDirectory),
                   isDirectory.boolValue else {
-                print("   ⚠️ Folder doesn't exist: \(folderPath)")
+                print("   Folder doesn't exist: \(folderPath)")
                 continue
             }
             
@@ -136,19 +120,16 @@ class FolderWatcherManager: LiveDataStream {
                 // Mark as heavy if not already
                 if !DatabaseManager.shared.isHeavyFolder(path: folderPath) {
                     DatabaseManager.shared.markAsHeavyFolder(path: folderPath, itemCount: itemCount)
-                    print("   📊 Marked as heavy folder: \(folderName) (\(itemCount) items)")
+                    print("   Marked as heavy folder: \(folderName) (\(itemCount) items)")
                 }
                 foldersToWatch.append((path: folderPath, name: folderName))
-                print("   ✅ Will watch: \(folderName)")
+                print("   Will watch: \(folderName)")
             } else {
                 // Even for smaller folders, we might want to watch them for instant updates
                 // For now, only watch heavy folders to keep overhead low
-                print("   ⭕️ Skipping (only \(itemCount) items): \(folderName)")
+                print("   Skipping (only \(itemCount) items): \(folderName)")
             }
         }
-        
-        print("🔍 [FolderWatcher] Dynamic file folders to watch: \(foldersToWatch.count)")
-        print("🔍 [FolderWatcher] =========================================================")
         
         // Start watching on background thread
         watcherQueue.async { [weak self] in
@@ -161,7 +142,7 @@ class FolderWatcherManager: LiveDataStream {
             }
             
             if watchedCount > 0 {
-                print("[FolderWatcher] 👀 Started watching \(watchedCount) dynamic file source folders")
+                print("[FolderWatcher] Started watching \(watchedCount) dynamic file source folders")
             }
         }
     }
@@ -173,7 +154,7 @@ class FolderWatcherManager: LiveDataStream {
             
             // Don't create duplicate watchers
             guard self.watchers[path] == nil else {
-                print("[FolderWatcher] ℹ️ Already watching: \(itemName)")
+                print("[FolderWatcher] Already watching: \(itemName)")
                 return
             }
             
@@ -181,7 +162,7 @@ class FolderWatcherManager: LiveDataStream {
             var isDirectory: ObjCBool = false
             guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
                   isDirectory.boolValue else {
-                print("[FolderWatcher] ⚠️ Path doesn't exist or isn't a directory: \(path)")
+                print("[FolderWatcher] Path doesn't exist or isn't a directory: \(path)")
                 return
             }
             
@@ -195,7 +176,6 @@ class FolderWatcherManager: LiveDataStream {
             )
             
             self.watchers[path] = watcher
-//            print("[FolderWatcher] ✅ Started watching: \(itemName) (\(path))")
         }
     }
     
@@ -207,7 +187,7 @@ class FolderWatcherManager: LiveDataStream {
             if let watcher = self.watchers[path] {
                 watcher.stop()
                 self.watchers.removeValue(forKey: path)
-                print("[FolderWatcher] 🛑 Stopped watching: \(path)")
+                print("[FolderWatcher] Stopped watching: \(path)")
             }
         }
     }
@@ -221,7 +201,7 @@ class FolderWatcherManager: LiveDataStream {
                 watcher.stop()
             }
             self.watchers.removeAll()
-            print("[FolderWatcher] 🛑 Stopped watching all folders")
+            print("[FolderWatcher] Stopped watching all folders")
         }
     }
     
@@ -242,7 +222,7 @@ class FolderWatcherManager: LiveDataStream {
             )
             return items.count
         } catch {
-            print("⚠️ [FolderWatcher] Failed to count folder items: \(error)")
+            print("[FolderWatcher] Failed to count folder items: \(error)")
             return 0
         }
     }
@@ -255,8 +235,8 @@ class FolderWatcherManager: LiveDataStream {
         let workItem = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
             
-            print("[FolderWatcher] 📂 Change detected in: \(name)")
-            print("[FolderWatcher] 🔄 Queueing cache refresh...")
+            print("[FolderWatcher] Change detected in: \(name)")
+            print("[FolderWatcher] Queueing cache refresh...")
             
             //Add to operation queue
             self.queueRefresh(for: path, name: name)
@@ -282,7 +262,6 @@ class FolderWatcherManager: LiveDataStream {
         }
         
         if alreadyQueued {
-            print("⏭️ [FolderWatcher] Coalescing: \(name) already queued, skipping duplicate")
             return
         }
         
@@ -292,13 +271,13 @@ class FolderWatcherManager: LiveDataStream {
         
         let queueDepth = refreshQueue.operationCount
         let activeCount = refreshQueue.operations.filter { $0.isExecuting }.count
-        print("⏳ [FolderWatcher] Queued refresh for \(name)")
-        print("   📊 Queue: \(queueDepth) total, \(activeCount) active")
+        print("[FolderWatcher] Queued refresh for \(name)")
+        print("   Queue: \(queueDepth) total, \(activeCount) active")
     }
     
     /// Manual refresh (for user-initiated refreshes)
     func forceRefresh(path: String, name: String) {
-        print("🔄 [FolderWatcher] Force refresh requested for \(name)")
+        print("[FolderWatcher] Force refresh requested for \(name)")
         queueRefresh(for: path, name: name)
     }
 }
@@ -376,7 +355,7 @@ private class FolderWatcher {
         )
         
         guard let stream = eventStream else {
-            print("[FolderWatcher] ❌ Failed to create event stream for: \(name)")
+            print("[FolderWatcher] Failed to create event stream for: \(name)")
             return
         }
         
@@ -388,7 +367,7 @@ private class FolderWatcher {
 //            print("[FolderWatcher] 🎬 Monitoring started for: \(name)")
             return
         } else {
-            print("[FolderWatcher] ❌ Failed to start monitoring for: \(name)")
+            print("[FolderWatcher] Failed to start monitoring for: \(name)")
             
         }
     }
@@ -401,7 +380,7 @@ private class FolderWatcher {
         FSEventStreamRelease(stream)
         
         eventStream = nil
-        print("[FolderWatcher] 🛑 Monitoring stopped for: \(name)")
+        print("[FolderWatcher] Monitoring stopped for: \(name)")
     }
     
     deinit {

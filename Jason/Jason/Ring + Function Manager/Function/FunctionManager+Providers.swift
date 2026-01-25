@@ -16,9 +16,9 @@ extension FunctionManager {
         
         if let config = configuration {
             providerConfigurations[provider.providerId] = config
-            print("📦 Registered provider: \(provider.providerName) (displayMode: \(config.effectiveDisplayMode))")
+            print("Registered provider: \(provider.providerName) (displayMode: \(config.effectiveDisplayMode))")
         } else {
-            print("📦 Registered provider: \(provider.providerName)")
+            print("Registered provider: \(provider.providerName)")
         }
     }
     

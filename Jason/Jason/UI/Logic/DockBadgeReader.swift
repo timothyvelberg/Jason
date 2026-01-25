@@ -36,9 +36,9 @@ class DockBadgeReader {
     
     private init() {
         if isAvailable {
-            print("✅ [DockBadgeReader] Accessibility API available")
+            print("[DockBadgeReader] Accessibility API available")
         } else {
-            print("⚠️ [DockBadgeReader] Accessibility permission not granted")
+            print("[DockBadgeReader] Accessibility permission not granted")
         }
     }
     

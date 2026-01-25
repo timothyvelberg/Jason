@@ -157,7 +157,7 @@ class MouseTracker {
         
         //Don't update hover for rings that aren't the active ring
         guard ringLevel == functionManager.activeRingLevel else {
-            print("⏭️ Skipping hover update for ring \(ringLevel) (active ring is \(functionManager.activeRingLevel))")
+            print("Skipping hover update for ring \(ringLevel) (active ring is \(functionManager.activeRingLevel))")
             return
         }
 

@@ -175,23 +175,21 @@ class ListPanelManager: ObservableObject {
             name: .providerContentUpdated,
             object: nil
         )
-        print("📋 [ListPanelManager] Initialized - registered for provider updates")
+        print("[ListPanelManager] Initialized - registered for provider updates")
     }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
-        print("📋 [ListPanelManager] Deallocated - removed observers")
+        print("[ListPanelManager] Deallocated - removed observers")
     }
     
     // MARK: - Provider Update Handler
 
     @objc private func handleProviderUpdate(_ notification: Notification) {
         guard let updateInfo = ProviderUpdateInfo.from(notification) else {
-            print("❌ [ListPanelManager] Invalid provider update notification")
+            print("[ListPanelManager] Invalid provider update notification")
             return
         }
-        
-        print("📢 [ListPanelManager] Received update for provider: \(updateInfo.providerId)")
         if let folderPath = updateInfo.folderPath {
             print("   Folder: \(folderPath)")
         }
@@ -208,24 +206,23 @@ class ListPanelManager: ObservableObject {
             // No folderPath specified - provider match is enough
             return true
         }) else {
-            print("   ⏭️ No matching panel found - ignoring")
             return
         }
         
         let matchingPanel = panelStack[matchingIndex]
-        print("   ✅ Found matching panel at level \(matchingPanel.level): '\(matchingPanel.title)'")
+        print("   Found matching panel at level \(matchingPanel.level): '\(matchingPanel.title)'")
         
         // Close any child panels
         if matchingIndex < panelStack.count - 1 {
             let childCount = panelStack.count - matchingIndex - 1
-            print("   🗑️ Closing \(childCount) child panel(s)")
+            print("   Closing \(childCount) child panel(s)")
             popToLevel(matchingPanel.level)
         }
         
         // Reload content
         guard let onReloadContent = onReloadContent,
               let providerId = matchingPanel.providerId else {
-            print("   ❌ No reload callback or providerId - cannot refresh")
+            print("   No reload callback or providerId - cannot refresh")
             return
         }
         
@@ -237,11 +234,11 @@ class ListPanelManager: ObservableObject {
             await MainActor.run {
                 // Find the panel again (stack may have changed)
                 guard let currentIndex = self.panelStack.firstIndex(where: { $0.id == matchingPanel.id }) else {
-                    print("   ⚠️ Panel no longer exists - skipping update")
+                    print("   Panel no longer exists - skipping update")
                     return
                 }
                 
-                print("   🔄 Updating panel with \(freshItems.count) items (was \(self.panelStack[currentIndex].items.count))")
+                print("   Updating panel with \(freshItems.count) items (was \(self.panelStack[currentIndex].items.count))")
                 self.panelStack[currentIndex].items = freshItems
             }
         }
@@ -267,7 +264,7 @@ class ListPanelManager: ObservableObject {
     func handleItemHover(node: FunctionNode?, level: Int, rowIndex: Int?) {
         // Suppress hover events while panel is scrolling
         if isPanelScrolling(level) {
-            print("📜 [Hover] Suppressed - panel \(level) is scrolling")
+            print("[Hover] Suppressed - panel \(level) is scrolling")
             return
         }
         
@@ -292,11 +289,11 @@ class ListPanelManager: ObservableObject {
         // Append to buffer
         searchBuffer += character.lowercased()
         
-        print("🔤 [TypeAhead] Buffer: '\(searchBuffer)'")
+        print("[TypeAhead] Buffer: '\(searchBuffer)'")
         
         // Find matching item in active panel
         guard let panel = panelStack.first(where: { $0.level == activePanelLevel }) else {
-            print("🔤 [TypeAhead] No active panel")
+            print("[TypeAhead] No active panel")
             searchBuffer = ""
             return
         }
@@ -331,7 +328,7 @@ class ListPanelManager: ObservableObject {
         if matchIndex == nil && searchBuffer.count > 1 {
             let firstChar = String(searchBuffer.prefix(1))
             searchBuffer = firstChar  // Reset to single char
-            print("🔤 [TypeAhead] No match, reset to: '\(searchBuffer)'")
+            print("[TypeAhead] No match, reset to: '\(searchBuffer)'")
             
             for i in (currentSelection + 1)..<items.count {
                 if items[i].name.lowercased().hasPrefix(searchBuffer) {
@@ -342,7 +339,7 @@ class ListPanelManager: ObservableObject {
         }
         
         if let index = matchIndex {
-            print("🔤 [TypeAhead] Found match at index \(index): '\(items[index].name)'")
+            print("[TypeAhead] Found match at index \(index): '\(items[index].name)'")
             
             // Update selection
             isKeyboardDriven = true
@@ -360,13 +357,13 @@ class ListPanelManager: ObservableObject {
             currentlyHoveredNodeId[activePanelLevel] = selectedNode.id
             onItemHover?(selectedNode, activePanelLevel, index)
         } else {
-            print("🔤 [TypeAhead] No match found")
+            print("[TypeAhead] No match found")
         }
         
         // Start timer to reset buffer
         let timer = DispatchWorkItem { [weak self] in
             self?.searchBuffer = ""
-            print("🔤 [TypeAhead] Buffer reset")
+            print("[TypeAhead] Buffer reset")
         }
         searchBufferTimer = timer
         DispatchQueue.main.asyncAfter(deadline: .now() + searchTimeout, execute: timer)
@@ -386,11 +383,11 @@ class ListPanelManager: ObservableObject {
             scrollingPanels.insert(level)
             currentlyHoveredNodeId.removeValue(forKey: level)  // Clear stale hover
             popToLevel(level)
-            print("📜 [Scroll] Level \(level) scrolling - closed child panels")
+            print("[Scroll] Level \(level) scrolling - closed child panels")
         } else {
             // Scrolling stopped - re-enable hover
             scrollingPanels.remove(level)
-            print("📜 [Scroll] Level \(level) scroll stopped - hover re-enabled")
+            print("[Scroll] Level \(level) scroll stopped - hover re-enabled")
         }
     }
     
@@ -402,14 +399,14 @@ class ListPanelManager: ObservableObject {
         // Clear pending panel if it was for this level
         if let pending = pendingPanel, pending.fromLevel == level {
             pendingPanel = nil
-            print("📋 [Header] Cleared pending panel for level \(level)")
+            print("[Header] Cleared pending panel for level \(level)")
         }
         
         // Reset arming for this panel
         if let index = panelStack.firstIndex(where: { $0.level == level }) {
             if panelStack[index].areChildrenArmed {
                 panelStack[index].areChildrenArmed = false
-                print("📋 [Header] Reset arming for level \(level)")
+                print("[Header] Reset arming for level \(level)")
             }
         }
         
@@ -417,7 +414,7 @@ class ListPanelManager: ObservableObject {
         let childCount = panelStack.filter { $0.level > level }.count
         if childCount > 0 {
             popToLevel(level)
-            print("📋 [Header] Closed \(childCount) child panel(s)")
+            print("[Header] Closed \(childCount) child panel(s)")
         }
     }
     
@@ -430,7 +427,7 @@ class ListPanelManager: ObservableObject {
         
         // Check if preview panel exists
         guard let previewIndex = panelStack.firstIndex(where: { $0.level == previewLevel }) else {
-            print("⌨️ [Keyboard] No preview panel to enter")
+            print("[Keyboard] No preview panel to enter")
             return
         }
         
@@ -449,7 +446,7 @@ class ListPanelManager: ObservableObject {
         // Arm the new active panel for its children
         panelStack[previewIndex].areChildrenArmed = true
         
-        print("⌨️ [Keyboard] ENTERED → active panel now level \(activePanelLevel)")
+        print("[Keyboard] ENTERED → active panel now level \(activePanelLevel)")
         
         // Trigger hover for first item to spawn next preview if it's a folder
         let activePanel = panelStack[previewIndex]
@@ -463,7 +460,7 @@ class ListPanelManager: ObservableObject {
     /// Exit to parent panel (← arrow) - close current active, parent becomes active
     func exitToParentPanel() {
         guard activePanelLevel > 0 else {
-            print("⌨️ [Keyboard] Already at root panel - cannot exit")
+            print("[Keyboard] Already at root panel - cannot exit")
             return
         }
         
@@ -482,13 +479,13 @@ class ListPanelManager: ObservableObject {
         }
         
         // In exitToParentPanel
-        print("🔍 [Exit] activePanelLevel=\(activePanelLevel), isKeyboardDriven=\(isKeyboardDriven)")
-        print("🔍 [Exit] keyboardSelectedRow=\(keyboardSelectedRow)")
+        print("[Exit] activePanelLevel=\(activePanelLevel), isKeyboardDriven=\(isKeyboardDriven)")
+        print("[Exit] keyboardSelectedRow=\(keyboardSelectedRow)")
         
         // Clear keyboard selection in old level
         keyboardSelectedRow.removeValue(forKey: parentLevel + 1)
         
-        print("⌨️ [Keyboard] EXITED ← active panel now level \(activePanelLevel)")
+        print("[Keyboard] EXITED ← active panel now level \(activePanelLevel)")
         
         // Re-trigger preview for currently selected item in parent
         if let selection = keyboardSelectedRow[parentLevel],
@@ -504,14 +501,14 @@ class ListPanelManager: ObservableObject {
     /// Get the effective selected row for a panel level
     /// Only the ACTIVE panel shows selection highlight
     func effectiveSelectedRow(for level: Int) -> Int? {
-        print("🔍 [EffectiveRow] level=\(level), activePanelLevel=\(activePanelLevel), isKeyboardDriven=\(isKeyboardDriven), hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
+        print("[EffectiveRow] level=\(level), activePanelLevel=\(activePanelLevel), isKeyboardDriven=\(isKeyboardDriven), hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
         
         guard level == activePanelLevel else {
             return nil
         }
         
         if isKeyboardDriven {
-            print("🔍 [EffectiveRow] Returning keyboardSelectedRow[\(level)]=\(keyboardSelectedRow[level] ?? -999)")
+            print("[EffectiveRow] Returning keyboardSelectedRow[\(level)]=\(keyboardSelectedRow[level] ?? -999)")
             return keyboardSelectedRow[level]
         }
         
@@ -523,12 +520,12 @@ class ListPanelManager: ObservableObject {
             // 1. hoveredRow matches (mouse on source row), OR
             // 2. hoveredRow is nil (transition state - assume still on source row)
             if hoveredRow[level] == sourceRow || hoveredRow[level] == nil {
-                print("🔍 [EffectiveRow] Returning source row \(sourceRow) from preview child (hover matches or nil)")
+                print("[EffectiveRow] Returning source row \(sourceRow) from preview child (hover matches or nil)")
                 return sourceRow
             }
         }
         
-        print("🔍 [EffectiveRow] Returning hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
+        print("[EffectiveRow] Returning hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
         return hoveredRow[level]
     }
 
@@ -536,7 +533,7 @@ class ListPanelManager: ObservableObject {
     func moveSelectionDown(in level: Int) {
         // Only allow navigation in the active panel
         guard level == activePanelLevel else {
-            print("⌨️ [Keyboard] Ignoring - level \(level) is not active (\(activePanelLevel))")
+            print("[Keyboard] Ignoring - level \(level) is not active (\(activePanelLevel))")
             return
         }
         
@@ -561,7 +558,7 @@ class ListPanelManager: ObservableObject {
         isKeyboardDriven = true
         keyboardSelectedRow[level] = newSelection
         
-        print("⌨️ [Keyboard] Selection DOWN in level \(level): \(newSelection)")
+        print("[Keyboard] Selection DOWN in level \(level): \(newSelection)")
         
         // Auto-arm for keyboard (no threshold needed)
         if let panelIndex = panelStack.firstIndex(where: { $0.level == level }) {
@@ -581,7 +578,7 @@ class ListPanelManager: ObservableObject {
     func moveSelectionUp(in level: Int) {
         // Only allow navigation in the active panel
         guard level == activePanelLevel else {
-            print("⌨️ [Keyboard] Ignoring - level \(level) is not active (\(activePanelLevel))")
+            print("[Keyboard] Ignoring - level \(level) is not active (\(activePanelLevel))")
             return
         }
         
@@ -604,7 +601,7 @@ class ListPanelManager: ObservableObject {
         isKeyboardDriven = true
         keyboardSelectedRow[level] = newSelection
         
-        print("⌨️ [Keyboard] Selection UP in level \(level): \(newSelection)")
+        print("[Keyboard] Selection UP in level \(level): \(newSelection)")
         
         // Auto-arm for keyboard (no threshold needed)
         if let panelIndex = panelStack.firstIndex(where: { $0.level == level }) {
@@ -626,7 +623,7 @@ class ListPanelManager: ObservableObject {
         
         isKeyboardDriven = false
         keyboardSelectedRow.removeAll()
-        print("🖱️ [Keyboard] Reset to mouse mode")
+        print("[Keyboard] Reset to mouse mode")
     }
     
     // MARK: - Scroll Offset Updates
@@ -677,7 +674,7 @@ class ListPanelManager: ObservableObject {
         // Constrain to screen boundaries (left, top, bottom only)
         let constrainedPosition = constrainToScreenBounds(position: position, panelWidth: panelWidth, panelHeight: panelHeight)
         
-        print("📋 [ListPanelManager] Showing panel at angle \(angle)°")
+        print("[ListPanelManager] Showing panel at angle \(angle)°")
         print("   Items: \(items.count)")
         print("   Panel center: \(position)")
         
@@ -703,7 +700,7 @@ class ListPanelManager: ObservableObject {
     
     /// Show panel at a specific position (for testing)
     func show(title: String, items: [FunctionNode], at position: CGPoint) {
-        print("📋 [ListPanelManager] Showing panel with \(items.count) items")
+        print("[ListPanelManager] Showing panel with \(items.count) items")
         panelStack = [
             PanelState(
                 title: title,
@@ -847,7 +844,7 @@ class ListPanelManager: ObservableObject {
                         // Check for arming
                         if !panelStack[index].areChildrenArmed && progress < slideThreshold {
                             panelStack[index].areChildrenArmed = true
-                            print("📋 [Slide] Panel level \(panel.level) children now ARMED")
+                            print("[Slide] Panel level \(panel.level) children now ARMED")
                             
                             // Spawn the pending panel
                             let p = pending
@@ -897,7 +894,7 @@ class ListPanelManager: ObservableObject {
                     } else {
                         activePanelLevel = panel.level  // THIS IS THE KEY LINE
                     }
-                    print("📋 [Slide] Active panel now level \(activePanelLevel)")
+                    print("[Slide] Active panel now level \(activePanelLevel)")
                 }
             }
         }
@@ -955,13 +952,13 @@ class ListPanelManager: ObservableObject {
     ) {
         // Check if this is a stale async completion (user has moved to different row)
         if let currentHovered = currentlyHoveredNodeId[level], currentHovered != sourceNodeId {
-            print("📋 [ListPanelManager] Discarding stale panel '\(title)' - user moved to different row")
+            print("[ListPanelManager] Discarding stale panel '\(title)' - user moved to different row")
             return
         }
         
         // Find the source panel
         guard let sourcePanel = panelStack.first(where: { $0.level == level }) else {
-            print("❌ [ListPanelManager] Cannot find panel at level \(level)")
+            print("[ListPanelManager] Cannot find panel at level \(level)")
             return
         }
         
@@ -972,7 +969,7 @@ class ListPanelManager: ObservableObject {
             // Not armed yet - store as pending
             if let rowIndex = sourceRowIndex {
                 pendingPanel = (title, items, level, sourceNodeId, rowIndex, providerId, contentIdentifier, contextActions)
-                print("📋 [ListPanelManager] Panel '\(title)' PENDING - waiting for arming")
+                print("[ListPanelManager] Panel '\(title)' PENDING - waiting for arming")
             }
             return
         }
@@ -1003,7 +1000,7 @@ class ListPanelManager: ObservableObject {
     ) {
         // Find the source panel
         guard let sourcePanel = panelStack.first(where: { $0.level == level }) else {
-            print("❌ [ListPanelManager] Cannot find panel at level \(level)")
+            print("[ListPanelManager] Cannot find panel at level \(level)")
             return
         }
         
@@ -1030,9 +1027,9 @@ class ListPanelManager: ObservableObject {
             let visualRowIndex = rowIndex - scrolledRows
             
             if visualRowIndex >= 0 && visualRowIndex < PanelState.maxVisibleItems {
-                print("📜 [Push] Row \(rowIndex) → visual row \(visualRowIndex) (scrolled \(scrolledRows))")
+                print("[Push] Row \(rowIndex) → visual row \(visualRowIndex) (scrolled \(scrolledRows))")
             } else {
-                print("📜 [Push] Row \(rowIndex) out of visible range (scrolled \(scrolledRows))")
+                print("[Push] Row \(rowIndex) out of visible range (scrolled \(scrolledRows))")
             }
             
             // Clamp visual row to visible range
@@ -1070,10 +1067,7 @@ class ListPanelManager: ObservableObject {
         
         panelStack.append(newPanel)
         
-        print("📋 [ListPanelManager] Pushed panel '\(title)' at level \(level + 1)")
-        print("   Items: \(items.count)")
-        print("   Position: \(newPosition)")
-        print("   Source row: \(sourceRowIndex ?? -1)")
+        print("[ListPanelManager] Pushed panel '\(title)' at level \(level + 1)")
     }
 
     func popToLevel(_ level: Int) {
@@ -1091,12 +1085,12 @@ class ListPanelManager: ObservableObject {
         panelStack.removeAll { $0.level > level }
         let removed = before - panelStack.count
         if removed > 0 {
-            print("📋 [ListPanelManager] Popped \(removed) panel(s), now at level \(level)")
+            print("[ListPanelManager] Popped \(removed) panel(s), now at level \(level)")
             
             // Reset activePanelLevel if we popped below it
             if activePanelLevel > level {
                 activePanelLevel = level
-                print("📋 [ListPanelManager] Reset activePanelLevel to \(level)")
+                print("[ListPanelManager] Reset activePanelLevel to \(level)")
             }
         }
         
@@ -1152,7 +1146,7 @@ class ListPanelManager: ObservableObject {
     /// Hide all panels
     func hide() {
         guard isVisible else { return }
-        print("📋 [ListPanelManager] Hiding all panels")
+        print("[ListPanelManager] Hiding all panels")
         panelStack.removeAll()
         pendingPanel = nil
         
@@ -1247,13 +1241,13 @@ class ListPanelManager: ObservableObject {
         let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < panel.items.count else {
-            print("📋 [Panel] Right-click outside rows")
+            print("[Panel] Right-click outside rows")
             panelStack[panelIndex].expandedItemId = nil
             return true
         }
         
         let clickedItem = panel.items[rowIndex]
-        print("📋 [Panel \(level)] Right-click on row \(rowIndex): '\(clickedItem.name)'")
+        print("[Panel \(level)] Right-click on row \(rowIndex): '\(clickedItem.name)'")
         
         // Toggle expanded state
         if panelStack[panelIndex].expandedItemId == clickedItem.id {
@@ -1297,7 +1291,7 @@ class ListPanelManager: ObservableObject {
         
         // NEW: If this row is expanded (showing context actions), let SwiftUI handle the click
         if panel.expandedItemId == clickedItem.id {
-            print("📋 [Panel] Click on expanded row - letting SwiftUI handle context actions")
+            print("[Panel] Click on expanded row - letting SwiftUI handle context actions")
             return nil
         }
         
@@ -1396,7 +1390,7 @@ class ListPanelManager: ObservableObject {
             type: .file,
             icon: icon,
             onLeftClick: ModifierAwareInteraction(base: .execute {
-                print("🧪 [Test] Would open: \(name)")
+                print("[Test] Would open: \(name)")
             })
         )
     }

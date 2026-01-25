@@ -47,16 +47,15 @@ extension RingView {
         // Also check if totalCount changed
         guard let prevIndex = previousIndex,
               index != prevIndex || totalCount != previousTotalCount else {
-            print("   ⏭️ SKIPPING: index and totalCount unchanged (index=\(index), totalCount=\(totalCount))")
             return
         }
         
         // Check if totalCount changed even though index stayed the same
         if index == prevIndex && totalCount != previousTotalCount {
-            print("   🔄 TOTALCOUNT CHANGED: Same index (\(index)) but count changed from \(previousTotalCount) to \(totalCount)")
+            print("   TOTALCOUNT CHANGED: Same index (\(index)) but count changed from \(previousTotalCount) to \(totalCount)")
             print("      Need to recalculate angles for new layout!")
         } else {
-            print("   🔄 UPDATING SELECTION: from \(prevIndex) to \(index)")
+            print("   UPDATING SELECTION: from \(prevIndex) to \(index)")
         }
         
         var newRotationIndex: Int
@@ -102,7 +101,7 @@ extension RingView {
         previousTotalCount = totalCount
         rotationIndex = newRotationIndex
         
-        print("   ✅ Update complete: previousIndex=\(previousIndex?.description ?? "nil"), previousTotalCount=\(previousTotalCount), rotationIndex=\(rotationIndex)")
+        print("   Update complete: previousIndex=\(previousIndex?.description ?? "nil"), previousTotalCount=\(previousTotalCount), rotationIndex=\(rotationIndex)")
     }
 
     /// Calculate the angle at a given rotationIndex (which can be negative or > totalCount for wraparound animation)

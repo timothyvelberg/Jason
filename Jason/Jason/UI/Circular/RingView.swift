@@ -27,7 +27,6 @@ struct RingView: View {
     
     // Effective rotation offset - flipped for counter-clockwise triggers
     var effectiveRotationOffset: Double {
-        print("🎬 [RingView] triggerDirection: \(String(describing: triggerDirection)), using offset: \(triggerDirection == .counterClockwise ? -animationRotationOffset : animationRotationOffset)")
         if triggerDirection == .counterClockwise {
             return -animationRotationOffset  // Flip: -10 becomes +10
         }
@@ -379,13 +378,11 @@ struct RingView: View {
     }
     
     private func handleOnAppear() {
-        print("   🎬 [RingView] onAppear called - nodes.count=\(nodes.count), previousNodes.count=\(previousNodes.count)")
         
         selectionIndicatorOpacity = 0
         hasCompletedInitialSelectionFade = false
         
         if nodes.count > 0 {
-            print("   🎬 Triggering initial icon entrance animation")
             animateIconsIn()
             previousNodes = nodes
             isFirstRender = false
@@ -431,7 +428,7 @@ struct RingView: View {
     private func animateSliceBackground(isSurgicalUpdate: Bool) {
         if !sliceConfig.isFullCircle && sliceConfig.positioning == .center {
             if isSurgicalUpdate {
-                print("   ✨ Smooth resize animation")
+                print("   Smooth resize animation")
                 
                 let adjustedEndAngle = sliceConfig.endAngle < sliceConfig.startAngle
                     ? sliceConfig.endAngle + 360
@@ -442,8 +439,6 @@ struct RingView: View {
                     animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
                 }
             } else {
-                print("   🎬 Full entrance animation for slice")
-                
                 let initialSliceSize = 10.0
                 
                 let centerAngle: Double
@@ -551,7 +546,6 @@ struct RingView: View {
             withAnimation(.easeOut(duration: 0.24)) {
                 animatedSliceStartAngle = Angle(degrees: sliceConfig.startAngle)
                 animatedSliceEndAngle = Angle(degrees: adjustedEndAngle)
-                print("   ✅ Animation triggered!")
             }
             
             let selectionDelay = 0.05

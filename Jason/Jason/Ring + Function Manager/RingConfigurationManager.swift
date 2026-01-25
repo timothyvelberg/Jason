@@ -29,7 +29,7 @@ class RingConfigurationManager: ObservableObject {
     
     private init() {
         self.databaseManager = DatabaseManager.shared
-        print("🎛️ [RingConfigManager] Initialized")
+        print("[RingConfigManager] Initialized")
     }
     
     // MARK: - Loading Methods
@@ -37,7 +37,6 @@ class RingConfigurationManager: ObservableObject {
     /// Load all ring configurations from the database
     /// Updates the in-memory cache with all configurations
     func loadConfigurations() {
-        print("[RingConfigManager] Loading all configurations from database...")
         
         let dbConfigs = databaseManager.getAllRingConfigurations()
         

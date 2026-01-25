@@ -106,7 +106,7 @@ class GestureManager {
     // MARK: - Lifecycle
     
     init() {
-//        print("🖱️ GestureManager initialized")
+        print("GestureManager initialized")
         return
     }
     
@@ -118,7 +118,7 @@ class GestureManager {
     
     func startMonitoring() {
         guard !isMonitoring else {
-            print("⚠️ GestureManager already monitoring")
+            print("GestureManager already monitoring")
             return
         }
         
@@ -144,7 +144,7 @@ class GestureManager {
         currentDrag = nil
         
         isMonitoring = false
-        print("🛑 GestureManager stopped monitoring")
+        print("GestureManager stopped monitoring")
     }
     
     // MARK: - Monitor Setup
@@ -241,8 +241,6 @@ class GestureManager {
             startTime: Date(),
             hasMoved: false
         )
-        
-        print("🖱️ Mouse down at \(position) - potential drag started")
     }
     
     private func handleMouseDragged(_ event: NSEvent, button: MouseButton) {
@@ -267,7 +265,7 @@ class GestureManager {
                 modifierFlags: event.modifierFlags
             )
             
-            print("🎯 Drag started from \(drag.startPoint) to \(position) (distance: \(distance)px)")
+            print("Drag started from \(drag.startPoint) to \(position) (distance: \(distance)px)")
             onGesture?(gestureEvent)
             
         } else if drag.hasMoved {
@@ -306,7 +304,7 @@ class GestureManager {
                 modifierFlags: event.modifierFlags
             )
             
-            print("🎯 Drag ended at \(position)")
+            print("Drag ended at \(position)")
             onGesture?(gestureEvent)
             
         } else {
@@ -358,7 +356,7 @@ class GestureManager {
             buttonName = "drag"
         }
         
-        print("🖱️ GestureManager: \(buttonName) at \(gestureEvent.position)")
+        print("GestureManager: \(buttonName) at \(gestureEvent.position)")
         
         // Fire callback
         onGesture?(gestureEvent)

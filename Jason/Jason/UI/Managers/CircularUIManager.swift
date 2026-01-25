@@ -103,24 +103,22 @@ class CircularUIManager: ObservableObject {
 
     @objc private func handleProviderUpdate(_ notification: Notification) {
         guard let updateInfo = ProviderUpdateInfo.from(notification) else {
-            print("❌ Invalid provider update notification")
+            print("Invalid provider update notification")
             return
         }
-        
-        print("📢 [CircularUIManager-\(configId)] Received update for provider: \(updateInfo.providerId)")
         if let folderPath = updateInfo.folderPath {
             print("   Folder: \(folderPath)")
         }
         
         // Only update if UI is visible
         guard isVisible else {
-            print("   ⏭️ UI not visible - ignoring update")
+            
             return
         }
         
         // Check if this provider is currently displayed in any ring
         guard let functionManager = functionManager else {
-            print("   ❌ No FunctionManager")
+            print("   No FunctionManager")
             return
         }
         
@@ -130,13 +128,13 @@ class CircularUIManager: ObservableObject {
         )
         
         if needsUpdate {
-            print("   ✅ Provider is visible - performing surgical update")
+            print("   Provider is visible - performing surgical update")
             functionManager.updateRing(
                 providerId: updateInfo.providerId,
                 contentIdentifier: updateInfo.folderPath
             )
         } else {
-            print("   ⏭️ Provider not currently visible - ignoring")
+            print("   Provider not currently visible - ignoring")
         }
     }
 
@@ -150,13 +148,13 @@ class CircularUIManager: ObservableObject {
             if ring.providerId == providerId {
                 // If no content identifier specified, provider match is enough
                 if contentIdentifier == nil {
-                    print("   🎯 Found matching provider in Ring \(index)")
+                    print("   Found matching provider in Ring \(index)")
                     return true
                 }
                 
                 // If content identifier specified, check it too
                 if ring.contentIdentifier == contentIdentifier {
-                    print("   🎯 Found matching provider + content in Ring \(index): \(contentIdentifier ?? "")")
+                    print("   Found matching provider + content in Ring \(index): \(contentIdentifier ?? "")")
                     return true
                 }
             }
@@ -169,7 +167,7 @@ class CircularUIManager: ObservableObject {
                     node.providerId == providerId && node.type != .category
                 }
                 if hasMatchingNode {
-                    print("   🎯 Found provider '\(providerId)' in mixed Ring \(index) (via node check)")
+                    print("   Found provider '\(providerId)' in mixed Ring \(index) (via node check)")
                     return true
                 }
             }
@@ -186,11 +184,11 @@ class CircularUIManager: ObservableObject {
             iconSize: CGFloat(configuration.iconSize),
             startAngle: CGFloat(configuration.startAngle)
         )
-        print("   ✅ FunctionManager initialized with config values")
+        print("   FunctionManager initialized with config values")
         
         // Create ListPanelManager
         self.listPanelManager = ListPanelManager()
-        print("   ✅ ListPanelManager initialized")
+        print("   ListPanelManager initialized")
         
         // Create provider factory
         let factory = ProviderFactory(
@@ -199,7 +197,7 @@ class CircularUIManager: ObservableObject {
         )
         
         // Create providers from configuration
-        print("🎯 [Setup] Loading providers from configuration")
+        print("   [Setup] Loading providers from configuration")
         print("   Configuration: \(configuration.name)")
         print("   Providers: \(configuration.providers.count)")
         
@@ -214,14 +212,14 @@ class CircularUIManager: ObservableObject {
                 .lowercased()
         }
         
-        print("📋 [Setup] Available config providerTypes: \(configuration.providers.map { $0.providerType })")
+        print("[Setup] Available config providerTypes: \(configuration.providers.map { $0.providerType })")
 
         // Register all providers with their configurations
         for provider in providers {
             // Look up this provider's configuration by matching normalized names
             let normalizedProviderId = normalizeProviderName(provider.providerId)
             
-            print("🔍 [Setup] Matching '\(provider.providerId)' → normalized: '\(normalizedProviderId)'")
+            print("[Setup] Matching '\(provider.providerId)' → normalized: '\(normalizedProviderId)'")
 
             
             let providerConfig = configuration.providers.first { config in
@@ -231,11 +229,11 @@ class CircularUIManager: ObservableObject {
             
             if let config = providerConfig {
                 functionManager?.registerProvider(provider, configuration: config)
-                print("   ✅ Registered '\(provider.providerName)' (providerId: \(provider.providerId)) with config")
+                print("      Registered '\(provider.providerName)' (providerId: \(provider.providerId)) with config")
                 print("      displayMode: \(config.effectiveDisplayMode)")
             } else {
                 functionManager?.registerProvider(provider, configuration: nil)
-                print("   ⚠️ Registered '\(provider.providerName)' (providerId: \(provider.providerId)) WITHOUT config")
+                print("      Registered '\(provider.providerName)' (providerId: \(provider.providerId)) WITHOUT config")
                 print("      Available configs: \(configuration.providers.map { $0.providerType }.joined(separator: ", "))")
             }
             
@@ -248,7 +246,7 @@ class CircularUIManager: ObservableObject {
             }
         }
         
-        print("   ✅ Registered \(providers.count) provider(s)")
+        print("   Registered \(providers.count) provider(s)")
 
         if let functionManager = functionManager {
             self.mouseTracker = MouseTracker(functionManager: functionManager)
@@ -303,7 +301,7 @@ class CircularUIManager: ObservableObject {
                 guard node.needsDynamicLoading,
                       let providerId = node.providerId,
                       let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) else {
-                    print("📋 [ExpandToPanel] Node '\(node.name)' has no children and can't load dynamically")
+                    print("[ExpandToPanel] Node '\(node.name)' has no children and can't load dynamically")
                     return
                 }
                 
@@ -312,7 +310,7 @@ class CircularUIManager: ObservableObject {
                     let children = await provider.loadChildren(for: node)
                     
                     guard !children.isEmpty else {
-                        print("📋 [ExpandToPanel] No children loaded for: \(node.name)")
+                        print("[ExpandToPanel] No children loaded for: \(node.name)")
                         return
                     }
                     
@@ -397,7 +395,7 @@ class CircularUIManager: ObservableObject {
                     let children = await provider.loadChildren(for: node)
                     
                     guard !children.isEmpty else {
-                        print("📋 [Panel] No children loaded for: \(node.name)")
+                        print("[Panel] No children loaded for: \(node.name)")
                         return
                     }
                     
@@ -421,7 +419,7 @@ class CircularUIManager: ObservableObject {
             listPanelManager?.onReloadContent = { [weak self] providerId, contentIdentifier in
                 guard let self = self,
                       let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) else {
-                    print("❌ [Panel Reload] Provider '\(providerId)' not found")
+                    print("[Panel Reload] Provider '\(providerId)' not found")
                     return []
                 }
                 
@@ -436,9 +434,9 @@ class CircularUIManager: ObservableObject {
                     providerId: providerId
                 )
                 
-                print("🔄 [Panel Reload] Reloading content for '\(contentIdentifier ?? "unknown")'")
+                print("[Panel Reload] Reloading content for '\(contentIdentifier ?? "unknown")'")
                 let freshChildren = await provider.loadChildren(for: reloadNode)
-                print("🔄 [Panel Reload] Got \(freshChildren.count) items")
+                print("[Panel Reload] Got \(freshChildren.count) items")
                 
                 return freshChildren
             }
@@ -486,7 +484,7 @@ class CircularUIManager: ObservableObject {
         // Check if click is inside the panel
         if let panelManager = listPanelManager {
             if let result = panelManager.handleLeftClick(at: event.position) {
-                print("🖱️ [Left Click] Panel item: '\(result.node.name)' at level \(result.level)")
+                print("[Left Click] Panel item: '\(result.node.name)' at level \(result.level)")
                 handlePanelItemLeftClick(node: result.node, modifiers: event.modifierFlags, fromLevel: result.level)
                 return
             }
@@ -498,15 +496,15 @@ class CircularUIManager: ObservableObject {
                     // Check if click was in close zone
                     let distance = hypot(event.position.x - centerPoint.x, event.position.y - centerPoint.y)
                     if distance < FunctionManager.closeZoneRadius {
-                        print("🎯 [Left Click] In close zone - closing UI")
+                        print("[Left Click] In close zone - closing UI")
                         hide()
                     } else {
-                        print("⚠️ Left-click not on any item")
+                        print("Left-click not on any item")
                     }
                     return
                 }
         
-        print("🖱️ [Left Click] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
+        print("[Left Click] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
         // Resolve behavior based on current modifier flags
         let behavior = node.onLeftClick.resolve(with: event.modifierFlags)
@@ -520,11 +518,11 @@ class CircularUIManager: ObservableObject {
         case .expand:
             functionManager.expandCategory(ringLevel: ringLevel, index: index, openedByClick: true)
         case .navigateInto:
-            print("📂 Navigating into folder: '\(node.name)'")
+            print("Navigating into folder: '\(node.name)'")
             functionManager.navigateIntoFolder(ringLevel: ringLevel, index: index)
         case .launchRing(let configId):
-            print("🚀 [Left Click] Launching ring config \(configId)")
-            print("🚀 [Left Click] Launching ring config \(configId) from item '\(node.name)' (id: \(node.id))")
+            print("[Left Click] Launching ring config \(configId)")
+            print("[Left Click] Launching ring config \(configId) from item '\(node.name)' (id: \(node.id))")
             hide()  // Hide current ring first
             
             // Small delay to ensure clean transition
@@ -538,7 +536,7 @@ class CircularUIManager: ObservableObject {
                 action()
                 hide()
             case .navigate:
-                print("📂 Navigating into draggable folder: '\(node.name)'")
+                print("Navigating into draggable folder: '\(node.name)'")
                 functionManager.navigateIntoFolder(ringLevel: ringLevel, index: index)
             case .none:
                 break
@@ -552,12 +550,12 @@ class CircularUIManager: ObservableObject {
         // 1. Check if drag started inside a panel FIRST
         if let panelManager = listPanelManager {
             if let result = panelManager.handleDragStart(at: event.position) {
-                print("🖱️ [Drag Start] On panel item: '\(result.node.name)' at level \(result.level)")
+                print("[Drag Start] On panel item: '\(result.node.name)' at level \(result.level)")
                 
                 // Stop tracking during drag
                 mouseTracker?.stopTrackingMouse()
                 gestureManager?.stopMonitoring()
-                print("⏸️ Mouse tracking paused for panel drag operation")
+                print("Mouse tracking paused for panel drag operation")
                 
                 // Copy provider and update modifier flags
                 var provider = result.dragProvider
@@ -575,7 +573,7 @@ class CircularUIManager: ObservableObject {
                 provider.onDragCompleted = { [weak self] success in
                     originalCompletion?(success)
                     DispatchQueue.main.async {
-                        print("🏁 Panel drag completed - hiding UI")
+                        print("Panel drag completed - hiding UI")
                         self?.hide()
                     }
                 }
@@ -584,7 +582,7 @@ class CircularUIManager: ObservableObject {
                 self.dragStartPoint = event.position
                 self.draggedNode = result.node
                 
-                print("✅ Panel drag initialized for: \(result.node.name)")
+                print("Panel drag initialized for: \(result.node.name)")
                 print("   Files: \(provider.fileURLs.map { $0.lastPathComponent }.joined(separator: ", "))")
                 
                 provider.onDragStarted?()
@@ -596,11 +594,11 @@ class CircularUIManager: ObservableObject {
         guard let functionManager = functionManager else { return }
         
         guard let (ringLevel, index, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) else {
-            print("⚠️ Drag start not on any item")
+            print("Drag start not on any item")
             return
         }
         
-        print("🖱️ [Drag Start] On ring item: '\(node.name)' at ring \(ringLevel), index \(index)")
+        print("[Drag Start] On ring item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
         // Check if the node is draggable (resolve with current modifiers)
         let behavior = node.onLeftClick.resolve(with: event.modifierFlags)
@@ -609,7 +607,7 @@ class CircularUIManager: ObservableObject {
             // Stop mouse tracking during drag
             mouseTracker?.stopTrackingMouse()
             gestureManager?.stopMonitoring()
-            print("⏸️ Mouse tracking paused for drag operation")
+            print("Mouse tracking paused for drag operation")
             
             // Store modifier flags at drag start
             provider.modifierFlags = event.modifierFlags
@@ -619,7 +617,7 @@ class CircularUIManager: ObservableObject {
             provider.onDragCompleted = { [weak self] success in
                 originalCompletion?(success)
                 DispatchQueue.main.async {
-                    print("🏁 Drag completed - hiding UI")
+                    print("Drag completed - hiding UI")
                     self?.hide()
                 }
             }
@@ -628,13 +626,13 @@ class CircularUIManager: ObservableObject {
             self.dragStartPoint = event.position
             self.draggedNode = node
             
-            print("✅ Ring drag initialized for: \(node.name)")
+            print("Ring drag initialized for: \(node.name)")
             print("   Files: \(provider.fileURLs.map { $0.lastPathComponent }.joined(separator: ", "))")
             print("   Modifiers: \(event.modifierFlags)")
             
             provider.onDragStarted?()
         } else {
-            print("⚠️ Node is not draggable")
+            print("Node is not draggable")
         }
     }
     
@@ -656,12 +654,12 @@ class CircularUIManager: ObservableObject {
                 
                 switch behavior {
                 case .navigateInto:
-                    print("📜 Scroll detected - navigating into folder")
+                    print("Scroll detected - navigating into folder")
                     functionManager.navigateIntoFolder(ringLevel: hoveredRingLevel, index: hoveredIndex)
                     mouseTracker?.pauseUntilMovement()
                     
                 case .expand:
-                    print("📜 Scroll detected - expanding category")
+                    print("Scroll detected - expanding category")
                     functionManager.expandCategory(ringLevel: hoveredRingLevel, index: hoveredIndex, openedByClick: true)
                     mouseTracker?.pauseUntilMovement()
                     
@@ -681,7 +679,7 @@ class CircularUIManager: ObservableObject {
         // Go back one level
         let currentLevel = functionManager.activeRingLevel
         if currentLevel > 0 {
-            print("📜 Scroll back detected - collapsing to ring \(currentLevel - 1)")
+            print("Scroll back detected - collapsing to ring \(currentLevel - 1)")
             functionManager.collapseToRing(level: currentLevel - 1)
             mouseTracker?.pauseUntilMovement()
         }
@@ -689,7 +687,7 @@ class CircularUIManager: ObservableObject {
     
     private func handleRightClick(event: GestureManager.GestureEvent) {
         if let panelManager = listPanelManager, panelManager.handleRightClick(at: event.position) {
-            print("🖱️ [Right Click] Handled by panel")
+            print("[Right Click] Handled by panel")
             return
         }
         
@@ -697,11 +695,11 @@ class CircularUIManager: ObservableObject {
         
         // Use position-based detection instead of hoveredIndex
         guard let (ringLevel, index, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) else {
-            print("⚠️ Right-click not on any item")
+            print("Right-click not on any item")
             return
         }
         
-        print("🖱️ [Right Click] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
+        print("[Right Click] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
         // Resolve behavior based on current modifier flags
         let behavior = node.onRightClick.resolve(with: event.modifierFlags)
@@ -713,13 +711,13 @@ class CircularUIManager: ObservableObject {
             mouseTracker?.pauseUntilMovement()
             
         case .navigateInto:
-            print("📂 Navigating into folder: '\(node.name)'")
+            print("Navigating into folder: '\(node.name)'")
             functionManager.navigateIntoFolder(ringLevel: ringLevel, index: index)
             // Pause mouse tracking to prevent immediate collapse
             mouseTracker?.pauseUntilMovement()
             
         case .launchRing(let configId):
-            print("🚀 [Right Click] Launching ring config \(configId)")
+            print("[Right Click] Launching ring config \(configId)")
             hide()  // Hide current ring first
             
             // Small delay to ensure clean transition
@@ -744,15 +742,15 @@ class CircularUIManager: ObservableObject {
         
         // Use position-based detection instead of hoveredIndex
         guard let (ringLevel, index, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) else {
-            print("⚠️ Middle-click not on any item")
+            print("Middle-click not on any item")
             return
         }
         
-        print("🖱️ [Middle Click] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
+        print("[Middle Click] On item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
         // Check if node is previewable - if so, show preview instead of executing action
         if node.isPreviewable, let previewURL = node.previewURL {
-            print("👁️ [Middle Click] Node is previewable - showing Quick Look")
+            print("[Middle Click] Node is previewable - showing Quick Look")
             QuickLookManager.shared.togglePreview(for: previewURL)
             return
         }
@@ -767,7 +765,7 @@ class CircularUIManager: ObservableObject {
         case .executeKeepOpen(let action):
             action()
         case .launchRing(let configId):
-            print("🚀 [Middle Click] Launching ring config \(configId)")
+            print("[Middle Click] Launching ring config \(configId)")
             hide()  // Hide current ring first
             
             // Small delay to ensure clean transition
@@ -786,7 +784,7 @@ class CircularUIManager: ObservableObject {
     }
 
     private func handlePanelItemLeftClick(node: FunctionNode, modifiers: NSEvent.ModifierFlags, fromLevel level: Int) {
-        print("🖱️ [Panel Left Click] On item: '\(node.name)' at level \(level)")
+        print("[Panel Left Click] On item: '\(node.name)' at level \(level)")
         
         let behavior = node.onLeftClick.resolve(with: modifiers)
         
@@ -801,7 +799,7 @@ class CircularUIManager: ObservableObject {
         case .expand, .navigateInto:
             // Check if we should cascade to panel
             guard let children = node.children, !children.isEmpty else {
-                print("📋 [Panel] Node '\(node.name)' has no children")
+                print("[Panel] Node '\(node.name)' has no children")
                 return
             }
             
@@ -815,7 +813,7 @@ class CircularUIManager: ObservableObject {
             )
             
         case .launchRing(let configId):
-            print("🚀 [Panel] Launching ring config \(configId)")
+            print("[Panel] Launching ring config \(configId)")
             hide()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 CircularUIInstanceManager.shared.show(configId: configId)
@@ -846,7 +844,7 @@ class CircularUIManager: ObservableObject {
     }
     
     private func handlePanelContextAction(actionNode: FunctionNode, modifiers: NSEvent.ModifierFlags) {
-        print("🖱️ [Panel Context Action] '\(actionNode.name)'")
+        print("[Panel Context Action] '\(actionNode.name)'")
         
         // Context actions typically use onLeftClick for their action
         let behavior = actionNode.onLeftClick.resolve(with: modifiers)
@@ -867,12 +865,12 @@ class CircularUIManager: ObservableObject {
             }
             
         default:
-            print("⚠️ [Panel Context] Unhandled behavior for '\(actionNode.name)'")
+            print("[Panel Context] Unhandled behavior for '\(actionNode.name)'")
         }
     }
 
     private func handlePanelItemRightClick(node: FunctionNode, modifiers: NSEvent.ModifierFlags) {
-        print("🖱️ [Panel Right Click] On item: '\(node.name)'")
+        print("[Panel Right Click] On item: '\(node.name)'")
         
         let behavior = node.onRightClick.resolve(with: modifiers)
         
@@ -887,7 +885,7 @@ class CircularUIManager: ObservableObject {
         case .expand:
             // Show context actions if available
             if let contextActions = node.contextActions, !contextActions.isEmpty {
-                print("📋 [Panel] Expanding context actions for '\(node.name)'")
+                print("[Panel] Expanding context actions for '\(node.name)'")
                 if let manager = listPanelManager {
                     manager.show(
                         title: node.name,
@@ -901,7 +899,7 @@ class CircularUIManager: ObservableObject {
             }
             
         case .launchRing(let configId):
-            print("🚀 [Panel Right Click] Launching ring config \(configId)")
+            print("[Panel Right Click] Launching ring config \(configId)")
             hide()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 CircularUIInstanceManager.shared.show(configId: configId)
@@ -953,17 +951,17 @@ class CircularUIManager: ObservableObject {
         
         let activeRingLevel = functionManager.activeRingLevel
         guard activeRingLevel < functionManager.rings.count else {
-            print("⚠️ No active ring for preview")
+            print("No active ring for preview")
             return
         }
         
         guard let hoveredIndex = functionManager.rings[activeRingLevel].hoveredIndex else {
-            print("⚠️ No item currently hovered for preview")
+            print("No item currently hovered for preview")
             return
         }
         
         guard hoveredIndex < functionManager.rings[activeRingLevel].nodes.count else {
-            print("⚠️ Invalid hovered index for preview")
+            print("Invalid hovered index for preview")
             return
         }
         
@@ -971,11 +969,11 @@ class CircularUIManager: ObservableObject {
         
         // Check if node is previewable
         guard node.isPreviewable, let previewURL = node.previewURL else {
-            print("⚠️ Node '\(node.name)' is not previewable")
+            print("Node '\(node.name)' is not previewable")
             return
         }
         
-        print("👁️ [Preview] Showing Quick Look for: \(node.name)")
+        print("[Preview] Showing Quick Look for: \(node.name)")
         QuickLookManager.shared.showPreview(for: previewURL)
     }
     
@@ -985,25 +983,25 @@ class CircularUIManager: ObservableObject {
     func executeHoveredItemIfInHoldMode() {
         // Only execute in hold mode AND if auto-execute is enabled
         guard isInHoldMode else {
-            print("⏭️ [HoldMode] Not in hold mode - skipping auto-execute")
+            print("[HoldMode] Not in hold mode - skipping auto-execute")
             return
         }
         
         // Check if auto-execute is enabled for this configuration
         guard configuration.autoExecuteOnRelease else {
-            print("⏭️ [HoldMode] Auto-execute disabled for this ring - skipping")
+            print("[HoldMode] Auto-execute disabled for this ring - skipping")
             return
         }
         
         guard let functionManager = functionManager else {
-            print("❌ [HoldMode] No FunctionManager")
+            print("[HoldMode] No FunctionManager")
             return
         }
         
         // Get the active ring
         let activeRingLevel = functionManager.activeRingLevel
         guard activeRingLevel < functionManager.rings.count else {
-            print("❌ [HoldMode] Invalid ring level: \(activeRingLevel)")
+            print("[HoldMode] Invalid ring level: \(activeRingLevel)")
             return
         }
         
@@ -1011,18 +1009,18 @@ class CircularUIManager: ObservableObject {
         
         // Check if there's a hovered item
         guard let hoveredIndex = ring.hoveredIndex else {
-            print("⏭️ [HoldMode] No item currently hovered - skipping auto-execute")
+            print("[HoldMode] No item currently hovered - skipping auto-execute")
             return
         }
         
         guard hoveredIndex < ring.nodes.count else {
-            print("❌ [HoldMode] Invalid hovered index: \(hoveredIndex)")
+            print("[HoldMode] Invalid hovered index: \(hoveredIndex)")
             return
         }
         
         let selectedNode = ring.nodes[hoveredIndex]
         
-        print("✅ [HoldMode] Hold released - auto-executing: \(selectedNode.name)")
+        print("[HoldMode] Hold released - auto-executing: \(selectedNode.name)")
         
         // Execute the item's left click action (resolve with no modifiers since key/button was just released)
         let behavior = selectedNode.onLeftClick.resolve(with: [])
@@ -1035,17 +1033,17 @@ class CircularUIManager: ObservableObject {
             action()
             // Note: hide() will be called after this method returns (we don't honor keepOpen in hold mode)
         default:
-            print("⚠️ [HoldMode] Selected node doesn't have execute action")
+            print("[HoldMode] Selected node doesn't have execute action")
         }
     }
     
     func handleCtrlReleaseInAppSwitcher() {
         guard isInAppSwitcherMode else { return }
         
-        print("⌨️ [App Switcher] Ctrl released - switching to hovered app")
+        print("[App Switcher] Ctrl released - switching to hovered app")
         
         guard let functionManager = functionManager else {
-            print("❌ No FunctionManager")
+            print("No FunctionManager")
             exitAppSwitcherMode()
             hide()
             return
@@ -1054,7 +1052,7 @@ class CircularUIManager: ObservableObject {
         // We should be in Ring 1 (apps ring)
         guard functionManager.activeRingLevel == 1,
               functionManager.rings.count > 1 else {
-            print("❌ Not in apps ring (level: \(functionManager.activeRingLevel))")
+            print("Not in apps ring (level: \(functionManager.activeRingLevel))")
             exitAppSwitcherMode()
             hide()
             return
@@ -1063,7 +1061,7 @@ class CircularUIManager: ObservableObject {
         let ring = functionManager.rings[1]
         
         guard let hoveredIndex = ring.hoveredIndex else {
-            print("❌ No app currently hovered")
+            print("No app currently hovered")
             exitAppSwitcherMode()
             hide()
             return
@@ -1071,7 +1069,7 @@ class CircularUIManager: ObservableObject {
         
         let selectedNode = ring.nodes[hoveredIndex]
         
-        print("✅ Ctrl released - switching to app: \(selectedNode.name)")
+        print("Ctrl released - switching to app: \(selectedNode.name)")
         
         // Execute the app's left click action (resolve with no modifiers since Ctrl was just released)
         let behavior = selectedNode.onLeftClick.resolve(with: [])
@@ -1082,7 +1080,7 @@ class CircularUIManager: ObservableObject {
             exitAppSwitcherMode()
             hide()
         default:
-            print("⚠️ Selected node doesn't have execute action")
+            print("Selected node doesn't have execute action")
             exitAppSwitcherMode()
             hide()
         }
@@ -1090,7 +1088,7 @@ class CircularUIManager: ObservableObject {
 
     private func exitAppSwitcherMode() {
         if isInAppSwitcherMode {
-            print("🚪 Exiting app switcher mode")
+            print("Exiting app switcher mode")
         }
         isInAppSwitcherMode = false
     }
@@ -1113,28 +1111,28 @@ class CircularUIManager: ObservableObject {
         
         // Store trigger direction for animation
         self.triggerDirection = triggerDirection
-        print("🔄 [CircularUIManager] triggerDirection set to: \(String(describing: triggerDirection))")
+        print("[CircularUIManager] triggerDirection set to: \(String(describing: triggerDirection))")
 
         
-        // 🆕 Refresh badge cache before loading functions
+        // Refresh badge cache before loading functions
         DockBadgeReader.shared.forceRefresh()
         
-        // 🆕 ADDED: Register as the active CircularUIManager
+        // Register as the active CircularUIManager
         print("🔗 [CircularUIManager-\(configId)] Registering as active instance with AppSwitcherManager")
         AppSwitcherManager.shared.activeCircularUIManager = self
         
         // Save the currently active app BEFORE we show our UI
         previousApp = NSWorkspace.shared.frontmostApplication
         if let prevApp = previousApp {
-            print("💾 Saved previous app: \(prevApp.localizedName ?? "Unknown")")
+            print("Saved previous app: \(prevApp.localizedName ?? "Unknown")")
         }
         
         // Load functions (and optionally expand to a category)
         if let providerId = providerId {
-            print("🎯 [CircularUIManager] Showing UI expanded to: \(providerId)")
+            print("[CircularUIManager] Showing UI expanded to: \(providerId)")
             functionManager.loadAndExpandToCategory(providerId: providerId)
             
-            // IMPORTANT: Tell MouseTracker we're starting at Ring 0 (even though Ring 1 is active)
+            // Tell MouseTracker we're starting at Ring 0 (even though Ring 1 is active)
             // This way, when user moves back to Ring 0, it will collapse
             mouseTracker?.ringLevelAtPause = 0
         } else {
@@ -1157,8 +1155,6 @@ class CircularUIManager: ObservableObject {
         if let providerId = providerId {
             print("   Expanded to category: \(providerId)")
         }
-        print("   Active ring level: \(functionManager.activeRingLevel)")
-        print("   Total rings: \(functionManager.rings.count)")
     }
     
     // MARK: - Hide Method
@@ -1185,18 +1181,18 @@ class CircularUIManager: ObservableObject {
         
         // Unregister as the active CircularUIManager
         if AppSwitcherManager.shared.activeCircularUIManager === self {
-            print("🔓 [CircularUIManager-\(configId)] Unregistering as active instance")
+            print("[CircularUIManager-\(configId)] Unregistering as active instance")
             AppSwitcherManager.shared.activeCircularUIManager = nil
         }
         
         // Only restore previous app if we're NOT intentionally switching
         if !isIntentionallySwitching {
             if let prevApp = previousApp, prevApp.isTerminated == false {
-                print("🔄 Restoring focus to: \(prevApp.localizedName ?? "Unknown")")
+                print("Restoring focus to: \(prevApp.localizedName ?? "Unknown")")
                 prevApp.activate()
             }
         } else {
-            print("⏭️ Skipping restore - intentionally switching apps")
+            print("Skipping restore - intentionally switching apps")
         }
         
         // Reset all state for clean slate on next show
@@ -1227,7 +1223,7 @@ class CircularUIManager: ObservableObject {
         isVisible = false
         overlayWindow?.hideOverlay()
         
-        print("🎯 Switching to selected app: \(app.localizedName ?? "Unknown")")
+        print("Switching to selected app: \(app.localizedName ?? "Unknown")")
         
         // Activate the app AFTER setting the flag
         app.activate()
@@ -1240,7 +1236,7 @@ class CircularUIManager: ObservableObject {
 
     func showTestRingForPanelIntegration() {
         guard let functionManager = functionManager else {
-            print("❌ [Test] FunctionManager not initialized")
+            print("[Test] FunctionManager not initialized")
             return
         }
         
@@ -1276,7 +1272,7 @@ class CircularUIManager: ObservableObject {
         mouseTracker?.startTrackingMouse()
         gestureManager?.startMonitoring()
         
-        print("🧪 [Test] Showing test ring with \(itemCount) items, \(anglePerItem)° per item")
+        print("[Test] Showing test ring with \(itemCount) items, \(anglePerItem)° per item")
     }
 
     private func showPanelForFolder(title: String,contents: [FunctionNode], atAngle angle: Double) {
@@ -1297,7 +1293,7 @@ class CircularUIManager: ObservableObject {
             angle: angle
         )
         
-        print("📋 [Test] Panel triggered at angle \(angle)°")
+        print("[Test] Panel triggered at angle \(angle)°")
     }
 
     private func createMockFolderNode(name: String, onTap: (() -> Void)? = nil) -> FunctionNode {
@@ -1335,7 +1331,7 @@ class CircularUIManager: ObservableObject {
         if let monitor = panelMouseMonitor {
             NSEvent.removeMonitor(monitor)
             panelMouseMonitor = nil
-            print("⏸️ [MouseMonitor] Paused")
+            print("[MouseMonitor] Paused")
         }
     }
 
@@ -1355,6 +1351,6 @@ class CircularUIManager: ObservableObject {
             
             return event
         }
-        print("▶️ [MouseMonitor] Resumed")
+        print("[MouseMonitor] Resumed")
     }
 }
