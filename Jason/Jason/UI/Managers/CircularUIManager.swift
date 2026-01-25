@@ -396,6 +396,9 @@ class CircularUIManager: ObservableObject {
                     
                     guard !children.isEmpty else {
                         print("[Panel] No children loaded for: \(node.name)")
+                        await MainActor.run {
+                            self.listPanelManager?.popToLevel(level)
+                        }
                         return
                     }
                     
