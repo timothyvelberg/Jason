@@ -50,7 +50,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
     
     init() {
         print("FavoriteFilesProvider initialized")
-//        loadFiles()
+        loadFiles()
     }
     
     // MARK: - File Loading

@@ -145,26 +145,26 @@ struct FavoritesSettingsSection: View {
             Group {
                 switch selectedFavoriteType {
                 case .folders:
-                    if let instance = instanceManager.getFirstInstance() {
+                    if let instance = instanceManager.instances.values.first(where: {
+                        $0.functionManager?.providers.contains(where: { $0 is FavoriteFolderProvider }) ?? false
+                    }) {
                         FavoritesSettingsView(circularUI: instance)
                     } else {
-                        noInstanceView
+                        noProviderView(for: "Favorite Folders", providerType: "FavoriteFolderProvider")
                     }
                     
                 case .files:
-                    if let instance = instanceManager.getFirstInstance(),
-                       let filesProvider = instance.favoriteFilesProvider {
+                    if let filesProvider = instanceManager.instances.values.compactMap({ $0.favoriteFilesProvider }).first {
                         FavoriteFilesSettingsView(filesProvider: filesProvider)
                     } else {
-                        noInstanceView
+                        noProviderView(for: "Favorite Files", providerType: "FavoriteFilesProvider")
                     }
                     
                 case .apps:
-                    if let instance = instanceManager.getFirstInstance(),
-                       let appsProvider = instance.functionManager?.favoriteAppsProvider {
+                    if let appsProvider = instanceManager.instances.values.compactMap({ $0.functionManager?.favoriteAppsProvider }).first {
                         FavoriteAppsSettingsView(appsProvider: appsProvider)
                     } else {
-                        noInstanceView
+                        noProviderView(for: "Favorite Apps", providerType: "CombinedAppsProvider")
                     }
                 }
             }
@@ -172,11 +172,12 @@ struct FavoritesSettingsSection: View {
         .navigationTitle("Favorites")
     }
     
-    private var noInstanceView: some View {
+    // Replace noInstanceView with this more informative version:
+    private func noProviderView(for name: String, providerType: String) -> some View {
         ContentUnavailableView(
-            "No Ring Instance",
+            "No \(name) Provider",
             systemImage: "circle.dashed",
-            description: Text("Create a ring configuration first")
+            description: Text("Add \(providerType) to a ring configuration to manage \(name.lowercased())")
         )
     }
 }
