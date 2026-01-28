@@ -192,6 +192,24 @@ class DatabaseManager {
         ON ring_configurations(shortcut) 
         WHERE is_active = 1;
         """
+        
+        // Create ring_triggers table
+        let ringTriggersSQL = """
+        CREATE TABLE IF NOT EXISTS ring_triggers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ring_id INTEGER NOT NULL,
+            trigger_type TEXT NOT NULL,
+            key_code INTEGER,
+            modifier_flags INTEGER DEFAULT 0,
+            button_number INTEGER,
+            swipe_direction TEXT,
+            finger_count INTEGER,
+            is_hold_mode INTEGER DEFAULT 0,
+            auto_execute_on_release INTEGER DEFAULT 1,
+            created_at INTEGER DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (ring_id) REFERENCES ring_configurations(id) ON DELETE CASCADE
+        );
+        """
 
         // Create ring_providers table
         let ringProvidersSQL = """
@@ -233,7 +251,8 @@ class DatabaseManager {
             ringConfigurationsIndexSQL,
             ringProvidersSQL,
             ringProvidersIndexSQL,
-            circleCalibrationSQL
+            circleCalibrationSQL,
+            ringTriggersSQL
         ]
         
         for sql in tables {

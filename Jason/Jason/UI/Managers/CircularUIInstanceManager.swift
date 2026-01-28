@@ -192,7 +192,7 @@ class CircularUIInstanceManager: ObservableObject {
     
     // MARK: - Input Trigger Management
 
-    /// Register keyboard shortcuts and mouse buttons for all active instances
+    /// Register all triggers for all active instances
     func registerInputTriggers() {
         print("[InstanceManager] Registering input triggers for all instances...")
         
@@ -203,142 +203,162 @@ class CircularUIInstanceManager: ObservableObject {
         hotkeyManager.unregisterAllCircles()
         
         let activeConfigs = configurationManager.getActiveConfigurations()
-        var holdKeyConfigured = false
         
         for config in activeConfigs {
-            var hasKeyboardShortcut = false
-            var hasMouseButton = false
-            
-            if config.triggerType == "keyboard",
-               let keyCode = config.keyCode {
-                let modifierFlags = config.modifierFlags ?? 0
-                
-                if config.isHoldMode {
-                    // HOLD MODE: Show while key is held, hide on release
-                    print("[InstanceManager] Registering HOLD mode for '\(config.name)' (ID: \(config.id))")
-                    
-                    hotkeyManager.registerShortcut(
-                        keyCode: keyCode,
-                        modifierFlags: modifierFlags,
-                        isHoldMode: true,
-                        forConfigId: config.id,
-                        onPress: { [weak self] in
-                            print("🔽 [InstanceManager] Hold key PRESSED for '\(config.name)'")
-                            self?.showInHoldMode(configId: config.id)
-                        },
-                        onRelease: { [weak self] in
-                            print("🔼 [InstanceManager] Hold key RELEASED for '\(config.name)'")
-                            self?.hideFromHoldMode(configId: config.id)
-                        }
-                    )
-                    hasKeyboardShortcut = true
-                } else {
-                    // TAP MODE: Toggle on each press
-                    print("[InstanceManager] Registering TAP mode for '\(config.name)' (ID: \(config.id))")
-                    
-                    hotkeyManager.registerShortcut(
-                        keyCode: keyCode,
-                        modifierFlags: modifierFlags,
-                        isHoldMode: false,
-                        forConfigId: config.id,
-                        onPress: { [weak self] in
-                            print("🎯 [InstanceManager] Keyboard shortcut triggered for '\(config.name)' (ID: \(config.id))")
-                            self?.show(configId: config.id)
-                        }
-                    )
-                    hasKeyboardShortcut = true
-                }
-            }
-            
-            // Register mouse button if configured
-            if config.triggerType == "mouse",
-               let buttonNumber = config.buttonNumber {
-                let modifierFlags = config.modifierFlags ?? 0
-                
-                if config.isHoldMode {
-                    // Mouse button hold mode not yet supported
-                    print("   ⚠️ Skipping '\(config.name)' - mouse button hold mode not yet implemented")
-                } else {
-                    // TAP MODE for mouse buttons
-                    print("[InstanceManager] Registering mouse button TAP mode for '\(config.name)' (ID: \(config.id))")
-                    hotkeyManager.registerMouseButton(
-                        buttonNumber: buttonNumber,
-                        modifierFlags: modifierFlags,
-                        forConfigId: config.id
-                    ) { [weak self] in
-                        print("🎯 [InstanceManager] Mouse button triggered for '\(config.name)' (ID: \(config.id))")
-                        self?.show(configId: config.id)
-                    }
-                    hasMouseButton = true
-                }
-            }
-            
-            // Register trackpad gesture if configured
-            if config.triggerType == "trackpad",
-               let swipeDirection = config.swipeDirection,
-               let fingerCount = config.fingerCount {
-                let modifierFlags = config.modifierFlags ?? 0
-                
-                if config.isHoldMode {
-                    // Trackpad hold mode not yet supported
-                    print("   ⚠️ Skipping '\(config.name)' - trackpad hold mode not yet implemented")
-                } else {
-                    // Check if this is a circle gesture
-                    if swipeDirection == "circleClockwise" || swipeDirection == "circleCounterClockwise" {
-                        let direction: RotationDirection = swipeDirection == "circleClockwise" ? .clockwise : .counterClockwise
-                        
-                        print("[InstanceManager] Registering circle gesture for '\(config.name)' (ID: \(config.id))")
-                        
-                        hotkeyManager.registerCircle(
-                            direction: direction,
-                            fingerCount: fingerCount,
-                            modifierFlags: modifierFlags,
-                            forConfigId: config.id
-                        ) { [weak self] triggerDirection in
-                            print("🎯 [InstanceManager] Circle gesture triggered for '\(config.name)' (ID: \(config.id)), direction: \(triggerDirection)")
-                            self?.show(configId: config.id, triggerDirection: triggerDirection)
-                        }
-                        // NEW: Check if this is a two-finger tap gesture
-                    } else if swipeDirection == "twoFingerTapLeft" || swipeDirection == "twoFingerTapRight" {
-                        let side: TapSide = swipeDirection == "twoFingerTapLeft" ? .left : .right
-                        
-                        print("[InstanceManager] Registering two-finger tap for '\(config.name)' (ID: \(config.id))")
-                        
-                        hotkeyManager.registerTwoFingerTap(
-                            side: side,
-                            modifierFlags: modifierFlags,
-                            forConfigId: config.id
-                        ) { [weak self] triggerSide in
-                            print("🎯 [InstanceManager] Two-finger tap triggered for '\(config.name)' (ID: \(config.id)), side: \(triggerSide)")
-                            self?.show(configId: config.id)
-                        }
-                    } else {
-                        // SWIPE/TAP gesture (existing behavior)
-                        print("[InstanceManager] Registering trackpad gesture TAP mode for '\(config.name)' (ID: \(config.id))")
-                        hotkeyManager.registerSwipe(
-                            direction: swipeDirection,
-                            fingerCount: fingerCount,
-                            modifierFlags: modifierFlags,
-                            forConfigId: config.id
-                        ) { [weak self] in
-                            print("🎯 [InstanceManager] Trackpad gesture triggered for '\(config.name)' (ID: \(config.id))")
-                            self?.show(configId: config.id)
-                        }
-                    }
-                    hasMouseButton = true  // Mark as having a trigger
-                }
-            }
-            
-            // Only skip if NO triggers are configured
-            if !hasKeyboardShortcut && !hasMouseButton {
+            // Skip configs with no triggers
+            guard config.hasTriggers else {
                 print("   Skipping '\(config.name)' - no triggers configured")
+                continue
+            }
+            
+            // Register each trigger for this config
+            for trigger in config.triggers {
+                registerTrigger(trigger, forConfig: config)
             }
         }
         
         print("[InstanceManager] Registration complete!")
     }
     
+    /// Register a single trigger for a configuration
+    private func registerTrigger(_ trigger: TriggerConfiguration, forConfig config: StoredRingConfiguration) {
+        switch trigger.triggerType {
+        case "keyboard":
+            registerKeyboardTrigger(trigger, forConfig: config)
+        case "mouse":
+            registerMouseTrigger(trigger, forConfig: config)
+        case "trackpad":
+            registerTrackpadTrigger(trigger, forConfig: config)
+        default:
+            print("   ⚠️ Unknown trigger type '\(trigger.triggerType)' for '\(config.name)'")
+        }
+    }
     
+    /// Register a keyboard trigger
+    private func registerKeyboardTrigger(_ trigger: TriggerConfiguration, forConfig config: StoredRingConfiguration) {
+        guard let keyCode = trigger.keyCode else {
+            print("   ⚠️ Keyboard trigger missing keyCode for '\(config.name)'")
+            return
+        }
+        
+        if trigger.isHoldMode {
+            print("[InstanceManager] Registering keyboard HOLD: \(trigger.displayDescription) for '\(config.name)'")
+            
+            hotkeyManager.registerShortcut(
+                keyCode: keyCode,
+                modifierFlags: trigger.modifierFlags,
+                isHoldMode: true,
+                forConfigId: config.id,
+                onPress: { [weak self] in
+                    print("🔽 [InstanceManager] Hold key PRESSED for '\(config.name)'")
+                    self?.showInHoldMode(configId: config.id, trigger: trigger)
+                },
+                onRelease: { [weak self] in
+                    print("🔼 [InstanceManager] Hold key RELEASED for '\(config.name)'")
+                    self?.hideFromHoldMode(configId: config.id)
+                }
+            )
+        } else {
+            print("[InstanceManager] Registering keyboard TAP: \(trigger.displayDescription) for '\(config.name)'")
+            
+            hotkeyManager.registerShortcut(
+                keyCode: keyCode,
+                modifierFlags: trigger.modifierFlags,
+                isHoldMode: false,
+                forConfigId: config.id,
+                onPress: { [weak self] in
+                    print("🎯 [InstanceManager] Keyboard triggered for '\(config.name)'")
+                    self?.show(configId: config.id)
+                }
+            )
+        }
+    }
+    
+    /// Register a mouse button trigger
+    private func registerMouseTrigger(_ trigger: TriggerConfiguration, forConfig config: StoredRingConfiguration) {
+        guard let buttonNumber = trigger.buttonNumber else {
+            print("   ⚠️ Mouse trigger missing buttonNumber for '\(config.name)'")
+            return
+        }
+        
+        if trigger.isHoldMode {
+            print("   ⚠️ Mouse button hold mode not yet implemented for '\(config.name)'")
+            return
+        }
+        
+        print("[InstanceManager] Registering mouse TAP: \(trigger.displayDescription) for '\(config.name)'")
+        
+        hotkeyManager.registerMouseButton(
+            buttonNumber: buttonNumber,
+            modifierFlags: trigger.modifierFlags,
+            forConfigId: config.id
+        ) { [weak self] in
+            print("🎯 [InstanceManager] Mouse button triggered for '\(config.name)'")
+            self?.show(configId: config.id)
+        }
+    }
+    
+    /// Register a trackpad gesture trigger
+    private func registerTrackpadTrigger(_ trigger: TriggerConfiguration, forConfig config: StoredRingConfiguration) {
+        guard let swipeDirection = trigger.swipeDirection,
+              let fingerCount = trigger.fingerCount else {
+            print("   ⚠️ Trackpad trigger missing direction/fingerCount for '\(config.name)'")
+            return
+        }
+        
+        if trigger.isHoldMode {
+            print("   ⚠️ Trackpad hold mode not yet implemented for '\(config.name)'")
+            return
+        }
+        
+        // Circle gestures
+        if swipeDirection == "circleClockwise" || swipeDirection == "circleCounterClockwise" {
+            let direction: RotationDirection = swipeDirection == "circleClockwise" ? .clockwise : .counterClockwise
+            
+            print("[InstanceManager] Registering circle gesture: \(trigger.displayDescription) for '\(config.name)'")
+            
+            hotkeyManager.registerCircle(
+                direction: direction,
+                fingerCount: fingerCount,
+                modifierFlags: trigger.modifierFlags,
+                forConfigId: config.id
+            ) { [weak self] triggerDirection in
+                print("🎯 [InstanceManager] Circle gesture triggered for '\(config.name)'")
+                self?.show(configId: config.id, triggerDirection: triggerDirection)
+            }
+            return
+        }
+        
+        // Two-finger tap gestures
+        if swipeDirection == "twoFingerTapLeft" || swipeDirection == "twoFingerTapRight" {
+            let side: TapSide = swipeDirection == "twoFingerTapLeft" ? .left : .right
+            
+            print("[InstanceManager] Registering two-finger tap: \(trigger.displayDescription) for '\(config.name)'")
+            
+            hotkeyManager.registerTwoFingerTap(
+                side: side,
+                modifierFlags: trigger.modifierFlags,
+                forConfigId: config.id
+            ) { [weak self] _ in
+                print("🎯 [InstanceManager] Two-finger tap triggered for '\(config.name)'")
+                self?.show(configId: config.id)
+            }
+            return
+        }
+        
+        // Standard swipe gestures
+        print("[InstanceManager] Registering trackpad swipe: \(trigger.displayDescription) for '\(config.name)'")
+        
+        hotkeyManager.registerSwipe(
+            direction: swipeDirection,
+            fingerCount: fingerCount,
+            modifierFlags: trigger.modifierFlags,
+            forConfigId: config.id
+        ) { [weak self] in
+            print("🎯 [InstanceManager] Trackpad gesture triggered for '\(config.name)'")
+            self?.show(configId: config.id)
+        }
+    }
     
     func startHotkeyMonitoring() {
         print("[InstanceManager] Starting hotkey monitoring...")
@@ -522,15 +542,18 @@ extension CircularUIInstanceManager {
     // MARK: - Hold Mode Support
     
     /// Show an instance in hold mode (sets isInHoldMode flag)
-    /// - Parameter configId: The configuration ID
-    private func showInHoldMode(configId: Int) {
+    /// - Parameters:
+    ///   - configId: The configuration ID
+    ///   - trigger: The trigger that activated this ring (for auto-execute settings)
+    private func showInHoldMode(configId: Int, trigger: TriggerConfiguration? = nil) {
         guard let instance = getInstance(forConfigId: configId) else {
             print("❌ [InstanceManager] Cannot show in hold mode - no instance for config \(configId)")
             return
         }
         
-        // Set hold mode flag BEFORE showing
+        // Set hold mode flag and active trigger BEFORE showing
         instance.isInHoldMode = true
+        instance.activeTrigger = trigger
         
         // Hide currently active instance if different
         if let currentActiveId = activeInstanceId, currentActiveId != configId {

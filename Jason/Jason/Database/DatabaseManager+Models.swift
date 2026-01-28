@@ -143,4 +143,18 @@ struct RingProviderEntry: Identifiable {
     let providerConfig: String?
 }
 
+struct RingTriggerEntry: Identifiable {
+    let id: Int
+    let ringId: Int
+    let triggerType: String            // "keyboard", "mouse", "trackpad"
+    let keyCode: UInt16?
+    let modifierFlags: UInt
+    let buttonNumber: Int32?
+    let swipeDirection: String?
+    let fingerCount: Int?
+    let isHoldMode: Bool
+    let autoExecuteOnRelease: Bool
+    let createdAt: Int
+}
+
 // MARK: - Errors

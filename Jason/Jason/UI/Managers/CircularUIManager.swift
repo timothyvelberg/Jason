@@ -38,6 +38,7 @@ class CircularUIManager: ObservableObject {
     var inputCoordinator: InputCoordinator?
     
     var listPanelManager: ListPanelManager?
+    var activeTrigger: TriggerConfiguration?
     
     // MARK: - Configuration (Phase 3 Refactoring)
     
@@ -1029,9 +1030,10 @@ class CircularUIManager: ObservableObject {
             return
         }
         
-        // Check if auto-execute is enabled for this configuration
-        guard configuration.autoExecuteOnRelease else {
-            print("[HoldMode] Auto-execute disabled for this ring - skipping")
+        // Check if auto-execute is enabled for the active trigger
+        let autoExecuteEnabled = activeTrigger?.autoExecuteOnRelease ?? true
+        guard autoExecuteEnabled else {
+            print("[HoldMode] Auto-execute disabled for this trigger - skipping")
             return
         }
         

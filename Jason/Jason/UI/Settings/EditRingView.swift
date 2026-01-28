@@ -23,6 +23,186 @@ struct RingProviderConfig: Identifiable, Equatable {
     }
 }
 
+// MARK: - Trigger Config (for form state)
+
+struct TriggerFormConfig: Identifiable, Equatable {
+    let id: UUID
+    var triggerType: TriggerType
+    var keyCode: UInt16?
+    var modifierFlags: UInt
+    var buttonNumber: Int32?
+    var swipeDirection: SwipeDirection
+    var fingerCount: Int
+    var isHoldMode: Bool
+    var autoExecuteOnRelease: Bool
+    
+    // For existing triggers loaded from DB
+    var databaseId: Int?
+    
+    init(
+        id: UUID = UUID(),
+        triggerType: TriggerType = .keyboard,
+        keyCode: UInt16? = nil,
+        modifierFlags: UInt = 0,
+        buttonNumber: Int32? = nil,
+        swipeDirection: SwipeDirection = .up,
+        fingerCount: Int = 3,
+        isHoldMode: Bool = false,
+        autoExecuteOnRelease: Bool = true,
+        databaseId: Int? = nil
+    ) {
+        self.id = id
+        self.triggerType = triggerType
+        self.keyCode = keyCode
+        self.modifierFlags = modifierFlags
+        self.buttonNumber = buttonNumber
+        self.swipeDirection = swipeDirection
+        self.fingerCount = fingerCount
+        self.isHoldMode = isHoldMode
+        self.autoExecuteOnRelease = autoExecuteOnRelease
+        self.databaseId = databaseId
+    }
+    
+    /// Create from a TriggerConfiguration (loaded from DB)
+    init(from config: TriggerConfiguration) {
+        self.id = UUID()
+        self.databaseId = config.id
+        self.modifierFlags = config.modifierFlags
+        self.isHoldMode = config.isHoldMode
+        self.autoExecuteOnRelease = config.autoExecuteOnRelease
+        
+        if config.triggerType == "keyboard" {
+            self.triggerType = .keyboard
+            self.keyCode = config.keyCode
+            self.buttonNumber = nil
+            self.swipeDirection = .up
+            self.fingerCount = 3
+        } else if config.triggerType == "mouse" {
+            self.triggerType = .mouse
+            self.keyCode = nil
+            self.buttonNumber = config.buttonNumber
+            self.swipeDirection = .up
+            self.fingerCount = 3
+        } else {
+            self.triggerType = .trackpad
+            self.keyCode = nil
+            self.buttonNumber = nil
+            self.swipeDirection = SwipeDirection(rawValue: config.swipeDirection ?? "up") ?? .up
+            self.fingerCount = config.fingerCount ?? 3
+        }
+    }
+    
+    /// Display description
+    var displayDescription: String {
+        switch triggerType {
+        case .keyboard:
+            guard let keyCode = keyCode else { return "No key set" }
+            return formatKeyboard(keyCode: keyCode, modifiers: modifierFlags)
+        case .mouse:
+            guard let buttonNumber = buttonNumber else { return "No button set" }
+            return formatMouse(buttonNumber: buttonNumber, modifiers: modifierFlags)
+        case .trackpad:
+            return formatTrackpad(direction: swipeDirection, fingerCount: fingerCount, modifiers: modifierFlags)
+        }
+    }
+    
+    /// Whether this trigger has valid data
+    var isValid: Bool {
+        switch triggerType {
+        case .keyboard:
+            return keyCode != nil
+        case .mouse:
+            return buttonNumber != nil
+        case .trackpad:
+            return true // Always valid with defaults
+        }
+    }
+    
+    // MARK: - Formatting helpers
+    
+    private func formatKeyboard(keyCode: UInt16, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        parts.append(keyCodeToString(keyCode))
+        return parts.joined()
+    }
+    
+    private func formatMouse(buttonNumber: Int32, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        let buttonName: String
+        switch buttonNumber {
+        case 2: buttonName = "Middle Click"
+        case 3: buttonName = "Back Button"
+        case 4: buttonName = "Forward Button"
+        default: buttonName = "Button \(buttonNumber + 1)"
+        }
+        
+        parts.append(buttonName)
+        return parts.joined()
+    }
+    
+    private func formatTrackpad(direction: SwipeDirection, fingerCount: Int, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        parts.append("\(fingerCount)-Finger \(direction.displayName)")
+        return parts.joined()
+    }
+    
+    private func keyCodeToString(_ keyCode: UInt16) -> String {
+        switch keyCode {
+        case 0: return "A"
+        case 1: return "S"
+        case 2: return "D"
+        case 3: return "F"
+        case 4: return "H"
+        case 5: return "G"
+        case 6: return "Z"
+        case 7: return "X"
+        case 8: return "C"
+        case 9: return "V"
+        case 11: return "B"
+        case 12: return "Q"
+        case 13: return "W"
+        case 14: return "E"
+        case 15: return "R"
+        case 16: return "Y"
+        case 17: return "T"
+        case 31: return "O"
+        case 32: return "U"
+        case 34: return "I"
+        case 35: return "P"
+        case 37: return "L"
+        case 38: return "J"
+        case 40: return "K"
+        case 45: return "N"
+        case 46: return "M"
+        case 49: return "Space"
+        case 50: return "`"
+        case 53: return "Esc"
+        default: return "[\(keyCode)]"
+        }
+    }
+}
+
 struct EditRingView: View {
     @Environment(\.dismiss) var dismiss
     
@@ -32,15 +212,8 @@ struct EditRingView: View {
     
     // Form fields
     @State private var name: String = ""
-    @State private var triggerType: TriggerType = .keyboard
-    @State private var recordedKeyCode: UInt16?
-    @State private var recordedModifierFlags: UInt?
-    @State private var recordedButtonNumber: Int32?
-    @State private var swipeDirection: SwipeDirection = .up
-    @State private var fingerCount: Int = 3
-    @State private var swipeModifierFlags: UInt = 0
-    @State private var isHoldMode: Bool = false
-    @State private var autoExecuteOnRelease: Bool = true
+    @State private var triggers: [TriggerFormConfig] = []  // NEW: Array of triggers
+    @State private var showAddTriggerSheet = false          // NEW: Sheet state
     @State private var ringRadius: String = "80"
     @State private var centerHoleRadius: String = "56"
     @State private var iconSize: String = "32"
@@ -96,70 +269,71 @@ struct EditRingView: View {
                             TextField("Ring Name", text: $name)
                                 .textFieldStyle(.roundedBorder)
                             
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Trigger Type:")
-                                    .font(.body)
-                                
-                                Picker("", selection: $triggerType) {
-                                    Text("Keyboard").tag(TriggerType.keyboard)
-                                    Text("Mouse").tag(TriggerType.mouse)
-                                    Text("Trackpad").tag(TriggerType.trackpad)
-                                }
-                                .pickerStyle(.segmented)
-                                .frame(width: 400)
-                                
-                                // Show appropriate recorder based on trigger type
-                                if triggerType == .keyboard {
-                                    KeyboardShortcutRecorder(
-                                        keyCode: $recordedKeyCode,
-                                        modifierFlags: $recordedModifierFlags
-                                    )
-                                    
-                                    Text("Click the button and press your desired key combination")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                } else if triggerType == .mouse {
-                                    MouseButtonRecorder(
-                                        buttonNumber: $recordedButtonNumber,
-                                        modifierFlags: $recordedModifierFlags
-                                    )
-                                    
-                                    Text("Click the button and then click your mouse button (middle, back, or forward)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                } else {
-                                    // Trackpad gesture picker
-                                    TrackpadGesturePicker(
-                                        direction: $swipeDirection,
-                                        fingerCount: $fingerCount,
-                                        modifierFlags: $swipeModifierFlags
-                                    )
-                                    
-                                    Text("Select finger count, swipe direction, and optional modifier keys")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                // Hold mode toggle
-                                Divider()
-                                    .padding(.vertical, 4)
-                                
-                                Toggle("Hold to show (release to hide)", isOn: $isHoldMode)
-                                    .help("When enabled, UI appears while key/button is held and disappears when released. When disabled, UI toggles on each press.")
-                                
-                                // Auto-execute toggle (only show when hold mode is enabled)
-                                if isHoldMode {
-                                    Toggle("Auto-execute on release", isOn: $autoExecuteOnRelease)
-                                        .padding(.leading, 20)  // Indent to show it's related to hold mode
-                                        .help("When enabled, releasing the hold key executes the hovered item without clicking. Perfect for app switching.")
-                                }
-                            }
-                            
                             Toggle("Active on Launch", isOn: $isActive)
-                                .help("New rings are active by default. Toggle active/inactive in the management view after creation.")
+                                .help("New rings are active by default.")
                                 .disabled(true)
                         }
                         .padding(12)
+                    }
+
+                    // Triggers Section (NEW)
+                    GroupBox(label: Label("Triggers", systemImage: "bolt.fill")) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            // Header with add button
+                            HStack {
+                                Text("Configure how to activate this ring")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Spacer()
+                                
+                                Button(action: { showAddTriggerSheet = true }) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.blue)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Add trigger")
+                            }
+                            
+                            // Triggers list
+                            if triggers.isEmpty {
+                                HStack {
+                                    Spacer()
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "keyboard.badge.ellipsis")
+                                            .font(.system(size: 32))
+                                            .foregroundColor(.secondary.opacity(0.5))
+                                        Text("No triggers configured")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text("Add a keyboard shortcut, mouse button, or trackpad gesture")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary.opacity(0.8))
+                                    }
+                                    .padding(.vertical, 20)
+                                    Spacer()
+                                }
+                            } else {
+                                VStack(spacing: 8) {
+                                    ForEach(triggers) { trigger in
+                                        TriggerRowView(trigger: trigger) {
+                                            withAnimation {
+                                                triggers.removeAll { $0.id == trigger.id }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(12)
+                    }
+                    .sheet(isPresented: $showAddTriggerSheet) {
+                        AddTriggerSheet(existingTriggers: triggers) { newTrigger in
+                            withAnimation {
+                                triggers.append(newTrigger)
+                            }
+                        }
                     }
                     
                     // Ring Geometry
@@ -281,21 +455,12 @@ struct EditRingView: View {
     // MARK: - Validation
     
     private var isFormValid: Bool {
-        let hasValidTrigger: Bool
-        if triggerType == .keyboard {
-            hasValidTrigger = recordedKeyCode != nil && recordedModifierFlags != nil
-        } else if triggerType == .mouse {
-            hasValidTrigger = recordedButtonNumber != nil
-        } else {
-            // Trackpad always valid (has default direction and finger count, modifiers optional)
-            hasValidTrigger = true
-        }
-        
         return !name.trimmingCharacters(in: .whitespaces).isEmpty &&
                !ringRadius.isEmpty &&
                !centerHoleRadius.isEmpty &&
                !iconSize.isEmpty &&
-               hasValidTrigger &&
+               !triggers.isEmpty &&  // Must have at least one trigger
+               triggers.allSatisfy { $0.isValid } &&
                hasAtLeastOneProvider
     }
     
@@ -315,64 +480,39 @@ struct EditRingView: View {
             startAngle = config.startAngle
             isActive = config.isActive
             
-            // Load trigger based on type
-            if config.triggerType == "keyboard" {
-                triggerType = .keyboard
-                recordedKeyCode = config.keyCode
-                recordedModifierFlags = config.modifierFlags
-            } else if config.triggerType == "mouse" {
-                triggerType = .mouse
-                recordedButtonNumber = config.buttonNumber
-                recordedModifierFlags = config.modifierFlags
-            } else if config.triggerType == "trackpad" || config.triggerType == "swipe" {
-                // Support both "trackpad" (new) and "swipe" (legacy)
-                triggerType = .trackpad
-                if let dir = config.swipeDirection {
-                    swipeDirection = SwipeDirection(rawValue: dir) ?? .up
-                }
-                fingerCount = config.fingerCount ?? 3  // Default to 3 for legacy data
-                swipeModifierFlags = config.modifierFlags ?? 0
-            }
-            
-            isHoldMode = config.isHoldMode
-            autoExecuteOnRelease = config.autoExecuteOnRelease
+            // Load triggers from array
+            triggers = config.triggers.map { TriggerFormConfig(from: $0) }
             
             // Build providers array from saved config
-            // First, create a map of saved providers by type
             var savedProvidersByType: [String: (order: Int, displayMode: ProviderDisplayMode)] = [:]
             for provider in config.providers {
                 let displayMode = ProviderDisplayMode(rawValue: provider.displayMode ?? "parent") ?? .parent
                 savedProvidersByType[provider.providerType] = (provider.order, displayMode)
             }
             
-            // Build providers list: enabled ones first (in saved order), then disabled ones
             var enabledProviders: [(ProviderConfig, Int)] = []
             var disabledProviders: [ProviderConfig] = []
             
             for defaultProvider in Self.defaultProviders {
                 if let saved = savedProvidersByType[defaultProvider.type] {
-                    // Provider was enabled - preserve its order and displayMode
                     var provider = defaultProvider
                     provider.isEnabled = true
                     provider.displayMode = saved.displayMode
                     enabledProviders.append((provider, saved.order))
                 } else {
-                    // Provider was not enabled
                     var provider = defaultProvider
                     provider.isEnabled = false
                     disabledProviders.append(provider)
                 }
             }
             
-            // Sort enabled providers by their saved order
             enabledProviders.sort { $0.1 < $1.1 }
-            
-            // Combine: enabled first (in order), then disabled
             providers = enabledProviders.map { $0.0 } + disabledProviders
             
         } else {
             // New ring - use defaults
             providers = Self.defaultProviders
+            triggers = []  // Start with no triggers
         }
     }
     
@@ -407,11 +547,7 @@ struct EditRingView: View {
     }
     
     private func saveRing() {
-        
-        print("🔍 [SaveRing] About to save:")
-        print("   triggerType: \(triggerType)")
-        print("   fingerCount: \(fingerCount)")
-        print("   swipeDirection: \(swipeDirection.rawValue)")
+        print("🔍 [SaveRing] About to save \(triggers.count) trigger(s)")
         
         errorMessage = nil
         
@@ -423,46 +559,22 @@ struct EditRingView: View {
             return
         }
         
-        // Validate and extract trigger data based on type
-        let keyCode: UInt16?
-        let modifierFlags: UInt?
-        let buttonNumber: Int32?
-        let shortcutDisplay: String
-        
-        let swipeDir: String?
-        
-        if triggerType == .keyboard {
-            // Validate keyboard shortcut
-            guard let kc = recordedKeyCode,
-                  let mf = recordedModifierFlags else {
-                errorMessage = "Please record a keyboard shortcut"
-                return
-            }
-            keyCode = kc
-            modifierFlags = mf
-            buttonNumber = nil
-            swipeDir = nil
-            shortcutDisplay = formatShortcut(keyCode: kc, modifiers: mf)
-            
-        } else if triggerType == .mouse {
-            // Validate mouse button
-            guard let bn = recordedButtonNumber else {
-                errorMessage = "Please record a mouse button"
-                return
-            }
-            keyCode = nil
-            modifierFlags = recordedModifierFlags
-            buttonNumber = bn
-            swipeDir = nil
-            shortcutDisplay = formatMouseButton(buttonNumber: bn, modifiers: modifierFlags ?? 0)
-        } else {
-            // Trackpad gesture
-            keyCode = nil
-            modifierFlags = swipeModifierFlags
-            buttonNumber = nil
-            swipeDir = swipeDirection.rawValue
-            shortcutDisplay = formatTrackpadGesture(direction: swipeDirection.rawValue, fingerCount: fingerCount, modifiers: swipeModifierFlags)
+        // Build triggers array for API
+        let triggerData: [(type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, autoExecuteOnRelease: Bool)] = triggers.map { trigger in
+            (
+                type: trigger.triggerType.rawValue,
+                keyCode: trigger.triggerType == .keyboard ? trigger.keyCode : nil,
+                modifierFlags: trigger.modifierFlags,
+                buttonNumber: trigger.triggerType == .mouse ? trigger.buttonNumber : nil,
+                swipeDirection: trigger.triggerType == .trackpad ? trigger.swipeDirection.rawValue : nil,
+                fingerCount: trigger.triggerType == .trackpad ? trigger.fingerCount : nil,
+                isHoldMode: trigger.isHoldMode,
+                autoExecuteOnRelease: trigger.autoExecuteOnRelease
+            )
         }
+        
+        // Build shortcut display (first trigger, for legacy display)
+        let shortcutDisplay = triggers.first?.displayDescription ?? "No trigger"
         
         // Build providers array from ordered, enabled providers
         var providerData: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
@@ -486,18 +598,11 @@ struct EditRingView: View {
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
                     startAngle: startAngle,
-                    triggerType: triggerType.rawValue,
-                    keyCode: keyCode,
-                    modifierFlags: modifierFlags,
-                    buttonNumber: buttonNumber,
-                    swipeDirection: swipeDir,
-                    fingerCount: triggerType == .trackpad ? fingerCount : nil,
-                    isHoldMode: isHoldMode,
-                    autoExecuteOnRelease: autoExecuteOnRelease,
+                    triggers: triggerData,
                     providers: providerData
                 )
                 
-                print("✅ [EditRing] Created new ring: '\(newConfig.name)' (active: \(newConfig.isActive))")
+                print("✅ [EditRing] Created new ring: '\(newConfig.name)' with \(newConfig.triggers.count) trigger(s)")
             } else {
                 // Update existing configuration
                 guard let config = configuration else {
@@ -505,7 +610,7 @@ struct EditRingView: View {
                     return
                 }
                 
-                // Step 1: Update configuration with ALL trigger parameters
+                // Step 1: Update ring properties
                 try configManager.updateConfiguration(
                     id: config.id,
                     name: name.trimmingCharacters(in: .whitespaces),
@@ -513,25 +618,36 @@ struct EditRingView: View {
                     ringRadius: radiusValue,
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
-                    startAngle: startAngle,
-                    triggerType: triggerType.rawValue,
-                    keyCode: keyCode,
-                    modifierFlags: modifierFlags,
-                    buttonNumber: buttonNumber,
-                    swipeDirection: swipeDir,
-                    fingerCount: triggerType == .trackpad ? fingerCount : nil,
-                    isHoldMode: isHoldMode,
-                    autoExecuteOnRelease: autoExecuteOnRelease
+                    startAngle: startAngle
                 )
                 
-                // Step 2: Remove all existing providers
+                // Step 2: Remove all existing triggers
+                for trigger in config.triggers {
+                    try configManager.removeTrigger(id: trigger.id)
+                }
+                
+                // Step 3: Add all triggers from form
+                for trigger in triggers {
+                    _ = try configManager.addTrigger(
+                        toRing: config.id,
+                        triggerType: trigger.triggerType.rawValue,
+                        keyCode: trigger.triggerType == .keyboard ? trigger.keyCode : nil,
+                        modifierFlags: trigger.modifierFlags,
+                        buttonNumber: trigger.triggerType == .mouse ? trigger.buttonNumber : nil,
+                        swipeDirection: trigger.triggerType == .trackpad ? trigger.swipeDirection.rawValue : nil,
+                        fingerCount: trigger.triggerType == .trackpad ? trigger.fingerCount : nil,
+                        isHoldMode: trigger.isHoldMode,
+                        autoExecuteOnRelease: trigger.autoExecuteOnRelease
+                    )
+                }
+                
+                // Step 4: Remove all existing providers
                 for provider in config.providers {
                     try configManager.removeProvider(id: provider.id)
                 }
                 
-                // Step 3: Add new providers in order
+                // Step 5: Add new providers in order
                 for provider in providerData {
-                    // Build config dictionary for displayMode
                     var providerConfig: [String: Any]? = nil
                     if let displayMode = provider.displayMode {
                         providerConfig = ["displayMode": displayMode]
@@ -546,7 +662,7 @@ struct EditRingView: View {
                     )
                 }
                 
-                print("✅ [EditRing] Updated ring (ID: \(config.id))")
+                print("✅ [EditRing] Updated ring (ID: \(config.id)) with \(triggers.count) trigger(s)")
             }
             
             onSave()

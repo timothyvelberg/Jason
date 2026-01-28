@@ -16,100 +16,57 @@ enum DisplayMode: String {
     case direct  // Skip category, show children directly in ring 0
 }
 
-// MARK: - Ring Configuration Models
+// MARK: - Trigger Configuration
 
-/// Domain model representing a stored ring configuration from the database
-/// This is distinct from:
-/// - The database entry model (RingConfigurationEntry)
-/// - FunctionManager's RingConfiguration (used for rendering/geometry)
-struct StoredRingConfiguration: Identifiable, Equatable {
+/// Domain model representing a trigger for a ring
+struct TriggerConfiguration: Identifiable, Equatable {
     let id: Int
-    let name: String
-    let shortcut: String           // DEPRECATED - display only, for now
-    let ringRadius: Double
-    let centerHoleRadius: Double
-    let iconSize: Double
-    let startAngle: Double
-    let isActive: Bool
-    let providers: [ProviderConfiguration]
-    
-    // Trigger data
-    let triggerType: String        // "keyboard", "mouse", or "trackpad"
-    let keyCode: UInt16?           // For keyboard triggers
-    let modifierFlags: UInt?       // For keyboard, mouse, and trackpad triggers
-    let buttonNumber: Int32?       // For mouse triggers (2=middle, 3=back, 4=forward)
-    let swipeDirection: String?    // For trackpad triggers ("up", "down", "left", "right")
-    let fingerCount: Int?          // For trackpad triggers (3 or 4 fingers)
-    let isHoldMode: Bool           // true = hold to show, false = tap to toggle
-    let autoExecuteOnRelease: Bool // true = auto-execute on release (only when isHoldMode = true)
-    
-    // MARK: - Shortcut Properties
-    
-    /// Check if this configuration has a valid trigger (keyboard, mouse, or trackpad)
-    var hasShortcut: Bool {
-        if triggerType == "keyboard" {
-            return keyCode != nil && modifierFlags != nil
-        } else if triggerType == "mouse" {
-            return buttonNumber != nil
-        } else if triggerType == "trackpad" {
-            return swipeDirection != nil && fingerCount != nil
-        }
-        return false
-    }
-    
-    /// Get a human-readable shortcut description
-    var shortcutDescription: String {
-        if triggerType == "keyboard", let keyCode = keyCode, let modifiers = modifierFlags {
-            return formatShortcut(keyCode: keyCode, modifiers: modifiers)
-        } else if triggerType == "mouse", let buttonNumber = buttonNumber {
-            return formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags ?? 0)
-        } else if triggerType == "trackpad", let swipeDirection = swipeDirection {
-            return formatTrackpadGesture(direction: swipeDirection, fingerCount: fingerCount, modifiers: modifierFlags ?? 0)
-        }
-        return "No trigger"
-    }
+    let triggerType: String            // "keyboard", "mouse", "trackpad"
+    let keyCode: UInt16?
+    let modifierFlags: UInt
+    let buttonNumber: Int32?
+    let swipeDirection: String?
+    let fingerCount: Int?
+    let isHoldMode: Bool
+    let autoExecuteOnRelease: Bool
     
     // MARK: - Computed Properties
     
-    /// Total number of providers in this ring
-    var providerCount: Int {
-        return providers.count
+    /// Human-readable description of this trigger
+    var displayDescription: String {
+        switch triggerType {
+        case "keyboard":
+            guard let keyCode = keyCode else { return "No key" }
+            return formatKeyboardShortcut(keyCode: keyCode, modifiers: modifierFlags)
+        case "mouse":
+            guard let buttonNumber = buttonNumber else { return "No button" }
+            return formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags)
+        case "trackpad":
+            guard let direction = swipeDirection else { return "No gesture" }
+            return formatTrackpadGesture(direction: direction, fingerCount: fingerCount, modifiers: modifierFlags)
+        default:
+            return "Unknown trigger"
+        }
     }
     
-    /// Check if this ring has any providers
-    var hasProviders: Bool {
-        return !providers.isEmpty
+    /// Short type label for UI
+    var typeLabel: String {
+        switch triggerType {
+        case "keyboard": return "Keyboard"
+        case "mouse": return "Mouse"
+        case "trackpad": return "Trackpad"
+        default: return "Unknown"
+        }
     }
     
-    /// Get providers sorted by their order
-    var sortedProviders: [ProviderConfiguration] {
-        return providers.sorted { $0.order < $1.order }
+    /// Mode description
+    var modeDescription: String {
+        return isHoldMode ? "Hold" : "Tap"
     }
     
-    /// Calculate the outer radius of the ring
-    var outerRadius: Double {
-        return centerHoleRadius + ringRadius
-    }
+    // MARK: - Formatting Helpers
     
-    /// Get the ring thickness (same as ringRadius, for semantic clarity)
-    var thickness: Double {
-        return ringRadius
-    }
-    
-    /// Get provider by type
-    func provider(ofType type: String) -> ProviderConfiguration? {
-        return providers.first { $0.providerType == type }
-    }
-    
-    /// Check if this ring contains a specific provider type
-    func hasProvider(ofType type: String) -> Bool {
-        return providers.contains { $0.providerType == type }
-    }
-    
-    // MARK: - Shortcut Formatting Helpers
-    
-    /// Format shortcut for display
-    private func formatShortcut(keyCode: UInt16, modifiers: UInt) -> String {
+    private func formatKeyboardShortcut(keyCode: UInt16, modifiers: UInt) -> String {
         let flags = NSEvent.ModifierFlags(rawValue: modifiers)
         var parts: [String] = []
         
@@ -118,13 +75,58 @@ struct StoredRingConfiguration: Identifiable, Equatable {
         if flags.contains(.shift) { parts.append("⇧") }
         if flags.contains(.command) { parts.append("⌘") }
         
-        // Add key character
         parts.append(keyCodeToString(keyCode))
-        
         return parts.joined()
     }
     
-    /// Convert key code to string (for display purposes)
+    private func formatMouseButton(buttonNumber: Int32, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        let buttonName: String
+        switch buttonNumber {
+        case 2: buttonName = "Middle Click"
+        case 3: buttonName = "Back Button"
+        case 4: buttonName = "Forward Button"
+        default: buttonName = "Button \(buttonNumber + 1)"
+        }
+        
+        parts.append(buttonName)
+        return parts.joined()
+    }
+    
+    private func formatTrackpadGesture(direction: String, fingerCount: Int?, modifiers: UInt) -> String {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var parts: [String] = []
+        
+        if flags.contains(.control) { parts.append("⌃") }
+        if flags.contains(.option) { parts.append("⌥") }
+        if flags.contains(.shift) { parts.append("⇧") }
+        if flags.contains(.command) { parts.append("⌘") }
+        
+        let fingerText = fingerCount.map { "\($0)-Finger " } ?? ""
+        let gestureText: String
+        switch direction.lowercased() {
+        case "up": gestureText = "↑ \(fingerText)Swipe Up"
+        case "down": gestureText = "↓ \(fingerText)Swipe Down"
+        case "left": gestureText = "← \(fingerText)Swipe Left"
+        case "right": gestureText = "→ \(fingerText)Swipe Right"
+        case "circleclockwise": gestureText = "↻ \(fingerText)Circle"
+        case "circlecounterclockwise": gestureText = "↺ \(fingerText)Circle"
+        case "twofingertapleft": gestureText = "👆 Two-Finger Tap (Left)"
+        case "twofingertapright": gestureText = "👆 Two-Finger Tap (Right)"
+        default: gestureText = "\(fingerText)\(direction)"
+        }
+        
+        parts.append(gestureText)
+        return parts.joined()
+    }
+    
     private func keyCodeToString(_ keyCode: UInt16) -> String {
         switch keyCode {
         case 0: return "A"
@@ -159,66 +161,108 @@ struct StoredRingConfiguration: Identifiable, Equatable {
         default: return "[\(keyCode)]"
         }
     }
+}
+
+// MARK: - Ring Configuration Models
+
+/// Domain model representing a stored ring configuration from the database
+/// This is distinct from:
+/// - The database entry model (RingConfigurationEntry)
+/// - FunctionManager's RingConfiguration (used for rendering/geometry)
+struct StoredRingConfiguration: Identifiable, Equatable {
+    let id: Int
+    let name: String
+    let shortcut: String           // DEPRECATED - display only
+    let ringRadius: Double
+    let centerHoleRadius: Double
+    let iconSize: Double
+    let startAngle: Double
+    let isActive: Bool
+    let triggers: [TriggerConfiguration]
+    let providers: [ProviderConfiguration]
     
-    /// Format a mouse button for display
-    private func formatMouseButton(buttonNumber: Int32, modifiers: UInt) -> String {
-        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
-        var parts: [String] = []
-        
-        if flags.contains(.control) { parts.append("⌃") }
-        if flags.contains(.option) { parts.append("⌥") }
-        if flags.contains(.shift) { parts.append("⇧") }
-        if flags.contains(.command) { parts.append("⌘") }
-        
-        // Convert button number to readable name
-        let buttonName: String
-        switch buttonNumber {
-        case 2:
-            buttonName = "Button 3 (Middle)"
-        case 3:
-            buttonName = "Button 4 (Back)"
-        case 4:
-            buttonName = "Button 5 (Forward)"
-        default:
-            buttonName = "Button \(buttonNumber + 1)"
-        }
-        
-        parts.append(buttonName)
-        
-        return parts.joined()
+    // MARK: - Trigger Properties
+    
+    /// Check if this configuration has any triggers
+    var hasTriggers: Bool {
+        return !triggers.isEmpty
     }
     
-    /// Format a trackpad gesture for display
-    private func formatTrackpadGesture(direction: String, fingerCount: Int?, modifiers: UInt) -> String {
-        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
-        var parts: [String] = []
-        
-        if flags.contains(.control) { parts.append("⌃") }
-        if flags.contains(.option) { parts.append("⌥") }
-        if flags.contains(.shift) { parts.append("⇧") }
-        if flags.contains(.command) { parts.append("⌘") }
-        
-        // Convert direction to arrow emoji with finger count
-        let directionSymbol: String
-        let fingerText = fingerCount.map { "\($0)-Finger " } ?? ""
-        switch direction.lowercased() {
-        case "up":
-            directionSymbol = "↑ \(fingerText)Swipe Up"
-        case "down":
-            directionSymbol = "↓ \(fingerText)Swipe Down"
-        case "left":
-            directionSymbol = "← \(fingerText)Swipe Left"
-        case "right":
-            directionSymbol = "→ \(fingerText)Swipe Right"
-        case "tap":
-            directionSymbol = "\(fingerText)Tap"
-        default:
-            directionSymbol = "\(fingerText)Swipe \(direction)"
+    /// Get a summary of all triggers for display
+    var triggersSummary: String {
+        if triggers.isEmpty {
+            return "No triggers"
+        } else if triggers.count == 1 {
+            return triggers[0].displayDescription
+        } else {
+            return "\(triggers.count) triggers"
         }
-        
-        parts.append(directionSymbol)
-        
-        return parts.joined()
+    }
+    
+    /// Get all trigger descriptions as an array
+    var triggerDescriptions: [String] {
+        return triggers.map { $0.displayDescription }
+    }
+    
+    /// DEPRECATED - for backward compatibility during transition
+    var shortcutDescription: String {
+        return triggers.first?.displayDescription ?? "No trigger"
+    }
+    
+    /// DEPRECATED - for backward compatibility
+    var hasShortcut: Bool {
+        return hasTriggers
+    }
+    
+    // MARK: - Provider Properties
+    
+    /// Total number of providers in this ring
+    var providerCount: Int {
+        return providers.count
+    }
+    
+    /// Check if this ring has any providers
+    var hasProviders: Bool {
+        return !providers.isEmpty
+    }
+    
+    /// Get providers sorted by their order
+    var sortedProviders: [ProviderConfiguration] {
+        return providers.sorted { $0.order < $1.order }
+    }
+    
+    // MARK: - Geometry Properties
+    
+    /// Calculate the outer radius of the ring
+    var outerRadius: Double {
+        return centerHoleRadius + ringRadius
+    }
+    
+    /// Get the ring thickness (same as ringRadius, for semantic clarity)
+    var thickness: Double {
+        return ringRadius
+    }
+    
+    // MARK: - Query Methods
+    
+    /// Get provider by type
+    func provider(ofType type: String) -> ProviderConfiguration? {
+        return providers.first { $0.providerType == type }
+    }
+    
+    /// Check if this ring contains a specific provider type
+    func hasProvider(ofType type: String) -> Bool {
+        return providers.contains { $0.providerType == type }
+    }
+    
+    /// Get trigger by type
+    func trigger(ofType type: String) -> TriggerConfiguration? {
+        return triggers.first { $0.triggerType == type }
+    }
+    
+    /// Check if this ring has a trigger of a specific type
+    func hasTrigger(ofType type: String) -> Bool {
+        return triggers.contains { $0.triggerType == type }
     }
     
     // MARK: - Display Helpers
@@ -229,7 +273,7 @@ struct StoredRingConfiguration: Identifiable, Equatable {
         StoredRingConfiguration(
             id: \(id),
             name: "\(name)",
-            shortcut: "\(shortcutDescription)",
+            triggers: \(triggers.count),
             centerHole: \(centerHoleRadius),
             ringRadius: \(ringRadius),
             iconSize: \(iconSize),
@@ -248,19 +292,14 @@ struct StoredRingConfiguration: Identifiable, Equatable {
                lhs.ringRadius == rhs.ringRadius &&
                lhs.centerHoleRadius == rhs.centerHoleRadius &&
                lhs.iconSize == rhs.iconSize &&
-               lhs.startAngle == rhs.startAngle && 
+               lhs.startAngle == rhs.startAngle &&
                lhs.isActive == rhs.isActive &&
-               lhs.triggerType == rhs.triggerType &&
-               lhs.keyCode == rhs.keyCode &&
-               lhs.modifierFlags == rhs.modifierFlags &&
-               lhs.buttonNumber == rhs.buttonNumber &&
-               lhs.swipeDirection == rhs.swipeDirection &&
-               lhs.fingerCount == rhs.fingerCount &&
-               lhs.isHoldMode == rhs.isHoldMode &&
-               lhs.autoExecuteOnRelease == rhs.autoExecuteOnRelease &&
+               lhs.triggers == rhs.triggers &&
                lhs.providers == rhs.providers
     }
 }
+
+// MARK: - Provider Configuration
 
 /// Domain model representing a provider within a ring configuration
 struct ProviderConfiguration: Identifiable, Equatable {
@@ -385,9 +424,9 @@ enum StoredRingConfigurationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .duplicateShortcut(let shortcut):
-            return "Shortcut '\(shortcut)' is already in use by another active ring"
+            return "Trigger '\(shortcut)' is already in use by another active ring"
         case .invalidShortcut(let shortcut):
-            return "Invalid shortcut: '\(shortcut)'"
+            return "Invalid trigger: '\(shortcut)'"
         case .invalidRingId(let id):
             return "Ring configuration with ID \(id) not found"
         case .invalidProviderId(let id):

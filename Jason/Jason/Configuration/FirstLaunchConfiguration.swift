@@ -3,7 +3,7 @@
 //  Jason
 //
 //  Creates sensible default ring configurations on first launch
-//  Now includes keyboard shortcuts with raw key codes and modifier flags
+//  Now supports multiple triggers per ring
 //
 
 import Foundation
@@ -13,35 +13,61 @@ class FirstLaunchConfiguration {
     
     // MARK: - Default Shortcuts
     
-    /// Default keyboard shortcuts (using raw key codes + modifiers)
-    private struct DefaultShortcut {
-        let keyCode: UInt16
-        let modifierFlags: UInt
-        
-        // Common shortcuts for ring configurations
-        static let ctrlShiftD = DefaultShortcut(
-            keyCode: 2, // "D"
-            modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
+    /// Helper to create a keyboard trigger tuple
+    private static func keyboardTrigger(
+        keyCode: UInt16,
+        modifiers: NSEvent.ModifierFlags,
+        isHoldMode: Bool = false,
+        autoExecuteOnRelease: Bool = true
+    ) -> (type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, autoExecuteOnRelease: Bool) {
+        return (
+            type: "keyboard",
+            keyCode: keyCode,
+            modifierFlags: modifiers.rawValue,
+            buttonNumber: nil,
+            swipeDirection: nil,
+            fingerCount: nil,
+            isHoldMode: isHoldMode,
+            autoExecuteOnRelease: autoExecuteOnRelease
         )
-        
-        static let ctrlShiftA = DefaultShortcut(
-            keyCode: 0, //"A"
-            modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
+    }
+    
+    /// Helper to create a trackpad trigger tuple
+    private static func trackpadTrigger(
+        direction: String,
+        fingerCount: Int,
+        modifiers: NSEvent.ModifierFlags = [],
+        isHoldMode: Bool = false,
+        autoExecuteOnRelease: Bool = true
+    ) -> (type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, autoExecuteOnRelease: Bool) {
+        return (
+            type: "trackpad",
+            keyCode: nil,
+            modifierFlags: modifiers.rawValue,
+            buttonNumber: nil,
+            swipeDirection: direction,
+            fingerCount: fingerCount,
+            isHoldMode: isHoldMode,
+            autoExecuteOnRelease: autoExecuteOnRelease
         )
-        
-        static let ctrlShiftF = DefaultShortcut(
-            keyCode: 3,  // "F"
-            modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
-        )
-        
-        static let ctrlShiftE = DefaultShortcut(
-            keyCode: 14,  // "E"
-            modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
-        )
-        
-        static let ctrlShiftQ = DefaultShortcut(
-            keyCode: 12,  // "Q"
-            modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue
+    }
+    
+    /// Helper to create a mouse trigger tuple
+    private static func mouseTrigger(
+        buttonNumber: Int32,
+        modifiers: NSEvent.ModifierFlags = [],
+        isHoldMode: Bool = false,
+        autoExecuteOnRelease: Bool = true
+    ) -> (type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, autoExecuteOnRelease: Bool) {
+        return (
+            type: "mouse",
+            keyCode: nil,
+            modifierFlags: modifiers.rawValue,
+            buttonNumber: buttonNumber,
+            swipeDirection: nil,
+            fingerCount: nil,
+            isHoldMode: isHoldMode,
+            autoExecuteOnRelease: autoExecuteOnRelease
         )
     }
     
@@ -65,24 +91,25 @@ class FirstLaunchConfiguration {
         
         print("[FirstLaunch] No configurations found - creating default 'Everything' ring")
         
-        // Create default "Everything" ring with Cmd+Shift+SpaceCmd+Shift+SpaceCmd+Shift+SpaceCmd+Shift+Space
+        // Create default "Everything" ring with keyboard + trackpad triggers
         do {
             let defaultConfig = try configManager.createConfiguration(
                 name: "Everything",
-                shortcut: "Cmd+Shift+D",  // For display only
+                shortcut: "Ctrl+Shift+D",  // For display only
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
                 iconSize: 32.0,
-                keyCode: DefaultShortcut.ctrlShiftD.keyCode,
-                modifierFlags: DefaultShortcut.ctrlShiftD.modifierFlags,
+                triggers: [
+                    keyboardTrigger(keyCode: 2, modifiers: [.control, .shift])  // Ctrl+Shift+D
+                ],
                 providers: [
                     (type: "CombinedAppsProvider", order: 1, displayMode: "parent", angle: nil),
-                    (type: "FavoriteFilesProvider", order: 2,displayMode: "parent", nil),
-                    (type: "FavoriteFolderProvider", order: 3,displayMode: "parent", angle: nil),
+                    (type: "FavoriteFilesProvider", order: 2, displayMode: "parent", angle: nil),
+                    (type: "FavoriteFolderProvider", order: 3, displayMode: "parent", angle: nil),
                     (type: "SystemActionsProvider", order: 4, displayMode: "parent", angle: nil)
                 ]
             )
-            print("   Created '\(defaultConfig.name)' - \(defaultConfig.shortcutDescription)")
+            print("   Created '\(defaultConfig.name)' - \(defaultConfig.triggersSummary)")
             
             let appsDirectRing = try configManager.createConfiguration(
                 name: "Quick Apps (Direct)",
@@ -90,14 +117,15 @@ class FirstLaunchConfiguration {
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
                 iconSize: 32.0,
-                keyCode: DefaultShortcut.ctrlShiftQ.keyCode,
-                modifierFlags: DefaultShortcut.ctrlShiftQ.modifierFlags,
+                triggers: [
+                    keyboardTrigger(keyCode: 12, modifiers: [.control, .shift])  // Ctrl+Shift+Q
+                ],
                 providers: [
                     (type: "CombinedAppsProvider", order: 1, displayMode: "direct", angle: nil)
                 ]
             )
             
-            print("   Created '\(appsDirectRing.name)' - \(appsDirectRing.shortcutDescription)")
+            print("   Created '\(appsDirectRing.name)' - \(appsDirectRing.triggersSummary)")
             print("   Created default configurations")
             
         } catch {
@@ -117,34 +145,37 @@ class FirstLaunchConfiguration {
         print("[FirstLaunch] Creating example configurations...")
         
         do {
+            // Example: Ring with MULTIPLE triggers (keyboard + trackpad)
             let folderRing = try configManager.createConfiguration(
                 name: "My Folders",
                 shortcut: "Ctrl+Shift+A",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
                 iconSize: 32.0,
-                keyCode: DefaultShortcut.ctrlShiftA.keyCode,
-                modifierFlags: DefaultShortcut.ctrlShiftA.modifierFlags,
+                triggers: [
+                    keyboardTrigger(keyCode: 0, modifiers: [.control, .shift]),  // Ctrl+Shift+A
+                    trackpadTrigger(direction: "up", fingerCount: 3)              // 3-finger swipe up
+                ],
                 providers: [
                     (type: "FavoriteFolderProvider", order: 1, displayMode: "direct", angle: nil)
                 ]
             )
-            print("   Created '\(folderRing.name)' - \(folderRing.shortcutDescription)")
+            print("   Created '\(folderRing.name)' - \(folderRing.triggersSummary)")
 
-            
             let filesRing = try configManager.createConfiguration(
                 name: "My Files",
                 shortcut: "Ctrl+Shift+F",  // For display
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
                 iconSize: 32.0,
-                keyCode: DefaultShortcut.ctrlShiftF.keyCode,
-                modifierFlags: DefaultShortcut.ctrlShiftF.modifierFlags,
+                triggers: [
+                    keyboardTrigger(keyCode: 3, modifiers: [.control, .shift])  // Ctrl+Shift+F
+                ],
                 providers: [
                     (type: "FavoriteFilesProvider", order: 1, displayMode: "direct", angle: nil)
                 ]
             )
-            print("   Created '\(filesRing.name)' - \(filesRing.shortcutDescription)")
+            print("   Created '\(filesRing.name)' - \(filesRing.triggersSummary)")
   
             let everythingDirectRing = try configManager.createConfiguration(
                 name: "Everything Direct",
@@ -152,15 +183,18 @@ class FirstLaunchConfiguration {
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
                 iconSize: 32.0,
-                keyCode: 13,  // "W"
-                modifierFlags: NSEvent.ModifierFlags([.control, .shift]).rawValue,
+                triggers: [
+                    keyboardTrigger(keyCode: 13, modifiers: [.control, .shift]),  // Ctrl+Shift+W
+                    trackpadTrigger(direction: "down", fingerCount: 4)             // 4-finger swipe down
+                ],
                 providers: [
                     (type: "CombinedAppsProvider", order: 1, displayMode: "direct", angle: nil),
-                    (type: "FavoriteFolderProvider", order: 2, displayMode: "direct", nil)
+                    (type: "FavoriteFolderProvider", order: 2, displayMode: "direct", angle: nil)
                 ]
             )
+            print("   Created '\(everythingDirectRing.name)' - \(everythingDirectRing.triggersSummary)")
+            
             // Reload configurations after all database updates
-            // This ensures the in-memory configs reflect all displayMode changes
             configManager.loadConfigurations()
             
         } catch {

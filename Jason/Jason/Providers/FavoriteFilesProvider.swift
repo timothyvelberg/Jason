@@ -363,7 +363,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 type: .category,
                 icon: providerIcon,
                 children: fileNodes,
-//                childDisplayMode: .panel,
+                childDisplayMode: .panel,
                 preferredLayout: .partialSlice,
                 slicePositioning: .center,
                 providerId: providerId,
