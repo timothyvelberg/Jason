@@ -11,57 +11,6 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - Panel State
-
-struct PanelState: Identifiable {
-    let id: UUID = UUID()
-    let title: String
-    var items: [FunctionNode]
-    let position: CGPoint
-    let level: Int                    // 0 = from ring, 1+ = from panel
-    let sourceNodeId: String?         // Which node spawned this panel
-    let sourceRowIndex: Int?
-    let spawnAngle: Double?
-    let contextActions: [FunctionNode]?
-    
-    //Identity tracking for updates
-    let providerId: String?
-    
-    
-    let contentIdentifier: String?    // Folder path for folder content
-    var expandedItemId: String?       // Which row has context actions showing
-    var areChildrenArmed: Bool = false
-    var isOverlapping: Bool = false
-    var scrollOffset: CGFloat = 0     // Track scroll position for accurate row positioning
-    
-   
-    
-    // Panel dimensions (constants for now, could be configurable)
-    static let panelWidth: CGFloat = 260
-    static let rowHeight: CGFloat = 32
-    static let titleHeight: CGFloat = 40
-    static let maxVisibleItems: Int = 10
-    static let padding: CGFloat = 8
-    static let cascadeSlideDistance: CGFloat = 30
-
-    
-    /// Calculate panel height based on item count
-    var panelHeight: CGFloat {
-        let itemCount = min(items.count, Self.maxVisibleItems)
-        return Self.titleHeight + CGFloat(itemCount) * Self.rowHeight + Self.padding
-    }
-    
-    /// Panel bounds in screen coordinates
-    var bounds: NSRect {
-        NSRect(
-            x: position.x - Self.panelWidth / 2,
-            y: position.y - panelHeight / 2,
-            width: Self.panelWidth,
-            height: panelHeight
-        )
-    }
-}
-
 // MARK: - List Panel Manager
 
 class ListPanelManager: ObservableObject {
@@ -74,7 +23,6 @@ class ListPanelManager: ObservableObject {
     // MARK: - Keyboard Navigation State
 
     /// Which panel level is currently active (has keyboard focus)
-    /// Active panel shows selection, responds to arrows
     @Published var activePanelLevel: Int = 0
 
     /// Keyboard-selected row per panel level
@@ -85,17 +33,16 @@ class ListPanelManager: ObservableObject {
         inputCoordinator?.inputMode == .keyboard
     }
     
-    
-    // MARK: - Type-Ahead Search State
+    // MARK: - Type-Ahead Search State (internal for extension access)
 
     /// Buffer for type-ahead search
-    private var searchBuffer: String = ""
+    var searchBuffer: String = ""
 
     /// Timer to reset search buffer
-    private var searchBufferTimer: DispatchWorkItem?
+    var searchBufferTimer: DispatchWorkItem?
 
     /// Timeout before search buffer resets (seconds)
-    private let searchTimeout: Double = 0.5
+    let searchTimeout: Double = 0.5
     
     // MARK: - Sliding Configuration
     
@@ -130,11 +77,13 @@ class ListPanelManager: ObservableObject {
         }
     }
     
+    // MARK: - Ring Context (internal for extension access)
+    
     /// Current ring context (stored for cascading position calculations)
     private(set) var currentRingCenter: CGPoint = .zero
     private(set) var currentRingOuterRadius: CGFloat = 0
     private(set) var currentAngle: Double = 0
-    private var currentScreen: NSScreen?
+    var currentScreen: NSScreen?
     
     weak var inputCoordinator: InputCoordinator?
 
@@ -151,10 +100,9 @@ class ListPanelManager: ObservableObject {
         contextActions: [FunctionNode]?
     )?
     
-    
     /// Track which node ID is currently being loaded for each panel level
     /// Used to discard stale async completions when user has moved to a different row
-    private var currentlyHoveredNodeId: [Int: String] = [:]
+    var currentlyHoveredNodeId: [Int: String] = [:]
     
     // MARK: - Callbacks (wired by CircularUIManager)
     
@@ -169,6 +117,16 @@ class ListPanelManager: ObservableObject {
     /// Callback when user exits beyond panel level 0 (back to ring)
     var onExitToRing: (() -> Void)?
     
+    // MARK: - Scroll State Tracking
+    
+    /// Panels currently being scrolled (suppress hover during scroll)
+    private var scrollingPanels: Set<Int> = []
+    
+    /// Debounce timers per panel level
+    private var scrollDebounceTimers: [Int: DispatchWorkItem] = [:]
+    
+    /// How long to wait after scroll stops before re-enabling hover (seconds)
+    private let scrollDebounceDelay: Double = 0.1
     
     // MARK: - Initialization
 
@@ -249,16 +207,7 @@ class ListPanelManager: ObservableObject {
         }
     }
     
-    // MARK: - Scroll State Tracking
-    
-    /// Panels currently being scrolled (suppress hover during scroll)
-    private var scrollingPanels: Set<Int> = []
-    
-    /// Debounce timers per panel level
-    private var scrollDebounceTimers: [Int: DispatchWorkItem] = [:]
-    
-    /// How long to wait after scroll stops before re-enabling hover (seconds)
-    private let scrollDebounceDelay: Double = 0.1
+    // MARK: - Scroll State
     
     /// Check if a panel is currently scrolling
     func isPanelScrolling(_ level: Int) -> Bool {
@@ -288,103 +237,6 @@ class ListPanelManager: ObservableObject {
         
         // Forward to the actual handler
         onItemHover?(node, level, rowIndex)
-    }
-    
-    // MARK: - Type-Ahead Search
-
-    /// Handle character input for type-ahead search in active panel
-    func handleCharacterInput(_ character: String) {
-        // Cancel existing timer
-        searchBufferTimer?.cancel()
-        
-        // Append to buffer
-        searchBuffer += character.lowercased()
-        
-        print("[TypeAhead] Buffer: '\(searchBuffer)'")
-        
-        // Find matching item in active panel
-        guard let panel = panelStack.first(where: { $0.level == activePanelLevel }) else {
-            print("[TypeAhead] No active panel")
-            searchBuffer = ""
-            return
-        }
-        
-        // Get current selection to determine starting point
-        let currentSelection = keyboardSelectedRow[activePanelLevel] ?? -1
-        
-        // Search from current position + 1 to end, then from start to current position
-        let items = panel.items
-        var matchIndex: Int? = nil
-        
-        // First: search from after current selection to end
-        for i in (currentSelection + 1)..<items.count {
-            if items[i].name.lowercased().hasPrefix(searchBuffer) {
-                matchIndex = i
-                break
-            }
-        }
-        
-        // If no match found and we have a multi-char buffer, also check from start
-        // (but only if buffer has more than 1 char, meaning user is refining search)
-        if matchIndex == nil && searchBuffer.count > 1 {
-            for i in 0...currentSelection {
-                if items[i].name.lowercased().hasPrefix(searchBuffer) {
-                    matchIndex = i
-                    break
-                }
-            }
-        }
-        
-        // If still no match with multi-char, try single char from current position
-        if matchIndex == nil && searchBuffer.count > 1 {
-            let firstChar = String(searchBuffer.prefix(1))
-            searchBuffer = firstChar  // Reset to single char
-            print("[TypeAhead] No match, reset to: '\(searchBuffer)'")
-            
-            for i in (currentSelection + 1)..<items.count {
-                if items[i].name.lowercased().hasPrefix(searchBuffer) {
-                    matchIndex = i
-                    break
-                }
-            }
-        }
-        
-        if let index = matchIndex {
-            print("[TypeAhead] Found match at index \(index): '\(items[index].name)'")
-            
-            // Update selection
-            inputCoordinator?.switchToKeyboard()
-            keyboardSelectedRow[activePanelLevel] = index
-            
-            // Close any existing preview
-            popToLevel(activePanelLevel)
-            
-            // Arm for children and trigger hover to spawn preview
-            if let panelIndex = panelStack.firstIndex(where: { $0.level == activePanelLevel }) {
-                panelStack[panelIndex].areChildrenArmed = true
-            }
-            
-            let selectedNode = items[index]
-            currentlyHoveredNodeId[activePanelLevel] = selectedNode.id
-            onItemHover?(selectedNode, activePanelLevel, index)
-        } else {
-            print("[TypeAhead] No match found")
-        }
-        
-        // Start timer to reset buffer
-        let timer = DispatchWorkItem { [weak self] in
-            self?.searchBuffer = ""
-            print("[TypeAhead] Buffer reset")
-        }
-        searchBufferTimer = timer
-        DispatchQueue.main.asyncAfter(deadline: .now() + searchTimeout, execute: timer)
-    }
-
-    /// Reset type-ahead search state (call when hiding panels)
-    func resetTypeAheadSearch() {
-        searchBufferTimer?.cancel()
-        searchBufferTimer = nil
-        searchBuffer = ""
     }
     
     /// Handle scroll state changes from a panel
@@ -427,218 +279,6 @@ class ListPanelManager: ObservableObject {
             popToLevel(level)
             print("[Header] Closed \(childCount) child panel(s)")
         }
-    }
-    
-    // MARK: - Keyboard Navigation
-
-    
-    /// Enter the preview panel (→ arrow) - make it active
-    func enterPreviewPanel() {
-        let previewLevel = activePanelLevel + 1
-        
-        // Check if preview panel exists
-        guard let previewIndex = panelStack.firstIndex(where: { $0.level == previewLevel }) else {
-            print("[Keyboard] No preview panel to enter")
-            return
-        }
-        
-        // Set parent panel(s) to overlapping
-        for i in panelStack.indices where panelStack[i].level <= previewLevel {
-            panelStack[i].isOverlapping = true
-        }
-        
-        // Move focus to preview (now becomes active)
-        activePanelLevel = previewLevel
-        inputCoordinator?.switchToKeyboard()
-        inputCoordinator?.focusPanel(level: previewLevel)
-        
-        // Select first row in new active panel
-        keyboardSelectedRow[activePanelLevel] = 0
-        
-        // Arm the new active panel for its children
-        panelStack[previewIndex].areChildrenArmed = true
-        
-        print("[Keyboard] ENTERED → active panel now level \(activePanelLevel)")
-        
-        // Trigger hover for first item to spawn next preview if it's a folder
-        let activePanel = panelStack[previewIndex]
-        if !activePanel.items.isEmpty {
-            let firstNode = activePanel.items[0]
-            currentlyHoveredNodeId[activePanelLevel] = firstNode.id
-            onItemHover?(firstNode, activePanelLevel, 0)
-        }
-    }
-
-    /// Exit to parent panel (← arrow) - close current active, parent becomes active
-    func exitToParentPanel() {
-        guard activePanelLevel > 0 else {
-            print("[Keyboard] At root panel - exiting to ring")
-            inputCoordinator?.switchToKeyboard()
-            onExitToRing?()
-            return
-        }
-        
-        let parentLevel = activePanelLevel - 1
-        
-        // Pop all panels above parent (including current active)
-        popToLevel(parentLevel)
-        
-        // Move focus back to parent
-        activePanelLevel = parentLevel
-        inputCoordinator?.switchToKeyboard()
-        inputCoordinator?.focusPanel(level: parentLevel)
-        
-        // Un-overlap the parent (it's now active, not background)
-        if let parentIndex = panelStack.firstIndex(where: { $0.level == parentLevel }) {
-            panelStack[parentIndex].areChildrenArmed = true
-        }
-        
-        // In exitToParentPanel
-        print("[Exit] activePanelLevel=\(activePanelLevel), isKeyboardDriven=\(isKeyboardDriven)")
-        print("[Exit] keyboardSelectedRow=\(keyboardSelectedRow)")
-        
-        // Clear keyboard selection in old level
-        keyboardSelectedRow.removeValue(forKey: parentLevel + 1)
-        
-        print("[Keyboard] EXITED ← active panel now level \(activePanelLevel)")
-        
-        // Re-trigger preview for currently selected item in parent
-        if let selection = keyboardSelectedRow[parentLevel],
-           let panel = panelStack.first(where: { $0.level == parentLevel }),
-           selection < panel.items.count {
-            let selectedNode = panel.items[selection]
-            currentlyHoveredNodeId[parentLevel] = selectedNode.id
-            onItemHover?(selectedNode, parentLevel, selection)
-        }
-    }
-    
-    
-    /// Get the effective selected row for a panel level
-    /// Only the ACTIVE panel shows selection highlight
-    func effectiveSelectedRow(for level: Int) -> Int? {
-        print("[EffectiveRow] level=\(level), activePanelLevel=\(activePanelLevel), isKeyboardDriven=\(isKeyboardDriven), hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
-        
-        guard level == activePanelLevel else {
-            return nil
-        }
-        
-        if isKeyboardDriven {
-            print("[EffectiveRow] Returning keyboardSelectedRow[\(level)]=\(keyboardSelectedRow[level] ?? -999)")
-            return keyboardSelectedRow[level]
-        }
-        
-        // If this panel has a preview child, highlight the source row
-        if let previewPanel = panelStack.first(where: { $0.level == level + 1 }),
-           !previewPanel.isOverlapping,
-           let sourceRow = previewPanel.sourceRowIndex {
-            // Return source row if:
-            // 1. hoveredRow matches (mouse on source row), OR
-            // 2. hoveredRow is nil (transition state - assume still on source row)
-            if hoveredRow[level] == sourceRow || hoveredRow[level] == nil {
-                print("[EffectiveRow] Returning source row \(sourceRow) from preview child (hover matches or nil)")
-                return sourceRow
-            }
-        }
-        
-        print("[EffectiveRow] Returning hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
-        return hoveredRow[level]
-    }
-
-    /// Move selection down in the active panel
-    func moveSelectionDown(in level: Int) {
-        // Only allow navigation in the active panel
-        guard level == activePanelLevel else {
-            print("[Keyboard] Ignoring - level \(level) is not active (\(activePanelLevel))")
-            return
-        }
-        
-        guard let panel = panelStack.first(where: { $0.level == level }) else { return }
-        
-        let maxIndex = panel.items.count - 1
-        guard maxIndex >= 0 else { return }
-        
-        // Calculate new selection
-        let currentSelection: Int
-        if isKeyboardDriven, let existing = keyboardSelectedRow[level] {
-            currentSelection = existing
-        } else if let hovered = hoveredRow[level] {
-            currentSelection = hovered
-        } else {
-            currentSelection = -1  // Will become 0
-        }
-        
-        let newSelection = min(currentSelection + 1, maxIndex)
-        
-        // Update state
-        inputCoordinator?.switchToKeyboard()
-        keyboardSelectedRow[level] = newSelection
-        
-        print("[Keyboard] Selection DOWN in level \(level): \(newSelection)")
-        
-        // Auto-arm for keyboard (no threshold needed)
-        if let panelIndex = panelStack.firstIndex(where: { $0.level == level }) {
-            panelStack[panelIndex].areChildrenArmed = true
-        }
-        
-        // Close any existing preview (child panel)
-        popToLevel(level)
-        
-        // Trigger hover to spawn preview if selected item is a folder
-        let selectedNode = panel.items[newSelection]
-        currentlyHoveredNodeId[level] = selectedNode.id
-        onItemHover?(selectedNode, level, newSelection)
-    }
-    
-    /// Move selection up in the active panel
-    func moveSelectionUp(in level: Int) {
-        print("[DEBUG] inputCoordinator is \(inputCoordinator == nil ? "nil" : "set")")
-        // Only allow navigation in the active panel
-        guard level == activePanelLevel else {
-            print("[Keyboard] Ignoring - level \(level) is not active (\(activePanelLevel))")
-            return
-        }
-        
-        guard let panel = panelStack.first(where: { $0.level == level }) else { return }
-        guard !panel.items.isEmpty else { return }
-        
-        // Calculate new selection
-        let currentSelection: Int
-        if isKeyboardDriven, let existing = keyboardSelectedRow[level] {
-            currentSelection = existing
-        } else if let hovered = hoveredRow[level] {
-            currentSelection = hovered
-        } else {
-            currentSelection = 0  // Will stay 0
-        }
-        
-        let newSelection = max(currentSelection - 1, 0)
-        
-        // Update state
-        inputCoordinator?.switchToKeyboard()
-        keyboardSelectedRow[level] = newSelection
-        
-        print("[Keyboard] Selection UP in level \(level): \(newSelection)")
-        
-        // Auto-arm for keyboard (no threshold needed)
-        if let panelIndex = panelStack.firstIndex(where: { $0.level == level }) {
-            panelStack[panelIndex].areChildrenArmed = true
-        }
-        
-        // Close any existing preview (child panel)
-        popToLevel(level)
-        
-        // Trigger hover to spawn preview if selected item is a folder
-        let selectedNode = panel.items[newSelection]
-        currentlyHoveredNodeId[level] = selectedNode.id
-        onItemHover?(selectedNode, level, newSelection)
-    }
-
-    /// Clear keyboard selection state (called when switching to mouse mode)
-    func resetToMouseMode() {
-        guard isKeyboardDriven else { return }
-        
-        keyboardSelectedRow.removeAll()
-        print("[Keyboard] Reset to mouse mode")
     }
     
     // MARK: - Scroll Offset Updates
@@ -733,57 +373,6 @@ class ListPanelManager: ObservableObject {
                 scrollOffset: 0
             )
         ]
-    }
-    
-    // MARK: - Bounds Calculation
-
-    /// Get the current bounds for a panel (accounting for overlap state)
-    func currentBounds(for panel: PanelState) -> NSRect {
-        let currentPos = currentPosition(for: panel)
-        return NSRect(
-            x: currentPos.x - PanelState.panelWidth / 2,
-            y: currentPos.y - panel.panelHeight / 2,
-            width: PanelState.panelWidth,
-            height: panel.panelHeight
-        )
-    }
-
-    /// Calculate the screen bounds of a specific row in a panel
-    /// Accounts for scroll offset to return the VISIBLE position of the row
-    func rowBounds(forPanel panel: PanelState, rowIndex: Int) -> NSRect? {
-        guard rowIndex >= 0 && rowIndex < panel.items.count else { return nil }
-        
-        let panelBounds = currentBounds(for: panel)
-        
-        // Calculate the logical position of this row (as if not scrolled)
-        // Then adjust for scroll offset
-        let logicalRowTop = panelBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight - (CGFloat(rowIndex) * PanelState.rowHeight)
-        
-        // Scroll offset is positive when scrolled down (content moved up)
-        // So visible row position = logical position + scrollOffset
-        let visibleRowTop = logicalRowTop + panel.scrollOffset
-        let visibleRowBottom = visibleRowTop - PanelState.rowHeight
-        
-        // Check if row is actually visible in the panel's scroll area
-        let scrollAreaTop = panelBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight
-        let scrollAreaBottom = panelBounds.minY + (PanelState.padding / 2)
-        
-        // Row must be at least partially visible
-        if visibleRowTop < scrollAreaBottom || visibleRowBottom > scrollAreaTop {
-            return nil  // Row is scrolled out of view
-        }
-        
-        // Row X spans the panel width (with some padding)
-        let horizontalPadding: CGFloat = 4
-        let rowLeft = panelBounds.minX + horizontalPadding
-        let rowRight = panelBounds.maxX - horizontalPadding
-        
-        return NSRect(
-            x: rowLeft,
-            y: visibleRowBottom,
-            width: rowRight - rowLeft,
-            height: PanelState.rowHeight
-        )
     }
     
     // MARK: - Mouse Movement Tracking
@@ -918,49 +507,12 @@ class ListPanelManager: ObservableObject {
                             hoveredRow[activePanelLevel] = 0
                         }
                     } else {
-                        activePanelLevel = panel.level  // THIS IS THE KEY LINE
+                        activePanelLevel = panel.level
                     }
                     print("[Slide] Active panel now level \(activePanelLevel)")
                 }
             }
         }
-    }
-
-    // MARK: - Position Calculation
-
-    /// Get the current position for a panel (accounting for overlap state)
-    func currentPosition(for panel: PanelState) -> CGPoint {
-        guard panel.isOverlapping else {
-            // Not overlapping, but ancestors might be shifted - need to adjust
-            if panel.level > 0,
-               let parentPanel = panelStack.first(where: { $0.level == panel.level - 1 }) {
-                let parentOriginalX = parentPanel.position.x
-                let parentCurrentPos = currentPosition(for: parentPanel)
-                let parentShift = parentCurrentPos.x - parentOriginalX
-                
-                // Only shift if there's actually a difference
-                if abs(parentShift) > 0.1 {
-                    return CGPoint(x: panel.position.x + parentShift, y: panel.position.y)
-                }
-            }
-            return panel.position
-        }
-        
-        // Panel is overlapping - calculate position relative to parent's CURRENT position
-        guard let parentPanel = panelStack.first(where: { $0.level == panel.level - 1 }) else {
-            return panel.position
-        }
-        
-        // Get parent's current position (recursive - handles chain of overlaps)
-        let parentCurrentPos = currentPosition(for: parentPanel)
-        
-        // Calculate parent's current left edge
-        let parentCurrentLeftEdge = parentCurrentPos.x - (PanelState.panelWidth / 2)
-        
-        // Overlapping X: parent's current left edge + peekWidth + half panel width
-        let overlappingX = parentCurrentLeftEdge + peekWidth + (PanelState.panelWidth / 2)
-        
-        return CGPoint(x: overlappingX, y: panel.position.y)
     }
     
     // MARK: - Push Panel (Cascading)
@@ -1105,7 +657,7 @@ class ListPanelManager: ObservableObject {
             scrollDebounceTimers.removeValue(forKey: panel.level)
             scrollingPanels.remove(panel.level)
             currentlyHoveredNodeId.removeValue(forKey: panel.level)
-            hoveredRow.removeValue(forKey: panel.level)  // Also clear hover
+            hoveredRow.removeValue(forKey: panel.level)
         }
         
         panelStack.removeAll { $0.level > level }
@@ -1124,47 +676,6 @@ class ListPanelManager: ObservableObject {
         if let pending = pendingPanel, pending.fromLevel > level {
             pendingPanel = nil
         }
-    }
-    
-    // MARK: - Position Calculation
-    
-    private func calculatePanelPosition(
-        fromRing ring: (center: CGPoint, outerRadius: CGFloat, angle: Double),
-        panelWidth: CGFloat,
-        itemCount: Int
-    ) -> CGPoint {
-        let angle = ring.angle
-        let angleInRadians = (angle - 90) * (.pi / 180)
-        
-        // Gap between ring edge and panel
-        let gapFromRing: CGFloat = 8
-        
-        // Calculate anchor point at ring edge
-        let anchorRadius = ring.outerRadius + gapFromRing
-        let anchorX = ring.center.x + anchorRadius * cos(angleInRadians)
-        let anchorY = ring.center.y - anchorRadius * sin(angleInRadians)
-        
-        // Calculate panel height
-        let itemCountClamped = min(itemCount, PanelState.maxVisibleItems)
-        let panelHeight = CGFloat(itemCountClamped) * PanelState.rowHeight + PanelState.padding
-        
-        // Base offset: half-dimensions in angle direction
-        let offsetX = (panelWidth / 2) * cos(angleInRadians)
-        let offsetY = (panelHeight / 2) * -sin(angleInRadians)
-        
-        // Diagonal factor: peaks at 45°, 135°, 225°, 315° (0 at cardinal angles)
-        let angleWithinQuadrant = angle.truncatingRemainder(dividingBy: 90)
-        let diagonalFactor = sin(angleWithinQuadrant * 2 * .pi / 180)
-        
-        // Extra offset for diagonal angles (18% extra at peak)
-        let extraFactor: CGFloat = 0.18 * CGFloat(diagonalFactor)
-        let extraOffsetX = extraFactor * panelWidth * cos(angleInRadians)
-        let extraOffsetY = extraFactor * panelHeight * -sin(angleInRadians)
-        
-        let panelX = anchorX + offsetX + extraOffsetX
-        let panelY = anchorY + offsetY + extraOffsetY
-        
-        return CGPoint(x: panelX, y: panelY)
     }
     
     // MARK: - Hide / Clear
@@ -1204,159 +715,174 @@ class ListPanelManager: ObservableObject {
         hide()
     }
     
-    // MARK: - Hit Testing
+    // MARK: - Position Calculation
     
-    /// Check if a point is inside ANY panel
-    func contains(point: CGPoint) -> Bool {
-        panelStack.contains { currentBounds(for: $0).contains(point) }
-    }
-    
-    /// Check if point is in the panel zone (inside any actual panel)
-    func isInPanelZone(point: CGPoint) -> Bool {
-        guard !panelStack.isEmpty else { return false }
-        
-        // Check if point is inside any actual panel
-        if let matchingPanel = panelStack.first(where: { currentBounds(for: $0).contains(point) }) {
-            return true
-        }
-        
-        return false
-    }
-    
-    /// Find which panel level contains the point (nil if none)
-    func panelLevel(at point: CGPoint) -> Int? {
-        // Check from rightmost to leftmost (higher levels first)
-        for panel in panelStack.reversed() {
-            if currentBounds(for: panel).contains(point) {
-                return panel.level
+    /// Get the current position for a panel (accounting for overlap state)
+    func currentPosition(for panel: PanelState) -> CGPoint {
+        guard panel.isOverlapping else {
+            // Not overlapping, but ancestors might be shifted - need to adjust
+            if panel.level > 0,
+               let parentPanel = panelStack.first(where: { $0.level == panel.level - 1 }) {
+                let parentOriginalX = parentPanel.position.x
+                let parentCurrentPos = currentPosition(for: parentPanel)
+                let parentShift = parentCurrentPos.x - parentOriginalX
+                
+                // Only shift if there's actually a difference
+                if abs(parentShift) > 0.1 {
+                    return CGPoint(x: panel.position.x + parentShift, y: panel.position.y)
+                }
             }
+            return panel.position
         }
-        return nil
+        
+        // Panel is overlapping - calculate position relative to parent's CURRENT position
+        guard let parentPanel = panelStack.first(where: { $0.level == panel.level - 1 }) else {
+            return panel.position
+        }
+        
+        // Get parent's current position (recursive - handles chain of overlaps)
+        let parentCurrentPos = currentPosition(for: parentPanel)
+        
+        // Calculate parent's current left edge
+        let parentCurrentLeftEdge = parentCurrentPos.x - (PanelState.panelWidth / 2)
+        
+        // Overlapping X: parent's current left edge + peekWidth + half panel width
+        let overlappingX = parentCurrentLeftEdge + peekWidth + (PanelState.panelWidth / 2)
+        
+        return CGPoint(x: overlappingX, y: panel.position.y)
     }
     
-    /// Get the panel at a specific level
-    func panel(at level: Int) -> PanelState? {
-        panelStack.first { $0.level == level }
+    // MARK: - Bounds Calculation
+
+    /// Get the current bounds for a panel (accounting for overlap state)
+    func currentBounds(for panel: PanelState) -> NSRect {
+        let currentPos = currentPosition(for: panel)
+        return NSRect(
+            x: currentPos.x - PanelState.panelWidth / 2,
+            y: currentPos.y - panel.panelHeight / 2,
+            width: PanelState.panelWidth,
+            height: panel.panelHeight
+        )
+    }
+
+    /// Calculate the screen bounds of a specific row in a panel
+    /// Accounts for scroll offset to return the VISIBLE position of the row
+    func rowBounds(forPanel panel: PanelState, rowIndex: Int) -> NSRect? {
+        guard rowIndex >= 0 && rowIndex < panel.items.count else { return nil }
+        
+        let panelBounds = currentBounds(for: panel)
+        
+        // Calculate the logical position of this row (as if not scrolled)
+        // Then adjust for scroll offset
+        let logicalRowTop = panelBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight - (CGFloat(rowIndex) * PanelState.rowHeight)
+        
+        // Scroll offset is positive when scrolled down (content moved up)
+        // So visible row position = logical position + scrollOffset
+        let visibleRowTop = logicalRowTop + panel.scrollOffset
+        let visibleRowBottom = visibleRowTop - PanelState.rowHeight
+        
+        // Check if row is actually visible in the panel's scroll area
+        let scrollAreaTop = panelBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight
+        let scrollAreaBottom = panelBounds.minY + (PanelState.padding / 2)
+        
+        // Row must be at least partially visible
+        if visibleRowTop < scrollAreaBottom || visibleRowBottom > scrollAreaTop {
+            return nil  // Row is scrolled out of view
+        }
+        
+        // Row X spans the panel width (with some padding)
+        let horizontalPadding: CGFloat = 4
+        let rowLeft = panelBounds.minX + horizontalPadding
+        let rowRight = panelBounds.maxX - horizontalPadding
+        
+        return NSRect(
+            x: rowLeft,
+            y: visibleRowBottom,
+            width: rowRight - rowLeft,
+            height: PanelState.rowHeight
+        )
     }
     
-    /// Left edge of leftmost panel (for ring boundary detection)
-    var leftmostPanelEdge: CGFloat? {
-        panelStack.first.map { $0.bounds.minX }
+    // MARK: - Panel Position from Ring
+    
+    /// Calculate panel position when spawning from a ring node
+    func calculatePanelPosition(
+        fromRing ring: (center: CGPoint, outerRadius: CGFloat, angle: Double),
+        panelWidth: CGFloat,
+        itemCount: Int
+    ) -> CGPoint {
+        let angle = ring.angle
+        let angleInRadians = (angle - 90) * (.pi / 180)
+        
+        // Gap between ring edge and panel
+        let gapFromRing: CGFloat = 8
+        
+        // Calculate anchor point at ring edge
+        let anchorRadius = ring.outerRadius + gapFromRing
+        let anchorX = ring.center.x + anchorRadius * cos(angleInRadians)
+        let anchorY = ring.center.y - anchorRadius * sin(angleInRadians)
+        
+        // Calculate panel height
+        let itemCountClamped = min(itemCount, PanelState.maxVisibleItems)
+        let panelHeight = CGFloat(itemCountClamped) * PanelState.rowHeight + PanelState.padding
+        
+        // Base offset: half-dimensions in angle direction
+        let offsetX = (panelWidth / 2) * cos(angleInRadians)
+        let offsetY = (panelHeight / 2) * -sin(angleInRadians)
+        
+        // Diagonal factor: peaks at 45°, 135°, 225°, 315° (0 at cardinal angles)
+        let angleWithinQuadrant = angle.truncatingRemainder(dividingBy: 90)
+        let diagonalFactor = sin(angleWithinQuadrant * 2 * .pi / 180)
+        
+        // Extra offset for diagonal angles (18% extra at peak)
+        let extraFactor: CGFloat = 0.18 * CGFloat(diagonalFactor)
+        let extraOffsetX = extraFactor * panelWidth * cos(angleInRadians)
+        let extraOffsetY = extraFactor * panelHeight * -sin(angleInRadians)
+        
+        let panelX = anchorX + offsetX + extraOffsetX
+        let panelY = anchorY + offsetY + extraOffsetY
+        
+        return CGPoint(x: panelX, y: panelY)
     }
     
-    // MARK: - Right Click Handling
-    
-    /// Handle right-click at position, returns true if handled
-    func handleRightClick(at point: CGPoint) -> Bool {
-        // Find which panel was clicked
-        guard let level = panelLevel(at: point),
-              let panelIndex = panelStack.firstIndex(where: { $0.level == level }) else {
-            return false
+    // MARK: - Screen Boundary Constraints
+
+    /// Constrain panel position to screen boundaries (left, top, bottom only - NOT right)
+    func constrainToScreenBounds(position: CGPoint, panelWidth: CGFloat, panelHeight: CGFloat) -> CGPoint {
+        // Use the screen where panels are being displayed (set in show())
+        let screen = currentScreen ?? NSScreen.main ?? NSScreen.screens.first
+        guard let visibleFrame = screen?.visibleFrame else {
+            return position
         }
         
-        let panel = panelStack[panelIndex]
-        let bounds = currentBounds(for: panel)
+        var constrainedX = position.x
+        var constrainedY = position.y
         
-        // Calculate which row was clicked (accounting for title and scroll)
-        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
+        let halfWidth = panelWidth / 2
+        let halfHeight = panelHeight / 2
         
-        // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
-        let scrollAdjustedY = relativeY + panel.scrollOffset
-        let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
-        
-        guard rowIndex >= 0 && rowIndex < panel.items.count else {
-            print("[Panel] Right-click outside rows")
-            panelStack[panelIndex].expandedItemId = nil
-            return true
+        // Left boundary: panel's left edge can't go past screen's left edge
+        let minX = visibleFrame.minX + halfWidth
+        if constrainedX < minX {
+            constrainedX = minX
         }
         
-        let clickedItem = panel.items[rowIndex]
-        print("[Panel \(level)] Right-click on row \(rowIndex): '\(clickedItem.name)'")
-        
-        // Toggle expanded state
-        if panelStack[panelIndex].expandedItemId == clickedItem.id {
-            panelStack[panelIndex].expandedItemId = nil
-        } else {
-            panelStack[panelIndex].expandedItemId = clickedItem.id
+        // Bottom boundary: panel's bottom edge can't go past screen's bottom edge
+        let minY = visibleFrame.minY + halfHeight
+        if constrainedY < minY {
+            constrainedY = minY
         }
         
-        return true
-    }
-    
-    /// Handle left-click at position, returns the clicked item and panel level if inside a panel
-    func handleLeftClick(at point: CGPoint) -> (node: FunctionNode, level: Int)? {
-        // Find which panel was clicked
-        guard let level = panelLevel(at: point),
-              let panelIndex = panelStack.firstIndex(where: { $0.level == level }) else {
-            return nil
+        // Top boundary: panel's top edge can't go past screen's top edge
+        let maxY = visibleFrame.maxY - halfHeight
+        if constrainedY > maxY {
+            constrainedY = maxY
         }
         
-        let panel = panelStack[panelIndex]
-        let bounds = currentBounds(for: panel)
+        // RIGHT boundary: intentionally NOT constrained
+        // Panels flow left-to-right; if they go off-screen, user should reposition ring
         
-        // Check if click is in title bar area
-        let distanceFromTop = bounds.maxY - point.y
-        if distanceFromTop < PanelState.titleHeight + (PanelState.padding / 2) {
-            return nil  // Let SwiftUI handle title bar clicks
-        }
-        
-        // Calculate which row was clicked (accounting for title and scroll)
-        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
-        
-        // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
-        let scrollAdjustedY = relativeY + panel.scrollOffset
-        let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
-        
-        guard rowIndex >= 0 && rowIndex < panel.items.count else {
-            return nil
-        }
-        
-        let clickedItem = panel.items[rowIndex]
-        
-        // NEW: If this row is expanded (showing context actions), let SwiftUI handle the click
-        if panel.expandedItemId == clickedItem.id {
-            print("[Panel] Click on expanded row - letting SwiftUI handle context actions")
-            return nil
-        }
-        
-        // Collapse any expanded row in this panel
-        panelStack[panelIndex].expandedItemId = nil
-        
-        return (clickedItem, level)
-    }
-    
-    /// Handle drag start at position, returns the node and its DragProvider if draggable
-    func handleDragStart(at point: CGPoint) -> (node: FunctionNode, dragProvider: DragProvider, level: Int)? {
-        // Find which panel was clicked
-        guard let level = panelLevel(at: point),
-              let panelIndex = panelStack.firstIndex(where: { $0.level == level }) else {
-            return nil
-        }
-        
-        let panel = panelStack[panelIndex]
-        let bounds = currentBounds(for: panel)
-        
-        // Calculate which row was clicked (accounting for title and scroll)
-        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
-        
-        // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
-        let scrollAdjustedY = relativeY + panel.scrollOffset
-        let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
-        
-        guard rowIndex >= 0 && rowIndex < panel.items.count else {
-            return nil
-        }
-        
-        let node = panel.items[rowIndex]
-        
-        // Check if node is draggable (resolve with current modifiers)
-        let behavior = node.onLeftClick.resolve(with: NSEvent.modifierFlags)
-        
-        if case .drag(let provider) = behavior {
-            return (node, provider, level)
-        }
-        
-        return nil
+        return CGPoint(x: constrainedX, y: constrainedY)
     }
     
     // MARK: - Test Helpers
@@ -1417,45 +943,5 @@ class ListPanelManager: ObservableObject {
                 print("[Test] Would open: \(name)")
             })
         )
-    }
-    
-    // MARK: - Screen Boundary Constraints
-
-    /// Constrain panel position to screen boundaries (left, top, bottom only - NOT right)
-    private func constrainToScreenBounds(position: CGPoint, panelWidth: CGFloat, panelHeight: CGFloat) -> CGPoint {
-        // Use the screen where panels are being displayed (set in show())
-        let screen = currentScreen ?? NSScreen.main ?? NSScreen.screens.first
-        guard let visibleFrame = screen?.visibleFrame else {
-            return position
-        }
-        
-        var constrainedX = position.x
-        var constrainedY = position.y
-        
-        let halfWidth = panelWidth / 2
-        let halfHeight = panelHeight / 2
-        
-        // Left boundary: panel's left edge can't go past screen's left edge
-        let minX = visibleFrame.minX + halfWidth
-        if constrainedX < minX {
-            constrainedX = minX
-        }
-        
-        // Bottom boundary: panel's bottom edge can't go past screen's bottom edge
-        let minY = visibleFrame.minY + halfHeight
-        if constrainedY < minY {
-            constrainedY = minY
-        }
-        
-        // Top boundary: panel's top edge can't go past screen's top edge
-        let maxY = visibleFrame.maxY - halfHeight
-        if constrainedY > maxY {
-            constrainedY = maxY
-        }
-        
-        // RIGHT boundary: intentionally NOT constrained
-        // Panels flow left-to-right; if they go off-screen, user should reposition ring
-        
-        return CGPoint(x: constrainedX, y: constrainedY)
     }
 }

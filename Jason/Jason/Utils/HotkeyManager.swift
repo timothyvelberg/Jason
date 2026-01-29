@@ -43,6 +43,9 @@ class HotkeyManager {
     /// Called when a letter key is pressed while UI is visible
     var onCharacterInput: ((String) -> Void)?
     
+    /// Called when Enter is pressed while UI is visible
+    var onEnter: (() -> Void)?
+    
     // MARK: - Configuration
     
     /// Key code for hold-to-show functionality (nil = disabled)
@@ -762,6 +765,10 @@ class HotkeyManager {
             case 124:  // Right arrow
                 print("[HotkeyManager] Right arrow pressed")
                 onArrowRight?()
+                return true
+            case 36, 76:  // Return key, Keypad Enter
+                print("[HotkeyManager] Enter pressed")
+                onEnter?()
                 return true
             default:
                 break

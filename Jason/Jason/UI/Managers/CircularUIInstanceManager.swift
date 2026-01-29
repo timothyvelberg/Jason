@@ -412,6 +412,13 @@ class CircularUIInstanceManager: ObservableObject {
             
             panelManager.handleCharacterInput(character)
         }
+        hotkeyManager.onEnter = { [weak self] in
+            guard let instance = self?.getActiveInstance(),
+                  let panelManager = instance.listPanelManager,
+                  panelManager.isVisible else { return }
+            
+            panelManager.executeSelectedItem()
+        }
         
         hotkeyManager.startMonitoring()
     }
