@@ -20,7 +20,7 @@ class CircularUIInstanceManager: ObservableObject {
     // MARK: - Published State
     
     /// Dictionary of active instances, keyed by configuration ID
-    @Published private(set) var instances: [Int: CircularUIManager] = [:]
+    @Published private(set) var instances: [Int: any UIManager] = [:]
     
     /// Track which instance is currently visible (nil if none are visible)
     private(set) var activeInstanceId: Int? = nil
@@ -62,7 +62,15 @@ class CircularUIInstanceManager: ObservableObject {
         }
         
         // Create new instance with configuration
-        let instance = CircularUIManager(configuration: config)
+        let instance: any UIManager
+
+        switch config.presentationMode {
+        case .ring:
+            instance = CircularUIManager(configuration: config)
+        case .panel:
+            instance = PanelUIManager(configuration: config)
+        }
+        
         instances[config.id] = instance
         
         // Setup the instance so it's ready to use immediately
@@ -75,14 +83,14 @@ class CircularUIInstanceManager: ObservableObject {
     /// Get a CircularUIManager instance by configuration ID
     /// - Parameter configId: The configuration ID
     /// - Returns: The CircularUIManager instance if it exists, nil otherwise
-    func getInstance(forConfigId configId: Int) -> CircularUIManager? {
+    func getInstance(forConfigId configId: Int) -> (any UIManager)? {
         return instances[configId]
     }
     
     /// Get a CircularUIManager instance by keyboard shortcut
     /// - Parameter shortcut: The keyboard shortcut (e.g., "Cmd+Shift+A")
     /// - Returns: The CircularUIManager instance if found, nil otherwise
-    func getInstance(forShortcut shortcut: String) -> CircularUIManager? {
+    func getInstance(forShortcut shortcut: String) -> (any UIManager)? {
         // Find config with matching shortcut
         guard let config = configurationManager.getConfiguration(forShortcut: shortcut) else {
             print("⚠️ [InstanceManager] No configuration found for shortcut: \(shortcut)")
@@ -94,7 +102,7 @@ class CircularUIInstanceManager: ObservableObject {
     
     /// Get the first active instance (useful for fallback/default behavior)
     /// - Returns: The first CircularUIManager instance, or nil if none exist
-    func getFirstInstance() -> CircularUIManager? {
+    func getFirstInstance() -> (any UIManager)? {
         guard let firstConfig = configurationManager.getActiveConfigurations().first else {
             return nil
         }
@@ -450,7 +458,7 @@ class CircularUIInstanceManager: ObservableObject {
     }
     
     /// Get all currently visible instances
-    var visibleInstances: [CircularUIManager] {
+    var visibleInstances: [any UIManager] {
         return instances.values.filter { $0.isVisible }
     }
 }
@@ -534,7 +542,7 @@ extension CircularUIInstanceManager {
     
     /// Get the currently active instance (the one that should handle notifications)
     /// - Returns: The active CircularUIManager instance, or nil if none is active
-    func getActiveInstance() -> CircularUIManager? {
+    func getActiveInstance() -> (any UIManager)? {
         guard let activeId = activeInstanceId else { return nil }
         return getInstance(forConfigId: activeId)
     }

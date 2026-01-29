@@ -125,6 +125,7 @@ struct RingConfigurationEntry: Identifiable {
     let fingerCount: Int?          // For trackpad triggers (3 or 4 fingers)
     let isHoldMode: Bool           // true = hold to show, false = tap to toggle
     let autoExecuteOnRelease: Bool // true = auto-execute on release (only when isHoldMode = true)
+    let presentationMode: String
 }
 
 struct CircleCalibrationEntry {

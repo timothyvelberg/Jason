@@ -128,6 +128,8 @@ class FirstLaunchConfiguration {
             print("   Created '\(appsDirectRing.name)' - \(appsDirectRing.triggersSummary)")
             print("   Created default configurations")
             
+            createClipboardPanel()
+            
         } catch {
             print("   Failed to create default configuration: \(error)")
             
@@ -227,5 +229,37 @@ class FirstLaunchConfiguration {
         ensureDefaultConfiguration()
         
         print("   Reset complete")
+    }
+    
+    /// Create a clipboard panel for testing standalone panels
+    @MainActor
+    static func createClipboardPanel() {
+        let configManager = RingConfigurationManager.shared
+        
+        print("[FirstLaunch] Creating clipboard panel...")
+        
+        do {
+            let clipboardPanel = try configManager.createConfiguration(
+                name: "Clipboard",
+                shortcut: "Cmd+Shift+V",  // For display
+                ringRadius: 80.0,         // Not used for panels
+                centerHoleRadius: 56.0,
+                iconSize: 32.0,
+                presentationMode: .panel,  // KEY: Makes it a panel
+                triggers: [
+                    keyboardTrigger(keyCode: 9, modifiers: [.control, .shift])  // Cmd+Shift+V
+                ],
+                providers: [
+                    (type: "ClipboardHistoryProvider", order: 1, displayMode: "direct", angle: nil)
+                ]
+            )
+            print("   Created '\(clipboardPanel.name)' - \(clipboardPanel.triggersSummary) [PANEL MODE]")
+            
+            // Reload to pick up changes
+            configManager.loadConfigurations()
+            
+        } catch {
+            print("   Failed to create clipboard panel: \(error)")
+        }
     }
 }

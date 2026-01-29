@@ -145,23 +145,31 @@ struct FavoritesSettingsSection: View {
             Group {
                 switch selectedFavoriteType {
                 case .folders:
-                    if let instance = instanceManager.instances.values.first(where: {
-                        $0.functionManager?.providers.contains(where: { $0 is FavoriteFolderProvider }) ?? false
-                    }) {
+                    if let instance = instanceManager.instances.values
+                        .compactMap({ $0 as? CircularUIManager })
+                        .first(where: {
+                            $0.functionManager?.providers.contains(where: { $0 is FavoriteFolderProvider }) ?? false
+                        }) {
                         FavoritesSettingsView(circularUI: instance)
                     } else {
                         noProviderView(for: "Favorite Folders", providerType: "FavoriteFolderProvider")
                     }
                     
                 case .files:
-                    if let filesProvider = instanceManager.instances.values.compactMap({ $0.favoriteFilesProvider }).first {
+                    if let filesProvider = instanceManager.instances.values
+                        .compactMap({ $0 as? CircularUIManager })
+                        .compactMap({ $0.favoriteFilesProvider })
+                        .first {
                         FavoriteFilesSettingsView(filesProvider: filesProvider)
                     } else {
                         noProviderView(for: "Favorite Files", providerType: "FavoriteFilesProvider")
                     }
                     
                 case .apps:
-                    if let appsProvider = instanceManager.instances.values.compactMap({ $0.functionManager?.favoriteAppsProvider }).first {
+                    if let appsProvider = instanceManager.instances.values
+                        .compactMap({ $0 as? CircularUIManager })
+                        .compactMap({ $0.functionManager?.favoriteAppsProvider })
+                        .first {
                         FavoriteAppsSettingsView(appsProvider: appsProvider)
                     } else {
                         noProviderView(for: "Favorite Apps", providerType: "CombinedAppsProvider")
@@ -284,39 +292,6 @@ struct AdvancedSettingsView: View {
                 Button("Copy Debug Log to Clipboard") {
                     // TODO: Implement log export
                     print("📋 Debug log copy requested")
-                }
-            }
-            Section("List Panel Testing") {
-                Button("Test Ring → Panel") {
-                    if let instance = instanceManager.getFirstInstance() {
-                        instance.showTestRingForPanelIntegration()
-                    }
-                }
-                
-                Button("Show Test Panel at Mouse") {
-                    if let instance = instanceManager.getFirstInstance() {
-                        CircularUIInstanceManager.shared.show(configId: instance.configId)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            let mousePos = NSEvent.mouseLocation
-                            instance.listPanelManager?.showTestPanel(at: mousePos)
-                        }
-                    }
-                }
-                
-                Button("Test Panel Cascading") {
-                    if let instance = instanceManager.getFirstInstance() {
-                        CircularUIInstanceManager.shared.show(configId: instance.configId)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            let mousePos = NSEvent.mouseLocation
-                            instance.listPanelManager?.showTestPanel(at: mousePos)
-                        }
-                    }
-                }
-                
-                Button("Hide Panel") {
-                    if let instance = instanceManager.getFirstInstance() {
-                        instance.listPanelManager?.hide()
-                    }
                 }
             }
         }

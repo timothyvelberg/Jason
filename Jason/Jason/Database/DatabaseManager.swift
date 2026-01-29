@@ -180,6 +180,7 @@ class DatabaseManager {
             finger_count INTEGER,
             is_hold_mode INTEGER DEFAULT 0,
             auto_execute_on_release INTEGER DEFAULT 1,
+            presentation_mode TEXT NOT NULL DEFAULT 'ring',
             created_at INTEGER DEFAULT (strftime('%s', 'now')),
             is_active INTEGER DEFAULT 1,
             display_order INTEGER DEFAULT 0

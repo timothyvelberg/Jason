@@ -160,6 +160,7 @@ class RingConfigurationManager: ObservableObject {
         centerHoleRadius: Double = 56.0,
         iconSize: Double,
         startAngle: Double = 0.0,
+        presentationMode: PresentationMode = .ring,
         triggers: [(type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, autoExecuteOnRelease: Bool)] = [],
         providers: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
     ) throws -> StoredRingConfiguration {
@@ -211,7 +212,8 @@ class RingConfigurationManager: ObservableObject {
             swipeDirection: nil,
             fingerCount: nil,
             isHoldMode: false,
-            autoExecuteOnRelease: true
+            autoExecuteOnRelease: true,
+            presentationMode: presentationMode.rawValue,
         ) else {
             throw StoredRingConfigurationError.databaseError("Failed to create ring configuration")
         }
@@ -296,6 +298,7 @@ class RingConfigurationManager: ObservableObject {
             iconSize: iconSize,
             startAngle: startAngle,
             isActive: true,
+            presentationMode: presentationMode,
             triggers: triggerConfigs,
             providers: providerConfigs
         )
@@ -757,6 +760,8 @@ class RingConfigurationManager: ObservableObject {
             )
         }
         
+        let presentationMode = PresentationMode(rawValue: dbConfig.presentationMode) ?? .ring
+        
         return StoredRingConfiguration(
             id: dbConfig.id,
             name: dbConfig.name,
@@ -766,6 +771,7 @@ class RingConfigurationManager: ObservableObject {
             iconSize: Double(dbConfig.iconSize),
             startAngle: Double(dbConfig.startAngle),
             isActive: dbConfig.isActive,
+            presentationMode: presentationMode,
             triggers: triggers,
             providers: providers
         )

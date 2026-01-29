@@ -353,14 +353,29 @@ class ListPanelManager: ObservableObject {
         ]
     }
     
-    /// Show panel at a specific position (for testing)
-    func show(title: String, items: [FunctionNode], at position: CGPoint) {
-        print("[ListPanelManager] Showing panel with \(items.count) items")
+    /// Show panel at a specific position (for standalone panels)
+    func show(title: String, items: [FunctionNode], at position: CGPoint, screen: NSScreen? = nil) {
+        print("[ListPanelManager] Showing panel with \(items.count) items at \(position)")
+        
+        // Store screen reference
+        self.currentScreen = screen ?? NSScreen.main
+        
+        // Calculate panel dimensions for constraint checking
+        let itemCountClamped = min(items.count, PanelState.maxVisibleItems)
+        let panelHeight = PanelState.titleHeight + CGFloat(itemCountClamped) * PanelState.rowHeight + PanelState.padding
+        
+        // Constrain position to screen bounds
+        let constrainedPosition = constrainToScreenBounds(
+            position: position,
+            panelWidth: PanelState.panelWidth,
+            panelHeight: panelHeight
+        )
+        
         panelStack = [
             PanelState(
                 title: title,
                 items: items,
-                position: position,
+                position: constrainedPosition,
                 level: 0,
                 sourceNodeId: nil,
                 sourceRowIndex: nil,
@@ -373,6 +388,10 @@ class ListPanelManager: ObservableObject {
                 scrollOffset: 0
             )
         ]
+        
+        // Set initial keyboard state
+        activePanelLevel = 0
+        keyboardSelectedRow[0] = 0
     }
     
     // MARK: - Mouse Movement Tracking

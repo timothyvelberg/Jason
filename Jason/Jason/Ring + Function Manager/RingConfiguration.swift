@@ -16,6 +16,16 @@ enum DisplayMode: String {
     case direct  // Skip category, show children directly in ring 0
 }
 
+// MARK: - Presentation Mode
+
+/// How the UI should be presented when triggered
+enum PresentationMode: String, Equatable {
+    case ring   // Show circular ring UI, panels spawn from ring items
+    case panel  // Show panel directly at mouse position, no ring
+    
+    static var `default`: PresentationMode { .ring }
+}
+
 // MARK: - Trigger Configuration
 
 /// Domain model representing a trigger for a ring
@@ -178,6 +188,7 @@ struct StoredRingConfiguration: Identifiable, Equatable {
     let iconSize: Double
     let startAngle: Double
     let isActive: Bool
+    let presentationMode: PresentationMode
     let triggers: [TriggerConfiguration]
     let providers: [ProviderConfiguration]
     
@@ -212,6 +223,18 @@ struct StoredRingConfiguration: Identifiable, Equatable {
     /// DEPRECATED - for backward compatibility
     var hasShortcut: Bool {
         return hasTriggers
+    }
+    
+    // MARK: - Presentation Mode Properties
+
+    /// Check if this configuration uses panel presentation
+    var isPanelMode: Bool {
+        return presentationMode == .panel
+    }
+
+    /// Check if this configuration uses ring presentation
+    var isRingMode: Bool {
+        return presentationMode == .ring
     }
     
     // MARK: - Provider Properties
@@ -286,16 +309,18 @@ struct StoredRingConfiguration: Identifiable, Equatable {
     // MARK: - Equatable
     
     static func == (lhs: StoredRingConfiguration, rhs: StoredRingConfiguration) -> Bool {
-        return lhs.id == rhs.id &&
-               lhs.name == rhs.name &&
-               lhs.shortcut == rhs.shortcut &&
-               lhs.ringRadius == rhs.ringRadius &&
-               lhs.centerHoleRadius == rhs.centerHoleRadius &&
-               lhs.iconSize == rhs.iconSize &&
-               lhs.startAngle == rhs.startAngle &&
-               lhs.isActive == rhs.isActive &&
-               lhs.triggers == rhs.triggers &&
-               lhs.providers == rhs.providers
+        return
+                lhs.id == rhs.id &&
+                lhs.name == rhs.name &&
+                lhs.shortcut == rhs.shortcut &&
+                lhs.ringRadius == rhs.ringRadius &&
+                lhs.centerHoleRadius == rhs.centerHoleRadius &&
+                lhs.iconSize == rhs.iconSize &&
+                lhs.startAngle == rhs.startAngle &&
+                lhs.isActive == rhs.isActive &&
+                lhs.presentationMode == rhs.presentationMode &&
+                lhs.triggers == rhs.triggers &&
+                lhs.providers == rhs.providers
     }
 }
 
