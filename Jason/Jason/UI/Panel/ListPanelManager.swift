@@ -273,6 +273,12 @@ class ListPanelManager: ObservableObject {
             return
         }
         
+        // Reset to mouse-driven selection when mouse hovers in panel
+        resetToMouseMode()
+        
+        // Update hovered row for this level
+        hoveredRow[level] = rowIndex
+        
         // Track which node is currently hovered at this level
         if let node = node {
             currentlyHoveredNodeId[level] = node.id
