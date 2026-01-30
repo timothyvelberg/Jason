@@ -31,11 +31,21 @@ struct PanelOnlyView: View {
     
     @ViewBuilder
     private func panelView(for panel: PanelState, in geometry: GeometryProxy) -> some View {
-        let position = listPanelManager.currentPosition(for: panel)
+        // Get the screen the overlay is on
+        let screen = panelUIManager.overlayWindow?.currentScreen ?? NSScreen.main
+        let screenOriginX = screen?.frame.origin.x ?? 0
+        let screenOriginY = screen?.frame.origin.y ?? 0
+        let screenHeight = screen?.frame.height ?? 1080
         
-        // Convert from screen coordinates to view coordinates
-        let viewX = position.x
-        let viewY = geometry.size.height - position.y  // Flip Y for SwiftUI
+        // Get global position
+        let globalPosition = listPanelManager.currentPosition(for: panel)
+        
+        // Convert GLOBAL → SCREEN-LOCAL coordinates
+        let localX = globalPosition.x - screenOriginX
+        let localY = globalPosition.y - screenOriginY
+        
+        // Flip Y for SwiftUI (Y=0 at top)
+        let viewY = screenHeight - localY
         
         ListPanelView(
             title: panel.title,
@@ -73,6 +83,6 @@ struct PanelOnlyView: View {
             hoveredRowIndex: listPanelManager.effectiveSelectedRow(for: panel.level),
             isKeyboardDriven: listPanelManager.isKeyboardDriven
         )
-        .position(x: viewX, y: viewY)
+        .position(x: localX, y: viewY)
     }
 }
