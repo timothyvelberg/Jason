@@ -30,6 +30,8 @@ struct PanelState: Identifiable {
     var areChildrenArmed: Bool = false
     var isOverlapping: Bool = false
     var scrollOffset: CGFloat = 0     // Track scroll position for accurate row positioning
+    var isSearchActive: Bool = false
+    var searchQuery: String = ""
     
     // MARK: - Constants
     

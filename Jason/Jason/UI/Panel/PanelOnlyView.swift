@@ -80,8 +80,26 @@ struct PanelOnlyView: View {
                     }
                 }
             ),
+            isSearchActive: Binding(
+                get: { panel.isSearchActive },
+                set: { newValue in
+                    if let index = listPanelManager.panelStack.firstIndex(where: { $0.id == panel.id }) {
+                        listPanelManager.panelStack[index].isSearchActive = newValue
+                    }
+                }
+            ),
+            searchQuery: Binding(
+                get: { panel.searchQuery },
+                set: { newValue in
+                    if let index = listPanelManager.panelStack.firstIndex(where: { $0.id == panel.id }) {
+                        listPanelManager.panelStack[index].searchQuery = newValue
+                    }
+                }
+            ),
             hoveredRowIndex: listPanelManager.effectiveSelectedRow(for: panel.level),
             isKeyboardDriven: listPanelManager.isKeyboardDriven
+            
+            
         )
         .position(x: localX, y: viewY)
     }

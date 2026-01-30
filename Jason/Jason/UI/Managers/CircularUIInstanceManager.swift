@@ -428,6 +428,27 @@ class CircularUIInstanceManager: ObservableObject {
             panelManager.executeSelectedItem()
         }
         
+        hotkeyManager.onEscapePressed = { [weak self] in
+            guard let instance = self?.getActiveInstance() else {
+                print("[InstanceManager] onEscapePressed: no active instance")
+                return false
+            }
+            guard let panelManager = instance.listPanelManager else {
+                print("[InstanceManager] onEscapePressed: no listPanelManager")
+                return false
+            }
+            print("[InstanceManager] onEscapePressed: calling handleSearchEscape, isSearchActive=\(panelManager.isSearchActive)")
+            return panelManager.handleSearchEscape()
+        }
+        
+        hotkeyManager.onBackspace = { [weak self] in
+            guard let instance = self?.getActiveInstance(),
+                  let panelManager = instance.listPanelManager,
+                  panelManager.isVisible else { return }
+            
+            panelManager.handleBackspace()
+        }
+        
         hotkeyManager.startMonitoring()
     }
     
@@ -439,7 +460,7 @@ class CircularUIInstanceManager: ObservableObject {
     
     // MARK: - Debugging & Diagnostics
     
-    /// Print current state for debugging
+    /// Print current state for debuggz
     func printDebugInfo() {
         print("🔍 [InstanceManager] Debug Info:")
         print("   Total instances: \(instances.count)")

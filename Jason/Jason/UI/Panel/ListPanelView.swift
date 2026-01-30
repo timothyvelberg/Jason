@@ -28,6 +28,8 @@ struct ListPanelView: View {
     
     // Expanded state from manager
     @Binding var expandedItemId: String?
+    @Binding var isSearchActive: Bool
+    @Binding var searchQuery: String
     var hoveredRowIndex: Int?
     var isKeyboardDriven: Bool = false
 
@@ -77,9 +79,16 @@ struct ListPanelView: View {
             VStack(spacing: 0) {
                 // Title bar
                 HStack {
-                    Text(title)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
+                    if isSearchActive {
+                        TextField("Search...", text: $searchQuery)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white)
+                    } else {
+                        Text(title)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
                     
                     Spacer()
                     

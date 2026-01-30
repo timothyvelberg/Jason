@@ -27,6 +27,12 @@ class OverlayWindow: NSWindow {
     // Store which screen the overlay is currently on
     var currentScreen: NSScreen?
     
+    // Callback for search toggle (CMD+F)
+    var onSearchToggle: (() -> Void)?
+
+    // Callback for escape - returns true if consumed (search handled it)
+    var onEscapePressed: (() -> Bool)?
+    
     init() {
         // Get the main screen size for fullscreen overlay
         let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
@@ -178,18 +184,36 @@ class OverlayWindow: NSWindow {
         hideOverlay()
     }
     
-    // Handle keyboard events - FIXED: Don't call super to prevent beep
+
     override func keyDown(with event: NSEvent) {
         print("OverlayWindow received key: \(event.keyCode)")
         
         let isCtrlPressed = event.modifierFlags.contains(.control)
         let isShiftPressed = event.modifierFlags.contains(.shift)
+        let isCmdPressed = event.modifierFlags.contains(.command)
         let isKKey = event.keyCode == 40  // K key
+        let isFKey = event.keyCode == 3   // F key
+        
+        // Handle CMD+F for search
+        if isCmdPressed && isFKey {
+            print("[OverlayWindow] CMD+F - toggling search")
+            onSearchToggle?()
+            return
+        }
         
         // Handle Escape
         if event.keyCode == 53 { // Escape
+            print("[OverlayWindow] Escape pressed, onEscapePressed is \(onEscapePressed == nil ? "nil" : "set")")
+            // Let search handle it first
+            if let handler = onEscapePressed {
+                let consumed = handler()
+                print("[OverlayWindow] onEscapePressed returned: \(consumed)")
+                if consumed {
+                    return
+                }
+            }
             hideOverlay()
-            return  // Consumed - no beep
+            return
         }
         
         // Handle our shortcut Ctrl+Shift+K

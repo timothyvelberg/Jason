@@ -46,6 +46,11 @@ class HotkeyManager {
     /// Called when Enter is pressed while UI is visible
     var onEnter: (() -> Void)?
     
+    /// Callback for escape - returns true if consumed (e.g., by search)
+    var onEscapePressed: (() -> Bool)?
+    
+    var onBackspace: (() -> Void)?
+    
     // MARK: - Configuration
     
     /// Key code for hold-to-show functionality (nil = disabled)
@@ -743,6 +748,13 @@ class HotkeyManager {
         // Escape = Hide UI (only when UI is visible)
         if event.keyCode == 53 && isUIVisible {
             print("[HotkeyManager] Escape pressed")
+            
+            // Let search handle it first
+            if onEscapePressed?() == true {
+                print("[HotkeyManager] Escape consumed by search")
+                return true
+            }
+            
             onHide?()
             return true
         }
@@ -769,6 +781,10 @@ class HotkeyManager {
             case 36, 76:  // Return key, Keypad Enter
                 print("[HotkeyManager] Enter pressed")
                 onEnter?()
+                return true
+            case 51:  // Backspace
+                print("[HotkeyManager] Backspace pressed")
+                onBackspace?()
                 return true
             default:
                 break
@@ -849,6 +865,7 @@ class HotkeyManager {
             return true
         }
     }
+    
     private func handleKeyUpEvent(_ event: NSEvent) {
         // Check if we have an active hold registration for this key
         guard let activeConfigId = activeHoldRegistration,

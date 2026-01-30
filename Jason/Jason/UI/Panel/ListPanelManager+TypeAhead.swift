@@ -14,6 +14,14 @@ extension ListPanelManager {
     
     /// Handle character input for type-ahead search in active panel
     func handleCharacterInput(_ character: String) {
+        
+        // If search is active, route to search query instead of type-ahead
+        if let index = panelStack.firstIndex(where: { $0.level == activePanelLevel }),
+           panelStack[index].isSearchActive {
+            panelStack[index].searchQuery += character
+            print("[Search] Query updated: '\(panelStack[index].searchQuery)'")
+            return
+        }
         // Cancel existing timer
         searchBufferTimer?.cancel()
         

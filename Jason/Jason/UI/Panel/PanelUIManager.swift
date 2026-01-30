@@ -379,6 +379,14 @@ class PanelUIManager: ObservableObject, UIManager {
             self?.hide()
         }
         
+        overlayWindow?.onSearchToggle = { [weak self] in
+            self?.listPanelManager?.activateSearch()
+        }
+
+        overlayWindow?.onEscapePressed = { [weak self] in
+            return self?.listPanelManager?.handleSearchEscape() ?? false
+        }
+        
         guard let panelManager = listPanelManager else {
             print("[PanelUIManager] ListPanelManager not initialized")
             return
