@@ -241,6 +241,15 @@ class DatabaseManager {
         ON ring_providers(ring_id, provider_order);
         """
         
+        // Create clipboard_history table
+        let clipboardHistorySQL = """
+        CREATE TABLE IF NOT EXISTS clipboard_history (
+            id TEXT PRIMARY KEY,
+            content TEXT NOT NULL,
+            copied_at REAL NOT NULL
+        );
+        """
+        
         let tables = [
             foldersSQL,
             favoriteFoldersSQL,
@@ -253,7 +262,8 @@ class DatabaseManager {
             ringProvidersSQL,
             ringProvidersIndexSQL,
             circleCalibrationSQL,
-            ringTriggersSQL
+            ringTriggersSQL,
+            clipboardHistorySQL
         ]
         
         for sql in tables {

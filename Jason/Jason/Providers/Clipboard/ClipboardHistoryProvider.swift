@@ -96,15 +96,27 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
         // Format timestamp
         let timeAgo = formatTimeAgo(entry.copiedAt)
         
-        // Create display name with truncated content
-        let displayName = displayText
+        // Create delete context action
+        let deleteAction = FunctionNode(
+            id: "clipboard-delete-\(entry.id.uuidString)",
+            name: "Delete",
+            type: .action,
+            icon: NSImage(systemSymbolName: "trash", accessibilityDescription: nil) ?? NSImage(),
+            showLabel: true,
+            providerId: providerId,
+            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                self?.clipboardManager.remove(entry: entry)
+                self?.refresh()
+            }),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
         
         return FunctionNode(
             id: "clipboard-\(entry.id.uuidString)",
-            name: displayName,
-            type: .action,
+            name: displayText,
+            type: .file,
             icon: iconForContent(entry.content),
-            showLabel: true,
+            contextActions: [deleteAction],
             metadata: [
                 "fullContent": entry.content,
                 "copiedAt": entry.copiedAt,
@@ -114,14 +126,13 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
             onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                 self?.pasteEntry(entry)
             }),
-            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
                 self?.pasteEntry(entry)
             })
         )
     }
-    
     private func pasteEntry(_ entry: ClipboardEntry) {
         print("📋 [ClipboardHistoryProvider] Pasting entry: \"\(entry.content.prefix(30))...\"")
         clipboardManager.paste(entry: entry)

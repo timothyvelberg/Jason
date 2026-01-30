@@ -418,35 +418,58 @@ class PanelUIManager: ObservableObject, UIManager {
         }
     }
     
-    // MARK: - Click Handlers
     
-    private func handleLeftClick(event: GestureManager.GestureEvent) {
-        guard isVisible, let panelManager = listPanelManager else { return }
+    // MARK: - Click Helpers
+
+    /// Returns (panel, rowIndex, node) for click at position, or nil if outside panels/rows
+    private func findClickedItem(at mousePos: CGPoint) -> (panel: PanelState, rowIndex: Int, node: FunctionNode)? {
+        guard let panelManager = listPanelManager else { return nil }
         
-        let mousePos = NSEvent.mouseLocation
-        
-        // Check if click is in any panel
         for panel in panelManager.panelStack.reversed() {
             let bounds = panelManager.currentBounds(for: panel)
-            if bounds.contains(mousePos) {
-                return // Click handled by panel's internal handling
+            guard bounds.contains(mousePos) else { continue }
+            
+            let distanceFromTop = bounds.maxY - mousePos.y
+            
+            // Check if in header
+            guard distanceFromTop >= PanelState.titleHeight + (PanelState.padding / 2) else {
+                return nil
             }
+            
+            // Calculate row index
+            let relativeY = distanceFromTop - PanelState.titleHeight - (PanelState.padding / 2)
+            let scrollAdjustedY = relativeY + panel.scrollOffset
+            let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
+            
+            // Validate
+            guard rowIndex >= 0 && rowIndex < panel.items.count else {
+                return nil
+            }
+            
+            return (panel, rowIndex, panel.items[rowIndex])
         }
         
-        // Click outside panels - hide
-        hide()
+        return nil
     }
     
-    private func handleRightClick(event: GestureManager.GestureEvent) {
-        guard isVisible, let panelManager = listPanelManager else { return }
+    private func handleLeftClick(event: GestureManager.GestureEvent) {
+        guard isVisible else { return }
         
-        let mousePos = NSEvent.mouseLocation
-        
-        let isOutside = panelManager.panelStack.allSatisfy { panel in
-            !panelManager.currentBounds(for: panel).contains(mousePos)
+        if let (_, rowIndex, node) = findClickedItem(at: NSEvent.mouseLocation) {
+            print("[PanelUIManager] Left click on row \(rowIndex): '\(node.name)'")
+            handlePanelItemLeftClick(node: node, modifiers: NSEvent.modifierFlags)
+        } else {
+            hide()
         }
+    }
+
+    private func handleRightClick(event: GestureManager.GestureEvent) {
+        guard isVisible else { return }
         
-        if isOutside {
+        if let (_, rowIndex, node) = findClickedItem(at: NSEvent.mouseLocation) {
+            print("[PanelUIManager] Right click on row \(rowIndex): '\(node.name)'")
+            handlePanelItemRightClick(node: node, modifiers: NSEvent.modifierFlags)
+        } else {
             hide()
         }
     }

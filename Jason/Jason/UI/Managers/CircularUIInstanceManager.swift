@@ -456,7 +456,6 @@ class CircularUIInstanceManager: ObservableObject {
     var hasVisibleInstance: Bool {
         return instances.values.contains { $0.isVisible }
     }
-    
     /// Get all currently visible instances
     var visibleInstances: [any UIManager] {
         return instances.values.filter { $0.isVisible }

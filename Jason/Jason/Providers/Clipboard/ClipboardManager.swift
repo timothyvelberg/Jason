@@ -10,15 +10,25 @@ import AppKit
 
 // MARK: - Clipboard Entry Model
 
+// In ClipboardManager.swift, update ClipboardEntry struct:
+
 struct ClipboardEntry: Identifiable, Equatable {
     let id: UUID
     let content: String
     let copiedAt: Date
     
+    // New entry (generates UUID and timestamp)
     init(content: String) {
         self.id = UUID()
         self.content = content
         self.copiedAt = Date()
+    }
+    
+    // Load from database
+    init(id: UUID, content: String, copiedAt: Date) {
+        self.id = id
+        self.content = content
+        self.copiedAt = copiedAt
     }
     
     static func == (lhs: ClipboardEntry, rhs: ClipboardEntry) -> Bool {
@@ -47,6 +57,10 @@ class ClipboardManager: ObservableObject {
     // MARK: - Initialization
     
     private init() {
+        // Load history from database
+        history = DatabaseManager.shared.getAllClipboardEntries()
+        print("[ClipboardManager] Loaded \(history.count) entries from database")
+        
         // Capture initial state without adding to history
         lastChangeCount = NSPasteboard.general.changeCount
         print("[ClipboardManager] Initialized with changeCount: \(lastChangeCount)")
@@ -85,9 +99,10 @@ class ClipboardManager: ObservableObject {
         return history.count
     }
     
-    /// Clear all history
+    // Update clearHistory() to also clear database:
     func clearHistory() {
         history.removeAll()
+        DatabaseManager.shared.clearClipboardHistory()
         print("[ClipboardManager] History cleared")
     }
     
@@ -128,24 +143,37 @@ class ClipboardManager: ObservableObject {
         addEntry(content: content)
     }
     
+    // Update addEntry(content:) to save to database:
     private func addEntry(content: String) {
         // Deduplication: check if this content already exists
         if let existingIndex = history.firstIndex(where: { $0.content == content }) {
-            // Remove the old entry
+            // Remove the old entry from memory and database
             let existing = history.remove(at: existingIndex)
+            DatabaseManager.shared.deleteClipboardEntry(id: existing.id)
             print("[ClipboardManager] Dedup: moving existing entry to top")
             
             // Create new entry with fresh timestamp and insert at top
             let newEntry = ClipboardEntry(content: content)
             history.insert(newEntry, at: 0)
+            DatabaseManager.shared.saveClipboardEntry(newEntry)
             
             print("[ClipboardManager] Entry moved to top: \"\(content.prefix(30))...\" (was at index \(existingIndex))")
         } else {
             // New entry - insert at top
             let entry = ClipboardEntry(content: content)
             history.insert(entry, at: 0)
+            DatabaseManager.shared.saveClipboardEntry(entry)
             
             print("[ClipboardManager] New entry added: \"\(content.prefix(30))...\" (total: \(history.count))")
+        }
+    }
+    
+    // Update remove(entry:) to also delete from database:
+    func remove(entry: ClipboardEntry) {
+        if let index = history.firstIndex(where: { $0.id == entry.id }) {
+            history.remove(at: index)
+            DatabaseManager.shared.deleteClipboardEntry(id: entry.id)
+            print("[ClipboardManager] Removed entry: \"\(entry.content.prefix(30))...\" (remaining: \(history.count))")
         }
     }
 }
