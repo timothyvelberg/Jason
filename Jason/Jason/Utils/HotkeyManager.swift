@@ -58,6 +58,10 @@ class HotkeyManager {
     private var requiresReleaseBeforeNextShow: Bool = false  // Prevents re-show while key still held
     private var activeHoldRegistration: Int? = nil
     
+    // Keyboard event tap (CGEventTap required to intercept before other apps)
+    private var keyboardEventTap: CFMachPort?
+    private var keyboardRunLoopSource: CFRunLoopSource?
+    
     // MARK: - Dynamic Shortcuts
     
     /// Registered mouse buttons: [configId: (buttonNumber, modifierFlags, callback)]
@@ -121,15 +125,8 @@ class HotkeyManager {
             return
         }
         
-        // Listen for global key events (keyDown only)
-        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-            self?.handleKeyEvent(event)
-        }
-        
-        // Listen for global key up events (for hold key release)
-        globalKeyUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyUp]) { [weak self] event in
-            self?.handleKeyUpEvent(event)
-        }
+        // Use CGEventTap for keyboard shortcuts (intercepts before other apps)
+        startKeyboardEventTap()
         
         // Listen for global modifier key changes
         globalFlagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged]) { [weak self] event in
@@ -257,6 +254,9 @@ class HotkeyManager {
         
         // Stop mouse monitoring
         stopMouseMonitoring()
+        
+        // Stop keyboard event tap
+        stopKeyboardEventTap()
         
         print("[HotkeyManager] Monitoring stopped")
     }
@@ -1125,6 +1125,147 @@ class HotkeyManager {
         parts.append("\(sideSymbol) Two-Finger Tap \(side.rawValue.capitalized)")
         
         return parts.joined()
+    }
+    
+    // MARK: - Keyboard Event Tap
+
+    private func startKeyboardEventTap() {
+        guard keyboardEventTap == nil else {
+            print("[HotkeyManager] Keyboard event tap already active")
+            return
+        }
+        
+        print("[HotkeyManager] Starting keyboard event tap...")
+        
+        // Tap keyDown and keyUp events
+        let eventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
+        
+        guard let eventTap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: CGEventMask(eventMask),
+            callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
+                let mySelf = Unmanaged<HotkeyManager>.fromOpaque(refcon!).takeUnretainedValue()
+                return mySelf.handleKeyboardEventTap(proxy: proxy, type: type, event: event)
+            },
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
+        ) else {
+            print("[HotkeyManager] Failed to create keyboard event tap")
+            print("   NOTE: This requires Accessibility permissions!")
+            return
+        }
+        
+        keyboardEventTap = eventTap
+        keyboardRunLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
+        
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), keyboardRunLoopSource, .commonModes)
+        CGEvent.tapEnable(tap: eventTap, enable: true)
+        
+        print("[HotkeyManager] Keyboard event tap started (intercepts before other apps)")
+    }
+
+    private func stopKeyboardEventTap() {
+        if let eventTap = keyboardEventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), keyboardRunLoopSource, .commonModes)
+            keyboardEventTap = nil
+            keyboardRunLoopSource = nil
+            print("[HotkeyManager] Keyboard event tap stopped")
+        }
+    }
+
+    private func handleKeyboardEventTap(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        // Handle tap disabled events (re-enable if system disabled it)
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap = keyboardEventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
+            return Unmanaged.passRetained(event)
+        }
+        
+        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+        let cgFlags = event.flags
+        
+        // Convert CGEventFlags to NSEvent.ModifierFlags for comparison
+        var eventModifiers: UInt = 0
+        if cgFlags.contains(.maskCommand) { eventModifiers |= NSEvent.ModifierFlags.command.rawValue }
+        if cgFlags.contains(.maskControl) { eventModifiers |= NSEvent.ModifierFlags.control.rawValue }
+        if cgFlags.contains(.maskAlternate) { eventModifiers |= NSEvent.ModifierFlags.option.rawValue }
+        if cgFlags.contains(.maskShift) { eventModifiers |= NSEvent.ModifierFlags.shift.rawValue }
+        
+        // Normalize to only the modifier keys we care about
+        let normalizedModifiers = eventModifiers & (
+            NSEvent.ModifierFlags.command.rawValue |
+            NSEvent.ModifierFlags.control.rawValue |
+            NSEvent.ModifierFlags.option.rawValue |
+            NSEvent.ModifierFlags.shift.rawValue
+        )
+        
+        if type == .keyDown {
+            // Check if this matches any registered shortcut
+            for (configId, registration) in registeredShortcuts {
+                if registration.keyCode == keyCode && registration.modifierFlags == normalizedModifiers {
+                    let display = formatShortcut(keyCode: keyCode, modifiers: normalizedModifiers)
+                    
+                    if registration.isHoldMode {
+                        // HOLD MODE
+                        if activeHoldRegistration == configId {
+                            // Already holding - consume but don't re-trigger
+                            return nil
+                        }
+                        
+                        if requiresReleaseBeforeNextShow && activeHoldRegistration != nil {
+                            return nil
+                        }
+                        
+                        print("[HotkeyManager] HOLD mode MATCHED for config \(configId): \(display) (intercepted)")
+                        activeHoldRegistration = configId
+                        
+                        DispatchQueue.main.async {
+                            registration.onPress()
+                        }
+                    } else {
+                        // TAP MODE
+                        print("[HotkeyManager] TAP mode MATCHED for config \(configId): \(display) (intercepted)")
+                        
+                        DispatchQueue.main.async {
+                            registration.onPress()
+                        }
+                    }
+                    
+                    // Consume the event - don't let other apps see it
+                    return nil
+                }
+            }
+            
+        } else if type == .keyUp {
+            // Check if we have an active hold registration for this key
+            if let activeConfigId = activeHoldRegistration,
+               let registration = registeredShortcuts[activeConfigId],
+               registration.keyCode == keyCode {
+                
+                let display = formatShortcut(keyCode: registration.keyCode, modifiers: registration.modifierFlags)
+                print("[HotkeyManager] HOLD key released for config \(activeConfigId): \(display)")
+                
+                activeHoldRegistration = nil
+                
+                if requiresReleaseBeforeNextShow {
+                    requiresReleaseBeforeNextShow = false
+                    print("   Ready for next show")
+                }
+                
+                DispatchQueue.main.async {
+                    registration.onRelease?()
+                }
+                
+                // Consume the release too
+                return nil
+            }
+        }
+        
+        // Not our shortcut - pass through to other apps
+        return Unmanaged.passRetained(event)
     }
     
     // MARK: - Circle Calibration
