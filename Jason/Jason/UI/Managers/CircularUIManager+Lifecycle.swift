@@ -67,6 +67,7 @@ extension CircularUIManager {
         
         mouseTracker?.startTrackingMouse()
         gestureManager?.startMonitoring()
+        resumeMouseMonitor()
         
         // Set initial focus to ring
         inputCoordinator?.focusRing(level: functionManager.activeRingLevel)
