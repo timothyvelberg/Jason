@@ -810,7 +810,7 @@ class HotkeyManager {
                let characters = event.charactersIgnoringModifiers,
                characters.count == 1,
                let char = characters.first,
-               (char.isLetter || char.isNumber || char == " ") {
+               (char.isLetter || char.isNumber || char == " " || char.isPunctuation || char.isSymbol) {
                 print("[HotkeyManager] Character input: '\(characters)'")
                 onCharacterInput?(characters)
                 return true
