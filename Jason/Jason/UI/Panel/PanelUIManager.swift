@@ -463,6 +463,11 @@ class PanelUIManager: ObservableObject, UIManager {
     private func handleLeftClick(event: GestureManager.GestureEvent) {
         guard isVisible else { return }
         
+        // Skip if context menu is open - SwiftUI handles the menu click
+        if listPanelManager?.panelStack.contains(where: { $0.expandedItemId != nil }) == true {
+            return
+        }
+        
         if let (_, rowIndex, node) = findClickedItem(at: NSEvent.mouseLocation) {
             print("[PanelUIManager] Left click on row \(rowIndex): '\(node.name)'")
             handlePanelItemLeftClick(node: node, modifiers: NSEvent.modifierFlags)

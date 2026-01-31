@@ -48,7 +48,6 @@ class DatabaseManager {
             sqlite3_close(db)
         }
     }
-    
     // MARK: - Database Path
     
     private func getDatabasePath() throws -> String {
