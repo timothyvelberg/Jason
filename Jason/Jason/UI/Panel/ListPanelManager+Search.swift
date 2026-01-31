@@ -25,12 +25,14 @@ extension ListPanelManager {
         // Store original items for restoration later
         panelStack[index].unfilteredItems = panelStack[index].items
         
+        // Store original height for top-anchored resizing
+        panelStack[index].searchAnchorHeight = panelStack[index].panelHeight
+        
         panelStack[index].isSearchActive = true
         panelStack[index].searchQuery = ""
         print("[Search] Activated on level \(activePanelLevel)")
     }
     
-    /// Deactivate search on the active panel
     func deactivateSearch() {
         guard let index = panelStack.firstIndex(where: { $0.level == activePanelLevel }) else {
             return
@@ -44,6 +46,7 @@ extension ListPanelManager {
         
         panelStack[index].isSearchActive = false
         panelStack[index].searchQuery = ""
+        panelStack[index].searchAnchorHeight = nil
         print("[Search] Deactivated on level \(activePanelLevel)")
     }
     
@@ -105,6 +108,7 @@ extension ListPanelManager {
                 panelStack[index].unfilteredItems = nil
             }
             panelStack[index].isSearchActive = false
+            panelStack[index].searchAnchorHeight = nil  // Add this
             print("[Search] Exited search mode")
             return true
         }

@@ -47,6 +47,11 @@ struct PanelOnlyView: View {
         // Flip Y for SwiftUI (Y=0 at top)
         let viewY = screenHeight - localY
         
+        // Adjust Y to keep top anchored during search
+        let adjustedViewY = panel.isSearchActive && panel.searchAnchorHeight != nil
+            ? viewY - ((panel.searchAnchorHeight! - panel.panelHeight) / 2)
+            : viewY
+        
         ListPanelView(
             title: panel.title,
             items: panel.items,
@@ -101,6 +106,6 @@ struct PanelOnlyView: View {
             
             
         )
-        .position(x: localX, y: viewY)
+        .position(x: localX, y: adjustedViewY)
     }
 }

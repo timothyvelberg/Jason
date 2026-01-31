@@ -36,6 +36,9 @@ struct PanelState: Identifiable {
     var isSearchActive: Bool = false
     var searchQuery: String = ""
     
+    /// Original panel height before search filtering (for top-anchored resizing)
+    var searchAnchorHeight: CGFloat?
+    
     // MARK: - Constants
     
     static let panelWidth: CGFloat = 260
