@@ -22,6 +22,9 @@ struct PanelState: Identifiable {
     let spawnAngle: Double?
     let contextActions: [FunctionNode]?
     
+    /// Original items before search filtering (nil when not searching)
+    var unfilteredItems: [FunctionNode]?
+    
     // Identity tracking for updates
     let providerId: String?
     let contentIdentifier: String?    // Folder path for folder content

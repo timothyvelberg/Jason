@@ -20,8 +20,10 @@ extension ListPanelManager {
            panelStack[index].isSearchActive {
             panelStack[index].searchQuery += character
             print("[Search] Query updated: '\(panelStack[index].searchQuery)'")
+            filterSearchResults()
             return
         }
+        
         // Cancel existing timer
         searchBufferTimer?.cancel()
         

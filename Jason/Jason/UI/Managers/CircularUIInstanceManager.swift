@@ -449,6 +449,22 @@ class CircularUIInstanceManager: ObservableObject {
             panelManager.handleBackspace()
         }
         
+        hotkeyManager.onDeleteWord = { [weak self] in
+            guard let instance = self?.getActiveInstance(),
+                  let panelManager = instance.listPanelManager,
+                  panelManager.isVisible else { return }
+            
+            panelManager.handleDeleteWord()
+        }
+
+        hotkeyManager.onDeleteAll = { [weak self] in
+            guard let instance = self?.getActiveInstance(),
+                  let panelManager = instance.listPanelManager,
+                  panelManager.isVisible else { return }
+            
+            panelManager.handleDeleteAll()
+        }
+        
         hotkeyManager.startMonitoring()
     }
     

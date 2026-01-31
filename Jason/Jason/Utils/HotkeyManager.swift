@@ -50,6 +50,8 @@ class HotkeyManager {
     var onEscapePressed: (() -> Bool)?
     
     var onBackspace: (() -> Void)?
+    var onDeleteWord: (() -> Void)?
+    var onDeleteAll: (() -> Void)?
     
     // MARK: - Configuration
     
@@ -783,9 +785,19 @@ class HotkeyManager {
                 onEnter?()
                 return true
             case 51:  // Backspace
-                print("[HotkeyManager] Backspace pressed")
-                onBackspace?()
-                return true
+                if eventModifiers.contains(.command) {
+                    print("[HotkeyManager] CMD+Backspace pressed")
+                    onDeleteAll?()
+                    return true
+                } else if eventModifiers.contains(.option) {
+                    print("[HotkeyManager] ALT+Backspace pressed")
+                    onDeleteWord?()
+                    return true
+                } else {
+                    print("[HotkeyManager] Backspace pressed")
+                    onBackspace?()
+                    return true
+                }
             default:
                 break
             }
@@ -793,13 +805,13 @@ class HotkeyManager {
             // Letter keys for type-ahead search (only when UI is visible)
             // Allow only if no command/control/option modifiers (shift is ok for typing capitals)
             let hasBlockingModifiers = !event.modifierFlags.intersection([.command, .control, .option]).isEmpty
-            
+
             if !hasBlockingModifiers,
-               let characters = event.charactersIgnoringModifiers?.lowercased(),
+               let characters = event.charactersIgnoringModifiers,
                characters.count == 1,
                let char = characters.first,
-               char.isLetter {
-                print("[HotkeyManager] Letter key pressed: '\(characters)'")
+               (char.isLetter || char.isNumber || char == " ") {
+                print("[HotkeyManager] Character input: '\(characters)'")
                 onCharacterInput?(characters)
                 return true
             }
