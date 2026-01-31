@@ -17,7 +17,7 @@ class DatabaseManager {
     // MARK: - Properties
     
     var db: OpaquePointer?
-    private let databaseFileName = "Jason.db"
+    private let databaseFileName = "Jason_01.db"
     let queue = DispatchQueue(label: "com.jason.database", qos: .userInitiated)
     
     // MARK: - Initialization
@@ -25,21 +25,21 @@ class DatabaseManager {
     private init() {
         do {
             let dbPath = try getDatabasePath()
-            print("📦 [DatabaseManager] Database path: \(dbPath)")
+            print("[DatabaseManager] Database path: \(dbPath)")
             
             // Open database
             if sqlite3_open(dbPath, &db) == SQLITE_OK {
-                print("✅ [DatabaseManager] Database opened successfully")
+                print("[DatabaseManager] Database opened successfully")
                 try setupDatabase()
                 try runMigrations()
             } else {
-                print("❌ [DatabaseManager] Failed to open database")
+                print("[DatabaseManager] Failed to open database")
                 if let error = sqlite3_errmsg(db) {
                     print("   Error: \(String(cString: error))")
                 }
             }
         } catch {
-            print("❌ [DatabaseManager] Failed to initialize database: \(error)")
+            print("[DatabaseManager] Failed to initialize database: \(error)")
         }
     }
     
