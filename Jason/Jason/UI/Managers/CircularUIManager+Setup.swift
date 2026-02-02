@@ -385,6 +385,13 @@ extension CircularUIManager {
             
             self.hide()
         }
+        overlayWindow?.onSearchToggle = { [weak self] in
+            self?.listPanelManager?.activateSearch()
+        }
+
+        overlayWindow?.onEscapePressed = { [weak self] in
+            return self?.listPanelManager?.handleSearchEscape() ?? false
+        }
         
         let contentView = CircularUIView(
             circularUI: self,

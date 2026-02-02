@@ -98,6 +98,10 @@ struct CircularUIView: View {
                     // Capture panel level for the closure
                     let panelLevel = panel.level
                     
+                    let adjustedPanelY = panel.isSearchActive && panel.searchAnchorHeight != nil
+                        ? panelSwiftUIY - ((panel.searchAnchorHeight! - panel.panelHeight) / 2)
+                        : panelSwiftUIYr
+                    
                     ListPanelView(
                         title: panel.title,
                         items: panel.items,
@@ -137,7 +141,7 @@ struct CircularUIView: View {
                         hoveredRowIndex: listPanelManager.effectiveSelectedRow(for: panelLevel),
                         isKeyboardDriven: listPanelManager.isKeyboardDriven
                     )
-                    .position(x: panelLocalX, y: panelSwiftUIY)
+                    .position(x: panelLocalX, y: adjustedPanelY)
                         
                     .transition(panel.level == 0
                                 ? .slideFromAngle(angle: panel.spawnAngle ?? 0, distance: PanelState.cascadeSlideDistance)
