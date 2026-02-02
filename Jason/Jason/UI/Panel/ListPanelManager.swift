@@ -778,12 +778,20 @@ class ListPanelManager: ObservableObject {
     
     // MARK: - Bounds Calculation
 
-    /// Get the current bounds for a panel (accounting for overlap state)
     func currentBounds(for panel: PanelState) -> NSRect {
         let currentPos = currentPosition(for: panel)
+        var centerY = currentPos.y
+        
+        // Adjust for top-anchored search resizing
+        // The view keeps the top edge fixed while shrinking from bottom
+        // We need to match that here for accurate hit testing
+        if panel.isSearchActive, let anchorHeight = panel.searchAnchorHeight {
+            centerY = currentPos.y + ((anchorHeight - panel.panelHeight) / 2)
+        }
+        
         return NSRect(
             x: currentPos.x - PanelState.panelWidth / 2,
-            y: currentPos.y - panel.panelHeight / 2,
+            y: centerY - panel.panelHeight / 2,
             width: PanelState.panelWidth,
             height: panel.panelHeight
         )

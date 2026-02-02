@@ -100,7 +100,7 @@ struct CircularUIView: View {
                     
                     let adjustedPanelY = panel.isSearchActive && panel.searchAnchorHeight != nil
                         ? panelSwiftUIY - ((panel.searchAnchorHeight! - panel.panelHeight) / 2)
-                        : panelSwiftUIYr
+                        : panelSwiftUIY
                     
                     ListPanelView(
                         title: panel.title,
