@@ -17,7 +17,7 @@ class DatabaseManager {
     // MARK: - Properties
     
     var db: OpaquePointer?
-    private let databaseFileName = "Jason_01.db"
+    private let databaseFileName = "Jason_02.db"
     let queue = DispatchQueue(label: "com.jason.database", qos: .userInitiated)
     
     // MARK: - Initialization
@@ -245,6 +245,8 @@ class DatabaseManager {
         CREATE TABLE IF NOT EXISTS clipboard_history (
             id TEXT PRIMARY KEY,
             content TEXT NOT NULL,
+            rtf_data BLOB,
+            html_data BLOB,
             copied_at REAL NOT NULL
         );
         """

@@ -10,24 +10,28 @@ import AppKit
 
 // MARK: - Clipboard Entry Model
 
-// In ClipboardManager.swift, update ClipboardEntry struct:
-
 struct ClipboardEntry: Identifiable, Equatable {
     let id: UUID
     let content: String
+    let rtfData: Data?
+    let htmlData: Data?
     let copiedAt: Date
     
     // New entry (generates UUID and timestamp)
-    init(content: String) {
+    init(content: String, rtfData: Data? = nil, htmlData: Data? = nil) {
         self.id = UUID()
         self.content = content
+        self.rtfData = rtfData
+        self.htmlData = htmlData
         self.copiedAt = Date()
     }
     
     // Load from database
-    init(id: UUID, content: String, copiedAt: Date) {
+    init(id: UUID, content: String, rtfData: Data? = nil, htmlData: Data? = nil, copiedAt: Date) {
         self.id = id
         self.content = content
+        self.rtfData = rtfData
+        self.htmlData = htmlData
         self.copiedAt = copiedAt
     }
     
@@ -99,24 +103,54 @@ class ClipboardManager: ObservableObject {
         return history.count
     }
     
-    // Update clearHistory() to also clear database:
     func clearHistory() {
         history.removeAll()
         DatabaseManager.shared.clearClipboardHistory()
         print("[ClipboardManager] History cleared")
     }
     
-    /// Paste a specific entry (writes to clipboard, then simulates Cmd+V)
     func paste(entry: ClipboardEntry) {
-        // Write the entry content to the clipboard
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(entry.content, forType: .string)
+        
+        // Check if Command is held - paste plain text only
+        let plainTextOnly = NSEvent.modifierFlags.contains(.command)
+        
+        if plainTextOnly {
+            pasteboard.declareTypes([.string], owner: nil)
+            pasteboard.setString(entry.content, forType: .string)
+            print("📋 [ClipboardManager] Pasting plain text only (⌘ held)")
+        } else {
+            // Declare types we're going to write
+            var types: [NSPasteboard.PasteboardType] = [.string]
+            if entry.rtfData != nil {
+                types.insert(.rtf, at: 0)
+            }
+            if entry.htmlData != nil {
+                types.insert(.html, at: 0)
+            }
+            pasteboard.declareTypes(types, owner: nil)
+            
+            // Restore HTML if available
+            if let htmlData = entry.htmlData {
+                pasteboard.setData(htmlData, forType: .html)
+                print("📋 [ClipboardManager] Restored HTML data (\(htmlData.count) bytes)")
+            }
+            
+            // Restore RTF if available
+            if let rtfData = entry.rtfData {
+                pasteboard.setData(rtfData, forType: .rtf)
+                print("📋 [ClipboardManager] Restored RTF data (\(rtfData.count) bytes)")
+            }
+            
+            // Always set string representation
+            pasteboard.setString(entry.content, forType: .string)
+        }
         
         // Update our changeCount so we don't re-capture this as a new entry
         lastChangeCount = pasteboard.changeCount
         
-        print("[ClipboardManager] Pasting entry: \"\(entry.content.prefix(30))...\"")
+        print("📋 [ClipboardManager] Pasting entry: \"\(entry.content.prefix(30))...\"")
         
         // Execute Cmd+V via ShortcutExecutor
         ShortcutExecutor.execute(keyCode: 9, modifierFlags: NSEvent.ModifierFlags.command.rawValue)
@@ -133,18 +167,31 @@ class ClipboardManager: ObservableObject {
         
         lastChangeCount = currentChangeCount
         
-        // Read string content from clipboard
-        guard let content = NSPasteboard.general.string(forType: .string),
+        let pasteboard = NSPasteboard.general
+        
+        // Read string content from clipboard (required)
+        guard let content = pasteboard.string(forType: .string),
               !content.isEmpty else {
             print("[ClipboardManager] Change detected but no string content")
             return
         }
         
-        addEntry(content: content)
+        // Read RTF data if available (optional)
+        let rtfData = pasteboard.data(forType: .rtf)
+        if rtfData != nil {
+            print("📋 [ClipboardManager] Captured RTF data (\(rtfData!.count) bytes)")
+        }
+        
+        // Read HTML data if available (optional)
+        let htmlData = pasteboard.data(forType: .html)
+        if htmlData != nil {
+            print("📋 [ClipboardManager] Captured HTML data (\(htmlData!.count) bytes)")
+        }
+        
+        addEntry(content: content, rtfData: rtfData, htmlData: htmlData)
     }
     
-    // Update addEntry(content:) to save to database:
-    private func addEntry(content: String) {
+    private func addEntry(content: String, rtfData: Data? = nil, htmlData: Data? = nil) {
         // Deduplication: check if this content already exists
         if let existingIndex = history.firstIndex(where: { $0.content == content }) {
             // Remove the old entry from memory and database
@@ -153,14 +200,14 @@ class ClipboardManager: ObservableObject {
             print("[ClipboardManager] Dedup: moving existing entry to top")
             
             // Create new entry with fresh timestamp and insert at top
-            let newEntry = ClipboardEntry(content: content)
+            let newEntry = ClipboardEntry(content: content, rtfData: rtfData, htmlData: htmlData)
             history.insert(newEntry, at: 0)
             DatabaseManager.shared.saveClipboardEntry(newEntry)
             
             print("[ClipboardManager] Entry moved to top: \"\(content.prefix(30))...\" (was at index \(existingIndex))")
         } else {
             // New entry - insert at top
-            let entry = ClipboardEntry(content: content)
+            let entry = ClipboardEntry(content: content, rtfData: rtfData, htmlData: htmlData)
             history.insert(entry, at: 0)
             DatabaseManager.shared.saveClipboardEntry(entry)
             
@@ -168,7 +215,6 @@ class ClipboardManager: ObservableObject {
         }
     }
     
-    // Update remove(entry:) to also delete from database:
     func remove(entry: ClipboardEntry) {
         if let index = history.firstIndex(where: { $0.id == entry.id }) {
             history.remove(at: index)

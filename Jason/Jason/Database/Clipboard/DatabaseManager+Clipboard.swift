@@ -25,8 +25,8 @@ extension DatabaseManager {
             }
             
             let sql = """
-            INSERT OR REPLACE INTO clipboard_history (id, content, copied_at)
-            VALUES (?, ?, ?);
+            INSERT OR REPLACE INTO clipboard_history (id, content, rtf_data, html_data, copied_at)
+            VALUES (?, ?, ?, ?, ?);
             """
             
             var statement: OpaquePointer?
@@ -34,10 +34,31 @@ extension DatabaseManager {
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_text(statement, 1, entry.id.uuidString, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_text(statement, 2, entry.content, -1, SQLITE_TRANSIENT)
-                sqlite3_bind_double(statement, 3, entry.copiedAt.timeIntervalSince1970)
+                
+                // Bind RTF data (BLOB) or NULL
+                if let rtfData = entry.rtfData {
+                    rtfData.withUnsafeBytes { bytes in
+                        sqlite3_bind_blob(statement, 3, bytes.baseAddress, Int32(rtfData.count), SQLITE_TRANSIENT)
+                    }
+                } else {
+                    sqlite3_bind_null(statement, 3)
+                }
+                
+                // Bind HTML data (BLOB) or NULL
+                if let htmlData = entry.htmlData {
+                    htmlData.withUnsafeBytes { bytes in
+                        sqlite3_bind_blob(statement, 4, bytes.baseAddress, Int32(htmlData.count), SQLITE_TRANSIENT)
+                    }
+                } else {
+                    sqlite3_bind_null(statement, 4)
+                }
+                
+                sqlite3_bind_double(statement, 5, entry.copiedAt.timeIntervalSince1970)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("📋 [DatabaseManager] Saved clipboard entry: \"\(entry.content.prefix(30))...\"")
+                    let rtfInfo = entry.rtfData != nil ? " RTF:\(entry.rtfData!.count)" : ""
+                    let htmlInfo = entry.htmlData != nil ? " HTML:\(entry.htmlData!.count)" : ""
+                    print("📋 [DatabaseManager] Saved clipboard entry: \"\(entry.content.prefix(30))...\"\(rtfInfo)\(htmlInfo)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
                         print("❌ [DatabaseManager] Failed to save clipboard entry: \(String(cString: error))")
@@ -86,7 +107,7 @@ extension DatabaseManager {
                 return
             }
             
-            let sql = "SELECT id, content, copied_at FROM clipboard_history ORDER BY copied_at DESC;"
+            let sql = "SELECT id, content, rtf_data, html_data, copied_at FROM clipboard_history ORDER BY copied_at DESC;"
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
@@ -98,12 +119,33 @@ extension DatabaseManager {
                     
                     let idString = String(cString: idCString)
                     let content = String(cString: contentCString)
-                    let copiedAt = sqlite3_column_double(statement, 2)
+                    
+                    // Read RTF data (BLOB) - may be NULL
+                    var rtfData: Data? = nil
+                    if let blobPointer = sqlite3_column_blob(statement, 2) {
+                        let blobSize = sqlite3_column_bytes(statement, 2)
+                        if blobSize > 0 {
+                            rtfData = Data(bytes: blobPointer, count: Int(blobSize))
+                        }
+                    }
+                    
+                    // Read HTML data (BLOB) - may be NULL
+                    var htmlData: Data? = nil
+                    if let blobPointer = sqlite3_column_blob(statement, 3) {
+                        let blobSize = sqlite3_column_bytes(statement, 3)
+                        if blobSize > 0 {
+                            htmlData = Data(bytes: blobPointer, count: Int(blobSize))
+                        }
+                    }
+                    
+                    let copiedAt = sqlite3_column_double(statement, 4)
                     
                     if let uuid = UUID(uuidString: idString) {
                         let entry = ClipboardEntry(
                             id: uuid,
                             content: content,
+                            rtfData: rtfData,
+                            htmlData: htmlData,
                             copiedAt: Date(timeIntervalSince1970: copiedAt)
                         )
                         entries.append(entry)
@@ -114,7 +156,9 @@ extension DatabaseManager {
             sqlite3_finalize(statement)
         }
         
-        print("📋 [DatabaseManager] Loaded \(entries.count) clipboard entries")
+        let rtfCount = entries.filter { $0.rtfData != nil }.count
+        let htmlCount = entries.filter { $0.htmlData != nil }.count
+        print("📋 [DatabaseManager] Loaded \(entries.count) clipboard entries (\(rtfCount) RTF, \(htmlCount) HTML)")
         return entries
     }
     
