@@ -119,12 +119,17 @@ class PanelUIManager: ObservableObject, UIManager {
         isVisible = true
         overlayWindow?.showOverlay(at: mousePosition)
         
+        // Determine typing mode from providers
+        // If any provider defaults to search, use search mode
+        let typingMode: TypingMode = providers.contains { $0.defaultsToSearchMode } ? .search : .typeAhead
+
         // Show panel at mouse position
         listPanelManager?.show(
             title: configuration.name,
             items: items,
             at: mousePosition,
-            screen: screen
+            screen: screen,
+            typingMode: typingMode
         )
         
         // Start gesture monitoring

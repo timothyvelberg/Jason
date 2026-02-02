@@ -15,11 +15,28 @@ extension ListPanelManager {
     /// Handle character input for type-ahead search in active panel
     func handleCharacterInput(_ character: String) {
         
-        // If search is active, route to search query instead of type-ahead
-        if let index = panelStack.firstIndex(where: { $0.level == activePanelLevel }),
-           panelStack[index].isSearchActive {
+        guard let index = panelStack.firstIndex(where: { $0.level == activePanelLevel }) else {
+            print("[TypeAhead] No active panel")
+            return
+        }
+        
+        // If search is already active, route to search query
+        if panelStack[index].isSearchActive {
             panelStack[index].searchQuery += character
             print("[Search] Query updated: '\(panelStack[index].searchQuery)'")
+            filterSearchResults()
+            return
+        }
+        
+        // Check panel's typing mode
+        if panelStack[index].typingMode == .search {
+            // Auto-activate search and add the character
+            activateSearch()
+            // Set the initial character (activateSearch sets query to "")
+            if let idx = panelStack.firstIndex(where: { $0.level == activePanelLevel }) {
+                panelStack[idx].searchQuery = character
+            }
+            print("[Search] Auto-activated with: '\(character)'")
             filterSearchResults()
             return
         }

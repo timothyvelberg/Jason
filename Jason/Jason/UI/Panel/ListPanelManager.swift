@@ -307,7 +307,8 @@ class ListPanelManager: ObservableObject {
         panelWidth: CGFloat = PanelState.panelWidth,
         providerId: String? = nil,
         contentIdentifier: String? = nil,
-        screen: NSScreen? = nil
+        screen: NSScreen? = nil,
+        typingMode: TypingMode = .typeAhead
     ) {
         // Store ring context for cascading
         self.currentAngle = angle
@@ -348,13 +349,14 @@ class ListPanelManager: ObservableObject {
                 contentIdentifier: contentIdentifier,
                 expandedItemId: nil,
                 isOverlapping: false,
-                scrollOffset: 0
+                scrollOffset: 0,
+                typingMode: typingMode
             )
         ]
     }
     
     /// Show panel at a specific position (for standalone panels)
-    func show(title: String, items: [FunctionNode], at position: CGPoint, screen: NSScreen? = nil) {
+    func show(title: String, items: [FunctionNode], at position: CGPoint, screen: NSScreen? = nil, typingMode: TypingMode = .typeAhead) {
         print("[ListPanelManager] Showing panel with \(items.count) items at \(position)")
         
         // Store screen reference
@@ -385,7 +387,8 @@ class ListPanelManager: ObservableObject {
                 contentIdentifier: nil,
                 expandedItemId: nil,
                 isOverlapping: false,
-                scrollOffset: 0
+                scrollOffset: 0,
+                typingMode: typingMode
             )
         ]
         
@@ -644,6 +647,7 @@ class ListPanelManager: ObservableObject {
         let newPosition = CGPoint(x: newX, y: newY)
         // Constrain to screen boundaries (left, top, bottom only)
         let constrainedPosition = constrainToScreenBounds(position: newPosition, panelWidth: newPanelWidth, panelHeight: newPanelHeight)
+        let inheritedTypingMode = sourcePanel.typingMode
         
         let newPanel = PanelState(
             title: title,
@@ -659,7 +663,8 @@ class ListPanelManager: ObservableObject {
             expandedItemId: nil,
             areChildrenArmed: false,
             isOverlapping: false,
-            scrollOffset: 0
+            scrollOffset: 0,
+            typingMode: inheritedTypingMode
         )
         
         panelStack.append(newPanel)

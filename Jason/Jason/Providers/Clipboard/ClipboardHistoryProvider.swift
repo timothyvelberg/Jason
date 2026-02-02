@@ -24,6 +24,10 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
     var providerIcon: NSImage {
         return NSImage(named: "parent-clipboard") ?? NSImage()
     }
+
+    var defaultsToSearchMode: Bool {
+        return true
+    }
     
     // MARK: - Private Properties
     

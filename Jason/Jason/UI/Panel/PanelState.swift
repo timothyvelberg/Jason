@@ -9,6 +9,17 @@
 import Foundation
 import AppKit
 
+// MARK: - Typing Mode
+
+/// Determines how character input is handled in this panel
+enum TypingMode {
+    /// Characters trigger type-ahead search (jump to matching item)
+    case typeAhead
+    
+    /// Characters activate and populate search filter
+    case search
+}
+
 // MARK: - Panel State
 
 struct PanelState: Identifiable {
@@ -35,9 +46,12 @@ struct PanelState: Identifiable {
     var scrollOffset: CGFloat = 0     // Track scroll position for accurate row positioning
     var isSearchActive: Bool = false
     var searchQuery: String = ""
+    var typingMode: TypingMode = .typeAhead
     
     /// Original panel height before search filtering (for top-anchored resizing)
     var searchAnchorHeight: CGFloat?
+    
+    
     
     // MARK: - Constants
     

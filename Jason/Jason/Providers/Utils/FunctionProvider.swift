@@ -20,6 +20,9 @@ protocol FunctionProvider {
     /// Icon to represent this provider in the UI
     var providerIcon: NSImage { get }
     
+    /// Whether panels from this provider should default to search mode instead of type-ahead
+    var defaultsToSearchMode: Bool { get }
+    
     /// Generate the function tree for this provider
     /// Returns an array of root-level FunctionNodes
     func provideFunctions() -> [FunctionNode]
@@ -47,36 +50,7 @@ extension FunctionProvider {
         print("⚠️ Provider '\(providerName)' does not implement loadChildren(for:)")
         return []
     }
+    
+    // Default to type-ahead - providers can override to enable search-first behavior
+    var defaultsToSearchMode: Bool { false }
 }
-
-// MARK: - Usage Example for AppSwitcher
-/*
- Example of how AppSwitcherManager would use preferredLayout:
- 
- extension AppSwitcherManager: FunctionProvider {
-     func provideFunctions() -> [FunctionNode] {
-         let apps = runningApps.map { app in
-             FunctionNode(
-                 id: "app-\(app.processIdentifier)",
-                 name: app.localizedName ?? "Unknown",
-                 icon: app.icon ?? NSImage(),
-                 contextActions: [
-                     FunctionNode(name: "Quit", onSelect: { self.quitApp(app) }),
-                     FunctionNode(name: "Hide", onSelect: { self.hideApp(app) })
-                 ],
-                 onSelect: { self.switchToApp(app) }
-             )
-         }
-         
-         return [
-             FunctionNode(
-                 id: "apps-category",
-                 name: "Applications",
-                 icon: NSImage(named: "apps") ?? NSImage(),
-                 children: apps,
-                 preferredLayout: .fullCircle  // ← 20+ apps fit better in full circle!
-             )
-         ]
-     }
- }
- */
