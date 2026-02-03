@@ -247,7 +247,7 @@ class FirstLaunchConfiguration {
                 iconSize: 32.0,
                 presentationMode: .panel,  // KEY: Makes it a panel
                 triggers: [
-                    keyboardTrigger(keyCode: 9, modifiers: [.control, .shift])  // Cmd+Shift+V
+                    keyboardTrigger(keyCode: 8, modifiers: [.option, .shift])  // Cmd+Shift+V
                 ],
                 providers: [
                     (type: "ClipboardHistoryProvider", order: 1, displayMode: "direct", angle: nil)

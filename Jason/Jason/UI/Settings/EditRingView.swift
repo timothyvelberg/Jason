@@ -219,6 +219,7 @@ struct EditRingView: View {
     @State private var iconSize: String = "32"
     @State private var startAngle: Double = 0.0
     @State private var isActive: Bool = true
+    @State private var useAsPanel: Bool = false
     
     // Provider selection - ordered array
     @State private var providers: [ProviderConfig] = []
@@ -272,6 +273,9 @@ struct EditRingView: View {
                             Toggle("Active on Launch", isOn: $isActive)
                                 .help("New rings are active by default.")
                                 .disabled(true)
+                            
+                            Toggle("Use as Panel", isOn: $useAsPanel)
+                                .help("Present as a standalone panel instead of a circular ring.")
                         }
                         .padding(12)
                     }
@@ -479,6 +483,7 @@ struct EditRingView: View {
             iconSize = String(Int(config.iconSize))
             startAngle = config.startAngle
             isActive = config.isActive
+            useAsPanel = config.presentationMode == .panel
             
             // Load triggers from array
             triggers = config.triggers.map { TriggerFormConfig(from: $0) }
@@ -598,8 +603,10 @@ struct EditRingView: View {
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
                     startAngle: startAngle,
+                    presentationMode: useAsPanel ? .panel : .ring,
                     triggers: triggerData,
                     providers: providerData
+                    
                 )
                 
                 print("✅ [EditRing] Created new ring: '\(newConfig.name)' with \(newConfig.triggers.count) trigger(s)")
@@ -618,7 +625,8 @@ struct EditRingView: View {
                     ringRadius: radiusValue,
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
-                    startAngle: startAngle
+                    startAngle: startAngle,
+                    presentationMode: useAsPanel ? .panel : .ring
                 )
                 
                 // Step 2: Remove all existing triggers

@@ -549,20 +549,21 @@ extension DatabaseManager {
     func updateRingConfiguration(
         id: Int,
         name: String? = nil,
-        shortcut: String? = nil,       // DEPRECATED
+        shortcut: String? = nil,
         ringRadius: CGFloat? = nil,
         centerHoleRadius: CGFloat? = nil,
         iconSize: CGFloat? = nil,
         startAngle: CGFloat? = nil,
-        triggerType: String? = nil,    // NEW
+        triggerType: String? = nil,
         keyCode: UInt16? = nil,
         modifierFlags: UInt? = nil,
-        buttonNumber: Int32? = nil,    // NEW
-        swipeDirection: String? = nil, // NEW - CRITICAL FIX!
+        buttonNumber: Int32? = nil,
+        swipeDirection: String? = nil,
         fingerCount: Int? = nil,
-        isHoldMode: Bool? = nil,       // NEW
-        autoExecuteOnRelease: Bool? = nil, // NEW
-        displayOrder: Int? = nil
+        isHoldMode: Bool? = nil,
+        autoExecuteOnRelease: Bool? = nil,
+        displayOrder: Int? = nil,
+        presentationMode: String? = nil
     ) {
         guard let db = db else { return }
         
@@ -607,6 +608,7 @@ extension DatabaseManager {
             if isHoldMode != nil { updates.append("is_hold_mode = ?") }
             if autoExecuteOnRelease != nil { updates.append("auto_execute_on_release = ?") }
             if displayOrder != nil { updates.append("display_order = ?") }
+            if presentationMode != nil { updates.append("presentation_mode = ?") }
             
             guard !updates.isEmpty else {
                 print("⚠️ [DatabaseManager] No fields to update for ring configuration id \(id)")
@@ -679,6 +681,11 @@ extension DatabaseManager {
                     sqlite3_bind_int(statement, paramIndex, Int32(displayOrder))
                     paramIndex += 1
                 }
+                if let presentationMode = presentationMode {
+                    sqlite3_bind_text(statement, paramIndex, (presentationMode as NSString).utf8String, -1, nil)
+                    paramIndex += 1
+                }
+                
                 
                 // Bind the WHERE id parameter
                 sqlite3_bind_int(statement, paramIndex, Int32(id))
