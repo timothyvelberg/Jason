@@ -20,12 +20,8 @@ class TodoListProvider: FunctionProvider {
     }
     
     init() {
-        // Seed with test data
-        todos = [
-            TodoItem(id: UUID().uuidString, title: "Build todo provider", isCompleted: false, createdAt: Date()),
-            TodoItem(id: UUID().uuidString, title: "Wire input mode", isCompleted: false, createdAt: Date()),
-            TodoItem(id: UUID().uuidString, title: "Add persistence", isCompleted: false, createdAt: Date()),
-        ]
+        todos = DatabaseManager.shared.getAllTodos()
+        print("[TodoListProvider] Loaded \(todos.count) todos from database")
     }
     
     func provideFunctions() -> [FunctionNode] {
@@ -48,6 +44,24 @@ class TodoListProvider: FunctionProvider {
     }
     
     private func buildTodoNodes() -> [FunctionNode] {
+        todos = DatabaseManager.shared.getAllTodos()
+        if todos.isEmpty {
+            return [
+                FunctionNode(
+                    id: "todo-empty",
+                    name: "No todos yet",
+                    type: .action,
+                    icon: NSImage(systemSymbolName: "checklist", accessibilityDescription: nil) ?? NSImage(),
+                    showLabel: true,
+                    providerId: providerId,
+                    onLeftClick: ModifierAwareInteraction(base: .doNothing),
+                    onRightClick: ModifierAwareInteraction(base: .doNothing),
+                    onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                    onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+                )
+            ]
+        }
+        
         return todos.map { todo in
             let icon: NSImage
             if todo.isCompleted {
@@ -86,6 +100,7 @@ class TodoListProvider: FunctionProvider {
             createdAt: Date()
         )
         todos.insert(todo, at: 0)
+        DatabaseManager.shared.saveTodo(id: todo.id, title: todo.title, createdAt: todo.createdAt)
         print("[TodoListProvider] Added: '\(title)' (\(todos.count) total)")
     }
     
@@ -93,6 +108,7 @@ class TodoListProvider: FunctionProvider {
         guard let index = todos.firstIndex(where: { $0.id == id }) else { return }
         let title = todos[index].title
         todos.remove(at: index)
+        DatabaseManager.shared.deleteTodo(id: id)
         print("🗑️ [TodoListProvider] Deleted: '\(title)' (\(todos.count) remaining)")
         onTodoChanged?()
     }
@@ -100,12 +116,12 @@ class TodoListProvider: FunctionProvider {
     private func toggleTodo(id: String) {
         guard let index = todos.firstIndex(where: { $0.id == id }) else { return }
         todos[index].isCompleted.toggle()
+        DatabaseManager.shared.toggleTodo(id: id)
         print("[TodoListProvider] Toggled: '\(todos[index].title)' → \(todos[index].isCompleted ? "done" : "undone")")
         onTodoChanged?()
     }
     
     private func deleteAction(for todo: TodoItem) -> FunctionNode {
-        let providerId = self.providerId
         return FunctionNode(
             id: "delete-todo-\(todo.id)",
             name: "Delete",

@@ -251,6 +251,15 @@ class DatabaseManager {
         );
         """
         
+        let todosSQL = """
+        CREATE TABLE IF NOT EXISTS todos (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            is_completed INTEGER DEFAULT 0,
+            created_at REAL NOT NULL
+        );
+        """
+        
         let tables = [
             foldersSQL,
             favoriteFoldersSQL,
@@ -264,7 +273,8 @@ class DatabaseManager {
             ringProvidersIndexSQL,
             circleCalibrationSQL,
             ringTriggersSQL,
-            clipboardHistorySQL
+            clipboardHistorySQL,
+            todosSQL
         ]
         
         for sql in tables {
