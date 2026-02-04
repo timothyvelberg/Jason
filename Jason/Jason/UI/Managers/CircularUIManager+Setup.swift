@@ -150,6 +150,8 @@ extension CircularUIManager {
                 return .typeAhead
             }()
             
+            print("[ExpandToPanel] node: '\(node.name)', providerId: \(providerId ?? "nil"), typingMode: \(typingMode)")
+
             // Check if children already loaded
             if let children = node.children, !children.isEmpty {
                 self.listPanelManager?.show(
@@ -160,7 +162,8 @@ extension CircularUIManager {
                     angle: angle,
                     providerId: providerId,
                     contentIdentifier: contentIdentifier,
-                    screen: self.overlayWindow?.currentScreen
+                    screen: self.overlayWindow?.currentScreen,
+                    typingMode: typingMode
                 )
                 self.inputCoordinator?.focusPanel(level: 0)
                 
@@ -204,7 +207,8 @@ extension CircularUIManager {
                         angle: angle,
                         providerId: providerId,
                         contentIdentifier: contentIdentifier,
-                        screen: self.overlayWindow?.currentScreen
+                        screen: self.overlayWindow?.currentScreen,
+                        typingMode: typingMode
                     )
                     self.inputCoordinator?.focusPanel(level: 0)
                     
