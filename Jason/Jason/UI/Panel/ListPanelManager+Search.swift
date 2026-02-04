@@ -108,11 +108,24 @@ extension ListPanelManager {
                 panelStack[index].items = originalItems
                 panelStack[index].unfilteredItems = nil
             }
-            panelStack[index].isSearchActive = false
-            panelStack[index].searchAnchorHeight = nil
-            panelStack[index].activeTypingMode = panelStack[index].typingMode
-            print("[Search] Exited search mode")
             
+            if panelStack[index].typingMode == .input {
+                if panelStack[index].activeTypingMode == .input {
+                    // Already in input mode — let escape dismiss the panel
+                    panelStack[index].isSearchActive = false
+                    panelStack[index].searchAnchorHeight = nil
+                    print("[Input] Exiting input mode")
+                    return false  // Let escape propagate to dismiss
+                }
+                // Returning from search to input mode — keep field active
+                panelStack[index].activeTypingMode = .input
+                panelStack[index].searchAnchorHeight = panelStack[index].panelHeight
+                print("[Input] Returned to input mode")
+            } else {
+                panelStack[index].isSearchActive = false
+                panelStack[index].searchAnchorHeight = nil
+                print("[Search] Exited search mode")
+            }
             return true
         }
     }

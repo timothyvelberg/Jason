@@ -393,6 +393,7 @@ class ListPanelManager: ObservableObject {
                 expandedItemId: nil,
                 isOverlapping: false,
                 scrollOffset: 0,
+                typingMode: typingMode,
                 activeTypingMode: typingMode
             )
         ]
