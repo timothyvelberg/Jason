@@ -17,7 +17,7 @@ class DatabaseManager {
     // MARK: - Properties
     
     var db: OpaquePointer?
-    private let databaseFileName = "Jason_02.db"
+    private let databaseFileName = "Jason_01.db"
     let queue = DispatchQueue(label: "com.jason.database", qos: .userInitiated)
     
     // MARK: - Initialization
