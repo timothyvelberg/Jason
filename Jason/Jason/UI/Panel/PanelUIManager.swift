@@ -399,6 +399,16 @@ class PanelUIManager: ObservableObject, UIManager {
             }
         }
         
+        if let todoProvider = self.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider {
+            todoProvider.onTodoChanged = { [weak self] in
+                guard let self = self else { return }
+                let freshItems = self.loadProviderItems()
+                if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
+                    self.listPanelManager?.panelStack[index].items = freshItems
+                }
+            }
+        }
+        
         listPanelManager?.onExitToRing = { [weak self] in
             self?.hide()
         }

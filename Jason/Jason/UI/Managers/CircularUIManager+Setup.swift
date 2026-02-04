@@ -407,6 +407,26 @@ extension CircularUIManager {
             }
         }
         
+        if let todoProvider = self.functionManager?.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider {
+            todoProvider.onTodoChanged = { [weak self] in
+                guard let self = self else { return }
+                if let panel = self.listPanelManager?.panelStack.first(where: { $0.level == 0 }),
+                   let providerId = panel.providerId,
+                   let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) {
+                    let freshItems = provider.provideFunctions()
+                    let items: [FunctionNode]
+                    if freshItems.count == 1, freshItems[0].type == .category, let children = freshItems[0].children {
+                        items = children
+                    } else {
+                        items = freshItems
+                    }
+                    if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
+                        self.listPanelManager?.panelStack[index].items = items
+                    }
+                }
+            }
+        }
+        
         listPanelManager?.onExitToRing = { [weak self] in
             guard let self = self, let functionManager = self.functionManager else { return }
             
