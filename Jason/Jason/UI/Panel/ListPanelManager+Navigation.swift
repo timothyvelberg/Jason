@@ -231,7 +231,7 @@ extension ListPanelManager {
             let text = panelStack[index].searchQuery.trimmingCharacters(in: .whitespaces)
             print("[Input] Adding item: '\(text)'")
             panelStack[index].searchQuery = ""
-            onAddItem?(text)
+            onAddItem?(text, NSEvent.modifierFlags)
             return
         }
         

@@ -78,7 +78,7 @@ class ListPanelManager: ObservableObject {
     }
     
     /// Callback when user submits text in input mode (e.g., add todo)
-    var onAddItem: ((String) -> Void)?
+    var onAddItem: ((String, NSEvent.ModifierFlags) -> Void)?
     
     
     // MARK: - Ring Context (internal for extension access)

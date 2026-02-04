@@ -382,7 +382,7 @@ class PanelUIManager: ObservableObject, UIManager {
             return await provider.loadChildren(for: reloadNode)
         }
         
-        listPanelManager?.onAddItem = { [weak self] text in
+        listPanelManager?.onAddItem = { [weak self] text, modifiers in
             guard let self = self,
                   let todoProvider = self.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider else { return }
             
@@ -392,6 +392,10 @@ class PanelUIManager: ObservableObject, UIManager {
             let freshItems = self.loadProviderItems()
             if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
                 self.listPanelManager?.panelStack[index].items = freshItems
+            }
+            
+            if !modifiers.contains(.command) {
+                self.hide()
             }
         }
         
@@ -526,6 +530,12 @@ class PanelUIManager: ObservableObject, UIManager {
             hide()
         case .executeKeepOpen(let action):
             action()
+            
+            // Refresh items to reflect state changes
+            let freshItems = loadProviderItems()
+            if let index = listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
+                listPanelManager?.panelStack[index].items = freshItems
+            }
         case .navigateInto:
             break // Folder navigation handled by onItemHover
         default:
