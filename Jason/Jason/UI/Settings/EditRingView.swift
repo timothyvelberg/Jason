@@ -238,7 +238,8 @@ struct EditRingView: View {
         ProviderConfig(type: "SystemActionsProvider", name: "System Actions", description: "Lock, Sleep, Logout, etc.", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "WindowManagementProvider", name: "Window Management", description: "Resize and position windows", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "ShortcutExecuteProvider", name: "Keyboard Shortcuts", description: "Execute keyboard shortcuts (Copy, Paste, etc.)", isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "ClipboardHistoryProvider", name: "Clipboard History", description: "Access previously copied text", isEnabled: false, displayMode: .parent)
+        ProviderConfig(type: "ClipboardHistoryProvider", name: "Clipboard History", description: "Access previously copied text", isEnabled: false, displayMode: .parent),
+        ProviderConfig(type: "TodoListProvider", name: "Todo List", description: "Quick task list with add and complete", isEnabled: false, displayMode: .parent)
     ]
     
     var body: some View {

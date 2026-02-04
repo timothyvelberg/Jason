@@ -28,7 +28,7 @@ class TodoListProvider: FunctionProvider {
     }
     
     func provideFunctions() -> [FunctionNode] {
-        return todos.map { todo in
+        let items = todos.map { todo in
             let icon: NSImage
             if todo.isCompleted {
                 icon = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Done") ?? NSImage()
@@ -51,6 +51,21 @@ class TodoListProvider: FunctionProvider {
                 )
             )
         }
+        
+        return [
+            FunctionNode(
+                id: "todo-list",
+                name: "Todo List",
+                type: .category,
+                icon: NSImage(systemSymbolName: "checklist", accessibilityDescription: nil) ?? NSImage(),
+                children: items,
+                childDisplayMode: .panel,
+                onLeftClick: ModifierAwareInteraction(base: .doNothing),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .expand)
+            )
+        ]
     }
     
     func addTodo(title: String) {

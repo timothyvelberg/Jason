@@ -122,6 +122,6 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
     
     func refresh() {
         // Nothing to refresh for system functions
-        print("⚙️ [SystemFunctionsProvider] Refresh called (no-op)")
+        print("[SystemFunctionsProvider] Refresh called (no-op)")
     }
 }
