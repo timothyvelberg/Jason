@@ -81,7 +81,7 @@ extension ListPanelManager {
         var matchIndex: Int? = nil
         
         // First: search from after current selection to end
-        for i in (currentSelection + 1)..<items.count {
+        for i in 0..<max(0, currentSelection + 1) {
             if items[i].name.lowercased().hasPrefix(searchBuffer) {
                 matchIndex = i
                 break
@@ -91,7 +91,7 @@ extension ListPanelManager {
         // If no match found and we have a multi-char buffer, also check from start
         // (but only if buffer has more than 1 char, meaning user is refining search)
         if matchIndex == nil && searchBuffer.count > 1 {
-            for i in 0...currentSelection {
+            for i in 0..<max(0, currentSelection + 1) {
                 if items[i].name.lowercased().hasPrefix(searchBuffer) {
                     matchIndex = i
                     break

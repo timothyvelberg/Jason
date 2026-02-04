@@ -23,7 +23,6 @@ protocol FunctionProvider {
     /// The default typing mode for panels showing this provider's content
     var defaultTypingMode: TypingMode { get }
     
-    
     /// Generate the function tree for this provider
     /// Returns an array of root-level FunctionNodes
     func provideFunctions() -> [FunctionNode]

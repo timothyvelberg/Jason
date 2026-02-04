@@ -60,6 +60,7 @@ class TodoListProvider: FunctionProvider {
                 icon: NSImage(systemSymbolName: "checklist", accessibilityDescription: nil) ?? NSImage(),
                 children: items,
                 childDisplayMode: .panel,
+                providerId: "todo-list",  
                 onLeftClick: ModifierAwareInteraction(base: .doNothing),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),

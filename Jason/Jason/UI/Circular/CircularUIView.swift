@@ -121,6 +121,7 @@ struct CircularUIView: View {
                             listPanelManager.handleScrollStateChanged(isScrolling: isScrolling, forLevel: panelLevel)
                         },
                         contextActions: panel.contextActions,
+                        typingMode: panel.activeTypingMode,
                         expandedItemId: expandedItemIdBinding(for: panel.level),
                         isSearchActive: Binding(
                             get: { panel.isSearchActive },

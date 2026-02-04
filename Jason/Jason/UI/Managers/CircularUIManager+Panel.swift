@@ -29,6 +29,23 @@ extension CircularUIManager {
         case .executeKeepOpen(let action):
             action()
             
+            // Refresh items to reflect state changes (e.g., todo toggle)
+            if let panel = self.listPanelManager?.panelStack.first(where: { $0.level == level }),
+               let providerId = panel.providerId,
+               let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) {
+                let freshItems = provider.provideFunctions()
+                let items: [FunctionNode]
+                if freshItems.count == 1, freshItems[0].type == .category, let children = freshItems[0].children {
+                    items = children
+                } else {
+                    items = freshItems
+                }
+                if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == level }) {
+                    self.listPanelManager?.panelStack[index].items = items
+                }
+            }
+            
+            
         case .expand, .navigateInto:
             // Check if we should cascade to panel
             guard let children = node.children, !children.isEmpty else {

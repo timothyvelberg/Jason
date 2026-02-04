@@ -142,6 +142,14 @@ extension CircularUIManager {
             let providerId = node.providerId
             let contentIdentifier = node.metadata?["folderURL"] as? String ?? node.previewURL?.path
             
+            let typingMode: TypingMode = {
+                if let pid = providerId,
+                   let provider = self.functionManager?.providers.first(where: { $0.providerId == pid }) {
+                    return provider.defaultTypingMode
+                }
+                return .typeAhead
+            }()
+            
             // Check if children already loaded
             if let children = node.children, !children.isEmpty {
                 self.listPanelManager?.show(
@@ -155,6 +163,16 @@ extension CircularUIManager {
                     screen: self.overlayWindow?.currentScreen
                 )
                 self.inputCoordinator?.focusPanel(level: 0)
+                
+                // Auto-activate input field for input mode
+                if typingMode == .input {
+                    if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
+                        self.listPanelManager?.panelStack[index].isSearchActive = true
+                        self.listPanelManager?.panelStack[index].searchAnchorHeight = self.listPanelManager?.panelStack[index].panelHeight
+                        self.listPanelManager?.panelStack[index].activeTypingMode = .input
+                    }
+                }
+                
                 self.mouseTracker?.pauseUntilMovement()
                 return
             }
@@ -189,10 +207,32 @@ extension CircularUIManager {
                         screen: self.overlayWindow?.currentScreen
                     )
                     self.inputCoordinator?.focusPanel(level: 0)
+                    
+                    // Auto-activate input field for input mode
+                    if typingMode == .input {
+                        if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
+                            self.listPanelManager?.panelStack[index].isSearchActive = true
+                            self.listPanelManager?.panelStack[index].searchAnchorHeight = self.listPanelManager?.panelStack[index].panelHeight
+                            self.listPanelManager?.panelStack[index].activeTypingMode = .input
+                        }
+                    }
+                    
                     self.mouseTracker?.pauseUntilMovement()
                 }
             }
         }
+    }
+    
+    private func activateInputModeIfNeeded(for providerId: String?, atLevel level: Int) {
+        guard let providerId = providerId,
+              let provider = functionManager?.providers.first(where: { $0.providerId == providerId }),
+              provider.defaultTypingMode == .input,
+              let index = listPanelManager?.panelStack.firstIndex(where: { $0.level == level }) else { return }
+        
+        listPanelManager?.panelStack[index].typingMode = .input
+        listPanelManager?.panelStack[index].activeTypingMode = .input
+        listPanelManager?.panelStack[index].isSearchActive = true
+        listPanelManager?.panelStack[index].searchAnchorHeight = listPanelManager?.panelStack[index].panelHeight
     }
     
     // MARK: - Gesture Manager Setup
@@ -268,6 +308,7 @@ extension CircularUIManager {
                     contentIdentifier: contentIdentifier,
                     contextActions: node.contextActions
                 )
+                self.activateInputModeIfNeeded(for: providerId, atLevel: level + 1)
                 return
             }
             
@@ -303,6 +344,7 @@ extension CircularUIManager {
                         contentIdentifier: contentIdentifier,
                         contextActions: node.contextActions
                     )
+                    self.activateInputModeIfNeeded(for: providerId, atLevel: level + 1)
                 }
             }
         }
@@ -331,6 +373,34 @@ extension CircularUIManager {
             print("[Panel Reload] Got \(freshChildren.count) items")
             
             return freshChildren
+        }
+        
+        listPanelManager?.onAddItem = { [weak self] text, modifiers in
+            guard let self = self,
+                  let todoProvider = self.functionManager?.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider else { return }
+            
+            todoProvider.addTodo(title: text)
+            
+            // Refresh panel items at level 0
+            if let panel = self.listPanelManager?.panelStack.first(where: { $0.level == 0 }),
+               let providerId = panel.providerId,
+               let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) {
+                let freshItems = provider.provideFunctions()
+                // Unwrap category wrapper if panel shows direct children
+                let items: [FunctionNode]
+                if freshItems.count == 1, freshItems[0].type == .category, let children = freshItems[0].children {
+                    items = children
+                } else {
+                    items = freshItems
+                }
+                if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
+                    self.listPanelManager?.panelStack[index].items = items
+                }
+            }
+            
+            if !modifiers.contains(.command) {
+                self.hide()
+            }
         }
         
         listPanelManager?.onExitToRing = { [weak self] in
