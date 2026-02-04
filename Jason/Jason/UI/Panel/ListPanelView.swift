@@ -24,6 +24,7 @@ struct ListPanelView: View {
     var onScrollOffsetChanged: ((CGFloat) -> Void)?  // Current scroll offset
     var onScrollStateChanged: ((Bool) -> Void)?  // true = scrolling started, false = stopped
     var contextActions: [FunctionNode]?
+    var typingMode: TypingMode = .typeAhead
 
     
     // Expanded state from manager
@@ -80,7 +81,8 @@ struct ListPanelView: View {
                 // Title bar
                 HStack {
                     if isSearchActive {
-                        TextField("Search...", text: $searchQuery)
+                        let placeholder = typingMode == .input ? "Add todo..." : "Search..."
+                        TextField(placeholder, text: $searchQuery)
                             .textFieldStyle(.plain)
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.white)

@@ -223,6 +223,18 @@ extension ListPanelManager {
     
     /// Execute the currently selected item (Enter key)
     func executeSelectedItem() {
+        // Input mode with text → add item instead of executing
+        if let index = panelStack.firstIndex(where: { $0.level == activePanelLevel }),
+           panelStack[index].activeTypingMode == .input,
+           panelStack[index].isSearchActive,
+           !panelStack[index].searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+            let text = panelStack[index].searchQuery.trimmingCharacters(in: .whitespaces)
+            print("[Input] Adding item: '\(text)'")
+            panelStack[index].searchQuery = ""
+            onAddItem?(text)
+            return
+        }
+        
         guard let selectedRow = keyboardSelectedRow[activePanelLevel],
               let panel = panelStack.first(where: { $0.level == activePanelLevel }),
               selectedRow < panel.items.count else {

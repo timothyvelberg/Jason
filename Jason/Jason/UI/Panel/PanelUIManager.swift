@@ -121,7 +121,7 @@ class PanelUIManager: ObservableObject, UIManager {
         
         // Determine typing mode from providers
         // If any provider defaults to search, use search mode
-        let typingMode: TypingMode = providers.contains { $0.defaultsToSearchMode } ? .search : .typeAhead
+        let typingMode: TypingMode = providers.first?.defaultTypingMode ?? .typeAhead
 
         // Show panel at mouse position
         listPanelManager?.show(
@@ -144,6 +144,18 @@ class PanelUIManager: ObservableObject, UIManager {
         // Arm panel for keyboard navigation
         if let index = listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
             listPanelManager?.panelStack[index].areChildrenArmed = true
+        }
+        
+        // Arm panel for keyboard navigation
+        if let index = listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
+            listPanelManager?.panelStack[index].areChildrenArmed = true
+            
+            // Auto-activate input field for input mode
+            if typingMode == .input {
+                listPanelManager?.panelStack[index].isSearchActive = true
+                listPanelManager?.panelStack[index].searchAnchorHeight = listPanelManager?.panelStack[index].panelHeight
+                listPanelManager?.panelStack[index].activeTypingMode = .input
+            }
         }
         
         // Set initial keyboard selection
@@ -368,6 +380,19 @@ class PanelUIManager: ObservableObject, UIManager {
             )
             
             return await provider.loadChildren(for: reloadNode)
+        }
+        
+        listPanelManager?.onAddItem = { [weak self] text in
+            guard let self = self,
+                  let todoProvider = self.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider else { return }
+            
+            todoProvider.addTodo(title: text)
+            
+            // Refresh panel items
+            let freshItems = self.loadProviderItems()
+            if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
+                self.listPanelManager?.panelStack[index].items = freshItems
+            }
         }
         
         listPanelManager?.onExitToRing = { [weak self] in

@@ -129,6 +129,7 @@ class FirstLaunchConfiguration {
             print("   Created default configurations")
             
             createClipboardPanel()
+            createTodoPanel()
             
         } catch {
             print("   Failed to create default configuration: \(error)")
@@ -260,6 +261,37 @@ class FirstLaunchConfiguration {
             
         } catch {
             print("   Failed to create clipboard panel: \(error)")
+        }
+    }
+    
+    /// Create a todo list panel
+    @MainActor
+    static func createTodoPanel() {
+        let configManager = RingConfigurationManager.shared
+        
+        print("[FirstLaunch] Creating todo panel...")
+        
+        do {
+            let todoPanel = try configManager.createConfiguration(
+                name: "Todo",
+                shortcut: "Ctrl+Shift+T",
+                ringRadius: 80.0,
+                centerHoleRadius: 56.0,
+                iconSize: 32.0,
+                presentationMode: .panel,
+                triggers: [
+                    keyboardTrigger(keyCode: 17, modifiers: [.control, .shift])  // Ctrl+Shift+T
+                ],
+                providers: [
+                    (type: "TodoListProvider", order: 1, displayMode: "direct", angle: nil)
+                ]
+            )
+            print("   Created '\(todoPanel.name)' - \(todoPanel.triggersSummary) [PANEL MODE]")
+            
+            configManager.loadConfigurations()
+            
+        } catch {
+            print("   Failed to create todo panel: \(error)")
         }
     }
 }

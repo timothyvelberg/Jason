@@ -25,8 +25,8 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
         return NSImage(named: "parent-clipboard") ?? NSImage()
     }
 
-    var defaultsToSearchMode: Bool {
-        return true
+    var defaultTypingMode: TypingMode {
+        return .search
     }
     
     // MARK: - Private Properties

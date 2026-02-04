@@ -29,6 +29,7 @@ extension ListPanelManager {
         panelStack[index].searchAnchorHeight = panelStack[index].panelHeight
         
         panelStack[index].isSearchActive = true
+        panelStack[index].activeTypingMode = .search
         panelStack[index].searchQuery = ""
         print("[Search] Activated on level \(activePanelLevel)")
     }
@@ -108,8 +109,10 @@ extension ListPanelManager {
                 panelStack[index].unfilteredItems = nil
             }
             panelStack[index].isSearchActive = false
-            panelStack[index].searchAnchorHeight = nil  // Add this
+            panelStack[index].searchAnchorHeight = nil
+            panelStack[index].activeTypingMode = panelStack[index].typingMode
             print("[Search] Exited search mode")
+            
             return true
         }
     }

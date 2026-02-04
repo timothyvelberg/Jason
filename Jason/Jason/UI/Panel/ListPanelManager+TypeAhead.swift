@@ -23,8 +23,13 @@ extension ListPanelManager {
         // If search is already active, route to search query
         if panelStack[index].isSearchActive {
             panelStack[index].searchQuery += character
-            print("[Search] Query updated: '\(panelStack[index].searchQuery)'")
-            filterSearchResults()
+            
+            if panelStack[index].activeTypingMode == .search {
+                print("[Search] Query updated: '\(panelStack[index].searchQuery)'")
+                filterSearchResults()
+            } else {
+                print("[Input] Text: '\(panelStack[index].searchQuery)'")
+            }
             return
         }
         
@@ -38,6 +43,18 @@ extension ListPanelManager {
             }
             print("[Search] Auto-activated with: '\(character)'")
             filterSearchResults()
+            return
+        }
+        
+        // Input mode - show field, accumulate text, but DON'T filter
+        if panelStack[index].typingMode == .input {
+            if !panelStack[index].isSearchActive {
+                panelStack[index].isSearchActive = true
+                panelStack[index].activeTypingMode = .input
+                panelStack[index].searchAnchorHeight = panelStack[index].panelHeight
+            }
+            panelStack[index].searchQuery += character
+            print("[Input] Text: '\(panelStack[index].searchQuery)'")
             return
         }
         

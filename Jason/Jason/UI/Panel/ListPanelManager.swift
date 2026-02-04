@@ -77,6 +77,10 @@ class ListPanelManager: ObservableObject {
         }
     }
     
+    /// Callback when user submits text in input mode (e.g., add todo)
+    var onAddItem: ((String) -> Void)?
+    
+    
     // MARK: - Ring Context (internal for extension access)
     
     /// Current ring context (stored for cascading position calculations)
@@ -350,7 +354,8 @@ class ListPanelManager: ObservableObject {
                 expandedItemId: nil,
                 isOverlapping: false,
                 scrollOffset: 0,
-                typingMode: typingMode
+                typingMode: typingMode,
+                activeTypingMode: typingMode
             )
         ]
     }
@@ -388,7 +393,7 @@ class ListPanelManager: ObservableObject {
                 expandedItemId: nil,
                 isOverlapping: false,
                 scrollOffset: 0,
-                typingMode: typingMode
+                activeTypingMode: typingMode
             )
         ]
         
@@ -664,7 +669,8 @@ class ListPanelManager: ObservableObject {
             areChildrenArmed: false,
             isOverlapping: false,
             scrollOffset: 0,
-            typingMode: inheritedTypingMode
+            typingMode: inheritedTypingMode,
+            activeTypingMode: inheritedTypingMode
         )
         
         panelStack.append(newPanel)

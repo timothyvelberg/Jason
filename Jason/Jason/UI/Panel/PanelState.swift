@@ -18,6 +18,9 @@ enum TypingMode {
     
     /// Characters activate and populate search filter
     case search
+    
+    /// Characters populate input field for adding new items (header field always visible)
+    case input
 }
 
 // MARK: - Panel State
@@ -47,6 +50,9 @@ struct PanelState: Identifiable {
     var isSearchActive: Bool = false
     var searchQuery: String = ""
     var typingMode: TypingMode = .typeAhead
+
+    /// Active typing mode (can differ from default when CMD+F toggles)
+    var activeTypingMode: TypingMode
     
     /// Original panel height before search filtering (for top-anchored resizing)
     var searchAnchorHeight: CGFloat?

@@ -77,6 +77,7 @@ struct PanelOnlyView: View {
                 listPanelManager.handleScrollStateChanged(isScrolling: isScrolling, forLevel: panel.level)
             },
             contextActions: panel.contextActions,
+            typingMode: panel.activeTypingMode,
             expandedItemId: Binding(
                 get: { panel.expandedItemId },
                 set: { newValue in
@@ -103,8 +104,6 @@ struct PanelOnlyView: View {
             ),
             hoveredRowIndex: listPanelManager.effectiveSelectedRow(for: panel.level),
             isKeyboardDriven: listPanelManager.isKeyboardDriven
-            
-            
         )
         .position(x: localX, y: adjustedViewY)
     }

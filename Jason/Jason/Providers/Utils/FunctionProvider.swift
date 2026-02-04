@@ -19,9 +19,10 @@ protocol FunctionProvider {
     
     /// Icon to represent this provider in the UI
     var providerIcon: NSImage { get }
+
+    /// The default typing mode for panels showing this provider's content
+    var defaultTypingMode: TypingMode { get }
     
-    /// Whether panels from this provider should default to search mode instead of type-ahead
-    var defaultsToSearchMode: Bool { get }
     
     /// Generate the function tree for this provider
     /// Returns an array of root-level FunctionNodes
@@ -51,6 +52,7 @@ extension FunctionProvider {
         return []
     }
     
-    // Default to type-ahead - providers can override to enable search-first behavior
-    var defaultsToSearchMode: Bool { false }
+    // Default to type-ahead - providers can override
+    var defaultTypingMode: TypingMode { .typeAhead }
 }
+    

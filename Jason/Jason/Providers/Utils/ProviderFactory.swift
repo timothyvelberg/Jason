@@ -62,6 +62,9 @@ class ProviderFactory {
         case "ClipboardHistoryProvider":
             provider = createClipboardHistoryProvider(config: config)
             
+        case "TodoListProvider":
+            provider = createTodoListProvider(config: config)
+            
         default:
             return nil
         }
@@ -139,6 +142,10 @@ class ProviderFactory {
         return provider
     }
     
+    private func createTodoListProvider(config: ProviderConfiguration) -> TodoListProvider? {
+        return TodoListProvider()
+    }
+    
     // MARK: - Provider Type Validation
     static func isProviderTypeSupported(_ type: String) -> Bool {
         return supportedProviderTypes().contains(type)
@@ -154,7 +161,8 @@ class ProviderFactory {
             "FavoriteFolderProvider",
             "WindowManagementProvider",
             "ShortcutExecuteProvider",
-            "ClipboardHistoryProvider"
+            "ClipboardHistoryProvider",
+            "TodoListProvider"
         ]
     }
 }
