@@ -361,7 +361,7 @@ class ListPanelManager: ObservableObject {
     }
     
     /// Show panel at a specific position (for standalone panels)
-    func show(title: String, items: [FunctionNode], at position: CGPoint, screen: NSScreen? = nil, typingMode: TypingMode = .typeAhead) {
+    func show(title: String, items: [FunctionNode], at position: CGPoint, screen: NSScreen? = nil, providerId: String? = nil, typingMode: TypingMode = .typeAhead) {
         print("[ListPanelManager] Showing panel with \(items.count) items at \(position)")
         
         // Store screen reference
@@ -388,7 +388,7 @@ class ListPanelManager: ObservableObject {
                 sourceRowIndex: nil,
                 spawnAngle: nil,
                 contextActions: nil,
-                providerId: nil,
+                providerId: providerId,
                 contentIdentifier: nil,
                 expandedItemId: nil,
                 isOverlapping: false,

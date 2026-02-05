@@ -32,6 +32,7 @@ class CircularUIManager: ObservableObject, UIManager {
     var functionManager: FunctionManager?
     var mouseTracker: MouseTracker?
     var gestureManager: GestureManager?
+    var panelActionHandler: PanelActionHandler?
     
     var centerPoint: CGPoint = .zero
     var previousApp: NSRunningApplication?

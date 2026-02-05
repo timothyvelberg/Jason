@@ -28,6 +28,17 @@ extension CircularUIManager {
         self.inputCoordinator = InputCoordinator()
         print("   InputCoordinator initialized")
         
+        // Create PanelActionHandler
+        self.panelActionHandler = PanelActionHandler()
+        panelActionHandler?.listPanelManager = listPanelManager
+        panelActionHandler?.findProvider = { [weak self] providerId in
+            self?.functionManager?.providers.first { $0.providerId == providerId }
+        }
+        panelActionHandler?.hideUI = { [weak self] in
+            self?.hide()
+        }
+        print("   PanelActionHandler initialized")
+        
         // Create provider factory
         let factory = ProviderFactory(
             circularUIManager: self,
@@ -166,16 +177,7 @@ extension CircularUIManager {
                     typingMode: typingMode
                 )
                 self.inputCoordinator?.focusPanel(level: 0)
-                
-                // Auto-activate input field for input mode
-                if typingMode == .input {
-                    if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
-                        self.listPanelManager?.panelStack[index].isSearchActive = true
-                        self.listPanelManager?.panelStack[index].searchAnchorHeight = self.listPanelManager?.panelStack[index].panelHeight
-                        self.listPanelManager?.panelStack[index].activeTypingMode = .input
-                    }
-                }
-                
+                self.activateInputModeIfNeeded(for: providerId, atLevel: 0)
                 self.mouseTracker?.pauseUntilMovement()
                 return
             }
@@ -211,16 +213,7 @@ extension CircularUIManager {
                         typingMode: typingMode
                     )
                     self.inputCoordinator?.focusPanel(level: 0)
-                    
-                    // Auto-activate input field for input mode
-                    if typingMode == .input {
-                        if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
-                            self.listPanelManager?.panelStack[index].isSearchActive = true
-                            self.listPanelManager?.panelStack[index].searchAnchorHeight = self.listPanelManager?.panelStack[index].panelHeight
-                            self.listPanelManager?.panelStack[index].activeTypingMode = .input
-                        }
-                    }
-                    
+                    self.activateInputModeIfNeeded(for: providerId, atLevel: 0)
                     self.mouseTracker?.pauseUntilMovement()
                 }
             }
@@ -265,17 +258,19 @@ extension CircularUIManager {
     // MARK: - Panel Callbacks Setup
     
     private func setupPanelCallbacks() {
-        // Wire panel item click callbacks
-        listPanelManager?.onItemLeftClick = { [weak self] node, modifiers in
-            self?.handlePanelItemLeftClick(node: node, modifiers: modifiers)
+        guard let handler = panelActionHandler else { return }
+        
+        // Wire panel item click callbacks through shared handler
+        listPanelManager?.onItemLeftClick = { [weak handler] node, modifiers in
+            handler?.handleLeftClick(node: node, modifiers: modifiers, fromLevel: 0)
         }
 
-        listPanelManager?.onItemRightClick = { [weak self] node, modifiers in
-            self?.handlePanelItemRightClick(node: node, modifiers: modifiers)
+        listPanelManager?.onItemRightClick = { [weak handler] node, modifiers in
+            handler?.handleRightClick(node: node, modifiers: modifiers)
         }
         
-        listPanelManager?.onContextAction = { [weak self] actionNode, modifiers in
-            self?.handlePanelContextAction(actionNode: actionNode, modifiers: modifiers)
+        listPanelManager?.onContextAction = { [weak handler] actionNode, modifiers in
+            handler?.handleContextAction(actionNode: actionNode, modifiers: modifiers)
         }
         
         listPanelManager?.onItemHover = { [weak self] node, level, rowIndex in
@@ -379,51 +374,23 @@ extension CircularUIManager {
             return freshChildren
         }
         
-        listPanelManager?.onAddItem = { [weak self] text, modifiers in
+        // Wire add item callback (used by TodoListProvider and similar)
+        listPanelManager?.onAddItem = { [weak self, weak handler] text, modifiers in
             guard let self = self,
                   let todoProvider = self.functionManager?.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider else { return }
             
             todoProvider.addTodo(title: text)
-            
-            // Refresh panel items at level 0
-            if let panel = self.listPanelManager?.panelStack.first(where: { $0.level == 0 }),
-               let providerId = panel.providerId,
-               let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) {
-                let freshItems = provider.provideFunctions()
-                // Unwrap category wrapper if panel shows direct children
-                let items: [FunctionNode]
-                if freshItems.count == 1, freshItems[0].type == .category, let children = freshItems[0].children {
-                    items = children
-                } else {
-                    items = freshItems
-                }
-                if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
-                    self.listPanelManager?.panelStack[index].items = items
-                }
-            }
+            handler?.refreshPanelItems(at: 0)
             
             if !modifiers.contains(.command) {
                 self.hide()
             }
         }
         
+        // Wire todo change notifications
         if let todoProvider = self.functionManager?.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider {
-            todoProvider.onTodoChanged = { [weak self] in
-                guard let self = self else { return }
-                if let panel = self.listPanelManager?.panelStack.first(where: { $0.level == 0 }),
-                   let providerId = panel.providerId,
-                   let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) {
-                    let freshItems = provider.provideFunctions()
-                    let items: [FunctionNode]
-                    if freshItems.count == 1, freshItems[0].type == .category, let children = freshItems[0].children {
-                        items = children
-                    } else {
-                        items = freshItems
-                    }
-                    if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
-                        self.listPanelManager?.panelStack[index].items = items
-                    }
-                }
+            todoProvider.onTodoChanged = { [weak handler] in
+                handler?.refreshPanelItems(at: 0)
             }
         }
         
@@ -450,7 +417,6 @@ extension CircularUIManager {
                 return event
             }
             guard panelManager.isVisible else {
-                // Don't print here - too spammy when panel is legitimately hidden
                 return event
             }
             

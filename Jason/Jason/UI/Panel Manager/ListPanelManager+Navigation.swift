@@ -95,14 +95,14 @@ extension ListPanelManager {
     /// Get the effective selected row for a panel level
     /// Only the ACTIVE panel shows selection highlight
     func effectiveSelectedRow(for level: Int) -> Int? {
-        print("[EffectiveRow] level=\(level), activePanelLevel=\(activePanelLevel), isKeyboardDriven=\(isKeyboardDriven), hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
+//        print("[EffectiveRow] level=\(level), activePanelLevel=\(activePanelLevel), isKeyboardDriven=\(isKeyboardDriven), hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
         
         guard level == activePanelLevel else {
             return nil
         }
         
         if isKeyboardDriven {
-            print("[EffectiveRow] Returning keyboardSelectedRow[\(level)]=\(keyboardSelectedRow[level] ?? -999)")
+//            print("[EffectiveRow] Returning keyboardSelectedRow[\(level)]=\(keyboardSelectedRow[level] ?? -999)")
             return keyboardSelectedRow[level]
         }
         
@@ -114,12 +114,12 @@ extension ListPanelManager {
             // 1. hoveredRow matches (mouse on source row), OR
             // 2. hoveredRow is nil (transition state - assume still on source row)
             if hoveredRow[level] == sourceRow || hoveredRow[level] == nil {
-                print("[EffectiveRow] Returning source row \(sourceRow) from preview child (hover matches or nil)")
+//                print("[EffectiveRow] Returning source row \(sourceRow) from preview child (hover matches or nil)")
                 return sourceRow
             }
         }
         
-        print("[EffectiveRow] Returning hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
+//        print("[EffectiveRow] Returning hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
         return hoveredRow[level]
     }
 

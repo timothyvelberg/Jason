@@ -26,6 +26,7 @@ class PanelUIManager: ObservableObject, UIManager {
     var overlayWindow: OverlayWindow?
     var inputCoordinator: InputCoordinator?
     var gestureManager: GestureManager?
+    var panelActionHandler: PanelActionHandler?
     
     /// Providers for this panel
     var providers: [any FunctionProvider] = []
@@ -75,6 +76,17 @@ class PanelUIManager: ObservableObject, UIManager {
         // Wire input coordinator to panel manager
         listPanelManager?.inputCoordinator = inputCoordinator
         
+        // Create PanelActionHandler
+        self.panelActionHandler = PanelActionHandler()
+        panelActionHandler?.listPanelManager = listPanelManager
+        panelActionHandler?.findProvider = { [weak self] providerId in
+            self?.providers.first { $0.providerId == providerId }
+        }
+        panelActionHandler?.hideUI = { [weak self] in
+            self?.hide()
+        }
+        print("   PanelActionHandler initialized")
+        
         // Create providers
         setupProviders()
         
@@ -120,8 +132,8 @@ class PanelUIManager: ObservableObject, UIManager {
         overlayWindow?.showOverlay(at: mousePosition)
         
         // Determine typing mode from providers
-        // If any provider defaults to search, use search mode
         let typingMode: TypingMode = providers.first?.defaultTypingMode ?? .typeAhead
+        let providerId: String? = providers.count == 1 ? providers.first?.providerId : nil
 
         // Show panel at mouse position
         listPanelManager?.show(
@@ -129,6 +141,7 @@ class PanelUIManager: ObservableObject, UIManager {
             items: items,
             at: mousePosition,
             screen: screen,
+            providerId: providerId,
             typingMode: typingMode
         )
         
@@ -141,16 +154,10 @@ class PanelUIManager: ObservableObject, UIManager {
         // Set initial focus to panel
         inputCoordinator?.focusPanel(level: 0)
         
-        // Arm panel for keyboard navigation
-        if let index = listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
-            listPanelManager?.panelStack[index].areChildrenArmed = true
-        }
-        
-        // Arm panel for keyboard navigation
+        // Arm panel for keyboard navigation and auto-activate input mode
         if let index = listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
             listPanelManager?.panelStack[index].areChildrenArmed = true
             
-            // Auto-activate input field for input mode
             if typingMode == .input {
                 listPanelManager?.panelStack[index].isSearchActive = true
                 listPanelManager?.panelStack[index].searchAnchorHeight = listPanelManager?.panelStack[index].panelHeight
@@ -283,16 +290,19 @@ class PanelUIManager: ObservableObject, UIManager {
     // MARK: - Panel Callbacks Setup
     
     private func setupPanelCallbacks() {
-        listPanelManager?.onItemLeftClick = { [weak self] node, modifiers in
-            self?.handlePanelItemLeftClick(node: node, modifiers: modifiers)
+        guard let handler = panelActionHandler else { return }
+        
+        // Wire panel item click callbacks through shared handler
+        listPanelManager?.onItemLeftClick = { [weak handler] node, modifiers in
+            handler?.handleLeftClick(node: node, modifiers: modifiers, fromLevel: 0)
         }
         
-        listPanelManager?.onItemRightClick = { [weak self] node, modifiers in
-            self?.handlePanelItemRightClick(node: node, modifiers: modifiers)
+        listPanelManager?.onItemRightClick = { [weak handler] node, modifiers in
+            handler?.handleRightClick(node: node, modifiers: modifiers)
         }
         
-        listPanelManager?.onContextAction = { [weak self] actionNode, modifiers in
-            self?.handlePanelContextAction(actionNode: actionNode, modifiers: modifiers)
+        listPanelManager?.onContextAction = { [weak handler] actionNode, modifiers in
+            handler?.handleContextAction(actionNode: actionNode, modifiers: modifiers)
         }
         
         listPanelManager?.onItemHover = { [weak self] node, level, rowIndex in
@@ -382,30 +392,23 @@ class PanelUIManager: ObservableObject, UIManager {
             return await provider.loadChildren(for: reloadNode)
         }
         
-        listPanelManager?.onAddItem = { [weak self] text, modifiers in
+        // Wire add item callback
+        listPanelManager?.onAddItem = { [weak self, weak handler] text, modifiers in
             guard let self = self,
                   let todoProvider = self.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider else { return }
             
             todoProvider.addTodo(title: text)
-            
-            // Refresh panel items
-            let freshItems = self.loadProviderItems()
-            if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
-                self.listPanelManager?.panelStack[index].items = freshItems
-            }
+            handler?.refreshPanelItems(at: 0)
             
             if !modifiers.contains(.command) {
                 self.hide()
             }
         }
         
+        // Wire todo change notifications
         if let todoProvider = self.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider {
-            todoProvider.onTodoChanged = { [weak self] in
-                guard let self = self else { return }
-                let freshItems = self.loadProviderItems()
-                if let index = self.listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
-                    self.listPanelManager?.panelStack[index].items = freshItems
-                }
+            todoProvider.onTodoChanged = { [weak handler] in
+                handler?.refreshPanelItems(at: 0)
             }
         }
         
@@ -470,55 +473,22 @@ class PanelUIManager: ObservableObject, UIManager {
         }
     }
     
-    
-    // MARK: - Click Helpers
+    // MARK: - Click Handlers
 
-    /// Returns (panel, rowIndex, node) for click at position, or nil if outside panels/rows
-    private func findClickedItem(at mousePos: CGPoint) -> (panel: PanelState, rowIndex: Int, node: FunctionNode)? {
-        guard let panelManager = listPanelManager else { return nil }
-        
-        for panel in panelManager.panelStack.reversed() {
-            let bounds = panelManager.currentBounds(for: panel)
-            guard bounds.contains(mousePos) else { continue }
-            
-            let distanceFromTop = bounds.maxY - mousePos.y
-            
-            // Check if in header
-            guard distanceFromTop >= PanelState.titleHeight + (PanelState.padding / 2) else {
-                return nil
-            }
-            
-            // Calculate row index
-            let relativeY = distanceFromTop - PanelState.titleHeight - (PanelState.padding / 2)
-            let scrollAdjustedY = relativeY + panel.scrollOffset
-            let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
-            
-            // Validate
-            guard rowIndex >= 0 && rowIndex < panel.items.count else {
-                return nil
-            }
-            
-            return (panel, rowIndex, panel.items[rowIndex])
-        }
-        
-        return nil
-    }
-    
     private func handleLeftClick(event: GestureManager.GestureEvent) {
         guard isVisible else { return }
         
-        // Skip if context menu is open - SwiftUI handles the menu click
+        // Skip if context menu is open
         if listPanelManager?.panelStack.contains(where: { $0.expandedItemId != nil }) == true {
-            // Clear all expanded states
             for i in listPanelManager!.panelStack.indices {
                 listPanelManager!.panelStack[i].expandedItemId = nil
             }
             return
         }
         
-        if let (_, rowIndex, node) = findClickedItem(at: NSEvent.mouseLocation) {
-            print("[PanelUIManager] Left click on row \(rowIndex): '\(node.name)'")
-            handlePanelItemLeftClick(node: node, modifiers: NSEvent.modifierFlags)
+        if let result = listPanelManager?.handleLeftClick(at: NSEvent.mouseLocation) {
+            print("[PanelUIManager] Left click on: '\(result.node.name)' at level \(result.level)")
+            panelActionHandler?.handleLeftClick(node: result.node, modifiers: NSEvent.modifierFlags, fromLevel: result.level)
         } else {
             hide()
         }
@@ -527,61 +497,12 @@ class PanelUIManager: ObservableObject, UIManager {
     private func handleRightClick(event: GestureManager.GestureEvent) {
         guard isVisible else { return }
         
-        if let (_, rowIndex, node) = findClickedItem(at: NSEvent.mouseLocation) {
-            print("[PanelUIManager] Right click on row \(rowIndex): '\(node.name)'")
-            handlePanelItemRightClick(node: node, modifiers: NSEvent.modifierFlags)
-        } else {
-            hide()
+        // Let ListPanelManager's hit testing handle the right-click toggle
+        if let panelManager = listPanelManager, panelManager.handleRightClick(at: NSEvent.mouseLocation) {
+            return
         }
-    }
-    
-    private func handlePanelItemLeftClick(node: FunctionNode, modifiers: NSEvent.ModifierFlags) {
-        let behavior = node.onLeftClick.resolve(with: modifiers)
         
-        switch behavior {
-        case .execute(let action):
-            action()
-            hide()
-        case .executeKeepOpen(let action):
-            action()
-            
-            // Refresh items to reflect state changes
-            let freshItems = loadProviderItems()
-            if let index = listPanelManager?.panelStack.firstIndex(where: { $0.level == 0 }) {
-                listPanelManager?.panelStack[index].items = freshItems
-            }
-        case .navigateInto:
-            break // Folder navigation handled by onItemHover
-        default:
-            break
-        }
-    }
-    
-    private func handlePanelItemRightClick(node: FunctionNode, modifiers: NSEvent.ModifierFlags) {
-        if let panelManager = listPanelManager,
-           let panelIndex = panelManager.panelStack.firstIndex(where: { panel in
-               panel.items.contains { $0.id == node.id }
-           }) {
-            if panelManager.panelStack[panelIndex].expandedItemId == node.id {
-                panelManager.panelStack[panelIndex].expandedItemId = nil
-            } else {
-                panelManager.panelStack[panelIndex].expandedItemId = node.id
-            }
-        }
-    }
-    
-    private func handlePanelContextAction(actionNode: FunctionNode, modifiers: NSEvent.ModifierFlags) {
-        let behavior = actionNode.onLeftClick.resolve(with: modifiers)
-        
-        switch behavior {
-        case .execute(let action):
-            action()
-            hide()
-        case .executeKeepOpen(let action):
-            action()
-        default:
-            break
-        }
+        hide()
     }
     
     // MARK: - Hold Mode
