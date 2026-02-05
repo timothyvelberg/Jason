@@ -130,7 +130,7 @@ extension ListPanelManager {
             
             let selectedNode = items[index]
             currentlyHoveredNodeId[activePanelLevel] = selectedNode.id
-            onItemHover?(selectedNode, activePanelLevel, index)
+            handleItemHover(node: selectedNode, level: activePanelLevel, rowIndex: index)
         } else {
             print("[TypeAhead] No match found")
         }

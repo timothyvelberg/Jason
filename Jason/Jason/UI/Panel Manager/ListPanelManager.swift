@@ -221,11 +221,10 @@ class ListPanelManager: ObservableObject {
         scrollingPanels.contains(level)
     }
     
-    /// Handle item hover with scroll-suppression logic
-    func handleItemHover(node: FunctionNode?, level: Int, rowIndex: Int?) {
+    /// Handle item hover with scroll-suppression logic (called from view)
+    func handleViewHover(node: FunctionNode?, level: Int, rowIndex: Int?) {
         // Suppress hover events while panel is scrolling
         if isPanelScrolling(level) {
-            print("[Hover] Suppressed - panel \(level) is scrolling")
             return
         }
         
@@ -242,8 +241,8 @@ class ListPanelManager: ObservableObject {
             currentlyHoveredNodeId.removeValue(forKey: level)
         }
         
-        // Forward to the actual handler
-        onItemHover?(node, level, rowIndex)
+        // Call the cascading logic directly (not through callback)
+        handleItemHover(node: node, level: level, rowIndex: rowIndex ?? 0)
     }
     
     /// Handle scroll state changes from a panel
@@ -487,7 +486,7 @@ class ListPanelManager: ObservableObject {
                         if !isPanelScrolling(level) {
                             let node = panel.items[rowIndex]
                             currentlyHoveredNodeId[level] = node.id
-                            onItemHover?(node, level, rowIndex)
+                            handleItemHover(node: node, level: level, rowIndex: rowIndex)
                         }
                     }
                 } else {

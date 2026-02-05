@@ -109,7 +109,7 @@ struct CircularUIView: View {
                         onItemRightClick: listPanelManager.onItemRightClick,
                         onContextAction: listPanelManager.onContextAction,
                         onItemHover: { node, rowIndex in
-                            listPanelManager.handleItemHover(node: node, level: panelLevel, rowIndex: rowIndex)
+                            listPanelManager.handleViewHover(node: node, level: panel.level, rowIndex: rowIndex)
                         },
                         onHeaderHover: {
                             listPanelManager.handleHeaderHover(level: panelLevel)

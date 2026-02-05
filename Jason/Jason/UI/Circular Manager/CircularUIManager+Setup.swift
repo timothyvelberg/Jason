@@ -182,7 +182,7 @@ extension CircularUIManager {
                     typingMode: typingMode
                 )
                 self.inputCoordinator?.focusPanel(level: 0)
-                self.activateInputModeIfNeeded(for: providerId, atLevel: 0)
+                self.listPanelManager?.activateInputModeIfNeeded(for: providerId, atLevel: 0)
                 self.mouseTracker?.pauseUntilMovement()
                 return
             }
@@ -218,23 +218,11 @@ extension CircularUIManager {
                         typingMode: typingMode
                     )
                     self.inputCoordinator?.focusPanel(level: 0)
-                    self.activateInputModeIfNeeded(for: providerId, atLevel: 0)
+                    self.listPanelManager?.activateInputModeIfNeeded(for: providerId, atLevel: 0)
                     self.mouseTracker?.pauseUntilMovement()
                 }
             }
         }
-    }
-    
-    private func activateInputModeIfNeeded(for providerId: String?, atLevel level: Int) {
-        guard let providerId = providerId,
-              let provider = functionManager?.providers.first(where: { $0.providerId == providerId }),
-              provider.defaultTypingMode == .input,
-              let index = listPanelManager?.panelStack.firstIndex(where: { $0.level == level }) else { return }
-        
-        listPanelManager?.panelStack[index].typingMode = .input
-        listPanelManager?.panelStack[index].activeTypingMode = .input
-        listPanelManager?.panelStack[index].isSearchActive = true
-        listPanelManager?.panelStack[index].searchAnchorHeight = listPanelManager?.panelStack[index].panelHeight
     }
     
     // MARK: - Gesture Manager Setup
@@ -276,81 +264,6 @@ extension CircularUIManager {
         
         listPanelManager?.onContextAction = { [weak handler] actionNode, modifiers in
             handler?.handleContextAction(actionNode: actionNode, modifiers: modifiers)
-        }
-        
-        listPanelManager?.onItemHover = { [weak self] node, level, rowIndex in
-            guard let self = self, let node = node else {
-                return
-            }
-            
-            // Only cascade for folders
-            guard node.type == .folder else {
-                self.listPanelManager?.popToLevel(level)
-                return
-            }
-            
-            // Check if this node's panel is already showing at level+1
-            if let existingPanel = self.listPanelManager?.panel(at: level + 1),
-               existingPanel.sourceNodeId == node.id {
-                self.listPanelManager?.popToLevel(level + 1)
-                return
-            }
-            
-            // Extract identity from node
-            let providerId = node.providerId
-            let contentIdentifier = node.metadata?["folderURL"] as? String ?? node.previewURL?.path
-            
-            // Check if children already loaded
-            if let children = node.children, !children.isEmpty {
-                self.listPanelManager?.pushPanel(
-                    title: node.name,
-                    items: children,
-                    fromPanelAtLevel: level,
-                    sourceNodeId: node.id,
-                    sourceRowIndex: rowIndex,
-                    providerId: providerId,
-                    contentIdentifier: contentIdentifier,
-                    contextActions: node.contextActions
-                )
-                self.activateInputModeIfNeeded(for: providerId, atLevel: level + 1)
-                return
-            }
-            
-            // Children not loaded - check if we can load dynamically
-            guard node.needsDynamicLoading,
-                  let providerId = node.providerId,
-                  let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) else {
-                self.listPanelManager?.popToLevel(level)
-                return
-            }
-            
-            // Load children asynchronously
-            Task {
-                let children = await provider.loadChildren(for: node)
-                
-                guard !children.isEmpty else {
-                    print("[Panel] No children loaded for: \(node.name)")
-                    await MainActor.run {
-                        self.listPanelManager?.popToLevel(level)
-                    }
-                    return
-                }
-                
-                // Push panel on main thread
-                await MainActor.run {
-                    self.listPanelManager?.pushPanel(
-                        title: node.name,
-                        items: children,
-                        fromPanelAtLevel: level,
-                        sourceNodeId: node.id,
-                        sourceRowIndex: rowIndex,
-                        providerId: providerId,
-                        contentIdentifier: contentIdentifier,
-                        contextActions: node.contextActions
-                    )
-                    self.activateInputModeIfNeeded(for: providerId, atLevel: level + 1)
-                }
-            }
         }
         
         // Wire panel content reload callback

@@ -65,7 +65,7 @@ struct PanelOnlyView: View {
                 listPanelManager.onContextAction?(action, modifiers)
             },
             onItemHover: { node, rowIndex in
-                listPanelManager.handleItemHover(node: node, level: panel.level, rowIndex: rowIndex)
+                listPanelManager.handleViewHover(node: node, level: panel.level, rowIndex: rowIndex)
             },
             onHeaderHover: {
                 listPanelManager.handleHeaderHover(level: panel.level)

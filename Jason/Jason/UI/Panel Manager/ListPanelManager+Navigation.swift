@@ -46,7 +46,7 @@ extension ListPanelManager {
         if !activePanel.items.isEmpty {
             let firstNode = activePanel.items[0]
             currentlyHoveredNodeId[activePanelLevel] = firstNode.id
-            onItemHover?(firstNode, activePanelLevel, 0)
+            handleItemHover(node: firstNode, level: activePanelLevel, rowIndex: 0)
         }
     }
 
@@ -88,7 +88,7 @@ extension ListPanelManager {
            selection < panel.items.count {
             let selectedNode = panel.items[selection]
             currentlyHoveredNodeId[parentLevel] = selectedNode.id
-            onItemHover?(selectedNode, parentLevel, selection)
+            handleItemHover(node: selectedNode, level: parentLevel, rowIndex: selection)
         }
     }
     
@@ -165,7 +165,7 @@ extension ListPanelManager {
         // Trigger hover to spawn preview if selected item is a folder
         let selectedNode = panel.items[newSelection]
         currentlyHoveredNodeId[level] = selectedNode.id
-        onItemHover?(selectedNode, level, newSelection)
+        handleItemHover(node: selectedNode, level: level, rowIndex: newSelection)
     }
     
     /// Move selection up in the active panel
@@ -210,7 +210,7 @@ extension ListPanelManager {
         // Trigger hover to spawn preview if selected item is a folder
         let selectedNode = panel.items[newSelection]
         currentlyHoveredNodeId[level] = selectedNode.id
-        onItemHover?(selectedNode, level, newSelection)
+        handleItemHover(node: selectedNode, level: level, rowIndex: newSelection)
     }
 
     /// Clear keyboard selection state (called when switching to mouse mode)
@@ -246,5 +246,91 @@ extension ListPanelManager {
         print("[Keyboard] Execute: '\(selectedNode.name)'")
         
         onItemLeftClick?(selectedNode, NSEvent.modifierFlags)
+    }
+    
+    /// Handle item hover — manages folder cascading, child panel push/pop, and dynamic loading.
+    func handleItemHover(node: FunctionNode?, level: Int, rowIndex: Int) {
+        print("[handleItemHover] node: '\(node?.name ?? "nil")', level: \(level), rowIndex: \(rowIndex), type: \(String(describing: node?.type))")
+
+        guard let node = node else { return }
+        
+        // Only cascade for folders
+        guard node.type == .folder else {
+            popToLevel(level)
+            return
+        }
+        
+        // Check if this node's panel is already showing at level+1
+        if let existingPanel = panelStack.first(where: { $0.level == level + 1 }),
+           existingPanel.sourceNodeId == node.id {
+            popToLevel(level + 1)
+            return
+        }
+        
+        // Extract identity from node
+        let providerId = node.providerId
+        let contentIdentifier = node.metadata?["folderURL"] as? String ?? node.previewURL?.path
+        
+        // Children already loaded — push immediately
+        if let children = node.children, !children.isEmpty {
+            pushPanel(
+                title: node.name,
+                items: children,
+                fromPanelAtLevel: level,
+                sourceNodeId: node.id,
+                sourceRowIndex: rowIndex,
+                providerId: providerId,
+                contentIdentifier: contentIdentifier,
+                contextActions: node.contextActions
+            )
+            activateInputModeIfNeeded(for: providerId, atLevel: level + 1)
+            return
+        }
+        
+        // Dynamic loading
+        guard node.needsDynamicLoading,
+              let providerId = node.providerId,
+              let provider = findProvider?(providerId) else {
+            popToLevel(level)
+            return
+        }
+        
+        Task {
+            let children = await provider.loadChildren(for: node)
+            
+            guard !children.isEmpty else {
+                await MainActor.run {
+                    self.popToLevel(level)
+                }
+                return
+            }
+            
+            await MainActor.run {
+                self.pushPanel(
+                    title: node.name,
+                    items: children,
+                    fromPanelAtLevel: level,
+                    sourceNodeId: node.id,
+                    sourceRowIndex: rowIndex,
+                    providerId: providerId,
+                    contentIdentifier: contentIdentifier,
+                    contextActions: node.contextActions
+                )
+                self.activateInputModeIfNeeded(for: providerId, atLevel: level + 1)
+            }
+        }
+    }
+
+    /// Activate input mode on a panel if its provider defaults to .input
+    func activateInputModeIfNeeded(for providerId: String?, atLevel level: Int) {
+        guard let providerId = providerId,
+              let provider = findProvider?(providerId),
+              provider.defaultTypingMode == .input,
+              let index = panelStack.firstIndex(where: { $0.level == level }) else { return }
+        
+        panelStack[index].typingMode = .input
+        panelStack[index].activeTypingMode = .input
+        panelStack[index].isSearchActive = true
+        panelStack[index].searchAnchorHeight = panelStack[index].panelHeight
     }
 }
