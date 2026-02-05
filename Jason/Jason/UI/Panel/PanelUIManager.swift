@@ -509,6 +509,10 @@ class PanelUIManager: ObservableObject, UIManager {
         
         // Skip if context menu is open - SwiftUI handles the menu click
         if listPanelManager?.panelStack.contains(where: { $0.expandedItemId != nil }) == true {
+            // Clear all expanded states
+            for i in listPanelManager!.panelStack.indices {
+                listPanelManager!.panelStack[i].expandedItemId = nil
+            }
             return
         }
         
@@ -558,7 +562,11 @@ class PanelUIManager: ObservableObject, UIManager {
            let panelIndex = panelManager.panelStack.firstIndex(where: { panel in
                panel.items.contains { $0.id == node.id }
            }) {
-            listPanelManager?.panelStack[panelIndex].expandedItemId = node.id
+            if panelManager.panelStack[panelIndex].expandedItemId == node.id {
+                panelManager.panelStack[panelIndex].expandedItemId = nil
+            } else {
+                panelManager.panelStack[panelIndex].expandedItemId = node.id
+            }
         }
     }
     

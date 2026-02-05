@@ -20,6 +20,14 @@ extension CircularUIManager {
                 handlePanelItemLeftClick(node: result.node, modifiers: event.modifierFlags, fromLevel: result.level)
                 return
             }
+            
+            // Clear context actions if any are open
+            if panelManager.panelStack.contains(where: { $0.expandedItemId != nil }) {
+                for i in panelManager.panelStack.indices {
+                    panelManager.panelStack[i].expandedItemId = nil
+                }
+                return
+            }
         }
         
         guard let functionManager = functionManager else { return }
