@@ -242,16 +242,9 @@ class PanelUIManager: ObservableObject, UIManager {
     private func loadProviderItems() -> [FunctionNode] {
         var allItems: [FunctionNode] = []
         
-        func normalizeProviderName(_ name: String) -> String {
-            return name
-                .replacingOccurrences(of: "Provider", with: "", options: .caseInsensitive)
-                .replacingOccurrences(of: "-", with: "")
-                .lowercased()
-        }
-        
         for provider in providers {
             let providerConfig = configuration.providers.first {
-                normalizeProviderName($0.providerType) == normalizeProviderName(provider.providerId)
+                ProviderFactory.normalizeProviderName($0.providerType) == ProviderFactory.normalizeProviderName(provider.providerId)
             }
             
             var items = provider.provideFunctions()
@@ -296,64 +289,10 @@ class PanelUIManager: ObservableObject, UIManager {
     
     private func setupPanelCallbacks() {
         guard let handler = panelActionHandler else { return }
-        
-        // Wire panel item click callbacks through shared handler
-        listPanelManager?.onItemLeftClick = { [weak handler] node, modifiers in
-            handler?.handleLeftClick(node: node, modifiers: modifiers, fromLevel: 0)
-        }
-        
-        listPanelManager?.onItemRightClick = { [weak handler] node, modifiers in
-            handler?.handleRightClick(node: node, modifiers: modifiers)
-        }
-        
-        listPanelManager?.onContextAction = { [weak handler] actionNode, modifiers in
-            handler?.handleContextAction(actionNode: actionNode, modifiers: modifiers)
-        }
-        
-        listPanelManager?.onReloadContent = { [weak self] providerId, contentIdentifier in
-            guard let self = self,
-                  let provider = self.providers.first(where: { $0.providerId == providerId }) else {
-                print("[Panel Reload] Provider '\(providerId)' not found")
-                return []
-            }
-            
-            let reloadNode = FunctionNode(
-                id: "reload-\(contentIdentifier ?? "unknown")",
-                name: "reload",
-                type: .folder,
-                icon: NSImage(),
-                metadata: contentIdentifier != nil ? ["folderURL": contentIdentifier!] : nil,
-                providerId: providerId
-            )
-            
-            return await provider.loadChildren(for: reloadNode)
-        }
-        
-        listPanelManager?.onAddItem = { [weak self] text, modifiers in
-            guard let self = self,
-                  let todoProvider = self.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider else { return }
-            
-            todoProvider.addTodo(title: text)
-            self.listPanelManager?.refreshPanelItems(at: 0)
-            
-            if !modifiers.contains(.command) {
-                self.hide()
-            }
-        }
 
-        if let todoProvider = self.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider {
-            todoProvider.onTodoChanged = { [weak self] in
-                self?.listPanelManager?.refreshPanelItems(at: 0)
-            }
-        }
-        
-        // Wire todo change notifications
-        if let todoProvider = self.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider {
-            todoProvider.onTodoChanged = { [weak handler] in
-                handler?.refreshPanelItems(at: 0)
-            }
-        }
-        
+        // Wire standard callbacks (click handling + reload)
+        listPanelManager?.wireStandardCallbacks(handler: handler, providers: providers)
+
         listPanelManager?.onExitToRing = { [weak self] in
             self?.hide()
         }

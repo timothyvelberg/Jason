@@ -116,7 +116,6 @@ class ListPanelManager: ObservableObject {
     var onItemLeftClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onItemRightClick: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onContextAction: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
-    var onItemHover: ((FunctionNode?, Int, Int?) -> Void)?
     
     /// Callback to reload content for a panel
     var onReloadContent: ((String, String?) async -> [FunctionNode])?
@@ -212,6 +211,70 @@ class ListPanelManager: ObservableObject {
                 self.panelStack[currentIndex].items = freshItems
             }
         }
+    }
+    
+    /// Wire standard panel callbacks that are identical across all UI managers.
+    /// Manager-specific callbacks (onExitToRing, onAddItem, etc.) remain wired individually.
+    func wireStandardCallbacks(handler: PanelActionHandler, providers: [any FunctionProvider]) {
+        onItemLeftClick = { [weak handler] node, modifiers in
+            handler?.handleLeftClick(node: node, modifiers: modifiers, fromLevel: 0)
+        }
+        
+        onItemRightClick = { [weak handler] node, modifiers in
+            handler?.handleRightClick(node: node, modifiers: modifiers)
+        }
+        
+        onContextAction = { [weak handler] actionNode, modifiers in
+            handler?.handleContextAction(actionNode: actionNode, modifiers: modifiers)
+        }
+        
+        onReloadContent = { [weak self] providerId, contentIdentifier in
+            guard let self = self,
+                  let provider = self.findProvider?(providerId) else {
+                print("[Panel Reload] Provider '\(providerId)' not found")
+                return []
+            }
+            
+            let reloadNode = FunctionNode(
+                id: "reload-\(contentIdentifier ?? "unknown")",
+                name: "reload",
+                type: .folder,
+                icon: NSImage(),
+                metadata: contentIdentifier != nil ? ["folderURL": contentIdentifier!] : nil,
+                providerId: providerId
+            )
+            
+            print("[Panel Reload] Reloading content for '\(contentIdentifier ?? "unknown")'")
+            let freshChildren = await provider.loadChildren(for: reloadNode)
+            print("[Panel Reload] Got \(freshChildren.count) items")
+            
+            return freshChildren
+        }
+        
+        // Wire add item for mutable providers
+         onAddItem = { [weak self, weak handler] text, modifiers in
+             guard let self = self else { return }
+             
+             guard let panel = self.panelStack.first(where: { $0.level == 0 }),
+                   let providerId = panel.providerId,
+                   let provider = self.findProvider?(providerId) as? any MutableListProvider else { return }
+             
+             provider.addItem(title: text)
+             self.refreshPanelItems(at: 0)
+             
+             if !modifiers.contains(.command) {
+                 handler?.hideUI?()
+             }
+         }
+         
+         // Wire items changed notifications for all mutable providers
+         for provider in providers {
+             if var mutableProvider = provider as? any MutableListProvider {
+                 mutableProvider.onItemsChanged = { [weak self] in
+                     self?.refreshPanelItems(at: 0)
+                 }
+             }
+         }
     }
     
     // MARK: - Scroll State

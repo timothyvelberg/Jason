@@ -1,13 +1,13 @@
 import Foundation
 import AppKit
 
-class TodoListProvider: FunctionProvider {
-    
+class TodoListProvider: FunctionProvider, MutableListProvider {
+
     var providerId: String { "todo-list" }
     var providerName: String { "Todo List" }
     var providerIcon: NSImage { NSImage(systemSymbolName: "checklist", accessibilityDescription: "Todo List") ?? NSImage() }
     var defaultTypingMode: TypingMode { .input }
-    var onTodoChanged: (() -> Void)?
+    var onItemsChanged: (() -> Void)?
     
     // In-memory storage for now
     private(set) var todos: [TodoItem] = []
@@ -92,7 +92,7 @@ class TodoListProvider: FunctionProvider {
         return buildTodoNodes()
     }
     
-    func addTodo(title: String) {
+    func addItem(title: String) {
         let todo = TodoItem(
             id: UUID().uuidString,
             title: title,
@@ -110,7 +110,8 @@ class TodoListProvider: FunctionProvider {
         todos.remove(at: index)
         DatabaseManager.shared.deleteTodo(id: id)
         print("🗑️ [TodoListProvider] Deleted: '\(title)' (\(todos.count) remaining)")
-        onTodoChanged?()
+        onItemsChanged?()
+
     }
 
     private func toggleTodo(id: String) {
@@ -118,7 +119,7 @@ class TodoListProvider: FunctionProvider {
         todos[index].isCompleted.toggle()
         DatabaseManager.shared.toggleTodo(id: id)
         print("[TodoListProvider] Toggled: '\(todos[index].title)' → \(todos[index].isCompleted ? "done" : "undone")")
-        onTodoChanged?()
+        onItemsChanged?()
     }
     
     private func deleteAction(for todo: TodoItem) -> FunctionNode {

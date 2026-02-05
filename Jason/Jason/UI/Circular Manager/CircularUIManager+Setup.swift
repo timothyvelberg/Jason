@@ -57,26 +57,18 @@ extension CircularUIManager {
         
         let providers = factory.createProviders(from: ringConfiguration)
         
-        // Helper to normalize provider names for matching
-        // Converts both "CombinedAppsProvider" (class name) and "combined-apps" (providerId) to same form
-        func normalizeProviderName(_ name: String) -> String {
-            return name
-                .replacingOccurrences(of: "Provider", with: "", options: .caseInsensitive)
-                .replacingOccurrences(of: "-", with: "")
-                .lowercased()
-        }
-        
         print("[Setup] Available config providerTypes: \(ringConfiguration.providers.map { $0.providerType })")
 
         // Register all providers with their configurations
         for provider in providers {
             // Look up this provider's configuration by matching normalized names
-            let normalizedProviderId = normalizeProviderName(provider.providerId)
+            let normalizedProviderId = ProviderFactory.normalizeProviderName(provider.providerId)
+
             
             print("[Setup] Matching '\(provider.providerId)' → normalized: '\(normalizedProviderId)'")
 
             let providerConfig = ringConfiguration.providers.first { config in
-                let normalizedConfigType = normalizeProviderName(config.providerType)
+                let normalizedConfigType = ProviderFactory.normalizeProviderName(config.providerType)
                 return normalizedConfigType == normalizedProviderId
             }
             
@@ -252,65 +244,9 @@ extension CircularUIManager {
     
     private func setupPanelCallbacks() {
         guard let handler = panelActionHandler else { return }
-        
-        // Wire panel item click callbacks through shared handler
-        listPanelManager?.onItemLeftClick = { [weak handler] node, modifiers in
-            handler?.handleLeftClick(node: node, modifiers: modifiers, fromLevel: 0)
-        }
 
-        listPanelManager?.onItemRightClick = { [weak handler] node, modifiers in
-            handler?.handleRightClick(node: node, modifiers: modifiers)
-        }
-        
-        listPanelManager?.onContextAction = { [weak handler] actionNode, modifiers in
-            handler?.handleContextAction(actionNode: actionNode, modifiers: modifiers)
-        }
-        
-        // Wire panel content reload callback
-        listPanelManager?.onReloadContent = { [weak self] providerId, contentIdentifier in
-            guard let self = self,
-                  let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) else {
-                print("[Panel Reload] Provider '\(providerId)' not found")
-                return []
-            }
-            
-            // Create a minimal node to call loadChildren
-            // Provider extracts folderURL from metadata
-            let reloadNode = FunctionNode(
-                id: "reload-\(contentIdentifier ?? "unknown")",
-                name: "reload",
-                type: .folder,
-                icon: NSImage(),
-                metadata: contentIdentifier != nil ? ["folderURL": contentIdentifier!] : nil,
-                providerId: providerId
-            )
-            
-            print("[Panel Reload] Reloading content for '\(contentIdentifier ?? "unknown")'")
-            let freshChildren = await provider.loadChildren(for: reloadNode)
-            print("[Panel Reload] Got \(freshChildren.count) items")
-            
-            return freshChildren
-        }
-        
-        // Wire add item callback
-        listPanelManager?.onAddItem = { [weak self] text, modifiers in
-            guard let self = self,
-                  let todoProvider = self.functionManager?.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider else { return }
-            
-            todoProvider.addTodo(title: text)
-            self.listPanelManager?.refreshPanelItems(at: 0)
-            
-            if !modifiers.contains(.command) {
-                self.hide()
-            }
-        }
-
-        // Wire todo change notifications
-        if let todoProvider = self.functionManager?.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider {
-            todoProvider.onTodoChanged = { [weak self] in
-                self?.listPanelManager?.refreshPanelItems(at: 0)
-            }
-        }
+        // Wire standard callbacks (click handling + reload)
+        listPanelManager?.wireStandardCallbacks(handler: handler, providers: functionManager?.providers ?? [])
         
         listPanelManager?.onExitToRing = { [weak self] in
             guard let self = self, let functionManager = self.functionManager else { return }

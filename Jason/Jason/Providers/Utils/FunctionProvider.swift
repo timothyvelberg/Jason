@@ -37,6 +37,15 @@ protocol FunctionProvider {
     func loadChildren(for node: FunctionNode) async -> [FunctionNode]
 }
 
+// MARK: - Mutable List Provider Protocol
+
+/// Protocol for providers that support adding items and notify on changes.
+/// Allows generic wiring of onAddItem/onItemsChanged without provider-specific code.
+protocol MutableListProvider: FunctionProvider {
+    func addItem(title: String)
+    var onItemsChanged: (() -> Void)? { get set }
+}
+
 // MARK: - Default Implementations
 
 extension FunctionProvider {
@@ -54,4 +63,3 @@ extension FunctionProvider {
     // Default to type-ahead - providers can override
     var defaultTypingMode: TypingMode { .typeAhead }
 }
-    

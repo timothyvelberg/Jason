@@ -32,6 +32,14 @@ class ProviderFactory {
         }
     }
     
+    // Add alongside the existing static methods
+    static func normalizeProviderName(_ name: String) -> String {
+        return name
+            .replacingOccurrences(of: "Provider", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "-", with: "")
+            .lowercased()
+    }
+    
     // MARK: - Provider Creation
     
     /// Create a provider instance from configuration
