@@ -162,40 +162,7 @@ class PanelActionHandler {
     
     // MARK: - Panel Refresh
     
-    /// Refresh panel items at the given level by re-querying the provider.
-    /// Handles the category-wrapper unwrapping pattern.
     func refreshPanelItems(at level: Int) {
-        guard let panelManager = listPanelManager else {
-            print("[PanelAction] refreshPanelItems: no listPanelManager")
-            return
-        }
-        guard let panel = panelManager.panelStack.first(where: { $0.level == level }) else {
-            print("[PanelAction] refreshPanelItems: no panel at level \(level)")
-            return
-        }
-        guard let providerId = panel.providerId else {
-            print("[PanelAction] refreshPanelItems: panel has no providerId")
-            return
-        }
-        guard let provider = findProvider?(providerId) else {
-            print("[PanelAction] refreshPanelItems: findProvider returned nil for '\(providerId)'")
-            return
-        }
-        
-        print("[PanelAction] refreshPanelItems: level \(level), provider '\(providerId)'")
-        
-        let freshItems = provider.provideFunctions()
-        
-        // Unwrap category wrapper if provider returns a single category with children
-        let items: [FunctionNode]
-        if freshItems.count == 1, freshItems[0].type == .category, let children = freshItems[0].children {
-            items = children
-        } else {
-            items = freshItems
-        }
-        
-        if let index = panelManager.panelStack.firstIndex(where: { $0.level == level }) {
-            panelManager.panelStack[index].items = items
-        }
+        listPanelManager?.refreshPanelItems(at: level)
     }
 }

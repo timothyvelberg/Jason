@@ -68,6 +68,9 @@ class ListPanelManager: ObservableObject {
         panelStack.first?.items ?? []
     }
     
+    /// Resolve a provider by ID (injected by owning manager)
+    var findProvider: ((String) -> (any FunctionProvider)?)?
+    
     /// Expanded item ID for first panel (for backward compatibility with binding)
     var expandedItemId: String? {
         get { panelStack.first?.expandedItemId }
@@ -296,6 +299,36 @@ class ListPanelManager: ObservableObject {
         let currentOffset = panelStack[index].scrollOffset
         if abs(currentOffset - offset) > 0.5 {
             panelStack[index].scrollOffset = offset
+        }
+    }
+    
+    /// Refresh panel items at the given level by re-querying the provider.
+    func refreshPanelItems(at level: Int) {
+        guard let panel = panelStack.first(where: { $0.level == level }) else {
+            print("[ListPanelManager] refreshPanelItems: no panel at level \(level)")
+            return
+        }
+        guard let providerId = panel.providerId else {
+            print("[ListPanelManager] refreshPanelItems: panel has no providerId")
+            return
+        }
+        guard let provider = findProvider?(providerId) else {
+            print("[ListPanelManager] refreshPanelItems: provider '\(providerId)' not found")
+            return
+        }
+        
+        let freshItems = provider.provideFunctions()
+        
+        // Unwrap category wrapper if provider returns a single category with children
+        let items: [FunctionNode]
+        if freshItems.count == 1, freshItems[0].type == .category, let children = freshItems[0].children {
+            items = children
+        } else {
+            items = freshItems
+        }
+        
+        if let index = panelStack.firstIndex(where: { $0.level == level }) {
+            panelStack[index].items = items
         }
     }
     

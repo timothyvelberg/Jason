@@ -24,6 +24,11 @@ extension CircularUIManager {
         self.listPanelManager = ListPanelManager()
         print("   ListPanelManager initialized")
         
+        self.listPanelManager = ListPanelManager()
+        listPanelManager?.findProvider = { [weak self] providerId in
+            self?.functionManager?.providers.first { $0.providerId == providerId }
+        }
+        
         // Create InputCoordinator
         self.inputCoordinator = InputCoordinator()
         print("   InputCoordinator initialized")
@@ -374,23 +379,23 @@ extension CircularUIManager {
             return freshChildren
         }
         
-        // Wire add item callback (used by TodoListProvider and similar)
-        listPanelManager?.onAddItem = { [weak self, weak handler] text, modifiers in
+        // Wire add item callback
+        listPanelManager?.onAddItem = { [weak self] text, modifiers in
             guard let self = self,
                   let todoProvider = self.functionManager?.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider else { return }
             
             todoProvider.addTodo(title: text)
-            handler?.refreshPanelItems(at: 0)
+            self.listPanelManager?.refreshPanelItems(at: 0)
             
             if !modifiers.contains(.command) {
                 self.hide()
             }
         }
-        
+
         // Wire todo change notifications
         if let todoProvider = self.functionManager?.providers.first(where: { $0 is TodoListProvider }) as? TodoListProvider {
-            todoProvider.onTodoChanged = { [weak handler] in
-                handler?.refreshPanelItems(at: 0)
+            todoProvider.onTodoChanged = { [weak self] in
+                self?.listPanelManager?.refreshPanelItems(at: 0)
             }
         }
         
