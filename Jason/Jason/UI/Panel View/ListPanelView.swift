@@ -9,6 +9,16 @@
 import SwiftUI
 import AppKit
 
+// MARK: - Row Height Preference Key
+
+/// Collects measured row heights from child views
+struct RowHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: [Int: CGFloat] = [:]
+    static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
 // MARK: - List Panel View
 
 struct ListPanelView: View {
@@ -23,6 +33,7 @@ struct ListPanelView: View {
     var onHeaderHover: (() -> Void)?
     var onScrollOffsetChanged: ((CGFloat) -> Void)?
     var onScrollStateChanged: ((Bool) -> Void)?
+    var onRowHeightsMeasured: (([CGFloat]) -> Void)?
     var contextActions: [FunctionNode]?
     var typingMode: TypingMode = .typeAhead
 
@@ -44,18 +55,25 @@ struct ListPanelView: View {
     @State private var isScrolling: Bool = false
     @State private var lastScrollOffset: CGFloat = 0
     @State private var scrollDebounceTask: DispatchWorkItem? = nil
+    @State private var measuredRowHeights: [Int: CGFloat] = [:]
     
     // Computed from config
     private var panelWidth: CGFloat { config.panelWidth }
-    private var rowHeight: CGFloat { config.rowHeight }
     private var maxVisibleItems: Int { config.maxVisibleItems }
     private var titleHeight: CGFloat { PanelConfig.titleHeight }
     
+    /// Scroll area height based on measured row heights
+    private var scrollAreaHeight: CGFloat {
+        let visibleCount = min(items.count, maxVisibleItems)
+        var total: CGFloat = 0
+        for i in 0..<visibleCount {
+            total += measuredRowHeights[i] ?? config.baseRowHeight
+        }
+        return total
+    }
+    
     private var panelHeight: CGFloat {
-        let itemCount = min(items.count, maxVisibleItems)
-        let contentHeight = CGFloat(itemCount) * rowHeight
-        let padding: CGFloat = PanelConfig.padding
-        return titleHeight + contentHeight + padding
+        titleHeight + scrollAreaHeight + ((PanelConfig.padding * 2) + PanelConfig.padding / 2 )
     }
     
     private var needsScroll: Bool {
@@ -117,7 +135,7 @@ struct ListPanelView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .frame(height: titleHeight)
                 .overlay(alignment: .bottom) {
                     Rectangle()
@@ -132,7 +150,7 @@ struct ListPanelView: View {
                                 ListPanelRow(
                                     item: item,
                                     iconSize: iconSize,
-                                    rowHeight: rowHeight,
+                                    baseRowHeight: config.baseRowHeight,
                                     lineLimit: config.lineLimit,
                                     isHovered: !isScrolling && hoveredRowIndex == index,
                                     isExpanded: expandedItemId == item.id,
@@ -148,7 +166,27 @@ struct ListPanelView: View {
                                         onContextAction?(action, modifiers)
                                     }
                                 )
-                                .id(index)  // Add ID for ScrollViewReader
+                                .background(
+                                    GeometryReader { geo in
+                                        Color.clear.preference(
+                                            key: RowHeightPreferenceKey.self,
+                                            value: [index: geo.size.height]
+                                        )
+                                    }
+                                )
+                                .id(index)
+                            }
+                        }
+                        .onPreferenceChange(RowHeightPreferenceKey.self) { heights in
+                            var changed = false
+                            for (index, height) in heights {
+                                if measuredRowHeights[index] != height {
+                                    measuredRowHeights[index] = height
+                                    changed = true
+                                }
+                            }
+                            if changed {
+                                reportRowHeights()
                             }
                         }
                         .background(
@@ -161,26 +199,47 @@ struct ListPanelView: View {
                         )
                     }
                     .coordinateSpace(name: "panelScroll")
-                    .frame(maxHeight: CGFloat(maxVisibleItems) * rowHeight)
+                    .frame(maxHeight: scrollAreaHeight)
                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 2))
                     .padding(.horizontal, 4)
-                    .padding(.bottom, 4)
+                    .padding(.bottom,8)
+                    .padding(.top, 8)
                     .onChange(of: hoveredRowIndex) { oldIndex, newIndex in
                         // Auto-scroll only when KEYBOARD navigates outside visible area
                         guard isKeyboardDriven, let index = newIndex else { return }
                         
-                        // Calculate which rows are currently visible
-                        let firstVisibleRow = Int(lastScrollOffset / rowHeight)
-                        let lastVisibleRow = firstVisibleRow + maxVisibleItems - 1
+                        // Calculate visible range using accumulated heights
+                        let scrollOffset = lastScrollOffset
+                        var accumulated: CGFloat = 0
+                        var firstVisibleRow = 0
+                        for i in 0..<items.count {
+                            let rowH = measuredRowHeights[i] ?? config.baseRowHeight
+                            if accumulated + rowH > scrollOffset {
+                                firstVisibleRow = i
+                                break
+                            }
+                            accumulated += rowH
+                        }
+                        
+                        accumulated = 0
+                        var lastVisibleRow = items.count - 1
+                        var visibleHeight: CGFloat = 0
+                        for i in firstVisibleRow..<items.count {
+                            let rowH = measuredRowHeights[i] ?? config.baseRowHeight
+                            visibleHeight += rowH
+                            if visibleHeight > scrollAreaHeight {
+                                lastVisibleRow = i - 1
+                                break
+                            }
+                            lastVisibleRow = i
+                        }
                         
                         // Only scroll if selection is outside visible range
                         if index < firstVisibleRow {
-                            // Selection went above visible area - scroll up
                             withAnimation(.easeInOut(duration: 0.15)) {
                                 proxy.scrollTo(index, anchor: .top)
                             }
                         } else if index > lastVisibleRow {
-                            // Selection went below visible area - scroll down
                             withAnimation(.easeInOut(duration: 0.15)) {
                                 proxy.scrollTo(index, anchor: .bottom)
                             }
@@ -190,6 +249,15 @@ struct ListPanelView: View {
             }
         }
         .frame(width: panelWidth, height: panelHeight)
+    }
+    
+    /// Build ordered array from measured heights and report to manager
+    private func reportRowHeights() {
+        var ordered: [CGFloat] = []
+        for i in 0..<items.count {
+            ordered.append(measuredRowHeights[i] ?? config.baseRowHeight)
+        }
+        onRowHeightsMeasured?(ordered)
     }
     
     private func handleScrollChange(_ newOffset: CGFloat) {
@@ -206,7 +274,7 @@ struct ListPanelView: View {
         if !isScrolling {
             isScrolling = true
             onScrollStateChanged?(true)
-            print("📜 [View] '\(title)' scroll STARTED")
+            print("[View] '\(title)' scroll STARTED")
         }
         
         // Cancel existing debounce
@@ -216,7 +284,7 @@ struct ListPanelView: View {
         let task = DispatchWorkItem { [self] in
             isScrolling = false
             onScrollStateChanged?(false)
-            print("📜 [View] '\(title)' scroll STOPPED")
+            print("[View] '\(title)' scroll STOPPED")
         }
         scrollDebounceTask = task
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: task)
@@ -228,7 +296,7 @@ struct ListPanelView: View {
 struct ListPanelRow: View {
     let item: FunctionNode
     let iconSize: CGFloat
-    let rowHeight: CGFloat
+    let baseRowHeight: CGFloat
     let lineLimit: Int
     let isHovered: Bool
     let isExpanded: Bool
@@ -250,7 +318,7 @@ struct ListPanelRow: View {
     private var contextActionIconSize: CGFloat { 16 }
     
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             // Icon
             Image(nsImage: item.icon)
                 .resizable()
@@ -279,8 +347,9 @@ struct ListPanelRow: View {
                     .foregroundColor(.white.opacity(0.5))
             }
         }
-        .padding(.horizontal, 10)
-        .frame(height: rowHeight)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .frame(minHeight: baseRowHeight)
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 6)

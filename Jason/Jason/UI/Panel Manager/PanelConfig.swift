@@ -2,7 +2,6 @@
 //  PanelConfig.swift
 //  Jason
 //
-//  Created by Timothy Velberg on 06/02/2026.
 //  Centralized configuration for panel appearance and layout.
 //  Providers can supply custom configs to control panel dimensions.
 //
@@ -13,7 +12,7 @@ struct PanelConfig {
     
     // MARK: - Configurable Properties
     
-    /// Maximum lines of text per row (drives row height)
+    /// Maximum lines of text per row (caps how tall a row can grow)
     var lineLimit: Int = 1
     
     /// Panel width in points
@@ -21,6 +20,24 @@ struct PanelConfig {
     
     /// Maximum number of visible rows before scrolling
     var maxVisibleItems: Int = 10
+    
+    /// Padding above the scroll content (between title bar and first row)
+    static let scrollTopPadding: CGFloat = 8
+    
+    /// Estimated rendered row height including view padding.
+    /// Used as fallback when measured heights aren't available yet.
+    var estimatedRowHeight: CGFloat { baseRowHeight + 16 }
+    
+    /// Padding below the scroll content
+    static let scrollBottomPadding: CGFloat = 8
+
+    /// Total distance from panel's bottom edge to where scroll content ends
+    static var contentBottomInset: CGFloat { (padding / 2) + scrollBottomPadding }
+
+    /// Total distance from panel's top edge to where scroll content begins
+    static var contentTopInset: CGFloat { (padding / 2) + titleHeight + scrollTopPadding }
+    
+    
     
     // MARK: - Constants (not configurable per-provider)
     
@@ -30,11 +47,13 @@ struct PanelConfig {
     
     // MARK: - Derived Properties
     
-    /// Row height derived from line limit
-    var rowHeight: CGFloat {
-        let baseHeight: CGFloat = 32
+    /// Minimum row height (single line). Rows grow from this when text wraps.
+    var baseRowHeight: CGFloat { 32 }
+    
+    /// Maximum row height based on line limit
+    var maxRowHeight: CGFloat {
         let extraPerLine: CGFloat = 16
-        return baseHeight + CGFloat(max(0, lineLimit - 1)) * extraPerLine
+        return baseRowHeight + CGFloat(max(0, lineLimit - 1)) * extraPerLine
     }
     
     // MARK: - Default

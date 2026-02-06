@@ -7,7 +7,7 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     var providerName: String { "Todo List" }
     var providerIcon: NSImage { NSImage(systemSymbolName: "checklist", accessibilityDescription: "Todo List") ?? NSImage() }
     var defaultTypingMode: TypingMode { .input }
-    var panelConfig: PanelConfig { PanelConfig(lineLimit: 2, panelWidth:400) }
+    var panelConfig: PanelConfig { PanelConfig(lineLimit: 3, panelWidth:320) }
     var onItemsChanged: (() -> Void)?
     
     // In-memory storage for now

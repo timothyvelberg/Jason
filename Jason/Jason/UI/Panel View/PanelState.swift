@@ -39,6 +39,10 @@ struct PanelState: Identifiable {
     /// Panel layout configuration (dimensions, line limit, etc.)
     let config: PanelConfig
     
+    /// Measured row heights from SwiftUI (indexed by item position)
+    /// Falls back to config.baseRowHeight for unmeasured rows
+    var rowHeights: [CGFloat] = []
+    
     /// Original items before search filtering (nil when not searching)
     var unfilteredItems: [FunctionNode]?
     
@@ -60,12 +64,69 @@ struct PanelState: Identifiable {
     /// Original panel height before search filtering (for top-anchored resizing)
     var searchAnchorHeight: CGFloat?
     
+    // MARK: - Row Height Helpers
+    
+    /// Get the height for a specific row (measured or fallback to base)
+    func heightForRow(_ index: Int) -> CGFloat {
+        if index < rowHeights.count {
+            return rowHeights[index]
+        }
+        return config.baseRowHeight
+    }
+    
+    /// Total content height for all items
+    var totalContentHeight: CGFloat {
+        if rowHeights.count == items.count {
+            return rowHeights.reduce(0, +)
+        }
+        // Mixed: sum measured + estimate unmeasured
+        var total: CGFloat = 0
+        for i in 0..<items.count {
+            total += heightForRow(i)
+        }
+        return total
+    }
+    
+    /// Content height for visible items (up to maxVisibleItems)
+    var visibleContentHeight: CGFloat {
+        let visibleCount = min(items.count, config.maxVisibleItems)
+        var total: CGFloat = 0
+        for i in 0..<visibleCount {
+            total += heightForRow(i)
+        }
+        return total
+    }
+    
+    /// Y offset from the top of the content area to the top of a given row
+    /// (sum of heights of all rows above it)
+    func yOffsetForRow(_ index: Int) -> CGFloat {
+        var offset: CGFloat = 0
+        for i in 0..<min(index, items.count) {
+            offset += heightForRow(i)
+        }
+        return offset
+    }
+    
+    /// Find which row index a given Y offset (from top of content) falls into
+    /// Returns nil if offset is outside all rows
+    func rowIndex(atContentOffset offset: CGFloat) -> Int? {
+        guard offset >= 0 else { return nil }
+        var accumulated: CGFloat = 0
+        for i in 0..<items.count {
+            let rowH = heightForRow(i)
+            if offset < accumulated + rowH {
+                return i
+            }
+            accumulated += rowH
+        }
+        return nil
+    }
+    
     // MARK: - Computed Properties
     
-    /// Calculate panel height based on item count and config
+    /// Calculate panel height based on visible content height
     var panelHeight: CGFloat {
-        let itemCount = min(items.count, config.maxVisibleItems)
-        return PanelConfig.titleHeight + CGFloat(itemCount) * config.rowHeight + PanelConfig.padding
+        return PanelConfig.titleHeight + visibleContentHeight + ((PanelConfig.padding * 2) + PanelConfig.padding / 2)
     }
     
     /// Panel bounds in screen coordinates (at original position, not accounting for overlap)

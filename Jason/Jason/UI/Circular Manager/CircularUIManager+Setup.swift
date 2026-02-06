@@ -159,11 +159,25 @@ extension CircularUIManager {
             
             print("[ExpandToPanel] node: '\(node.name)', providerId: \(providerId ?? "nil"), typingMode: \(typingMode)")
 
-            // Check if children already loaded
-            if let children = node.children, !children.isEmpty {
+            // Resolve panel items: prefer fresh data from provider, fall back to cached children
+            let panelItems: [FunctionNode]
+            if let providerId = providerId, let provider = provider {
+                let fresh = provider.provideFunctions()
+                if fresh.count == 1, fresh[0].type == .category, let c = fresh[0].children {
+                    panelItems = c
+                } else {
+                    panelItems = fresh
+                }
+            } else if let children = node.children, !children.isEmpty {
+                panelItems = children
+            } else {
+                panelItems = []
+            }
+
+            if !panelItems.isEmpty {
                 self.listPanelManager?.show(
                     title: node.name,
-                    items: children,
+                    items: panelItems,
                     ringCenter: ringCenter,
                     ringOuterRadius: ringOuterRadius,
                     angle: angle,
@@ -179,7 +193,7 @@ extension CircularUIManager {
                 return
             }
             
-            // Children not loaded - check if we can load dynamically
+            // No items resolved - check if we can load dynamically
             guard node.needsDynamicLoading,
                   let providerId = node.providerId,
                   let provider = self.functionManager?.providers.first(where: { $0.providerId == providerId }) else {

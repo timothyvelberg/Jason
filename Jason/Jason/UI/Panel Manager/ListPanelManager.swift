@@ -152,6 +152,14 @@ class ListPanelManager: ObservableObject {
         print("[ListPanelManager] Deallocated - removed observers")
     }
     
+    // MARK: - Row Height Updates
+    
+    /// Update measured row heights for a panel (called from SwiftUI view)
+    func updateRowHeights(_ heights: [CGFloat], forLevel level: Int) {
+        guard let index = panelStack.firstIndex(where: { $0.level == level }) else { return }
+        panelStack[index].rowHeights = heights
+    }
+    
     // MARK: - Provider Update Handler
 
     @objc private func handleProviderUpdate(_ notification: Notification) {
@@ -208,6 +216,9 @@ class ListPanelManager: ObservableObject {
                 }
                 
                 print("   Updating panel with \(freshItems.count) items (was \(self.panelStack[currentIndex].items.count))")
+                if freshItems.count != self.panelStack[currentIndex].items.count {
+                    self.panelStack[currentIndex].rowHeights = []
+                }
                 self.panelStack[currentIndex].items = freshItems
             }
         }
@@ -390,8 +401,19 @@ class ListPanelManager: ObservableObject {
         }
         
         if let index = panelStack.firstIndex(where: { $0.level == level }) {
+            if items.count != panelStack[index].items.count {
+                panelStack[index].rowHeights = []
+            }
             panelStack[index].items = items
         }
+    }
+    
+    // MARK: - Estimated Panel Height (before measurement)
+    
+    /// Estimate panel height using baseRowHeight (for initial positioning before SwiftUI measures)
+    private func estimatedPanelHeight(itemCount: Int, config: PanelConfig) -> CGFloat {
+        let visibleCount = min(itemCount, config.maxVisibleItems)
+        return PanelConfig.titleHeight + CGFloat(visibleCount) * config.baseRowHeight + ((PanelConfig.padding * 2) + PanelConfig.padding / 2)
     }
     
     // MARK: - Show Panel (from Ring)
@@ -422,9 +444,8 @@ class ListPanelManager: ObservableObject {
             itemCount: items.count
         )
         
-        // Calculate panel height for boundary check
-        let itemCountClamped = min(items.count, config.maxVisibleItems)
-        let panelHeight = PanelConfig.titleHeight + CGFloat(itemCountClamped) * config.rowHeight + PanelConfig.padding
+        // Use estimated height for boundary check (measurements come later)
+        let panelHeight = estimatedPanelHeight(itemCount: items.count, config: config)
 
         // Constrain to screen boundaries (left, top, bottom only)
         let constrainedPosition = constrainToScreenBounds(position: position, panelWidth: config.panelWidth, panelHeight: panelHeight)
@@ -473,9 +494,8 @@ class ListPanelManager: ObservableObject {
         // Store screen reference
         self.currentScreen = screen ?? NSScreen.main
         
-        // Calculate panel dimensions for constraint checking
-        let itemCountClamped = min(items.count, config.maxVisibleItems)
-        let panelHeight = PanelConfig.titleHeight + CGFloat(itemCountClamped) * config.rowHeight + PanelConfig.padding
+        // Use estimated height for constraint checking
+        let panelHeight = estimatedPanelHeight(itemCount: items.count, config: config)
         
         // Constrain position to screen bounds
         let constrainedPosition = constrainToScreenBounds(
@@ -539,7 +559,7 @@ class ListPanelManager: ObservableObject {
                 
                 // Check if in header area
                 let distanceFromTop = panelBounds.maxY - point.y
-                if distanceFromTop < PanelConfig.titleHeight + (PanelConfig.padding / 2) {
+                if distanceFromTop < PanelConfig.contentTopInset {
                     // In header - clear hover for this level
                     if hoveredRow[level] != nil {
                         hoveredRow[level] = nil
@@ -547,12 +567,12 @@ class ListPanelManager: ObservableObject {
                     continue
                 }
                 
-                // Calculate which row (if any) - use panel's config for row height
-                let relativeY = panelBounds.maxY - point.y - (PanelConfig.padding / 2) - PanelConfig.titleHeight
+                // Calculate which row using variable heights
+                let relativeY = panelBounds.maxY - point.y - PanelConfig.contentTopInset
                 let scrollAdjustedY = relativeY + panel.scrollOffset
-                let rowIndex = Int(scrollAdjustedY / panel.config.rowHeight)
+                let rowIndex = panel.rowIndex(atContentOffset: scrollAdjustedY)
                 
-                if rowIndex >= 0 && rowIndex < panel.items.count {
+                if let rowIndex = rowIndex, rowIndex >= 0 && rowIndex < panel.items.count {
                     // Valid row - update hover if changed
                     if hoveredRow[level] != rowIndex {
                         hoveredRow[level] = rowIndex
@@ -728,34 +748,36 @@ class ListPanelManager: ObservableObject {
         let gap: CGFloat = 8
         
         let newPanelWidth = config.panelWidth
-        let itemCount = min(items.count, config.maxVisibleItems)
-        let newPanelHeight = CGFloat(itemCount) * config.rowHeight + PanelConfig.padding + PanelConfig.titleHeight
+        let newPanelHeight = estimatedPanelHeight(itemCount: items.count, config: config)
         
         // New panel's left edge aligns with source panel's right edge + gap
         let newX = sourceBounds.maxX + gap + (newPanelWidth / 2)
         
         // Calculate Y position based on source row's VISUAL position
-        // Use scroll offset to determine where the row actually appears on screen
         let newY: CGFloat
         if let rowIndex = sourceRowIndex {
-            // Calculate visual row index from scroll offset
-            let scrolledRows = Int(sourcePanel.scrollOffset / config.rowHeight)
-            let visualRowIndex = rowIndex - scrolledRows
+            // Calculate the visual Y of the source row using accumulated heights
+            let rowTopOffset = sourcePanel.yOffsetForRow(rowIndex)
+            let rowHeight = sourcePanel.heightForRow(rowIndex)
             
-            if visualRowIndex >= 0 && visualRowIndex < config.maxVisibleItems {
-                print("[Push] Row \(rowIndex) → visual row \(visualRowIndex) (scrolled \(scrolledRows))")
+            // How far this row is scrolled: its logical top minus scroll offset
+            let visualOffset = rowTopOffset - sourcePanel.scrollOffset
+            let visibleContentHeight = sourcePanel.visibleContentHeight
+            
+            if visualOffset >= 0 && visualOffset < visibleContentHeight {
+                print("[Push] Row \(rowIndex) visible at offset \(visualOffset)")
             } else {
-                print("[Push] Row \(rowIndex) out of visible range (scrolled \(scrolledRows))")
+                print("[Push] Row \(rowIndex) out of visible range")
             }
             
-            // Clamp visual row to visible range
-            let clampedVisualRow = max(0, min(visualRowIndex, config.maxVisibleItems - 1))
+            // Clamp to visible area
+            let clampedOffset = max(0, min(visualOffset, visibleContentHeight - rowHeight))
             
-            // Calculate Y using visual row index
-            let rowCenterY = sourceBounds.maxY - (PanelConfig.padding / 2) - PanelConfig.titleHeight - (CGFloat(clampedVisualRow) * config.rowHeight) - (config.rowHeight / 2)
+            // Calculate Y: row center in screen coordinates
+            let rowCenterY = sourceBounds.maxY - PanelConfig.contentTopInset - clampedOffset - (rowHeight / 2)
             
-            // Align new panel so its first row aligns with the source row
-            newY = rowCenterY - (newPanelHeight / 2) + (config.rowHeight / 2) + (PanelConfig.padding / 2) + PanelConfig.titleHeight - config.rowHeight
+            // Align new panel top with source row
+            newY = rowCenterY - (newPanelHeight / 2) + (rowHeight / 2) + PanelConfig.contentTopInset - config.estimatedRowHeight
         } else {
             newY = sourceBounds.midY
         }
@@ -914,24 +936,24 @@ class ListPanelManager: ObservableObject {
     }
 
     /// Calculate the screen bounds of a specific row in a panel
-    /// Accounts for scroll offset to return the VISIBLE position of the row
+    /// Uses accumulated row heights for accurate variable-height positioning
     func rowBounds(forPanel panel: PanelState, rowIndex: Int) -> NSRect? {
         guard rowIndex >= 0 && rowIndex < panel.items.count else { return nil }
         
         let panelBounds = currentBounds(for: panel)
-        let rowHeight = panel.config.rowHeight
+        let rowHeight = panel.heightForRow(rowIndex)
+        let rowTopOffset = panel.yOffsetForRow(rowIndex)
         
-        // Calculate the logical position of this row (as if not scrolled)
-        // Then adjust for scroll offset
-        let logicalRowTop = panelBounds.maxY - (PanelConfig.padding / 2) - PanelConfig.titleHeight - (CGFloat(rowIndex) * rowHeight)
+        // Calculate the logical position of this row, then adjust for scroll
+        let logicalRowTop = panelBounds.maxY - PanelConfig.contentTopInset - rowTopOffset
         
-        // Scroll offset is positive when scrolled down (content moved up)
+        // Scroll offset: positive when scrolled down (content moved up)
         let visibleRowTop = logicalRowTop + panel.scrollOffset
         let visibleRowBottom = visibleRowTop - rowHeight
         
         // Check if row is actually visible in the panel's scroll area
-        let scrollAreaTop = panelBounds.maxY - (PanelConfig.padding / 2) - PanelConfig.titleHeight
-        let scrollAreaBottom = panelBounds.minY + (PanelConfig.padding / 2)
+        let scrollAreaTop = panelBounds.maxY - PanelConfig.contentTopInset
+        let scrollAreaBottom = panelBounds.minY + PanelConfig.contentBottomInset
         
         // Row must be at least partially visible
         if visibleRowTop < scrollAreaBottom || visibleRowBottom > scrollAreaTop {
@@ -970,9 +992,9 @@ class ListPanelManager: ObservableObject {
         let anchorX = ring.center.x + anchorRadius * cos(angleInRadians)
         let anchorY = ring.center.y - anchorRadius * sin(angleInRadians)
         
-        // Calculate panel height using config
+        // Estimate panel height using base row height (before measurement)
         let itemCountClamped = min(itemCount, config.maxVisibleItems)
-        let panelHeight = CGFloat(itemCountClamped) * config.rowHeight + PanelConfig.padding
+        let panelHeight = CGFloat(itemCountClamped) * config.baseRowHeight + ((PanelConfig.padding * 2) + PanelConfig.padding / 2)
         let panelWidth = config.panelWidth
         
         // Base offset: half-dimensions in angle direction

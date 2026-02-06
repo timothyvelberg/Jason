@@ -76,6 +76,9 @@ struct PanelOnlyView: View {
             onScrollStateChanged: { isScrolling in
                 listPanelManager.handleScrollStateChanged(isScrolling: isScrolling, forLevel: panel.level)
             },
+            onRowHeightsMeasured: { heights in
+                listPanelManager.updateRowHeights(heights, forLevel: panel.level)
+            },
             contextActions: panel.contextActions,
             typingMode: panel.activeTypingMode,
             expandedItemId: Binding(

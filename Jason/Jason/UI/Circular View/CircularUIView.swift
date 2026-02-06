@@ -120,6 +120,9 @@ struct CircularUIView: View {
                         onScrollStateChanged: { isScrolling in
                             listPanelManager.handleScrollStateChanged(isScrolling: isScrolling, forLevel: panelLevel)
                         },
+                        onRowHeightsMeasured: { heights in
+                            listPanelManager.updateRowHeights(heights, forLevel: panelLevel)
+                        },
                         contextActions: panel.contextActions,
                         typingMode: panel.activeTypingMode,
                         expandedItemId: expandedItemIdBinding(for: panel.level),
