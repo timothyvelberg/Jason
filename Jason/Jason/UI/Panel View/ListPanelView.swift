@@ -21,8 +21,8 @@ struct ListPanelView: View {
     var onContextAction: ((FunctionNode, NSEvent.ModifierFlags) -> Void)?
     var onItemHover: ((FunctionNode?, Int?) -> Void)?
     var onHeaderHover: (() -> Void)?
-    var onScrollOffsetChanged: ((CGFloat) -> Void)?  // Current scroll offset
-    var onScrollStateChanged: ((Bool) -> Void)?  // true = scrolling started, false = stopped
+    var onScrollOffsetChanged: ((CGFloat) -> Void)?
+    var onScrollStateChanged: ((Bool) -> Void)?
     var contextActions: [FunctionNode]?
     var typingMode: TypingMode = .typeAhead
 
@@ -60,9 +60,6 @@ struct ListPanelView: View {
     private var needsScroll: Bool {
         items.count > maxVisibleItems
     }
-    
-    
-    
     
     var body: some View {
         ZStack {
