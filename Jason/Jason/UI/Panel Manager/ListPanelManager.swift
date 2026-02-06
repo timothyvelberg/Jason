@@ -403,11 +403,11 @@ class ListPanelManager: ObservableObject {
         ringCenter: CGPoint,
         ringOuterRadius: CGFloat,
         angle: Double,
-        panelWidth: CGFloat = PanelState.panelWidth,
         providerId: String? = nil,
         contentIdentifier: String? = nil,
         screen: NSScreen? = nil,
-        typingMode: TypingMode = .typeAhead
+        typingMode: TypingMode = .typeAhead,
+        config: PanelConfig = .default
     ) {
         // Store ring context for cascading
         self.currentAngle = angle
@@ -415,23 +415,24 @@ class ListPanelManager: ObservableObject {
         self.currentRingOuterRadius = ringOuterRadius
         self.currentScreen = screen ?? NSScreen.main
         
-        // Calculate position
+        // Calculate position using config dimensions
         let position = calculatePanelPosition(
             fromRing: (center: ringCenter, outerRadius: ringOuterRadius, angle: angle),
-            panelWidth: panelWidth,
+            config: config,
             itemCount: items.count
         )
         
         // Calculate panel height for boundary check
-        let itemCountClamped = min(items.count, PanelState.maxVisibleItems)
-        let panelHeight = PanelState.titleHeight + CGFloat(itemCountClamped) * PanelState.rowHeight + PanelState.padding
+        let itemCountClamped = min(items.count, config.maxVisibleItems)
+        let panelHeight = PanelConfig.titleHeight + CGFloat(itemCountClamped) * config.rowHeight + PanelConfig.padding
 
         // Constrain to screen boundaries (left, top, bottom only)
-        let constrainedPosition = constrainToScreenBounds(position: position, panelWidth: panelWidth, panelHeight: panelHeight)
+        let constrainedPosition = constrainToScreenBounds(position: position, panelWidth: config.panelWidth, panelHeight: panelHeight)
         
         print("[ListPanelManager] Showing panel at angle \(angle)°")
         print("   Items: \(items.count)")
         print("   Panel center: \(position)")
+        print("   Config: width=\(config.panelWidth), maxVisible=\(config.maxVisibleItems), lineLimit=\(config.lineLimit)")
         
         // Clear any existing panels and push new one
         panelStack = [
@@ -444,6 +445,7 @@ class ListPanelManager: ObservableObject {
                 sourceRowIndex: nil,
                 spawnAngle: angle,
                 contextActions: nil,
+                config: config,
                 providerId: providerId,
                 contentIdentifier: contentIdentifier,
                 expandedItemId: nil,
@@ -456,20 +458,29 @@ class ListPanelManager: ObservableObject {
     }
     
     /// Show panel at a specific position (for standalone panels)
-    func show(title: String, items: [FunctionNode], at position: CGPoint, screen: NSScreen? = nil, providerId: String? = nil, typingMode: TypingMode = .typeAhead) {
+    func show(
+        title: String,
+        items: [FunctionNode],
+        at position: CGPoint,
+        screen: NSScreen? = nil,
+        providerId: String? = nil,
+        typingMode: TypingMode = .typeAhead,
+        config: PanelConfig = .default
+    ) {
         print("[ListPanelManager] Showing panel with \(items.count) items at \(position)")
+        print("   Config: width=\(config.panelWidth), maxVisible=\(config.maxVisibleItems), lineLimit=\(config.lineLimit)")
         
         // Store screen reference
         self.currentScreen = screen ?? NSScreen.main
         
         // Calculate panel dimensions for constraint checking
-        let itemCountClamped = min(items.count, PanelState.maxVisibleItems)
-        let panelHeight = PanelState.titleHeight + CGFloat(itemCountClamped) * PanelState.rowHeight + PanelState.padding
+        let itemCountClamped = min(items.count, config.maxVisibleItems)
+        let panelHeight = PanelConfig.titleHeight + CGFloat(itemCountClamped) * config.rowHeight + PanelConfig.padding
         
         // Constrain position to screen bounds
         let constrainedPosition = constrainToScreenBounds(
             position: position,
-            panelWidth: PanelState.panelWidth,
+            panelWidth: config.panelWidth,
             panelHeight: panelHeight
         )
         
@@ -483,6 +494,7 @@ class ListPanelManager: ObservableObject {
                 sourceRowIndex: nil,
                 spawnAngle: nil,
                 contextActions: nil,
+                config: config,
                 providerId: providerId,
                 contentIdentifier: nil,
                 expandedItemId: nil,
@@ -527,7 +539,7 @@ class ListPanelManager: ObservableObject {
                 
                 // Check if in header area
                 let distanceFromTop = panelBounds.maxY - point.y
-                if distanceFromTop < PanelState.titleHeight + (PanelState.padding / 2) {
+                if distanceFromTop < PanelConfig.titleHeight + (PanelConfig.padding / 2) {
                     // In header - clear hover for this level
                     if hoveredRow[level] != nil {
                         hoveredRow[level] = nil
@@ -535,10 +547,10 @@ class ListPanelManager: ObservableObject {
                     continue
                 }
                 
-                // Calculate which row (if any)
-                let relativeY = panelBounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
+                // Calculate which row (if any) - use panel's config for row height
+                let relativeY = panelBounds.maxY - point.y - (PanelConfig.padding / 2) - PanelConfig.titleHeight
                 let scrollAdjustedY = relativeY + panel.scrollOffset
-                let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
+                let rowIndex = Int(scrollAdjustedY / panel.config.rowHeight)
                 
                 if rowIndex >= 0 && rowIndex < panel.items.count {
                     // Valid row - update hover if changed
@@ -708,13 +720,16 @@ class ListPanelManager: ObservableObject {
         // Pop any panels above this level first
         popToLevel(level)
         
+        // Child panels inherit the source panel's config
+        let config = sourcePanel.config
+        
         // Calculate position: to the right of source panel
         let sourceBounds = sourcePanel.bounds
         let gap: CGFloat = 8
         
-        let newPanelWidth = PanelState.panelWidth
-        let itemCount = min(items.count, PanelState.maxVisibleItems)
-        let newPanelHeight = CGFloat(itemCount) * PanelState.rowHeight + PanelState.padding + PanelState.titleHeight
+        let newPanelWidth = config.panelWidth
+        let itemCount = min(items.count, config.maxVisibleItems)
+        let newPanelHeight = CGFloat(itemCount) * config.rowHeight + PanelConfig.padding + PanelConfig.titleHeight
         
         // New panel's left edge aligns with source panel's right edge + gap
         let newX = sourceBounds.maxX + gap + (newPanelWidth / 2)
@@ -724,23 +739,23 @@ class ListPanelManager: ObservableObject {
         let newY: CGFloat
         if let rowIndex = sourceRowIndex {
             // Calculate visual row index from scroll offset
-            let scrolledRows = Int(sourcePanel.scrollOffset / PanelState.rowHeight)
+            let scrolledRows = Int(sourcePanel.scrollOffset / config.rowHeight)
             let visualRowIndex = rowIndex - scrolledRows
             
-            if visualRowIndex >= 0 && visualRowIndex < PanelState.maxVisibleItems {
+            if visualRowIndex >= 0 && visualRowIndex < config.maxVisibleItems {
                 print("[Push] Row \(rowIndex) → visual row \(visualRowIndex) (scrolled \(scrolledRows))")
             } else {
                 print("[Push] Row \(rowIndex) out of visible range (scrolled \(scrolledRows))")
             }
             
             // Clamp visual row to visible range
-            let clampedVisualRow = max(0, min(visualRowIndex, PanelState.maxVisibleItems - 1))
+            let clampedVisualRow = max(0, min(visualRowIndex, config.maxVisibleItems - 1))
             
             // Calculate Y using visual row index
-            let rowCenterY = sourceBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight - (CGFloat(clampedVisualRow) * PanelState.rowHeight) - (PanelState.rowHeight / 2)
+            let rowCenterY = sourceBounds.maxY - (PanelConfig.padding / 2) - PanelConfig.titleHeight - (CGFloat(clampedVisualRow) * config.rowHeight) - (config.rowHeight / 2)
             
             // Align new panel so its first row aligns with the source row
-            newY = rowCenterY - (newPanelHeight / 2) + (PanelState.rowHeight / 2) + (PanelState.padding / 2) + PanelState.titleHeight - PanelState.rowHeight
+            newY = rowCenterY - (newPanelHeight / 2) + (config.rowHeight / 2) + (PanelConfig.padding / 2) + PanelConfig.titleHeight - config.rowHeight
         } else {
             newY = sourceBounds.midY
         }
@@ -759,6 +774,7 @@ class ListPanelManager: ObservableObject {
             sourceRowIndex: sourceRowIndex,
             spawnAngle: nil,
             contextActions: contextActions,
+            config: config,
             providerId: providerId,
             contentIdentifier: contentIdentifier,
             expandedItemId: nil,
@@ -869,11 +885,11 @@ class ListPanelManager: ObservableObject {
         // Get parent's current position (recursive - handles chain of overlaps)
         let parentCurrentPos = currentPosition(for: parentPanel)
         
-        // Calculate parent's current left edge
-        let parentCurrentLeftEdge = parentCurrentPos.x - (PanelState.panelWidth / 2)
+        // Calculate parent's current left edge using parent's config width
+        let parentCurrentLeftEdge = parentCurrentPos.x - (parentPanel.config.panelWidth / 2)
         
-        // Overlapping X: parent's current left edge + peekWidth + half panel width
-        let overlappingX = parentCurrentLeftEdge + peekWidth + (PanelState.panelWidth / 2)
+        // Overlapping X: parent's current left edge + peekWidth + half of THIS panel's width
+        let overlappingX = parentCurrentLeftEdge + peekWidth + (panel.config.panelWidth / 2)
         
         return CGPoint(x: overlappingX, y: panel.position.y)
     }
@@ -885,16 +901,14 @@ class ListPanelManager: ObservableObject {
         var centerY = currentPos.y
         
         // Adjust for top-anchored search resizing
-        // The view keeps the top edge fixed while shrinking from bottom
-        // We need to match that here for accurate hit testing
         if panel.isSearchActive, let anchorHeight = panel.searchAnchorHeight {
             centerY = currentPos.y + ((anchorHeight - panel.panelHeight) / 2)
         }
         
         return NSRect(
-            x: currentPos.x - PanelState.panelWidth / 2,
+            x: currentPos.x - panel.config.panelWidth / 2,
             y: centerY - panel.panelHeight / 2,
-            width: PanelState.panelWidth,
+            width: panel.config.panelWidth,
             height: panel.panelHeight
         )
     }
@@ -905,19 +919,19 @@ class ListPanelManager: ObservableObject {
         guard rowIndex >= 0 && rowIndex < panel.items.count else { return nil }
         
         let panelBounds = currentBounds(for: panel)
+        let rowHeight = panel.config.rowHeight
         
         // Calculate the logical position of this row (as if not scrolled)
         // Then adjust for scroll offset
-        let logicalRowTop = panelBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight - (CGFloat(rowIndex) * PanelState.rowHeight)
+        let logicalRowTop = panelBounds.maxY - (PanelConfig.padding / 2) - PanelConfig.titleHeight - (CGFloat(rowIndex) * rowHeight)
         
         // Scroll offset is positive when scrolled down (content moved up)
-        // So visible row position = logical position + scrollOffset
         let visibleRowTop = logicalRowTop + panel.scrollOffset
-        let visibleRowBottom = visibleRowTop - PanelState.rowHeight
+        let visibleRowBottom = visibleRowTop - rowHeight
         
         // Check if row is actually visible in the panel's scroll area
-        let scrollAreaTop = panelBounds.maxY - (PanelState.padding / 2) - PanelState.titleHeight
-        let scrollAreaBottom = panelBounds.minY + (PanelState.padding / 2)
+        let scrollAreaTop = panelBounds.maxY - (PanelConfig.padding / 2) - PanelConfig.titleHeight
+        let scrollAreaBottom = panelBounds.minY + (PanelConfig.padding / 2)
         
         // Row must be at least partially visible
         if visibleRowTop < scrollAreaBottom || visibleRowBottom > scrollAreaTop {
@@ -933,7 +947,7 @@ class ListPanelManager: ObservableObject {
             x: rowLeft,
             y: visibleRowBottom,
             width: rowRight - rowLeft,
-            height: PanelState.rowHeight
+            height: rowHeight
         )
     }
     
@@ -942,7 +956,7 @@ class ListPanelManager: ObservableObject {
     /// Calculate panel position when spawning from a ring node
     func calculatePanelPosition(
         fromRing ring: (center: CGPoint, outerRadius: CGFloat, angle: Double),
-        panelWidth: CGFloat,
+        config: PanelConfig,
         itemCount: Int
     ) -> CGPoint {
         let angle = ring.angle
@@ -956,9 +970,10 @@ class ListPanelManager: ObservableObject {
         let anchorX = ring.center.x + anchorRadius * cos(angleInRadians)
         let anchorY = ring.center.y - anchorRadius * sin(angleInRadians)
         
-        // Calculate panel height
-        let itemCountClamped = min(itemCount, PanelState.maxVisibleItems)
-        let panelHeight = CGFloat(itemCountClamped) * PanelState.rowHeight + PanelState.padding
+        // Calculate panel height using config
+        let itemCountClamped = min(itemCount, config.maxVisibleItems)
+        let panelHeight = CGFloat(itemCountClamped) * config.rowHeight + PanelConfig.padding
+        let panelWidth = config.panelWidth
         
         // Base offset: half-dimensions in angle direction
         let offsetX = (panelWidth / 2) * cos(angleInRadians)
@@ -1014,7 +1029,6 @@ class ListPanelManager: ObservableObject {
         }
         
         // RIGHT boundary: intentionally NOT constrained
-        // Panels flow left-to-right; if they go off-screen, user should reposition ring
         
         return CGPoint(x: constrainedX, y: constrainedY)
     }
@@ -1037,7 +1051,6 @@ class ListPanelManager: ObservableObject {
     private func createTestFolderWithChildren(name: String, depth: Int = 0) -> FunctionNode {
         let icon = NSWorkspace.shared.icon(for: .folder)
         
-        // Create nested children (limit depth to prevent infinite recursion)
         let children: [FunctionNode]
         if depth < 3 {
             children = [
@@ -1047,7 +1060,6 @@ class ListPanelManager: ObservableObject {
                 createTestFileNode(name: "file2.pdf", utType: .pdf),
             ]
         } else {
-            // At max depth, only files
             children = [
                 createTestFileNode(name: "file1.txt", utType: .plainText),
                 createTestFileNode(name: "file2.pdf", utType: .pdf),

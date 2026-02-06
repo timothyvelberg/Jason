@@ -23,6 +23,9 @@ protocol FunctionProvider {
     /// The default typing mode for panels showing this provider's content
     var defaultTypingMode: TypingMode { get }
     
+    /// Panel layout configuration (dimensions, line limit, etc.)
+    var panelConfig: PanelConfig { get }
+    
     /// Generate the function tree for this provider
     /// Returns an array of root-level FunctionNodes
     func provideFunctions() -> [FunctionNode]
@@ -62,4 +65,7 @@ extension FunctionProvider {
     
     // Default to type-ahead - providers can override
     var defaultTypingMode: TypingMode { .typeAhead }
+    
+    // Default panel config - providers can override for custom dimensions
+    var panelConfig: PanelConfig { .default }
 }

@@ -36,6 +36,9 @@ struct PanelState: Identifiable {
     let spawnAngle: Double?
     let contextActions: [FunctionNode]?
     
+    /// Panel layout configuration (dimensions, line limit, etc.)
+    let config: PanelConfig
+    
     /// Original items before search filtering (nil when not searching)
     var unfilteredItems: [FunctionNode]?
     
@@ -57,31 +60,20 @@ struct PanelState: Identifiable {
     /// Original panel height before search filtering (for top-anchored resizing)
     var searchAnchorHeight: CGFloat?
     
-    
-    
-    // MARK: - Constants
-    
-    static let panelWidth: CGFloat = 260
-    static let rowHeight: CGFloat = 32
-    static let titleHeight: CGFloat = 40
-    static let maxVisibleItems: Int = 10
-    static let padding: CGFloat = 8
-    static let cascadeSlideDistance: CGFloat = 30
-    
     // MARK: - Computed Properties
     
-    /// Calculate panel height based on item count
+    /// Calculate panel height based on item count and config
     var panelHeight: CGFloat {
-        let itemCount = min(items.count, Self.maxVisibleItems)
-        return Self.titleHeight + CGFloat(itemCount) * Self.rowHeight + Self.padding
+        let itemCount = min(items.count, config.maxVisibleItems)
+        return PanelConfig.titleHeight + CGFloat(itemCount) * config.rowHeight + PanelConfig.padding
     }
     
     /// Panel bounds in screen coordinates (at original position, not accounting for overlap)
     var bounds: NSRect {
         NSRect(
-            x: position.x - Self.panelWidth / 2,
+            x: position.x - config.panelWidth / 2,
             y: position.y - panelHeight / 2,
-            width: Self.panelWidth,
+            width: config.panelWidth,
             height: panelHeight
         )
     }

@@ -103,7 +103,8 @@ struct PanelOnlyView: View {
                 }
             ),
             hoveredRowIndex: listPanelManager.effectiveSelectedRow(for: panel.level),
-            isKeyboardDriven: listPanelManager.isKeyboardDriven
+            isKeyboardDriven: listPanelManager.isKeyboardDriven,
+            config: panel.config
         )
         .position(x: localX, y: adjustedViewY)
     }

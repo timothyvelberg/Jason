@@ -140,13 +140,14 @@ struct CircularUIView: View {
                             }
                         ),
                         hoveredRowIndex: listPanelManager.effectiveSelectedRow(for: panelLevel),
-                        isKeyboardDriven: listPanelManager.isKeyboardDriven
+                        isKeyboardDriven: listPanelManager.isKeyboardDriven,
+                        config: panel.config
                     )
                     .position(x: panelLocalX, y: adjustedPanelY)
                         
                     .transition(panel.level == 0
-                                ? .slideFromAngle(angle: panel.spawnAngle ?? 0, distance: PanelState.cascadeSlideDistance)
-                                : .slideFromLeft(distance: PanelState.cascadeSlideDistance))
+                                ? .slideFromAngle(angle: panel.spawnAngle ?? 0, distance: PanelConfig.cascadeSlideDistance)
+                                : .slideFromLeft(distance: PanelConfig.cascadeSlideDistance))
                     .animation(.easeInOut(duration: 0.2), value: panel.isOverlapping)
                 }
             }

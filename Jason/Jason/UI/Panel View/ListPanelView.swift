@@ -36,24 +36,25 @@ struct ListPanelView: View {
 
     
     // Configuration
-    var panelWidth: CGFloat = 260
-    var rowHeight: CGFloat = 32
+    var config: PanelConfig = .default
     var iconSize: CGFloat = 20
     var cornerRadius: CGFloat = 12
-    var maxVisibleItems: Int = 10
     
     // State
     @State private var isScrolling: Bool = false
     @State private var lastScrollOffset: CGFloat = 0
     @State private var scrollDebounceTask: DispatchWorkItem? = nil
     
-    // Computed
-    private var titleHeight: CGFloat { 40 }
+    // Computed from config
+    private var panelWidth: CGFloat { config.panelWidth }
+    private var rowHeight: CGFloat { config.rowHeight }
+    private var maxVisibleItems: Int { config.maxVisibleItems }
+    private var titleHeight: CGFloat { PanelConfig.titleHeight }
     
     private var panelHeight: CGFloat {
         let itemCount = min(items.count, maxVisibleItems)
         let contentHeight = CGFloat(itemCount) * rowHeight
-        let padding: CGFloat = 8
+        let padding: CGFloat = PanelConfig.padding
         return titleHeight + contentHeight + padding
     }
     
@@ -132,6 +133,7 @@ struct ListPanelView: View {
                                     item: item,
                                     iconSize: iconSize,
                                     rowHeight: rowHeight,
+                                    lineLimit: config.lineLimit,
                                     isHovered: !isScrolling && hoveredRowIndex == index,
                                     isExpanded: expandedItemId == item.id,
                                     onLeftClick: { modifiers in
@@ -227,6 +229,7 @@ struct ListPanelRow: View {
     let item: FunctionNode
     let iconSize: CGFloat
     let rowHeight: CGFloat
+    let lineLimit: Int
     let isHovered: Bool
     let isExpanded: Bool
     
@@ -254,12 +257,13 @@ struct ListPanelRow: View {
                 .scaledToFit()
                 .frame(width: iconSize, height: iconSize)
             
-            // Name (always visible, truncates when expanded)
+            // Name
             Text(item.name)
                 .font(.system(size: 13))
                 .foregroundColor(.white)
-                .lineLimit(1)
+                .lineLimit(lineLimit)
                 .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
             
             Spacer()
             

@@ -67,11 +67,11 @@ extension ListPanelManager {
         let bounds = currentBounds(for: panel)
         
         // Calculate which row was clicked (accounting for title and scroll)
-        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
+        let relativeY = bounds.maxY - point.y - (PanelConfig.padding / 2) - PanelConfig.titleHeight
         
         // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
         let scrollAdjustedY = relativeY + panel.scrollOffset
-        let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
+        let rowIndex = Int(scrollAdjustedY / panel.config.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < panel.items.count else {
             print("[Panel] Right-click outside rows")
@@ -105,16 +105,16 @@ extension ListPanelManager {
         
         // Check if click is in title bar area
         let distanceFromTop = bounds.maxY - point.y
-        if distanceFromTop < PanelState.titleHeight + (PanelState.padding / 2) {
+        if distanceFromTop < PanelConfig.titleHeight + (PanelConfig.padding / 2) {
             return nil  // Let SwiftUI handle title bar clicks
         }
         
         // Calculate which row was clicked (accounting for title and scroll)
-        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
+        let relativeY = bounds.maxY - point.y - (PanelConfig.padding / 2) - PanelConfig.titleHeight
         
         // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
         let scrollAdjustedY = relativeY + panel.scrollOffset
-        let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
+        let rowIndex = Int(scrollAdjustedY / panel.config.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < panel.items.count else {
             return nil
@@ -146,11 +146,11 @@ extension ListPanelManager {
         let bounds = currentBounds(for: panel)
         
         // Calculate which row was clicked (accounting for title and scroll)
-        let relativeY = bounds.maxY - point.y - (PanelState.padding / 2) - PanelState.titleHeight
+        let relativeY = bounds.maxY - point.y - (PanelConfig.padding / 2) - PanelConfig.titleHeight
         
         // Adjust for scroll: relativeY is in visual space, need to convert to logical row index
         let scrollAdjustedY = relativeY + panel.scrollOffset
-        let rowIndex = Int(scrollAdjustedY / PanelState.rowHeight)
+        let rowIndex = Int(scrollAdjustedY / panel.config.rowHeight)
         
         guard rowIndex >= 0 && rowIndex < panel.items.count else {
             return nil

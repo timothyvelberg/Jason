@@ -150,13 +150,12 @@ extension CircularUIManager {
             let providerId = node.providerId
             let contentIdentifier = node.metadata?["folderURL"] as? String ?? node.previewURL?.path
             
-            let typingMode: TypingMode = {
-                if let pid = providerId,
-                   let provider = self.functionManager?.providers.first(where: { $0.providerId == pid }) {
-                    return provider.defaultTypingMode
-                }
-                return .typeAhead
-            }()
+            // Resolve typing mode and panel config from provider
+            let provider = providerId.flatMap { pid in
+                self.functionManager?.providers.first(where: { $0.providerId == pid })
+            }
+            let typingMode: TypingMode = provider?.defaultTypingMode ?? .typeAhead
+            let panelConfig: PanelConfig = provider?.panelConfig ?? .default
             
             print("[ExpandToPanel] node: '\(node.name)', providerId: \(providerId ?? "nil"), typingMode: \(typingMode)")
 
@@ -171,7 +170,8 @@ extension CircularUIManager {
                     providerId: providerId,
                     contentIdentifier: contentIdentifier,
                     screen: self.overlayWindow?.currentScreen,
-                    typingMode: typingMode
+                    typingMode: typingMode,
+                    config: panelConfig
                 )
                 self.inputCoordinator?.focusPanel(level: 0)
                 self.listPanelManager?.activateInputModeIfNeeded(for: providerId, atLevel: 0)
@@ -207,7 +207,8 @@ extension CircularUIManager {
                         providerId: providerId,
                         contentIdentifier: contentIdentifier,
                         screen: self.overlayWindow?.currentScreen,
-                        typingMode: typingMode
+                        typingMode: typingMode,
+                        config: provider.panelConfig
                     )
                     self.inputCoordinator?.focusPanel(level: 0)
                     self.listPanelManager?.activateInputModeIfNeeded(for: providerId, atLevel: 0)
