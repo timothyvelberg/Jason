@@ -18,7 +18,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         return NSImage(named: "parent-folders") ?? NSImage()
     }
     
-    private let maxItemsPerFolder: Int = 40
+    private let maxItemsPerFolder: Int = 100
     private var nodeCache: [String: [FunctionNode]] = [:]
     
     // MARK: - FunctionProvider Protocol
@@ -87,15 +87,16 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         let folderPath = folderURL.path
         let db = DatabaseManager.shared
         
-        // Get custom max items from metadata
-        let customMaxItems = metadata["maxItems"] as? Int
-        
         // Get sort order
         let requestedSortOrder = getSortOrderForFolder(path: folderPath)
         print("🎯 [SORT] Folder: \(node.name) - Sort: \(requestedSortOrder.displayName)")
         
         // Record folder access
         db.recordFolderAccess(folderPath: folderPath)
+        
+        // Check actual folder size for heavy folder handling
+        let actualItemCount = countFolderItems(at: folderURL)
+        let folderExceedsLimit = actualItemCount > maxItemsPerFolder
         
         // Check if this is a HEAVY folder and try ENHANCED CACHE
         if db.isHeavyFolder(path: folderPath) {
@@ -116,11 +117,11 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 // Apply sort order
                 nodes = sortNodes(nodes, by: requestedSortOrder)
                 
-                // Apply custom limit if specified
-                if let limit = customMaxItems {
-                    print("✂️ [FavoriteFolderProvider] Applying custom limit: \(limit) items")
-                    nodes = Array(nodes.prefix(limit))
+                // Add "Open in Finder" if folder has more items than we're showing
+                if folderExceedsLimit {
+                    nodes.append(createOpenInFinderNode(for: folderURL))
                 }
+                
                 return nodes
             } else {
                 print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
@@ -131,8 +132,6 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         print("💿 [START] Loading from disk: \(folderURL.path)")
         let startTime = Date()
         
-        // Check ACTUAL folder size BEFORE limiting display
-        let actualItemCount = countFolderItems(at: folderURL)
         print("📊 [FavoriteFolderProvider] Actual folder contains: \(actualItemCount) items")
         
         let nodes: [FunctionNode] = await Task.detached(priority: .userInitiated) { [weak self] () -> [FunctionNode] in
@@ -142,7 +141,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             }
             print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
             
-            let result = self.getFolderContents(at: folderURL, sortOrder: requestedSortOrder, maxItems: customMaxItems)
+            let result = self.getFolderContents(at: folderURL, sortOrder: requestedSortOrder)
             
             print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items")
             return result
@@ -168,8 +167,12 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             print("ℹ️ [EnhancedCache] Folder has only \(actualItemCount) items - not caching (threshold: 100)")
         }
         
-        // Add end spacer
+        // Add "Open in Finder" if folder has more items than we're showing
         var resultNodes = nodes
+        if folderExceedsLimit {
+            resultNodes.append(createOpenInFinderNode(for: folderURL))
+        }
+        
         return resultNodes
     }
     
@@ -256,7 +259,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     
     // MARK: - Folder Contents
     
-    private func getFolderContents(at url: URL, sortOrder: FolderSortOrder, maxItems: Int? = nil) -> [FunctionNode] {
+    private func getFolderContents(at url: URL, sortOrder: FolderSortOrder) -> [FunctionNode] {
         do {
             let contents = try FileManager.default.contentsOfDirectory(
                 at: url,
@@ -265,9 +268,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             )
             
             let sortedContents = FolderSortingUtility.sortURLs(contents, by: sortOrder)
-            
-            let itemLimit = maxItems ?? maxItemsPerFolder
-            let limitedContents = Array(sortedContents.prefix(itemLimit))
+            let limitedContents = Array(sortedContents.prefix(maxItemsPerFolder))
             
             return limitedContents.map { contentURL in
                 if contentURL.isNavigableDirectory {
@@ -298,6 +299,29 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     }
     
     // MARK: - Node Creation
+    
+    private func createOpenInFinderNode(for folderURL: URL) -> FunctionNode {
+        let finderIcon = NSWorkspace.shared.icon(forFile: "/System/Library/CoreServices/Finder.app")
+        finderIcon.size = NSSize(width: 64, height: 64)
+        
+        return FunctionNode(
+            id: "open-finder-\(folderURL.path)",
+            name: "Open in Finder",
+            type: .action,
+            icon: finderIcon,
+            preferredLayout: .partialSlice,
+            showLabel: true,
+            slicePositioning: .center,
+            providerId: self.providerId,
+            onLeftClick: ModifierAwareInteraction(base: .execute {
+                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: folderURL.path)
+            }),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .execute {
+                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: folderURL.path)
+            })
+        )
+    }
     
     private func createFileNode(for url: URL) -> FunctionNode {
         let fileName = url.lastPathComponent
@@ -531,11 +555,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     
     private func createFavoriteFolderEntry(folderEntry: FolderEntry, settings: FavoriteFolderSettings) -> FunctionNode {
         let path = URL(fileURLWithPath: folderEntry.path)
-        var metadata: [String: Any] = ["folderURL": folderEntry.path]
-        
-        if let maxItems = settings.maxItems {
-            metadata["maxItems"] = maxItems
-        }
+        let metadata: [String: Any] = ["folderURL": folderEntry.path]
         
         let layout: LayoutStyle = {
             guard let layoutString = settings.preferredLayout else { return .fullCircle }
