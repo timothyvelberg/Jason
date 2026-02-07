@@ -105,48 +105,18 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         print("📋 [FavoriteFiles] Loaded \(dynamicFiles.count) dynamic favorite files")
         
         for dynamic in dynamicFiles {
-            // Execute the query to find the matching file/folder
-            if let resolvedPath = resolveDynamicFile(dynamic) {
-                // Get the actual file name from resolved path
-                let resolvedURL = URL(fileURLWithPath: resolvedPath)
-                let fileName = resolvedURL.lastPathComponent
-                
-                let treatAsDirectory = resolvedURL.isNavigableDirectory
-                
-                // Get icon
-                let icon: NSImage
-                if let iconData = dynamic.iconData, let customIcon = NSImage(data: iconData) {
-                    icon = customIcon
-                } else if treatAsDirectory {
-                    icon = IconProvider.shared.getFolderIcon(for: resolvedURL, size: 64, cornerRadius: 8)
-                } else {
-                    icon = NSWorkspace.shared.icon(forFile: resolvedPath)
-                }
-                
-                entries.append(FileEntry(
-                    id: "dynamic-file-\(dynamic.id ?? 0)",
-                    displayName: fileName,
-                    filePath: resolvedPath,
-                    icon: icon,
-                    isStatic: false,
-                    isDynamic: true,
-                    dynamicId: dynamic.id,
-                    listSortOrder: dynamic.listSortOrder,
-                    customIconData: dynamic.iconData,
-                    isDirectory: treatAsDirectory,
-                    dynamicSortOrder: dynamic.sortOrder
-                ))
-            } else {
+            let resolvedPaths = resolveDynamicFile(dynamic)
+            
+            if resolvedPaths.isEmpty {
                 print("⚠️ [FavoriteFiles] No file found for dynamic rule: \(dynamic.displayName)")
                 
-                // Still add entry but with placeholder icon
                 let icon = dynamic.iconData.flatMap { NSImage(data: $0) } ??
                           NSImage(systemSymbolName: "questionmark.circle", accessibilityDescription: nil) ?? NSImage()
                 
                 entries.append(FileEntry(
                     id: "dynamic-file-\(dynamic.id ?? 0)",
                     displayName: "\(dynamic.displayName) (not found)",
-                    filePath: "", // Empty path indicates no file found
+                    filePath: "",
                     icon: icon,
                     isStatic: false,
                     isDynamic: true,
@@ -156,6 +126,35 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                     isDirectory: false,
                     dynamicSortOrder: dynamic.sortOrder
                 ))
+            } else {
+                for (index, resolvedPath) in resolvedPaths.enumerated() {
+                    let resolvedURL = URL(fileURLWithPath: resolvedPath)
+                    let fileName = resolvedURL.lastPathComponent
+                    let treatAsDirectory = resolvedURL.isNavigableDirectory
+                    
+                    let icon: NSImage
+                    if let iconData = dynamic.iconData, let customIcon = NSImage(data: iconData) {
+                        icon = customIcon
+                    } else if treatAsDirectory {
+                        icon = IconProvider.shared.getFolderIcon(for: resolvedURL, size: 64, cornerRadius: 8)
+                    } else {
+                        icon = NSWorkspace.shared.icon(forFile: resolvedPath)
+                    }
+                    
+                    entries.append(FileEntry(
+                        id: "dynamic-file-\(dynamic.id ?? 0)-\(index)",
+                        displayName: fileName,
+                        filePath: resolvedPath,
+                        icon: icon,
+                        isStatic: false,
+                        isDynamic: true,
+                        dynamicId: dynamic.id,
+                        listSortOrder: dynamic.listSortOrder,
+                        customIconData: dynamic.iconData,
+                        isDirectory: treatAsDirectory,
+                        dynamicSortOrder: dynamic.sortOrder
+                    ))
+                }
             }
         }
         
@@ -164,33 +163,30 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         
         fileEntries = entries
         
-        print("✅ [FavoriteFiles] Total files: \(fileEntries.count)")
+        print("[FavoriteFiles] Total files: \(fileEntries.count)")
     }
     
     // MARK: - Dynamic File Resolution
     
-    private func resolveDynamicFile(_ dynamic: FavoriteDynamicFileEntry) -> String? {
+    private func resolveDynamicFile(_ dynamic: FavoriteDynamicFileEntry) -> [String] {
         let folderPath = dynamic.folderPath
         
-        // Check if folder exists
         guard FileManager.default.fileExists(atPath: folderPath) else {
-            print("⚠️ [FavoriteFiles] Folder not found: \(folderPath)")
-            return nil
+            print("[FavoriteFiles] Folder not found: \(folderPath)")
+            return []
         }
         
-        // 🎯 TRY CACHE FIRST for heavy folders
-        if let cachedResult = resolveDynamicFileFromCache(dynamic) {
-            print("⚡ [FavoriteFiles] Cache hit for dynamic file: \(dynamic.displayName)")
-            return cachedResult
+        if let cachedResults = resolveDynamicFileFromCache(dynamic) {
+            print("[FavoriteFiles] Cache hit for dynamic file: \(dynamic.displayName)")
+            return cachedResults
         }
         
-        // 📂 CACHE MISS - Fall back to filesystem scan
-        print("💿 [FavoriteFiles] Cache miss for '\(dynamic.displayName)' - scanning filesystem")
+        print("[FavoriteFiles] Cache miss for '\(dynamic.displayName)' - scanning filesystem")
         return resolveDynamicFileFromFilesystem(dynamic)
     }
 
     /// Try to resolve dynamic file from enhanced cache
-    private func resolveDynamicFileFromCache(_ dynamic: FavoriteDynamicFileEntry) -> String? {
+    private func resolveDynamicFileFromCache(_ dynamic: FavoriteDynamicFileEntry) -> [String]? {
         let db = DatabaseManager.shared
         
         // Only use cache if folder is marked as heavy
@@ -244,16 +240,17 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         }
         
         // Verify item still exists (cache might be slightly stale)
-        guard FileManager.default.fileExists(atPath: firstItem.path) else {
-            print("⚠️ [FavoriteFiles] Cached item no longer exists: \(firstItem.path)")
-            return nil
+        let topItems = items.prefix(3).filter {
+            FileManager.default.fileExists(atPath: $0.path)
         }
-        
-        return firstItem.path
+
+        guard !topItems.isEmpty else { return nil }
+
+        return topItems.map { $0.path }
     }
     
     /// Resolve dynamic file by scanning filesystem (fallback)
-    private func resolveDynamicFileFromFilesystem(_ dynamic: FavoriteDynamicFileEntry) -> String? {
+    private func resolveDynamicFileFromFilesystem(_ dynamic: FavoriteDynamicFileEntry) -> [String] {
         let folderURL = URL(fileURLWithPath: dynamic.folderPath)
         
         // Get folder contents with all required properties for sorting
@@ -263,7 +260,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
         ) else {
             print("⚠️ [FavoriteFiles] Cannot read folder: \(dynamic.folderPath)")
-            return nil
+            return []
         }
         
         // Apply file extension filter if specified (only for files)
@@ -296,7 +293,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         }
         
         // Return the first (best matching) item
-        return sortedItems.first?.path
+        return Array(sortedItems.prefix(3).map { $0.path })
     }
     
     /// Trigger cache population for a heavy folder that isn't cached yet
