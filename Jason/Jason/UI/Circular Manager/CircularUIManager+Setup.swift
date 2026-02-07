@@ -161,7 +161,7 @@ extension CircularUIManager {
 
             // Resolve panel items: prefer fresh data from provider, fall back to cached children
             let panelItems: [FunctionNode]
-            if let providerId = providerId, let provider = provider {
+            if let providerId = providerId, let provider = provider, provider is any MutableListProvider {
                 let fresh = provider.provideFunctions()
                 if fresh.count == 1, fresh[0].type == .category, let c = fresh[0].children {
                     panelItems = c

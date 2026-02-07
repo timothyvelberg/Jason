@@ -104,9 +104,9 @@ class FirstLaunchConfiguration {
                 ],
                 providers: [
                     (type: "CombinedAppsProvider", order: 1, displayMode: "parent", angle: nil),
-                    (type: "FavoriteFilesProvider", order: 2, displayMode: "parent", angle: nil),
+                    (type: "TodoListProvider", order: 2, displayMode: "parent", angle: nil),
                     (type: "FavoriteFolderProvider", order: 3, displayMode: "parent", angle: nil),
-                    (type: "SystemActionsProvider", order: 4, displayMode: "parent", angle: nil)
+                    (type: "ClipboardProvider", order: 4, displayMode: "parent", angle: nil)
                 ]
             )
             print("   Created '\(defaultConfig.name)' - \(defaultConfig.triggersSummary)")
