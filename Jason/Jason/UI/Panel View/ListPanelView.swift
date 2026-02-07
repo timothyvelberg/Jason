@@ -347,7 +347,7 @@ struct ListPanelRow: View {
     private var contextActionIconSize: CGFloat { 16 }
     
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 8) {
             // Icon
             Image(nsImage: item.icon)
                 .resizable()

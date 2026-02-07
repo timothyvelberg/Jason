@@ -113,7 +113,7 @@ extension ListPanelManager {
         inputCoordinator?.switchToKeyboard()
         
         // Reset selection to first item
-        keyboardSelectedRow[activePanelLevel] = 0
+        keyboardSelectedRow[activePanelLevel] = firstSelectableRow(in: activePanelLevel)
         
         print("[Search] Filtered to \(panelStack[index].items.count) items")
     }
@@ -137,7 +137,7 @@ extension ListPanelManager {
             if let originalItems = panelStack[index].unfilteredItems {
                 panelStack[index].items = originalItems
             }
-            keyboardSelectedRow[activePanelLevel] = 0
+            keyboardSelectedRow[activePanelLevel] = firstSelectableRow(in: activePanelLevel)
             print("[Search] Cleared query")
             return true
         } else {

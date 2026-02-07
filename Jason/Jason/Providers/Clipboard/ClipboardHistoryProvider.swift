@@ -32,6 +32,7 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
     // MARK: - Private Properties
     
     private let clipboardManager = ClipboardManager.shared
+    private let snippetsProvider = SnippetsProvider()
     
     // MARK: - Initialization
     
@@ -44,10 +45,11 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
     func provideFunctions() -> [FunctionNode] {
         let entries = Array(clipboardManager.history.prefix(50))
         
-        // Handle empty state - show placeholder
-        let children: [FunctionNode]
+        var children: [FunctionNode] = []
+        
+        // Clipboard history entries
         if entries.isEmpty {
-            children = [
+            children.append(
                 FunctionNode(
                     id: "clipboard-empty",
                     name: "No clipboard history",
@@ -60,11 +62,22 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
                     onMiddleClick: ModifierAwareInteraction(base: .doNothing),
                     onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
                 )
-            ]
+            )
         } else {
-            children = entries.map { entry in
-                createEntryNode(entry: entry)
-            }
+            children.append(contentsOf: entries.map { createEntryNode(entry: $0) })
+        }
+        
+        // Snippets section at the end
+        let snippetNodes = snippetsProvider.buildSnippetNodes()
+        if !snippetNodes.isEmpty && snippetNodes.first?.id != "snippets-empty" {
+            children.append(FunctionNode(
+                id: "section-snippets",
+                name: "Snippets",
+                type: .sectionHeader,
+                icon: NSImage(),
+                providerId: providerId
+            ))
+            children.append(contentsOf: snippetNodes)
         }
         
         // Return parent category node with panel display mode
@@ -94,13 +107,9 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
     // MARK: - Private Methods
     
     private func createEntryNode(entry: ClipboardEntry) -> FunctionNode {
-        // Truncate content for display
         let displayText = truncateForDisplay(entry.content, maxLength: 50)
-        
-        // Format timestamp
         let timeAgo = formatTimeAgo(entry.copiedAt)
         
-        // Create delete context action
         let deleteAction = FunctionNode(
             id: "clipboard-delete-\(entry.id.uuidString)",
             name: "Delete",
@@ -137,6 +146,7 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
             })
         )
     }
+    
     private func pasteEntry(_ entry: ClipboardEntry) {
         print("📋 [ClipboardHistoryProvider] Pasting entry: \"\(entry.content.prefix(30))...\"")
         clipboardManager.paste(entry: entry)
@@ -145,7 +155,6 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
     // MARK: - Helper Methods
     
     private func truncateForDisplay(_ text: String, maxLength: Int) -> String {
-        // Replace newlines with spaces for single-line display
         let singleLine = text.replacingOccurrences(of: "\n", with: " ")
                              .replacingOccurrences(of: "\r", with: " ")
                              .trimmingCharacters(in: .whitespaces)
@@ -176,9 +185,6 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
     }
     
     private func iconForContent(_ content: String) -> NSImage {
-        // Could be extended later to show different icons for URLs, code, etc.
-        // For now, use a simple text icon
-        
         if content.hasPrefix("http://") || content.hasPrefix("https://") {
             return NSImage(systemSymbolName: "link", accessibilityDescription: nil) ?? NSImage()
         }
@@ -187,7 +193,6 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
             return NSImage(systemSymbolName: "envelope", accessibilityDescription: nil) ?? NSImage()
         }
         
-        // Default text icon
         return NSImage(systemSymbolName: "doc.text", accessibilityDescription: nil) ?? NSImage()
     }
 }

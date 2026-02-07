@@ -34,7 +34,7 @@ extension ListPanelManager {
         inputCoordinator?.focusPanel(level: previewLevel)
         
         // Select first row in new active panel
-        keyboardSelectedRow[activePanelLevel] = 0
+        keyboardSelectedRow[activePanelLevel] = firstSelectableRow(in: activePanelLevel)
         
         // Arm the new active panel for its children
         panelStack[previewIndex].areChildrenArmed = true
@@ -48,6 +48,17 @@ extension ListPanelManager {
             currentlyHoveredNodeId[activePanelLevel] = firstNode.id
             handleItemHover(node: firstNode, level: activePanelLevel, rowIndex: 0)
         }
+    }
+    
+    /// Find the first selectable (non-sectionHeader) row index in a panel
+    func firstSelectableRow(in level: Int) -> Int {
+        guard let panel = panelStack.first(where: { $0.level == level }) else { return 0 }
+        for i in 0..<panel.items.count {
+            if panel.items[i].type != .sectionHeader {
+                return i
+            }
+        }
+        return 0
     }
 
     /// Exit to parent panel (← arrow) - close current active, parent becomes active
