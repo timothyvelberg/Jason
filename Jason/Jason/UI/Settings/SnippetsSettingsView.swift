@@ -28,11 +28,6 @@ struct SnippetsSettingsView: View {
                     Text("Add text snippets for quick pasting from clipboard history")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                    
-                    Button("Add Snippet") {
-                        isAddingNew = true
-                    }
-                    .buttonStyle(.borderedProminent)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
