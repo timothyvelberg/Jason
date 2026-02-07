@@ -41,13 +41,13 @@ struct ContentSettingsView: View {
             Group {
                 switch selectedTab {
                 case .instance:
-                    Text("Instances")
+                    RingsSettingsView()
                 case .folders:
                     FavoriteFoldersViews()
                 case .files:
-                    Text("Files")
+                    FavoriteFilesSettingsView()
                 case .apps:
-                    Text("Apps")
+                    FavoriteAppsSettingsView()
                 case .snippets:
                     SnippetsSettingsView()
                 case .settings:

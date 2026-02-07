@@ -9,9 +9,6 @@ import SwiftUI
 import AppKit
 
 struct FavoriteFilesSettingsView: View {
-    @ObservedObject var filesProvider: FavoriteFilesProvider
-    @Environment(\.dismiss) var dismiss
-    
     @State private var staticFiles: [FavoriteFileEntry] = []
     @State private var dynamicFiles: [FavoriteDynamicFileEntry] = []
     
@@ -47,26 +44,6 @@ struct FavoriteFilesSettingsView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Manage Favorite Files")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                
-                Spacer()
-                
-                Button(action: { dismiss() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding()
-            
-            Divider()
-            
-            // Files list
             if allEntries.isEmpty {
                 VStack(spacing: 16) {
                     Image(systemName: "star.slash")
@@ -75,15 +52,31 @@ struct FavoriteFilesSettingsView: View {
                     
                     Text("No favorite files yet")
                         .font(.headline)
+                        .foregroundColor(.secondary)
                     
                     Text("Click the buttons below to add static files or create dynamic file rules")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
+                    
+                    HStack(spacing: 12) {
+                        Button {
+                            showFilePicker()
+                        } label: {
+                            Label("Add File", systemImage: "doc.badge.plus")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        
+                        Button {
+                            showingDynamicFileCreator = true
+                        } label: {
+                            Label("Add Rule", systemImage: "wand.and.stars")
+                        }
+                        .buttonStyle(.bordered)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding()
             } else {
                 List {
                     ForEach(Array(allEntries.enumerated()), id: \.element.id) { index, item in
@@ -120,17 +113,18 @@ struct FavoriteFilesSettingsView: View {
             
             Divider()
             
-            // Footer with Add buttons
             HStack {
-                Button(action: { showFilePicker() }) {
+                Button {
+                    showFilePicker()
+                } label: {
                     Label("Add File", systemImage: "doc.badge.plus")
-                        .font(.headline)
                 }
                 .buttonStyle(.borderedProminent)
                 
-                Button(action: { showingDynamicFileCreator = true }) {
+                Button {
+                    showingDynamicFileCreator = true
+                } label: {
                     Label("Add Rule", systemImage: "wand.and.stars")
-                        .font(.headline)
                 }
                 .buttonStyle(.bordered)
                 
@@ -147,7 +141,6 @@ struct FavoriteFilesSettingsView: View {
             }
             .padding()
         }
-        .frame(width: 700, height: 550)
         .onAppear {
             loadFavoriteFiles()
         }
@@ -224,27 +217,30 @@ struct FavoriteFilesSettingsView: View {
     }
     
     private func addStaticFile(path: String) {
-        if filesProvider.addFavoriteFile(path: path) {
+        if DatabaseManager.shared.addFavoriteFile(path: path, displayName: nil, iconData: nil) {
             loadFavoriteFiles()
+            notifyProvider()
         }
     }
     
     private func addDynamicFile(displayName: String, folderPath: String, sortOrder: FolderSortOrder, extensions: String?, pattern: String?) {
-        if filesProvider.addFavoriteDynamicFile(
+        if DatabaseManager.shared.addFavoriteDynamicFile(
             displayName: displayName,
             folderPath: folderPath,
             sortOrder: sortOrder,
             fileExtensions: extensions,
-            namePattern: pattern
+            namePattern: pattern,
+            iconData: nil
         ) {
             loadFavoriteFiles()
+            notifyProvider()
         }
     }
     
     private func removeStaticFile(_ file: FavoriteFileEntry) {
-        if filesProvider.updateFavoriteFile(path: file.path, displayName: nil, iconData: nil) {
-            _ = DatabaseManager.shared.removeFavoriteFile(path: file.path)
+        if DatabaseManager.shared.removeFavoriteFile(path: file.path) {
             loadFavoriteFiles()
+            notifyProvider()
         }
     }
     
@@ -252,12 +248,14 @@ struct FavoriteFilesSettingsView: View {
         guard let id = file.id else { return }
         if DatabaseManager.shared.removeFavoriteDynamicFile(id: id) {
             loadFavoriteFiles()
+            notifyProvider()
         }
     }
     
     private func updateStaticFile(_ file: FavoriteFileEntry, displayName: String?, iconData: Data?) {
-        if filesProvider.updateFavoriteFile(path: file.path, displayName: displayName, iconData: iconData) {
+        if DatabaseManager.shared.updateFavoriteFile(path: file.path, displayName: displayName, iconData: iconData) {
             loadFavoriteFiles()
+            notifyProvider()
         }
     }
     
@@ -271,7 +269,7 @@ struct FavoriteFilesSettingsView: View {
         iconData: Data?
     ) {
         guard let id = file.id else { return }
-        if filesProvider.updateFavoriteDynamicFile(
+        if DatabaseManager.shared.updateFavoriteDynamicFile(
             id: id,
             displayName: displayName,
             folderPath: folderPath,
@@ -281,22 +279,34 @@ struct FavoriteFilesSettingsView: View {
             iconData: iconData
         ) {
             loadFavoriteFiles()
+            notifyProvider()
         }
     }
     
     private func moveFile(from source: IndexSet, to destination: Int) {
         guard let sourceIndex = source.first else { return }
         
+        // Work with the sorted combined list
+        var entries = allEntries
+        let movedEntry = entries.remove(at: sourceIndex)
         let actualDestination = sourceIndex < destination ? destination - 1 : destination
+        entries.insert(movedEntry, at: actualDestination)
         
-        print("🔄 Moving file from index \(sourceIndex) to \(actualDestination)")
-        
-        if filesProvider.reorderFavorites(from: sourceIndex, to: actualDestination) {
-            print("✅ Successfully reordered favorites in database")
-            loadFavoriteFiles()
-        } else {
-            print("❌ Failed to reorder favorites")
+        // Update sort orders in database
+        for (index, entry) in entries.enumerated() {
+            if entry.isStatic, let file = entry.entry as? FavoriteFileEntry {
+                _ = DatabaseManager.shared.reorderFavoriteFile(path: file.path, newSortOrder: index)
+            } else if !entry.isStatic, let file = entry.entry as? FavoriteDynamicFileEntry, let id = file.id {
+                _ = DatabaseManager.shared.reorderFavoriteDynamicFile(id: id, newSortOrder: index)
+            }
         }
+        
+        loadFavoriteFiles()
+        notifyProvider()
+    }
+    
+    private func notifyProvider() {
+        NotificationCenter.default.postProviderUpdate(providerId: "favorite-files")
     }
 }
 
@@ -312,13 +322,11 @@ struct FavoriteFileRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Drag indicator
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 14))
                 .foregroundColor(.secondary.opacity(0.5))
                 .help("Drag to reorder")
             
-            // File icon
             if let icon = fileIcon {
                 Image(nsImage: icon)
                     .resizable()
@@ -330,11 +338,11 @@ struct FavoriteFileRow: View {
                     .frame(width: 32, height: 32)
             }
             
-            // File info
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     Text(file.displayName ?? URL(fileURLWithPath: file.path).lastPathComponent)
-                        .font(.headline)
+                        .font(.body)
+                        .fontWeight(.medium)
                     
                     if !fileExists {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -353,7 +361,6 @@ struct FavoriteFileRow: View {
             
             Spacer()
             
-            // Type badge
             Text("Static")
                 .font(.caption2)
                 .foregroundColor(.white)
@@ -362,7 +369,6 @@ struct FavoriteFileRow: View {
                 .background(Color.blue)
                 .cornerRadius(4)
             
-            // Stats (if accessed)
             if let lastAccessed = file.lastAccessed {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("\(file.accessCount) opens")
@@ -376,14 +382,13 @@ struct FavoriteFileRow: View {
                 .frame(width: 80)
             }
             
-            // Actions
             HStack(spacing: 8) {
                 Button(action: onEdit) {
                     Image(systemName: "pencil.circle.fill")
                         .font(.title3)
                         .foregroundColor(.blue)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
                 .help("Edit")
                 
                 Button(action: onRemove) {
@@ -391,7 +396,7 @@ struct FavoriteFileRow: View {
                         .font(.title3)
                         .foregroundColor(.red)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
                 .help("Remove")
             }
         }
@@ -430,13 +435,11 @@ struct FavoriteDynamicFileRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Drag indicator
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 14))
                 .foregroundColor(.secondary.opacity(0.5))
                 .help("Drag to reorder")
             
-            // File icon
             if let icon = fileIcon {
                 Image(nsImage: icon)
                     .resizable()
@@ -448,10 +451,10 @@ struct FavoriteDynamicFileRow: View {
                     .frame(width: 32, height: 32)
             }
             
-            // File info
             VStack(alignment: .leading, spacing: 2) {
                 Text(file.displayName)
-                    .font(.headline)
+                    .font(.body)
+                    .fontWeight(.medium)
                 
                 HStack(spacing: 4) {
                     Image(systemName: "folder")
@@ -489,7 +492,6 @@ struct FavoriteDynamicFileRow: View {
             
             Spacer()
             
-            // Type badge
             Text("Dynamic")
                 .font(.caption2)
                 .foregroundColor(.white)
@@ -498,7 +500,6 @@ struct FavoriteDynamicFileRow: View {
                 .background(Color.purple)
                 .cornerRadius(4)
             
-            // Stats (if accessed)
             if let lastAccessed = file.lastAccessed {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("\(file.accessCount) opens")
@@ -512,14 +513,13 @@ struct FavoriteDynamicFileRow: View {
                 .frame(width: 80)
             }
             
-            // Actions
             HStack(spacing: 8) {
                 Button(action: onEdit) {
                     Image(systemName: "pencil.circle.fill")
                         .font(.title3)
                         .foregroundColor(.blue)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
                 .help("Edit")
                 
                 Button(action: onRemove) {
@@ -527,7 +527,7 @@ struct FavoriteDynamicFileRow: View {
                         .font(.title3)
                         .foregroundColor(.red)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
                 .help("Remove")
             }
         }
@@ -538,7 +538,6 @@ struct FavoriteDynamicFileRow: View {
     }
     
     private func resolveFile() {
-        // Try to resolve the dynamic file
         DispatchQueue.global(qos: .userInitiated).async {
             let folderURL = URL(fileURLWithPath: file.folderPath)
             
@@ -557,13 +556,11 @@ struct FavoriteDynamicFileRow: View {
                 return !isDirectory
             }
             
-            // Apply extension filter
             if let extensions = file.fileExtensions, !extensions.isEmpty {
                 let extArray = extensions.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces).lowercased() }
                 files = files.filter { extArray.contains($0.pathExtension.lowercased()) }
             }
             
-            // Sort using FolderSortingUtility
             let sortedFiles = FolderSortingUtility.sortURLs(files, by: file.sortOrder)
             
             if let firstFile = sortedFiles.first {
@@ -597,16 +594,11 @@ struct AddDynamicFileView: View {
     @State private var useExtensionFilter = false
     @State private var useNamePattern = false
     
-    // Sort options relevant for dynamic files
     private let sortOptions: [FolderSortOrder] = [
-        .modifiedNewest,
-        .modifiedOldest,
-        .createdNewest,
-        .createdOldest,
-        .sizeDescending,
-        .sizeAscending,
-        .alphabeticalAsc,
-        .alphabeticalDesc
+        .modifiedNewest, .modifiedOldest,
+        .createdNewest, .createdOldest,
+        .sizeDescending, .sizeAscending,
+        .alphabeticalAsc, .alphabeticalDesc
     ]
     
     var body: some View {
@@ -614,8 +606,6 @@ struct AddDynamicFileView: View {
             Text("Add Dynamic File Rule")
                 .font(.title2)
                 .fontWeight(.semibold)
-            
-            Divider()
             
             Form {
                 Section {
@@ -658,22 +648,20 @@ struct AddDynamicFileView: View {
             
             Spacer()
             
-            // Buttons
-            HStack {
+            HStack(spacing: 12) {
                 Button("Cancel") {
                     onCancel()
                 }
-                .keyboardShortcut(.escape)
-                
-                Spacer()
+                .buttonStyle(.bordered)
+                .keyboardShortcut(.cancelAction)
                 
                 Button("Save") {
                     let extensions = useExtensionFilter && !fileExtensions.isEmpty ? fileExtensions : nil
                     let pattern = useNamePattern && !namePattern.isEmpty ? namePattern : nil
                     onSave(displayName, folderPath, sortOrder, extensions, pattern)
                 }
-                .keyboardShortcut(.return)
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .disabled(displayName.isEmpty || folderPath.isEmpty)
             }
         }
@@ -720,8 +708,6 @@ struct EditFavoriteFileView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Divider()
-            
             Form {
                 Section {
                     Text(file.path)
@@ -742,21 +728,19 @@ struct EditFavoriteFileView: View {
             
             Spacer()
             
-            // Buttons
-            HStack {
+            HStack(spacing: 12) {
                 Button("Cancel") {
                     onCancel()
                 }
-                .keyboardShortcut(.escape)
-                
-                Spacer()
+                .buttonStyle(.bordered)
+                .keyboardShortcut(.cancelAction)
                 
                 Button("Save") {
                     let finalName = useCustomName && !displayName.isEmpty ? displayName : nil
                     onSave(finalName, nil)
                 }
-                .keyboardShortcut(.return)
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .disabled(useCustomName && displayName.isEmpty)
             }
         }
@@ -780,16 +764,11 @@ struct EditFavoriteDynamicFileView: View {
     @State private var useExtensionFilter: Bool
     @State private var useNamePattern: Bool
     
-    // Sort options relevant for dynamic files
     private let sortOptions: [FolderSortOrder] = [
-        .modifiedNewest,
-        .modifiedOldest,
-        .createdNewest,
-        .createdOldest,
-        .sizeDescending,
-        .sizeAscending,
-        .alphabeticalAsc,
-        .alphabeticalDesc
+        .modifiedNewest, .modifiedOldest,
+        .createdNewest, .createdOldest,
+        .sizeDescending, .sizeAscending,
+        .alphabeticalAsc, .alphabeticalDesc
     ]
     
     init(file: FavoriteDynamicFileEntry, onSave: @escaping (String, String, FolderSortOrder, String?, String?, Data?) -> Void, onCancel: @escaping () -> Void) {
@@ -811,8 +790,6 @@ struct EditFavoriteDynamicFileView: View {
             Text("Edit Dynamic File Rule")
                 .font(.title2)
                 .fontWeight(.semibold)
-            
-            Divider()
             
             Form {
                 Section {
@@ -854,22 +831,20 @@ struct EditFavoriteDynamicFileView: View {
             
             Spacer()
             
-            // Buttons
-            HStack {
+            HStack(spacing: 12) {
                 Button("Cancel") {
                     onCancel()
                 }
-                .keyboardShortcut(.escape)
-                
-                Spacer()
+                .buttonStyle(.bordered)
+                .keyboardShortcut(.cancelAction)
                 
                 Button("Save") {
                     let extensions = useExtensionFilter && !fileExtensions.isEmpty ? fileExtensions : nil
                     let pattern = useNamePattern && !namePattern.isEmpty ? namePattern : nil
                     onSave(displayName, folderPath, sortOrder, extensions, pattern, nil)
                 }
-                .keyboardShortcut(.return)
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .disabled(displayName.isEmpty || folderPath.isEmpty)
             }
         }
@@ -888,10 +863,4 @@ struct EditFavoriteDynamicFileView: View {
             folderPath = url.path
         }
     }
-}
-
-// MARK: - Preview
-
-#Preview {
-    FavoriteFilesSettingsView(filesProvider: FavoriteFilesProvider())
 }

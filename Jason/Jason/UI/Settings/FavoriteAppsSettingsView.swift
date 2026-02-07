@@ -9,9 +9,6 @@ import SwiftUI
 import AppKit
 
 struct FavoriteAppsSettingsView: View {
-    @ObservedObject var appsProvider: FavoriteAppsProvider
-    @Environment(\.dismiss) var dismiss
-    
     @State private var favoriteApps: [FavoriteAppEntry] = []
     @State private var showingAppPicker = false
     @State private var editingApp: FavoriteAppEntry?
@@ -19,26 +16,6 @@ struct FavoriteAppsSettingsView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Manage Favorite Apps")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                
-                Spacer()
-                
-                Button(action: { dismiss() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding()
-            
-            Divider()
-            
-            // Apps list
             if favoriteApps.isEmpty {
                 VStack(spacing: 16) {
                     Image(systemName: "star.slash")
@@ -47,14 +24,21 @@ struct FavoriteAppsSettingsView: View {
                     
                     Text("No favorite apps yet")
                         .font(.headline)
+                        .foregroundColor(.secondary)
                     
                     Text("Click the + button below to add your first favorite app")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
+                    
+                    Button {
+                        showingAppPicker = true
+                    } label: {
+                        Label("Add App", systemImage: "plus.circle.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding()
             } else {
                 List {
                     ForEach(favoriteApps) { app in
@@ -77,11 +61,11 @@ struct FavoriteAppsSettingsView: View {
             
             Divider()
             
-            // Footer with Add button
             HStack {
-                Button(action: { showingAppPicker = true }) {
+                Button {
+                    showingAppPicker = true
+                } label: {
                     Label("Add App", systemImage: "plus.circle.fill")
-                        .font(.headline)
                 }
                 .buttonStyle(.borderedProminent)
                 
@@ -93,7 +77,6 @@ struct FavoriteAppsSettingsView: View {
             }
             .padding()
         }
-        .frame(width: 600, height: 500)
         .onAppear {
             loadFavoriteApps()
         }
@@ -127,47 +110,46 @@ struct FavoriteAppsSettingsView: View {
     }
     
     private func addApp(bundleId: String, name: String) {
-        if appsProvider.addFavorite(bundleIdentifier: bundleId, displayName: name) {
+        if DatabaseManager.shared.addFavoriteApp(bundleIdentifier: bundleId, displayName: name, iconOverride: nil) {
             loadFavoriteApps()
+            notifyProvider()
         }
     }
     
     private func removeApp(_ app: FavoriteAppEntry) {
-        if appsProvider.removeFavorite(bundleIdentifier: app.bundleIdentifier) {
+        if DatabaseManager.shared.removeFavoriteApp(bundleIdentifier: app.bundleIdentifier) {
             loadFavoriteApps()
+            notifyProvider()
         }
     }
     
     private func updateApp(_ app: FavoriteAppEntry, name: String, iconOverride: String?) {
-        if appsProvider.updateFavorite(
+        if DatabaseManager.shared.updateFavoriteApp(
             bundleIdentifier: app.bundleIdentifier,
             displayName: name,
             iconOverride: iconOverride
         ) {
             loadFavoriteApps()
+            notifyProvider()
         }
     }
     
     private func moveApp(from source: IndexSet, to destination: Int) {
-        // Update local state first for immediate UI feedback
         favoriteApps.move(fromOffsets: source, toOffset: destination)
         
-        // Get the index we're moving from
-        guard let sourceIndex = source.first else { return }
-        
-        // Calculate actual destination (accounting for the removal)
-        let actualDestination = sourceIndex < destination ? destination - 1 : destination
-        
-        print("🔄 Moving app from index \(sourceIndex) to \(actualDestination)")
-        
-        // Update database order
-        if appsProvider.reorderFavorites(from: sourceIndex, to: actualDestination) {
-            print("✅ Successfully reordered favorites in database")
-        } else {
-            print("❌ Failed to reorder favorites - reverting")
-            // Revert local changes if database update failed
-            loadFavoriteApps()
+        for (index, app) in favoriteApps.enumerated() {
+            DatabaseManager.shared.reorderFavoriteApps(
+                bundleIdentifier: app.bundleIdentifier,
+                newSortOrder: index
+            )
         }
+        
+        loadFavoriteApps()
+        notifyProvider()
+    }
+    
+    private func notifyProvider() {
+        NotificationCenter.default.postProviderUpdate(providerId: "combined-apps")
     }
 }
 
@@ -182,13 +164,11 @@ struct FavoriteAppRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Drag indicator
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 14))
                 .foregroundColor(.secondary.opacity(0.5))
                 .help("Drag to reorder")
             
-            // App icon
             if let icon = appIcon {
                 Image(nsImage: icon)
                     .resizable()
@@ -200,10 +180,10 @@ struct FavoriteAppRow: View {
                     .frame(width: 32, height: 32)
             }
             
-            // App info
             VStack(alignment: .leading, spacing: 2) {
                 Text(app.displayName)
-                    .font(.headline)
+                    .font(.body)
+                    .fontWeight(.medium)
                 
                 Text(app.bundleIdentifier)
                     .font(.caption)
@@ -212,7 +192,6 @@ struct FavoriteAppRow: View {
             
             Spacer()
             
-            // Stats (if launched)
             if let lastAccessed = app.lastAccessed {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("\(app.accessCount) launches")
@@ -225,14 +204,13 @@ struct FavoriteAppRow: View {
                 }
             }
             
-            // Actions
             HStack(spacing: 8) {
                 Button(action: onEdit) {
                     Image(systemName: "pencil.circle.fill")
                         .font(.title3)
                         .foregroundColor(.blue)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
                 .help("Edit app settings")
                 
                 Button(action: onRemove) {
@@ -240,7 +218,7 @@ struct FavoriteAppRow: View {
                         .font(.title3)
                         .foregroundColor(.red)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
                 .help("Remove from favorites")
             }
         }
@@ -286,7 +264,6 @@ struct AppPickerView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             HStack {
                 Text("Choose an Application")
                     .font(.title2)
@@ -303,7 +280,6 @@ struct AppPickerView: View {
             }
             .padding()
             
-            // Search bar
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
@@ -327,7 +303,6 @@ struct AppPickerView: View {
             
             Divider()
             
-            // Apps list
             if isLoading {
                 VStack(spacing: 16) {
                     ProgressView()
@@ -391,7 +366,6 @@ struct AppPickerView: View {
             
             Divider()
             
-            // Footer
             HStack {
                 Text("\(filteredApps.count) application\(filteredApps.count == 1 ? "" : "s")")
                     .font(.caption)
@@ -439,7 +413,6 @@ struct AppPickerView: View {
                 }
             }
             
-            // Sort alphabetically
             apps.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
             
             DispatchQueue.main.async {
@@ -449,6 +422,15 @@ struct AppPickerView: View {
             }
         }
     }
+}
+
+struct ProviderConfig: Identifiable {
+    let id = UUID()
+    let type: String
+    let name: String
+    let description: String
+    var isEnabled: Bool
+    var displayMode: ProviderDisplayMode
 }
 
 // MARK: - Edit Favorite App View
@@ -474,14 +456,10 @@ struct EditFavoriteAppView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            // Header
             Text("Edit \(app.displayName)")
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Divider()
-            
-            // Form
             Form {
                 Section {
                     TextField("Display Name", text: $displayName)
@@ -494,7 +472,6 @@ struct EditFavoriteAppView: View {
                         TextField("SF Symbol Name", text: $iconOverride)
                             .help("e.g., star.fill, app.badge, folder.fill")
                         
-                        // Icon preview
                         if !iconOverride.isEmpty {
                             HStack {
                                 Text("Preview:")
@@ -519,21 +496,19 @@ struct EditFavoriteAppView: View {
             
             Spacer()
             
-            // Buttons
-            HStack {
+            HStack(spacing: 12) {
                 Button("Cancel") {
                     onCancel()
                 }
-                .keyboardShortcut(.escape)
-                
-                Spacer()
+                .buttonStyle(.bordered)
+                .keyboardShortcut(.cancelAction)
                 
                 Button("Save") {
                     let finalIconOverride = useCustomIcon && !iconOverride.isEmpty ? iconOverride : nil
                     onSave(displayName, finalIconOverride)
                 }
-                .keyboardShortcut(.return)
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .disabled(displayName.isEmpty)
             }
         }
@@ -542,17 +517,4 @@ struct EditFavoriteAppView: View {
     }
 }
 
-struct ProviderConfig: Identifiable {
-    let id = UUID()
-    let type: String
-    let name: String
-    let description: String
-    var isEnabled: Bool
-    var displayMode: ProviderDisplayMode
-}
 
-// MARK: - Preview
-
-#Preview {
-    FavoriteAppsSettingsView(appsProvider: FavoriteAppsProvider())
-}

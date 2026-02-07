@@ -162,7 +162,7 @@ struct FavoritesSettingsSection: View {
                         .compactMap({ $0 as? CircularUIManager })
                         .compactMap({ $0.favoriteFilesProvider })
                         .first {
-                        FavoriteFilesSettingsView(filesProvider: filesProvider)
+                        FavoriteFilesSettingsView()
                     } else {
                         noProviderView(for: "Favorite Files", providerType: "FavoriteFilesProvider")
                     }
@@ -172,7 +172,7 @@ struct FavoritesSettingsSection: View {
                         .compactMap({ $0 as? CircularUIManager })
                         .compactMap({ $0.functionManager?.favoriteAppsProvider })
                         .first {
-                        FavoriteAppsSettingsView(appsProvider: appsProvider)
+                        FavoriteAppsSettingsView()
                     } else {
                         noProviderView(for: "Favorite Apps", providerType: "CombinedAppsProvider")
                     }
