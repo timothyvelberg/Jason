@@ -14,7 +14,7 @@ class SnippetsProvider: FunctionProvider {
     
     var providerId: String { "snippets" }
     var providerName: String { "Snippets" }
-    var providerIcon: NSImage { NSImage(systemSymbolName: "text.snippet", accessibilityDescription: "Snippets") ?? NSImage() }
+    var providerIcon: NSImage { NSImage(systemSymbolName: "pencil.line", accessibilityDescription: "Snippets") ?? NSImage() }
     var defaultTypingMode: TypingMode { .search }
     
     // MARK: - Snippet Model
@@ -23,26 +23,24 @@ class SnippetsProvider: FunctionProvider {
         let id: String
         var title: String
         var content: String
+        var triggerText: String?
+        var sortOrder: Int
         let createdAt: Date
     }
     
-    // MARK: - In-Memory Storage (temporary)
+    // MARK: - Storage
     
     private(set) var snippets: [Snippet] = []
     
     // MARK: - Initialization
     
     init() {
-        loadSampleSnippets()
-        print("📌 [SnippetsProvider] Initialized with \(snippets.count) sample snippets")
+        loadSnippets()
+        print("📌 [SnippetsProvider] Initialized with \(snippets.count) snippets")
     }
     
-    private func loadSampleSnippets() {
-        snippets = [
-            Snippet(id: UUID().uuidString, title: "Email Signature", content: "Best regards,\nTimothy Velberg", createdAt: Date()),
-            Snippet(id: UUID().uuidString, title: "Phone Number", content: "+31 6 1234 5678", createdAt: Date().addingTimeInterval(-3600)),
-            Snippet(id: UUID().uuidString, title: "Home Address", content: "Keizersgracht 123, 1015 CJ Amsterdam", createdAt: Date().addingTimeInterval(-7200)),
-        ]
+    private func loadSnippets() {
+        snippets = DatabaseManager.shared.getAllSnippets()
     }
     
     // MARK: - FunctionProvider Methods
@@ -76,7 +74,7 @@ class SnippetsProvider: FunctionProvider {
                     id: "snippets-empty",
                     name: "No snippets saved",
                     type: .action,
-                    icon: NSImage(systemSymbolName: "text.snippet", accessibilityDescription: nil) ?? NSImage(),
+                    icon: NSImage(systemSymbolName: "pencil.line", accessibilityDescription: nil) ?? NSImage(),
                     showLabel: true,
                     providerId: providerId,
                     onLeftClick: ModifierAwareInteraction(base: .doNothing),
@@ -139,9 +137,29 @@ class SnippetsProvider: FunctionProvider {
     }
     
     private func deleteSnippet(id: String) {
-        guard let index = snippets.firstIndex(where: { $0.id == id }) else { return }
-        let title = snippets[index].title
-        snippets.remove(at: index)
-        print("🗑️ [SnippetsProvider] Deleted: '\(title)' (\(snippets.count) remaining)")
+        DatabaseManager.shared.deleteSnippet(id: id)
+        loadSnippets()
+        NotificationCenter.default.postProviderUpdate(providerId: providerId)
+        print("🗑️ [SnippetsProvider] Deleted snippet: \(id) (\(snippets.count) remaining)")
+    }
+    
+    // MARK: - Public Methods
+    
+    func addSnippet(title: String, content: String, triggerText: String? = nil) {
+        let id = UUID().uuidString
+        let sortOrder = DatabaseManager.shared.getNextSnippetSortOrder()
+        DatabaseManager.shared.saveSnippet(id: id, title: title, content: content, triggerText: triggerText, sortOrder: sortOrder, createdAt: Date())
+        loadSnippets()
+        NotificationCenter.default.postProviderUpdate(providerId: providerId)
+    }
+    
+    func updateSnippet(id: String, title: String, content: String, triggerText: String?) {
+        DatabaseManager.shared.updateSnippet(id: id, title: title, content: content, triggerText: triggerText)
+        loadSnippets()
+        NotificationCenter.default.postProviderUpdate(providerId: providerId)
+    }
+    
+    func refresh() {
+        loadSnippets()
     }
 }

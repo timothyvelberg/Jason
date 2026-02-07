@@ -115,6 +115,7 @@ struct FavoritesSettingsSection: View {
         case folders = "Folders"
         case files = "Files"
         case apps = "Apps"
+        case snippets = "Snippets"
         
         var id: String { rawValue }
         
@@ -123,6 +124,7 @@ struct FavoritesSettingsSection: View {
             case .folders: return "folder.fill"
             case .files: return "doc.fill"
             case .apps: return "app.fill"
+            case .snippets: return "pencil.line"
             }
         }
     }
@@ -174,6 +176,8 @@ struct FavoritesSettingsSection: View {
                     } else {
                         noProviderView(for: "Favorite Apps", providerType: "CombinedAppsProvider")
                     }
+                case .snippets:
+                    SnippetsSettingsView()
                 }
             }
         }

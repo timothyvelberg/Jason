@@ -260,6 +260,17 @@ class DatabaseManager {
         );
         """
         
+        let snippetsSQL = """
+        CREATE TABLE IF NOT EXISTS snippets (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            trigger_text TEXT,
+            sort_order INTEGER NOT NULL,
+            created_at REAL NOT NULL
+        );
+        """
+        
         let tables = [
             foldersSQL,
             favoriteFoldersSQL,
@@ -274,7 +285,8 @@ class DatabaseManager {
             circleCalibrationSQL,
             ringTriggersSQL,
             clipboardHistorySQL,
-            todosSQL
+            todosSQL,
+            snippetsSQL
         ]
         
         for sql in tables {
