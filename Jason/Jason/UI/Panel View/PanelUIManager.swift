@@ -13,10 +13,14 @@ import SwiftUI
 
 class PanelUIManager: ObservableObject, UIManager {
     
-    // MARK: - UIManager Protocol Properties
+    // MARK: - Drag Support
+    @Published var currentDragProvider: DragProvider?
+    @Published var dragStartPoint: CGPoint?
+    var draggedNode: FunctionNode?
     
-    let configId: Int
+    // MARK: - UIManager Protocol Properties
     @Published var isVisible: Bool = false
+    let configId: Int
     var isInHoldMode: Bool = false
     var activeTrigger: TriggerConfiguration?
     var listPanelManager: ListPanelManager?
@@ -277,10 +281,14 @@ class PanelUIManager: ObservableObject, UIManager {
             guard let self = self else { return }
             
             switch event.type {
+            case .mouseDown(.left):
+                self.handleMouseDown(event: event)
             case .click(.left):
                 self.handleLeftClick(event: event)
             case .click(.right):
                 self.handleRightClick(event: event)
+            case .dragStarted:
+                self.handleDragStart(event: event)
             default:
                 break
             }
@@ -298,6 +306,88 @@ class PanelUIManager: ObservableObject, UIManager {
         listPanelManager?.onExitToRing = { [weak self] in
             self?.hide()
         }
+    }
+    
+    // MARK: - Mouse Down & Drag Handlers
+
+    private func handleMouseDown(event: GestureManager.GestureEvent) {
+        guard isVisible else { return }
+        
+        if let panelManager = listPanelManager,
+           let _ = panelManager.handleDragStart(at: event.position) {
+            print("[PanelUIManager] Mouse down on draggable item - suppressing hover")
+            // Stop the mouse monitor to prevent hover updates
+            stopPanelMouseMonitor()
+            return
+        }
+    }
+
+    private func handleDragStart(event: GestureManager.GestureEvent) {
+        guard isVisible else {
+            print("[PanelUIManager] Drag start ignored - not visible")
+            return
+        }
+        
+        let hitTestPosition: CGPoint
+        if case .dragStarted(_, let startPoint) = event.type {
+            hitTestPosition = startPoint
+            print("[PanelUIManager] Drag start - hit testing at START point: \(startPoint), current position: \(event.position)")
+        } else {
+            hitTestPosition = event.position
+            print("[PanelUIManager] Drag start - hit testing at current position: \(event.position)")
+        }
+        
+        guard let panelManager = listPanelManager else {
+            print("[PanelUIManager] Drag start - no panel manager")
+            return
+        }
+        
+        // Debug: check panel state
+        print("[PanelUIManager] Panel stack: \(panelManager.panelStack.count) panel(s)")
+        for panel in panelManager.panelStack {
+            let bounds = panelManager.currentBounds(for: panel)
+            print("   Panel level \(panel.level): bounds=\(bounds), items=\(panel.items.count)")
+            print("   Contains point: \(bounds.contains(hitTestPosition))")
+        }
+        
+        guard let result = panelManager.handleDragStart(at: hitTestPosition) else {
+            print("[PanelUIManager] Drag start - hit test FAILED at \(hitTestPosition)")
+            return
+        }
+        
+        print("[PanelUIManager] Drag start on: '\(result.node.name)' at level \(result.level)")
+        
+        // Stop gesture monitoring during drag
+        gestureManager?.stopMonitoring()
+        print("   Gesture monitoring paused for drag")
+        
+        var provider = result.dragProvider
+        provider.modifierFlags = event.modifierFlags
+        
+        // Hide overlay window when system drag session begins
+        provider.onDragSessionBegan = { [weak self] in
+            DispatchQueue.main.async {
+                self?.overlayWindow?.orderOut(nil)
+            }
+        }
+        
+        // Hide UI when drag completes
+        let originalCompletion = provider.onDragCompleted
+        provider.onDragCompleted = { [weak self] success in
+            originalCompletion?(success)
+            DispatchQueue.main.async {
+                print("[PanelUIManager] Drag completed - hiding UI")
+                self?.hide()
+            }
+        }
+        
+        self.currentDragProvider = provider
+        self.dragStartPoint = event.position
+        self.draggedNode = result.node
+        
+        print("   Files: \(provider.fileURLs.map { $0.lastPathComponent }.joined(separator: ", "))")
+        
+        provider.onDragStarted?()
     }
     
     // MARK: - Overlay Window Setup
@@ -359,6 +449,11 @@ class PanelUIManager: ObservableObject, UIManager {
     // MARK: - Click Handlers
 
     private func handleLeftClick(event: GestureManager.GestureEvent) {
+        // Resume hover monitor if paused for potential drag that didn't happen
+        if panelMouseMonitor == nil && isVisible {
+            startPanelMouseMonitor()
+        }
+        
         guard isVisible else { return }
         
         // Skip if context menu is open

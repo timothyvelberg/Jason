@@ -241,6 +241,15 @@ class GestureManager {
             startTime: Date(),
             hasMoved: false
         )
+        
+        // Fire mouse down event so managers can prepare (e.g., pause tracking)
+        let gestureEvent = GestureEvent(
+            type: .mouseDown(button),
+            position: position,
+            timestamp: Date(),
+            modifierFlags: event.modifierFlags
+        )
+        onGesture?(gestureEvent)
     }
     
     private func handleMouseDragged(_ event: NSEvent, button: MouseButton) {

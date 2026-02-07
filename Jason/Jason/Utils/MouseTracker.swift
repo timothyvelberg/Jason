@@ -40,6 +40,7 @@ class MouseTracker {
         trackingStartPoint = NSEvent.mouseLocation
         print("Mouse tracking started at: \(String(describing: trackingStartPoint))")
 
+        
         var hasMouseMoved = false
 
         trackingTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
@@ -64,6 +65,7 @@ class MouseTracker {
         trackingStartPoint = nil
         lastFunctionIndex = nil
         lastRingLevel = nil
+        isPausedForDrag = false
         print("Mouse tracking stopped")
     }
     
@@ -82,6 +84,7 @@ class MouseTracker {
     }
 
     func resumeFromDrag() {
+        guard isPausedForDrag else { return }
         isPausedForDrag = false
         print("▶️ [MouseTracker] Resumed from drag")
     }

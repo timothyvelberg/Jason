@@ -13,6 +13,9 @@ extension CircularUIManager {
     // MARK: - Left Click
     
     func handleLeftClick(event: GestureManager.GestureEvent) {
+        // Resume tracking if paused for potential drag that didn't happen
+         mouseTracker?.resumeFromDrag()
+        
         // Check if click is inside the panel
         if let panelManager = listPanelManager {
             if let result = panelManager.handleLeftClick(at: event.position) {
@@ -185,28 +188,32 @@ extension CircularUIManager {
     // MARK: - Drag Start
     
     func handleDragStart(event: GestureManager.GestureEvent) {
+        // Extract the original mouse-down position for hit testing
+        let hitTestPosition: CGPoint
+        if case .dragStarted(_, let startPoint) = event.type {
+            hitTestPosition = startPoint
+        } else {
+            hitTestPosition = event.position
+        }
+        
         // 1. Check if drag started inside a panel FIRST
         if let panelManager = listPanelManager {
-            if let result = panelManager.handleDragStart(at: event.position) {
+            if let result = panelManager.handleDragStart(at: hitTestPosition) {  // ← changed
                 print("[Drag Start] On panel item: '\(result.node.name)' at level \(result.level)")
                 
-                // Stop tracking during drag
                 mouseTracker?.stopTrackingMouse()
                 gestureManager?.stopMonitoring()
                 print("Mouse tracking paused for panel drag operation")
                 
-                // Copy provider and update modifier flags
                 var provider = result.dragProvider
                 provider.modifierFlags = event.modifierFlags
                 
-                // Add this after setting up the provider, before calling onDragStarted:
                 provider.onDragSessionBegan = { [weak self] in
                     DispatchQueue.main.async {
                         self?.overlayWindow?.orderOut(nil)
                     }
                 }
                 
-                // Wrap completion to hide UI after drag
                 let originalCompletion = provider.onDragCompleted
                 provider.onDragCompleted = { [weak self] success in
                     originalCompletion?(success)
@@ -217,7 +224,7 @@ extension CircularUIManager {
                 }
                 
                 self.currentDragProvider = provider
-                self.dragStartPoint = event.position
+                self.dragStartPoint = event.position  // ← stays as current position (where cursor is)
                 self.draggedNode = result.node
                 
                 print("Panel drag initialized for: \(result.node.name)")
@@ -231,26 +238,22 @@ extension CircularUIManager {
         // 2. Fall through to ring check
         guard let functionManager = functionManager else { return }
         
-        guard let (ringLevel, index, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) else {
+        guard let (ringLevel, index, node) = functionManager.getItemAt(position: hitTestPosition, centerPoint: centerPoint) else {  // ← changed
             print("Drag start not on any item")
             return
         }
         
         print("[Drag Start] On ring item: '\(node.name)' at ring \(ringLevel), index \(index)")
         
-        // Check if the node is draggable (resolve with current modifiers)
         let behavior = node.onLeftClick.resolve(with: event.modifierFlags)
         
         if case .drag(var provider) = behavior {
-            // Stop mouse tracking during drag
             mouseTracker?.stopTrackingMouse()
             gestureManager?.stopMonitoring()
             print("Mouse tracking paused for drag operation")
             
-            // Store modifier flags at drag start
             provider.modifierFlags = event.modifierFlags
             
-            // Wrap the original onDragCompleted to hide UI after drag
             let originalCompletion = provider.onDragCompleted
             provider.onDragCompleted = { [weak self] success in
                 originalCompletion?(success)
@@ -261,7 +264,7 @@ extension CircularUIManager {
             }
             
             self.currentDragProvider = provider
-            self.dragStartPoint = event.position
+            self.dragStartPoint = event.position  // ← stays as current position
             self.draggedNode = node
             
             print("Ring drag initialized for: \(node.name)")
@@ -322,6 +325,29 @@ extension CircularUIManager {
             print("Scroll back detected - collapsing to ring \(currentLevel - 1)")
             functionManager.collapseToRing(level: currentLevel - 1)
             mouseTracker?.pauseUntilMovement()
+        }
+    }
+    
+    // MARK: - Mouse Down (Pre-drag Preparation)
+
+    func handleMouseDown(event: GestureManager.GestureEvent) {
+        // Check if mouse down is on a draggable panel item
+        if let panelManager = listPanelManager,
+           let result = panelManager.handleDragStart(at: event.position) {
+            print("[Mouse Down] On draggable panel item: '\(result.node.name)' - pausing tracker")
+            mouseTracker?.pauseForDrag()
+            return
+        }
+        
+        // Check if mouse down is on a draggable ring item
+        guard let functionManager = functionManager else { return }
+        
+        if let (_, _, node) = functionManager.getItemAt(position: event.position, centerPoint: centerPoint) {
+            let behavior = node.onLeftClick.resolve(with: event.modifierFlags)
+            if case .drag = behavior {
+                print("[Mouse Down] On draggable ring item: '\(node.name)' - pausing tracker")
+                mouseTracker?.pauseForDrag()
+            }
         }
     }
 }

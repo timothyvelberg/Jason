@@ -100,9 +100,9 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     private func makeTodoNode(_ todo: TodoItem) -> FunctionNode {
         let icon: NSImage
         if todo.isCompleted {
-            icon = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Done") ?? NSImage()
+            icon = NSImage(named: "icon_done") ?? NSImage()
         } else {
-            icon = NSImage(systemSymbolName: "circle", accessibilityDescription: "Todo") ?? NSImage()
+            icon = NSImage(named: "icon_todo") ?? NSImage()
         }
         
         return FunctionNode(

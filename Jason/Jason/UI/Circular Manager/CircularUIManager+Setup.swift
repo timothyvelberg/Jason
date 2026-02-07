@@ -241,6 +241,8 @@ extension CircularUIManager {
             guard let self = self else { return }
             
             switch event.type {
+            case .mouseDown(.left):
+                self.handleMouseDown(event: event)
             case .click(.left):
                 self.handleLeftClick(event: event)
             case .click(.right):

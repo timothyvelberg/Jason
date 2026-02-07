@@ -13,20 +13,30 @@ struct PanelOnlyView: View {
     @ObservedObject var listPanelManager: ListPanelManager
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Transparent background
-                Color.clear
-                
-                // Panel stack
-                if listPanelManager.isVisible {
-                    ForEach(listPanelManager.panelStack) { panel in
-                        panelView(for: panel, in: geometry)
+        ZStack {
+            GeometryReader { geometry in
+                ZStack {
+                    // Transparent background
+                    Color.clear
+                    
+                    // Panel stack
+                    if listPanelManager.isVisible {
+                        ForEach(listPanelManager.panelStack) { panel in
+                            panelView(for: panel, in: geometry)
+                        }
                     }
                 }
             }
+            .ignoresSafeArea()
+            
+            // Drag overlay - sits on top to handle drag gestures
+            DraggableOverlay(
+                dragProvider: $panelUIManager.currentDragProvider,
+                dragStartPoint: $panelUIManager.dragStartPoint
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .allowsHitTesting(false)
         }
-        .ignoresSafeArea()
     }
     
     @ViewBuilder
