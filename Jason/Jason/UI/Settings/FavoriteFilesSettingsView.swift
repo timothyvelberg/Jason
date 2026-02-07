@@ -59,22 +59,6 @@ struct FavoriteFilesSettingsView: View {
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
-                    
-                    HStack(spacing: 12) {
-                        Button {
-                            showFilePicker()
-                        } label: {
-                            Label("Add File", systemImage: "doc.badge.plus")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        
-                        Button {
-                            showingDynamicFileCreator = true
-                        } label: {
-                            Label("Add Rule", systemImage: "wand.and.stars")
-                        }
-                        .buttonStyle(.bordered)
-                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {

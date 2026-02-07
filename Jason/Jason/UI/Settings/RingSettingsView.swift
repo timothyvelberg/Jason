@@ -10,10 +10,14 @@ import SwiftUI
 
 struct RingsSettingsView: View {
     @State private var configurations: [StoredRingConfiguration] = []
-    @State private var showingEditor: Bool = false
-    @State private var editingConfig: StoredRingConfiguration?
+    @State private var activeSheet: SheetConfig?
     @State private var showingDeleteConfirmation: Bool = false
     @State private var configToDelete: StoredRingConfiguration?
+    
+    private struct SheetConfig: Identifiable {
+        let id: Int  // -1 for new, config.id for edit
+        let configuration: StoredRingConfiguration?
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -47,8 +51,7 @@ struct RingsSettingsView: View {
                         RingConfigurationRow(
                             config: config,
                             onEdit: {
-                                editingConfig = config
-                                showingEditor = true
+                                activeSheet = SheetConfig(id: config.id, configuration: config)
                             },
                             onTest: {
                                 testRing(config)
@@ -61,8 +64,7 @@ struct RingsSettingsView: View {
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         .contextMenu {
                             Button("Edit...") {
-                                editingConfig = config
-                                showingEditor = true
+                                activeSheet = SheetConfig(id: config.id, configuration: config)
                             }
                             
                             Button("Test") {
@@ -108,8 +110,8 @@ struct RingsSettingsView: View {
         .onAppear {
             loadConfigurations()
         }
-        .sheet(isPresented: $showingEditor) {
-            EditRingView(configuration: editingConfig, onSave: {
+        .sheet(item: $activeSheet) { sheet in
+            EditRingView(configuration: sheet.configuration, onSave: {
                 loadConfigurations()
                 CircularUIInstanceManager.shared.syncWithConfigurations()
                 CircularUIInstanceManager.shared.registerInputTriggers()
@@ -144,8 +146,7 @@ struct RingsSettingsView: View {
     }
     
     private func addNewConfiguration() {
-        editingConfig = nil
-        showingEditor = true
+        activeSheet = SheetConfig(id: -1, configuration: nil)
     }
     
     private func duplicateConfiguration(_ config: StoredRingConfiguration) {
@@ -189,6 +190,12 @@ struct RingConfigurationRow: View {
             Circle()
                 .fill(config.isActive ? Color.green : Color.gray.opacity(0.3))
                 .frame(width: 10, height: 10)
+            
+            Image(systemName: "circle.grid.3x3.fill")
+                .font(.system(size: 20))
+                .foregroundColor(.blue)
+                .frame(width: 28)
+            
             VStack(alignment: .leading, spacing: 4) {
                 Text(config.name)
                     .font(.body)

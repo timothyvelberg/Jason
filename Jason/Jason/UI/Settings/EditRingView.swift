@@ -350,18 +350,14 @@ struct EditRingView: View {
                             
                             Text("Drag to reorder • Enabled providers appear in ring order")
                                 .font(.caption2)
-                                .foregroundColor(.secondary.opacity(0.8))
-                            
-                            List {
-                                ForEach($providers) { $provider in
-                                    ProviderRowReorderable(provider: $provider)
-                                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
-                                        .listRowSeparator(.hidden)
+                                .foregroundColor(.secondary.opacity(0.8))   
+                            VStack(spacing: 4) {
+                                ForEach(providers.indices, id: \.self) { index in
+                                    ProviderRowReorderable(provider: $providers[index])
+                                        .padding(.vertical, 4)
+                                        .padding(.horizontal, 8)
                                 }
-                                .onMove(perform: moveProvider)
                             }
-                            .listStyle(.plain)
-                            .frame(height: CGFloat(providers.count) * 70 + 16)
                             .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
                             .cornerRadius(8)
                         }
