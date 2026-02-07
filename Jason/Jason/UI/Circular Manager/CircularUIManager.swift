@@ -103,6 +103,67 @@ class CircularUIManager: ObservableObject, UIManager {
         }
     }
     
+    func teardown() {
+        print("🧹 [CircularUIManager-\(configId)] teardown() called")
+        
+        // 1. Hide if visible
+        if isVisible {
+            hide()
+        }
+        
+        // 2. Break the retain cycle: NSHostingView -> CircularUIView -> @ObservedObject self
+        // Break retain cycle and release callbacks
+        overlayWindow?.contentView = nil
+        overlayWindow?.onLostFocus = nil
+        overlayWindow?.onScrollBack = nil
+        overlayWindow?.onSearchToggle = nil
+        overlayWindow?.onEscapePressed = nil
+        overlayWindow?.orderOut(nil)
+        
+        // 3. Remove notification observer (don't rely on deinit)
+        NotificationCenter.default.removeObserver(self)
+        
+        // 4. Remove mouse monitor
+        if let monitor = panelMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            panelMouseMonitor = nil
+        }
+        
+        // 5. Clean up FunctionManager (providers, nodes, caches)
+        if let fm = functionManager {
+            // Refresh providers to clear any internal caches
+            for provider in fm.providers {
+                provider.refresh()
+                // Clear nodeCache on providers that have it
+                if let folderProvider = provider as? FavoriteFolderProvider {
+                    folderProvider.clearCache()
+                }
+            }
+            // Reset clears rings, navigation stack, cached configs
+            fm.reset()
+            // Clear what reset() misses
+            fm.rootNodes.removeAll()
+            fm.providers.removeAll()
+            fm.providerConfigurations.removeAll()
+        }
+        
+        // 6. Stop folder watchers owned by this instance's providers
+        // (We'll address this more precisely in a later step)
+        
+        // 7. Nil out sub-objects to release their memory
+        functionManager = nil
+        mouseTracker = nil
+        gestureManager = nil
+        inputCoordinator = nil
+        listPanelManager = nil
+        panelActionHandler = nil
+        overlayWindow = nil
+        combinedAppsProvider = nil
+        favoriteFilesProvider = nil
+        
+        print("🧹 [CircularUIManager-\(configId)] teardown complete")
+    }
+    
     // MARK: - Provider Update Handler
 
     @objc private func handleProviderUpdate(_ notification: Notification) {

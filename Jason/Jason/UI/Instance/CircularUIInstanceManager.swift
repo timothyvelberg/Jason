@@ -122,9 +122,8 @@ class CircularUIInstanceManager: ObservableObject {
         print("🗑️ [InstanceManager] Removing instance for config ID: \(configId)")
         
         // Hide UI if visible
-        if instance.isVisible {
-            instance.hide()
-        }
+        // Tear down all resources
+        instance.teardown()
         
         // Clear active instance tracking if this was the active instance
         if activeInstanceId == configId {
@@ -142,11 +141,9 @@ class CircularUIInstanceManager: ObservableObject {
     func removeAllInstances() {
         print("🗑️ [InstanceManager] Removing all \(instances.count) instance(s)")
         
-        // Hide all visible UIs
+        // Tear down all instances
         for (_, instance) in instances {
-            if instance.isVisible {
-                instance.hide()
-            }
+            instance.teardown()
         }
         
         // Clear dictionary

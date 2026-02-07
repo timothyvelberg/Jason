@@ -37,13 +37,18 @@ protocol UIManager: AnyObject {
     
     /// Temporarily ignore focus changes
     func ignoreFocusChangesTemporarily(duration: TimeInterval)
+    /// Clean up all resources before removal
+    func teardown()
 }
 
 // MARK: - Default Implementations
 
 extension UIManager {
-    /// Convenience show without trigger direction
     func show() {
         show(triggerDirection: nil)
+    }
+    
+    func teardown() {
+        // Default no-op for managers that don't need cleanup
     }
 }

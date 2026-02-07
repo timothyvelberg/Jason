@@ -279,14 +279,8 @@ extension CircularUIManager {
         
         // Wire mouse movement for panel sliding
         panelMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
-            guard let self = self else {
-                print("[panelMouseMonitor] ⚠️ self is nil")
-                return event
-            }
-            guard let panelManager = self.listPanelManager else {
-                print("[panelMouseMonitor] ⚠️ listPanelManager is nil")
-                return event
-            }
+            guard let self = self else { return event }
+            guard let panelManager = self.listPanelManager else { return event }
             guard panelManager.isVisible else {
                 return event
             }
