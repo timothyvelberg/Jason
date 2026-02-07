@@ -82,10 +82,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func setupContentWindow() {
-        // Create ContentView - it will create its own AppSwitcherManager and CircularUIManager
-//        let contentView = ContentView()
         let contentView = ContentSettingsView()
-
         
         // Create window with size appropriate for settings interface
         contentWindow = NSWindow(

@@ -189,12 +189,6 @@ struct RingConfigurationRow: View {
             Circle()
                 .fill(config.isActive ? Color.green : Color.gray.opacity(0.3))
                 .frame(width: 10, height: 10)
-            
-            Image(systemName: "circle.grid.3x3.fill")
-                .font(.system(size: 20))
-                .foregroundColor(.blue)
-                .frame(width: 28)
-            
             VStack(alignment: .leading, spacing: 4) {
                 Text(config.name)
                     .font(.body)

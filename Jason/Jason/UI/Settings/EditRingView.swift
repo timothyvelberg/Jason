@@ -340,54 +340,7 @@ struct EditRingView: View {
                             }
                         }
                     }
-                    
-                    // Ring Geometry
-                    GroupBox(label: Label("Ring Geometry", systemImage: "circle.grid.3x3")) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text("Ring Radius:")
-                                    .frame(width: 140, alignment: .leading)
-                                TextField("", text: $ringRadius)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(width: 80)
-                                Text("px")
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            HStack {
-                                Text("Center Hole Radius:")
-                                    .frame(width: 140, alignment: .leading)
-                                TextField("", text: $centerHoleRadius)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(width: 80)
-                                Text("px")
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            HStack {
-                                Text("Icon Size:")
-                                    .frame(width: 140, alignment: .leading)
-                                TextField("", text: $iconSize)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(width: 80)
-                                Text("px")
-                                    .foregroundColor(.secondary)
-                            }
-                            HStack {
-                                Text("Start Position:")
-                                    .frame(width: 140, alignment: .leading)
-                                Picker("", selection: $startAngle) {
-                                    Text("12 o'clock (Top)").tag(0.0)
-                                    Text("3 o'clock (Right)").tag(90.0)
-                                    Text("6 o'clock (Bottom)").tag(180.0)
-                                    Text("9 o'clock (Left)").tag(270.0)
-                                }
-                                .frame(width: 180)
-                            }
-                        }
-                        .padding(12)
-                    }
-                    
+                                    
                     // Providers
                     GroupBox(label: Label("Content Providers", systemImage: "square.stack.3d.up.fill")) {
                         VStack(alignment: .leading, spacing: 8) {
