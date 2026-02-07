@@ -11,35 +11,15 @@ import AppKit
 
 // MARK: - Favorites Settings View
 
-struct FavoritesSettingsView: View {
-    @Environment(\.dismiss) var dismiss
+struct FavoriteFoldersViews: View {
     @State private var favorites: [(folder: FolderEntry, settings: FavoriteFolderSettings)] = []
     @State private var editingFavorite: FolderEntry?
     @State private var editingName: String = ""
     @State private var editingMaxItems: String = ""
     @State private var newFolderPath: String = ""
     
-    let circularUI: CircularUIManager
-    
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Manage Favorite Folders")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                
-                Spacer()
-                
-                Button("Done") {
-                    dismiss()
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .padding()
-            
-            Divider()
-            
             if favorites.isEmpty {
                 VStack(spacing: 20) {
                     Image(systemName: "folder.badge.plus")
@@ -105,7 +85,6 @@ struct FavoritesSettingsView: View {
             }
             .padding()
         }
-        .frame(width: 600, height: 500)
         .onAppear {
             loadFavorites()
         }
@@ -131,7 +110,6 @@ struct FavoritesSettingsView: View {
     private func loadFavorites() {
         favorites = DatabaseManager.shared.getFavoriteFolders()
         print("📋 Loaded \(favorites.count) favorites")
-        circularUI.hide()
     }
     
     private func addFolder() {

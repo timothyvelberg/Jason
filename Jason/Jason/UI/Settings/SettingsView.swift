@@ -152,7 +152,7 @@ struct FavoritesSettingsSection: View {
                         .first(where: {
                             $0.functionManager?.providers.contains(where: { $0 is FavoriteFolderProvider }) ?? false
                         }) {
-                        FavoritesSettingsView(circularUI: instance)
+                        FavoriteFoldersViews()
                     } else {
                         noProviderView(for: "Favorite Folders", providerType: "FavoriteFolderProvider")
                     }
