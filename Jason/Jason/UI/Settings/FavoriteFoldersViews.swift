@@ -130,7 +130,8 @@ struct FavoriteFoldersViews: View {
     
     private func removeFavorite(_ folder: FolderEntry) {
         if DatabaseManager.shared.removeFavoriteFolder(path: folder.path) {
-            print("🗑️ Removed favorite: \(folder.title)")
+            print("Removed favorite: \(folder.title)")
+            FolderWatcherManager.shared.reconcileWatchers()
             loadFavorites()
         }
     }

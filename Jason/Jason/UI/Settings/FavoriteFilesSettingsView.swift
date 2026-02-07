@@ -231,6 +231,7 @@ struct FavoriteFilesSettingsView: View {
     private func removeDynamicFile(_ file: FavoriteDynamicFileEntry) {
         guard let id = file.id else { return }
         if DatabaseManager.shared.removeFavoriteDynamicFile(id: id) {
+            FolderWatcherManager.shared.reconcileWatchers()
             loadFavoriteFiles()
             notifyProvider()
         }

@@ -184,6 +184,12 @@ class FolderWatcherManager: LiveDataStream {
         watcherQueue.async { [weak self] in
             guard let self = self else { return }
             
+            // Cancel any pending debounced refresh
+            if let pending = self.pendingRefreshes[path] {
+                pending.cancel()
+                self.pendingRefreshes.removeValue(forKey: path)
+            }
+            
             if let watcher = self.watchers[path] {
                 watcher.stop()
                 self.watchers.removeValue(forKey: path)
@@ -197,6 +203,12 @@ class FolderWatcherManager: LiveDataStream {
         watcherQueue.async { [weak self] in
             guard let self = self else { return }
             
+            // Cancel all pending refreshes
+            for (_, pending) in self.pendingRefreshes {
+                pending.cancel()
+            }
+            self.pendingRefreshes.removeAll()
+            
             for (_, watcher) in self.watchers {
                 watcher.stop()
             }
@@ -205,9 +217,57 @@ class FolderWatcherManager: LiveDataStream {
         }
     }
     
-    /// Get list of currently watched folders
+    /// Get list of currently watched folders (thread-safe)
     func getWatchedFolders() -> [String] {
-        return Array(watchers.keys)
+        return watcherQueue.sync {
+            Array(watchers.keys)
+        }
+    }
+    
+    /// Reconcile active watchers against current database state.
+    /// Stops watchers for folders that are no longer needed by any favorite or dynamic file.
+    /// Call this after removing a favorite folder or dynamic file from the database.
+    func reconcileWatchers() {
+        // Gather DB state on the calling thread (main) before dispatching
+        let heavyFavoritePaths = Set(
+            DatabaseManager.shared.getFavoriteFolders()
+                .map { $0.folder.path }
+                .filter { DatabaseManager.shared.isHeavyFolder(path: $0) }
+        )
+        
+        let dynamicFileFolderPaths = Set(
+            DatabaseManager.shared.getFavoriteDynamicFiles()
+                .map { $0.folderPath }
+        )
+        
+        let neededPaths = heavyFavoritePaths.union(dynamicFileFolderPaths)
+        
+        watcherQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            let activePaths = Set(self.watchers.keys)
+            let stalePaths = activePaths.subtracting(neededPaths)
+            
+            for path in stalePaths {
+                // Cancel pending refresh
+                if let pending = self.pendingRefreshes[path] {
+                    pending.cancel()
+                    self.pendingRefreshes.removeValue(forKey: path)
+                }
+                
+                if let watcher = self.watchers[path] {
+                    watcher.stop()
+                    self.watchers.removeValue(forKey: path)
+                    print("[FolderWatcher] 🧹 Reconcile: stopped stale watcher for \(path)")
+                }
+            }
+            
+            if stalePaths.isEmpty {
+                print("[FolderWatcher] 🧹 Reconcile: all watchers still needed")
+            } else {
+                print("[FolderWatcher] 🧹 Reconcile: removed \(stalePaths.count) stale watcher(s), \(self.watchers.count) remaining")
+            }
+        }
     }
     
     // MARK: - Private Methods
