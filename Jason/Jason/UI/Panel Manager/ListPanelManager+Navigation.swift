@@ -106,14 +106,11 @@ extension ListPanelManager {
     /// Get the effective selected row for a panel level
     /// Only the ACTIVE panel shows selection highlight
     func effectiveSelectedRow(for level: Int) -> Int? {
-//        print("[EffectiveRow] level=\(level), activePanelLevel=\(activePanelLevel), isKeyboardDriven=\(isKeyboardDriven), hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
-        
         guard level == activePanelLevel else {
             return nil
         }
         
         if isKeyboardDriven {
-//            print("[EffectiveRow] Returning keyboardSelectedRow[\(level)]=\(keyboardSelectedRow[level] ?? -999)")
             return keyboardSelectedRow[level]
         }
         
@@ -121,16 +118,11 @@ extension ListPanelManager {
         if let previewPanel = panelStack.first(where: { $0.level == level + 1 }),
            !previewPanel.isOverlapping,
            let sourceRow = previewPanel.sourceRowIndex {
-            // Return source row if:
-            // 1. hoveredRow matches (mouse on source row), OR
-            // 2. hoveredRow is nil (transition state - assume still on source row)
             if hoveredRow[level] == sourceRow || hoveredRow[level] == nil {
-//                print("[EffectiveRow] Returning source row \(sourceRow) from preview child (hover matches or nil)")
                 return sourceRow
             }
         }
         
-//        print("[EffectiveRow] Returning hoveredRow[\(level)]=\(hoveredRow[level] ?? -999)")
         return hoveredRow[level]
     }
 
@@ -275,10 +267,23 @@ extension ListPanelManager {
         onItemLeftClick?(selectedNode, NSEvent.modifierFlags)
     }
     
+    // MARK: - Dynamic Load Management
+    
+    /// Cancel any in-flight dynamic load and debounce timer
+    func cancelDynamicLoad() {
+        dynamicLoadDebounce?.cancel()
+        dynamicLoadDebounce = nil
+        dynamicLoadTask?.cancel()
+        dynamicLoadTask = nil
+    }
+    
     /// Handle item hover — manages folder cascading, child panel push/pop, and dynamic loading.
     func handleItemHover(node: FunctionNode?, level: Int, rowIndex: Int) {
         print("[handleItemHover] node: '\(node?.name ?? "nil")', level: \(level), rowIndex: \(rowIndex), type: \(String(describing: node?.type))")
 
+        // Cancel any in-flight dynamic load from previous hover
+        cancelDynamicLoad()
+        
         guard let node = node else { return }
         
         // Only cascade for folders
@@ -298,7 +303,7 @@ extension ListPanelManager {
         let providerId = node.providerId
         let contentIdentifier = node.metadata?["folderURL"] as? String ?? node.previewURL?.path
         
-        // Children already loaded — push immediately
+        // Children already loaded — push immediately (no debounce needed)
         if let children = node.children, !children.isEmpty {
             pushPanel(
                 title: node.name,
@@ -314,7 +319,7 @@ extension ListPanelManager {
             return
         }
         
-        // Dynamic loading
+        // Dynamic loading — debounce before hitting the filesystem
         guard node.needsDynamicLoading,
               let providerId = node.providerId,
               let provider = findProvider?(providerId) else {
@@ -322,30 +327,68 @@ extension ListPanelManager {
             return
         }
         
-        Task {
-            let children = await provider.loadChildren(for: node)
+        let nodeId = node.id
+        let nodeName = node.name
+        let contextActions = node.contextActions
+        
+        // Debounce: wait 150ms before starting the load
+        let debounceItem = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
             
-            guard !children.isEmpty else {
-                await MainActor.run {
-                    self.popToLevel(level)
-                }
+            // Verify the user is still on this item
+            guard self.currentlyHoveredNodeId[level] == nodeId else {
+                print("[Debounce] User moved away from '\(nodeName)' - skipping load")
                 return
             }
             
-            await MainActor.run {
-                self.pushPanel(
-                    title: node.name,
-                    items: children,
-                    fromPanelAtLevel: level,
-                    sourceNodeId: node.id,
-                    sourceRowIndex: rowIndex,
-                    providerId: providerId,
-                    contentIdentifier: contentIdentifier,
-                    contextActions: node.contextActions
-                )
-                self.activateInputModeIfNeeded(for: providerId, atLevel: level + 1)
+            // Start the actual async load as a cancellable task
+            let task = Task { [weak self] in
+                let children = await provider.loadChildren(for: node)
+                
+                // Check cancellation before UI work
+                guard !Task.isCancelled else {
+                    print("[DynamicLoad] Task cancelled for '\(nodeName)' - discarding results")
+                    return
+                }
+                
+                guard !children.isEmpty else {
+                    await MainActor.run {
+                        self?.popToLevel(level)
+                    }
+                    return
+                }
+                
+                await MainActor.run {
+                    guard let self = self else { return }
+                    
+                    // Final check: is the user still on this item?
+                    guard self.currentlyHoveredNodeId[level] == nodeId else {
+                        print("[DynamicLoad] User moved away during load of '\(nodeName)' - discarding")
+                        return
+                    }
+                    
+                    self.pushPanel(
+                        title: nodeName,
+                        items: children,
+                        fromPanelAtLevel: level,
+                        sourceNodeId: nodeId,
+                        sourceRowIndex: rowIndex,
+                        providerId: providerId,
+                        contentIdentifier: contentIdentifier,
+                        contextActions: contextActions
+                    )
+                    self.activateInputModeIfNeeded(for: providerId, atLevel: level + 1)
+                }
+            }
+            
+            // Store task reference for cancellation
+            DispatchQueue.main.async {
+                self.dynamicLoadTask = task
             }
         }
+        
+        dynamicLoadDebounce = debounceItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: debounceItem)
     }
 
     /// Activate input mode on a panel if its provider defaults to .input

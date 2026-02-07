@@ -83,6 +83,14 @@ class ListPanelManager: ObservableObject {
     /// Callback when user submits text in input mode (e.g., add todo)
     var onAddItem: ((String, NSEvent.ModifierFlags) -> Void)?
     
+    // MARK: - Dynamic Load State
+    
+    /// Current in-flight dynamic load task (cancelled when hover changes)
+    var dynamicLoadTask: Task<Void, Never>?
+    
+    /// Debounce timer for dynamic folder loading (prevents loading during fast scrolling)
+    var dynamicLoadDebounce: DispatchWorkItem?
+    
     
     // MARK: - Ring Context (internal for extension access)
     
@@ -815,6 +823,9 @@ class ListPanelManager: ObservableObject {
     func popToLevel(_ level: Int) {
         let before = panelStack.count
         
+        // Cancel any in-flight dynamic load
+        cancelDynamicLoad()
+        
         // Clean up scroll state and hover tracking for panels being popped
         for panel in panelStack where panel.level > level {
             scrollDebounceTimers[panel.level]?.cancel()
@@ -850,6 +861,9 @@ class ListPanelManager: ObservableObject {
         print("[ListPanelManager] Hiding all panels")
         panelStack.removeAll()
         pendingPanel = nil
+        
+        // Cancel any in-flight dynamic load
+        cancelDynamicLoad()
         
         // Reset keyboard navigation state
         activePanelLevel = 0

@@ -18,7 +18,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         return NSImage(named: "parent-folders") ?? NSImage()
     }
     
-    private let maxItemsPerFolder: Int = 100
+    private let maxItemsPerFolder: Int = 40
     private var nodeCache: [String: [FunctionNode]] = [:]
     
     // MARK: - FunctionProvider Protocol
@@ -91,12 +91,20 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         let requestedSortOrder = getSortOrderForFolder(path: folderPath)
         print("🎯 [SORT] Folder: \(node.name) - Sort: \(requestedSortOrder.displayName)")
         
+        // Early cancellation check — bail before any filesystem work
+        try? Task.checkCancellation()
+        if Task.isCancelled { return [] }
+        
         // Record folder access
         db.recordFolderAccess(folderPath: folderPath)
         
         // Check actual folder size for heavy folder handling
         let actualItemCount = countFolderItems(at: folderURL)
         let folderExceedsLimit = actualItemCount > maxItemsPerFolder
+        
+        // Cancellation check — after counting but before heavy work
+        try? Task.checkCancellation()
+        if Task.isCancelled { return [] }
         
         // Check if this is a HEAVY folder and try ENHANCED CACHE
         if db.isHeavyFolder(path: folderPath) {
@@ -134,18 +142,44 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         
         print("📊 [FavoriteFolderProvider] Actual folder contains: \(actualItemCount) items")
         
+        // Cancellation check — before expensive disk + thumbnail work
+        try? Task.checkCancellation()
+        if Task.isCancelled {
+            print("🚫 [FavoriteFolderProvider] Cancelled before disk load: \(node.name)")
+            return []
+        }
+        
         let nodes: [FunctionNode] = await Task.detached(priority: .userInitiated) { [weak self] () -> [FunctionNode] in
             guard let self = self else {
                 print("❌ [FavoriteFolderProvider] Self deallocated during load")
                 return []
             }
+            
+            // Check cancellation inside detached task
+            if Task.isCancelled {
+                print("🚫 [FavoriteFolderProvider] Cancelled at start of background load")
+                return []
+            }
+            
             print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
             
             let result = self.getFolderContents(at: folderURL, sortOrder: requestedSortOrder)
             
+            // Check cancellation after loading but before returning
+            if Task.isCancelled {
+                print("🚫 [FavoriteFolderProvider] Cancelled after disk load: \(folderURL.lastPathComponent)")
+                return []
+            }
+            
             print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items")
             return result
         }.value
+        
+        // Cancellation check — before caching work
+        if Task.isCancelled {
+            print("🚫 [FavoriteFolderProvider] Cancelled before caching: \(node.name)")
+            return []
+        }
         
         let elapsed = Date().timeIntervalSince(startTime)
         print("✅ [END] Loaded \(nodes.count) nodes in \(String(format: "%.2f", elapsed))s")
@@ -155,6 +189,12 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         
         // Cache heavy folders
         if actualItemCount > 100 {
+            // Final cancellation check — don't bother caching if we're about to be discarded
+            if Task.isCancelled {
+                print("🚫 [FavoriteFolderProvider] Cancelled before enhanced cache write: \(node.name)")
+                return []
+            }
+            
             print("📊 [EnhancedCache] Folder has \(actualItemCount) items - caching with thumbnails")
             
             // Convert nodes to EnhancedFolderItem format WITH THUMBNAILS
@@ -452,7 +492,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             contextActions: [
                 StandardContextActions.copyFile(url),
                 StandardContextActions.showInFinder(url),
-                StandardContextActions.deleteFile(url) { success in  // UPDATE
+                StandardContextActions.deleteFile(url) { success in
                     if success {
                         NotificationCenter.default.postProviderUpdate(
                             providerId: providerId,
@@ -511,7 +551,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             contextActions: [
                 StandardContextActions.copyFile(url),
                 StandardContextActions.showInFinder(url),
-                StandardContextActions.deleteFile(url) { success in  // UPDATE
+                StandardContextActions.deleteFile(url) { success in
                     if success {
                         NotificationCenter.default.postProviderUpdate(
                             providerId: providerId,
