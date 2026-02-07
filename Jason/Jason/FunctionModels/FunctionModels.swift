@@ -44,6 +44,12 @@ enum FunctionNodeType {
     /// - Non-interactive (hovering selects nothing)
     /// - Renders as small dot, not icon
     case spacer
+    
+    /// Section header for grouping items in panels
+    /// - Can have children (grouped items) but uses positional grouping in flat lists
+    /// - Non-interactive (keyboard navigation skips it)
+    /// - Only used in panel display mode
+    case sectionHeader
 }
 
 // MARK: - Display Mode
@@ -253,7 +259,6 @@ class FunctionNode: Identifiable, ObservableObject {
             // Files can have contextActions (right-click menu), but not children
             assert((children?.count ?? 0) == 0,
                 "[file] nodes cannot have children (node: \(name))")
-            
         case .action:
             // Actions are pure leaf nodes - no children or contextActions
             assert((children?.count ?? 0) == 0 && (contextActions?.count ?? 0) == 0,
@@ -261,10 +266,10 @@ class FunctionNode: Identifiable, ObservableObject {
         case .category:
             assert((children?.count ?? 0) > 0 || (contextActions?.count ?? 0) > 0,
                    "[.category] nodes must have children or contextActions (node: \(name))")
-        case .spacer:
-            // Spacers are pure visual separators - no children or contextActions
+        case .spacer, .sectionHeader:
+            // Spacers and section headers are pure visual elements - no children or contextActions
             assert((children?.count ?? 0) == 0 && (contextActions?.count ?? 0) == 0,
-                "[spacer] nodes cannot have children or contextActions (node: \(name))")
+                "[spacer/sectionHeader] nodes cannot have children or contextActions (node: \(name))")
         case .folder, .app:
             // Can have children or be empty
             break
@@ -280,7 +285,7 @@ class FunctionNode: Identifiable, ObservableObject {
     
     // Leaf nodes are determined by type (actions, files, and spacers are always leaves)
     var isLeaf: Bool {
-        return type == .action || type == .file || type == .spacer
+        return type == .action || type == .file || type == .spacer || type == .sectionHeader
     }
     
     // Branch nodes are determined by type (categories, folders, and apps can have children)

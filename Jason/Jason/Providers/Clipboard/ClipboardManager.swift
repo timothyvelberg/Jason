@@ -57,6 +57,7 @@ class ClipboardManager: ObservableObject {
     private var pollTimer: Timer?
     private var lastChangeCount: Int = 0
     private let pollInterval: TimeInterval = 0.5
+    private var addCounter: Int = 0
     
     // MARK: - Initialization
     
@@ -212,6 +213,20 @@ class ClipboardManager: ObservableObject {
             DatabaseManager.shared.saveClipboardEntry(entry)
             
             print("[ClipboardManager] New entry added: \"\(content.prefix(30))...\" (total: \(history.count))")
+        }
+        // Prune every 10th new entry
+        addCounter += 1
+        if addCounter >= 10 {
+            addCounter = 0
+            
+            // Cap in-memory array
+            if history.count > 200 {
+                history = Array(history.prefix(200))
+                print("🧹 [ClipboardManager] Trimmed in-memory history to 200")
+            }
+            
+            // Prune database
+            DatabaseManager.shared.pruneClipboardHistory(keepCount: 200)
         }
     }
     

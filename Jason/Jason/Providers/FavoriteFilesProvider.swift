@@ -335,8 +335,37 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
     // MARK: - Provide Functions
     
     func provideFunctions() -> [FunctionNode] {
-        let fileNodes: [FunctionNode] = fileEntries.map { entry in
-            createFileNode(from: entry)
+        // Group entries by parent directory, preserving sort order
+        var groupedEntries: [(directory: String, entries: [FileEntry])] = []
+        for entry in fileEntries {
+            let parentDir = URL(fileURLWithPath: entry.filePath).deletingLastPathComponent().path
+            if let lastIndex = groupedEntries.lastIndex(where: { $0.directory == parentDir }) {
+                // Check if this is the most recent group (consecutive entries from same dir)
+                if lastIndex == groupedEntries.count - 1 {
+                    groupedEntries[lastIndex].entries.append(entry)
+                } else {
+                    // Non-consecutive — new group
+                    groupedEntries.append((directory: parentDir, entries: [entry]))
+                }
+            } else {
+                groupedEntries.append((directory: parentDir, entries: [entry]))
+            }
+        }
+        
+        // Build flat list with section headers
+        var fileNodes: [FunctionNode] = []
+        for group in groupedEntries {
+            // Only add header if there's more than one group
+            if groupedEntries.count > 1 {
+                fileNodes.append(FunctionNode(
+                    id: "section-\(group.directory)",
+                    name: group.directory,
+                    type: .sectionHeader,
+                    icon: NSImage(),
+                    providerId: providerId
+                ))
+            }
+            fileNodes.append(contentsOf: group.entries.map { createFileNode(from: $0) })
         }
         
         if fileNodes.isEmpty {

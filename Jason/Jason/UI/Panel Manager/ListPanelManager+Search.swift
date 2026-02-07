@@ -65,10 +65,48 @@ extension ListPanelManager {
             // Empty query - show all items
             panelStack[index].items = originalItems
         } else {
-            // Filter items by name
-            panelStack[index].items = originalItems.filter { item in
-                item.name.lowercased().contains(query)
+            var filtered: [FunctionNode] = []
+            var i = 0
+            
+            while i < originalItems.count {
+                let item = originalItems[i]
+                
+                if item.type == .sectionHeader {
+                    // Check if header matches
+                    if item.name.lowercased().contains(query) {
+                        // Include header + all items until next header
+                        filtered.append(item)
+                        i += 1
+                        while i < originalItems.count && originalItems[i].type != .sectionHeader {
+                            filtered.append(originalItems[i])
+                            i += 1
+                        }
+                    } else {
+                        // Header doesn't match — check children individually
+                        var matchingChildren: [FunctionNode] = []
+                        i += 1
+                        while i < originalItems.count && originalItems[i].type != .sectionHeader {
+                            if originalItems[i].name.lowercased().contains(query) {
+                                matchingChildren.append(originalItems[i])
+                            }
+                            i += 1
+                        }
+                        // Include header + matching children if any matched
+                        if !matchingChildren.isEmpty {
+                            filtered.append(item)
+                            filtered.append(contentsOf: matchingChildren)
+                        }
+                    }
+                } else {
+                    // Orphan item (no section) — filter normally
+                    if item.name.lowercased().contains(query) {
+                        filtered.append(item)
+                    }
+                    i += 1
+                }
             }
+            
+            panelStack[index].items = filtered
         }
         
         // Switch to keyboard mode so effectiveSelectedRow uses keyboardSelectedRow

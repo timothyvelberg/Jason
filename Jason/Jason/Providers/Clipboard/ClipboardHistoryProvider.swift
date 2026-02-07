@@ -42,7 +42,7 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
     // MARK: - FunctionProvider Methods
     
     func provideFunctions() -> [FunctionNode] {
-        let entries = clipboardManager.history
+        let entries = Array(clipboardManager.history.prefix(50))
         
         // Handle empty state - show placeholder
         let children: [FunctionNode]

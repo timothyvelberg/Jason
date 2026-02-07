@@ -147,25 +147,34 @@ struct ListPanelView: View {
                     ScrollView(.vertical, showsIndicators: needsScroll) {
                         VStack(spacing: 0) {
                             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                ListPanelRow(
-                                    item: item,
-                                    iconSize: iconSize,
-                                    baseRowHeight: config.baseRowHeight,
-                                    lineLimit: config.lineLimit,
-                                    isHovered: !isScrolling && hoveredRowIndex == index,
-                                    isExpanded: expandedItemId == item.id,
-                                    onLeftClick: { modifiers in
-                                        expandedItemId = nil
-                                        onItemLeftClick?(item, modifiers)
-                                    },
-                                    onRightClick: { modifiers in
-                                        onItemRightClick?(item, modifiers)
-                                    },
-                                    onContextAction: { action, modifiers in
-                                        expandedItemId = nil
-                                        onContextAction?(action, modifiers)
+                                Group {
+                                    if item.type == .sectionHeader {
+                                        ListPanelSectionHeader(
+                                            item: item,
+                                            baseRowHeight: config.baseRowHeight
+                                        )
+                                    } else {
+                                        ListPanelRow(
+                                            item: item,
+                                            iconSize: iconSize,
+                                            baseRowHeight: config.baseRowHeight,
+                                            lineLimit: config.lineLimit,
+                                            isHovered: !isScrolling && hoveredRowIndex == index,
+                                            isExpanded: expandedItemId == item.id,
+                                            onLeftClick: { modifiers in
+                                                expandedItemId = nil
+                                                onItemLeftClick?(item, modifiers)
+                                            },
+                                            onRightClick: { modifiers in
+                                                onItemRightClick?(item, modifiers)
+                                            },
+                                            onContextAction: { action, modifiers in
+                                                expandedItemId = nil
+                                                onContextAction?(action, modifiers)
+                                            }
+                                        )
                                     }
-                                )
+                                }
                                 .background(
                                     GeometryReader { geo in
                                         Color.clear.preference(
@@ -291,6 +300,26 @@ struct ListPanelView: View {
     }
 }
 
+struct ListPanelSectionHeader: View {
+    let item: FunctionNode
+    let baseRowHeight: CGFloat
+    
+    var body: some View {
+        HStack {
+            Text(item.name)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.white.opacity(0.45))
+                .textCase(.uppercase)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 4)
+        .frame(maxWidth: .infinity)
+    }
+}
+
 // MARK: - List Panel Row
 
 struct ListPanelRow: View {
@@ -358,7 +387,6 @@ struct ListPanelRow: View {
         .padding(.horizontal, 4)
         .contentShape(Rectangle())
     }
-    
     // Break out context actions to simplify type checking
     @ViewBuilder
     private var contextActionsView: some View {

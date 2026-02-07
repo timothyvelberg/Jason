@@ -181,4 +181,42 @@ extension DatabaseManager {
             }
         }
     }
+    
+    /// Prune clipboard history to keep only the most recent entries
+    func pruneClipboardHistory(keepCount: Int = 200) {
+        queue.sync {
+            guard let db = db else {
+                print("❌ [DatabaseManager] Database not initialized")
+                return
+            }
+            
+            let sql = """
+            DELETE FROM clipboard_history
+            WHERE id NOT IN (
+                SELECT id FROM clipboard_history
+                ORDER BY copied_at DESC
+                LIMIT ?
+            );
+            """
+            
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_int(statement, 1, Int32(keepCount))
+                
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    let deletedCount = sqlite3_changes(db)
+                    if deletedCount > 0 {
+                        print("🧹 [DatabaseManager] Pruned \(deletedCount) old clipboard entries (keeping \(keepCount))")
+                    }
+                } else {
+                    if let error = sqlite3_errmsg(db) {
+                        print("❌ [DatabaseManager] Failed to prune clipboard history: \(String(cString: error))")
+                    }
+                }
+            }
+            
+            sqlite3_finalize(statement)
+        }
+    }
 }

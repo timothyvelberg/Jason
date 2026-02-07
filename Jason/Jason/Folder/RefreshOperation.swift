@@ -133,7 +133,6 @@ class RefreshOperation: Operation, @unchecked Sendable {
     /// Get settings for a folder - checks favorite folders first, then dynamic files, then defaults
     private func getFolderSettings(for path: String) -> (maxItems: Int, sortOrder: FolderSortOrder) {
         let db = DatabaseManager.shared
-        
         // 1. Check if it's a favorite folder
         let favoriteFolders = db.getFavoriteFolders()
         if let favoriteFolder = favoriteFolders.first(where: { $0.folder.path == path }) {

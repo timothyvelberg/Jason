@@ -146,7 +146,15 @@ extension ListPanelManager {
             currentSelection = -1  // Will become 0
         }
         
-        let newSelection = min(currentSelection + 1, maxIndex)
+        var newSelection = min(currentSelection + 1, maxIndex)
+
+        // Skip section headers
+        while newSelection <= maxIndex && panel.items[newSelection].type == .sectionHeader {
+            newSelection += 1
+        }
+        if newSelection > maxIndex {
+            newSelection = currentSelection  // Stay put if nothing below
+        }
         
         // Update state
         inputCoordinator?.switchToKeyboard()
@@ -191,7 +199,15 @@ extension ListPanelManager {
             currentSelection = 0  // Will stay 0
         }
         
-        let newSelection = max(currentSelection - 1, 0)
+        var newSelection = max(currentSelection - 1, 0)
+
+        // Skip section headers
+        while newSelection > 0 && panel.items[newSelection].type == .sectionHeader {
+            newSelection -= 1
+        }
+        if panel.items[newSelection].type == .sectionHeader {
+            newSelection = currentSelection  // Stay put if nothing above
+        }
         
         // Update state
         inputCoordinator?.switchToKeyboard()

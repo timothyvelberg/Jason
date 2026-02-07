@@ -63,34 +63,63 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
             ]
         }
         
-        return todos.map { todo in
-            let icon: NSImage
-            if todo.isCompleted {
-                icon = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Done") ?? NSImage()
-            } else {
-                icon = NSImage(systemSymbolName: "circle", accessibilityDescription: "Todo") ?? NSImage()
-            }
-            
-            return FunctionNode(
-                id: todo.id,
-                name: todo.title,
-                type: .file,
-                icon: icon,
-                contextActions: [deleteAction(for: todo)],
-                onLeftClick: ModifierAwareInteraction(
-                    base: .execute { [weak self] in
-                        self?.toggleTodo(id: todo.id)
-                    },
-                    command: .executeKeepOpen { [weak self] in
-                        self?.toggleTodo(id: todo.id)
-                    }
-                )
-            )
+        let incomplete = todos.filter { !$0.isCompleted }
+        let completed = todos.filter { $0.isCompleted }
+
+        var nodes: [FunctionNode] = []
+
+        if !incomplete.isEmpty {
+            nodes.append(FunctionNode(
+                id: "section-todo",
+                name: "To Do",
+                type: .sectionHeader,
+                icon: NSImage(),
+                providerId: providerId
+            ))
+            nodes.append(contentsOf: incomplete.map { makeTodoNode($0) })
         }
+
+        if !completed.isEmpty {
+            nodes.append(FunctionNode(
+                id: "section-done",
+                name: "Done",
+                type: .sectionHeader,
+                icon: NSImage(),
+                providerId: providerId
+            ))
+            nodes.append(contentsOf: completed.map { makeTodoNode($0) })
+        }
+
+        return nodes
     }
     
     func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
         return buildTodoNodes()
+    }
+    
+    private func makeTodoNode(_ todo: TodoItem) -> FunctionNode {
+        let icon: NSImage
+        if todo.isCompleted {
+            icon = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Done") ?? NSImage()
+        } else {
+            icon = NSImage(systemSymbolName: "circle", accessibilityDescription: "Todo") ?? NSImage()
+        }
+        
+        return FunctionNode(
+            id: todo.id,
+            name: todo.title,
+            type: .file,
+            icon: icon,
+            contextActions: [deleteAction(for: todo)],
+            onLeftClick: ModifierAwareInteraction(
+                base: .execute { [weak self] in
+                    self?.toggleTodo(id: todo.id)
+                },
+                command: .executeKeepOpen { [weak self] in
+                    self?.toggleTodo(id: todo.id)
+                }
+            )
+        )
     }
     
     func addItem(title: String) {
