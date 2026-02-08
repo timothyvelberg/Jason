@@ -64,6 +64,47 @@ class PanelUIManager: ObservableObject, UIManager {
         print("[PanelUIManager-\(configId)] Deallocated")
     }
     
+    func teardown() {
+        print("[PanelUIManager-\(configId)] teardown() called")
+        
+        // 1. Hide if visible
+        if isVisible {
+            hide()
+        }
+        
+        // 2. Break retain cycle + release closure references
+        overlayWindow?.contentView = nil
+        overlayWindow?.onLostFocus = nil
+        overlayWindow?.onSearchToggle = nil
+        overlayWindow?.onEscapePressed = nil
+        overlayWindow?.orderOut(nil)
+        
+        // 3. Remove notification observer
+        NotificationCenter.default.removeObserver(self)
+        
+        // 4. Remove mouse monitor
+        if let monitor = panelMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            panelMouseMonitor = nil
+        }
+        
+        // 5. Clean up providers
+        for provider in providers {
+            provider.clearCache()
+        }
+        
+        providers.removeAll()
+        
+        // 6. Nil out sub-objects
+        gestureManager = nil
+        inputCoordinator = nil
+        listPanelManager = nil
+        panelActionHandler = nil
+        overlayWindow = nil
+        
+        print("[PanelUIManager-\(configId)] teardown complete")
+    }
+    
     // MARK: - UIManager Protocol Methods
     
     func setup() {

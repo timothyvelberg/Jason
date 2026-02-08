@@ -515,7 +515,7 @@ extension DatabaseManager {
             let stalePaths = cachedPaths.subtracting(neededPaths)
             
             if stalePaths.isEmpty {
-                print("[EnhancedCache] 🧹 Reconcile: all cached folders still needed")
+                print("[EnhancedCache]Reconcile: all cached folders still needed")
                 return
             }
             
@@ -532,11 +532,11 @@ extension DatabaseManager {
                     if sqlite3_step(deleteStmt) == SQLITE_DONE {
                         let deleted = sqlite3_changes(db)
                         totalDeleted += Int(deleted)
-                        print("[EnhancedCache] 🧹 Reconcile: removed \(deleted) cached items for \(path)")
+                        print("[EnhancedCache] Reconcile: removed \(deleted) cached items for \(path)")
                     }
                 }
                 
-                print("[EnhancedCache] 🧹 Reconcile: removed \(stalePaths.count) stale folder(s), \(totalDeleted) total rows")
+                print("[EnhancedCache] Reconcile: removed \(stalePaths.count) stale folder(s), \(totalDeleted) total rows")
             }
             sqlite3_finalize(deleteStmt)
         }

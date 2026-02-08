@@ -258,14 +258,14 @@ class FolderWatcherManager: LiveDataStream {
                 if let watcher = self.watchers[path] {
                     watcher.stop()
                     self.watchers.removeValue(forKey: path)
-                    print("[FolderWatcher] 🧹 Reconcile: stopped stale watcher for \(path)")
+                    print("[FolderWatcher] Reconcile: stopped stale watcher for \(path)")
                 }
             }
             
             if stalePaths.isEmpty {
-                print("[FolderWatcher] 🧹 Reconcile: all watchers still needed")
+                print("[FolderWatcher] Reconcile: all watchers still needed")
             } else {
-                print("[FolderWatcher] 🧹 Reconcile: removed \(stalePaths.count) stale watcher(s), \(self.watchers.count) remaining")
+                print("[FolderWatcher] Reconcile: removed \(stalePaths.count) stale watcher(s), \(self.watchers.count) remaining")
             }
         }
     }

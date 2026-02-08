@@ -232,7 +232,7 @@ struct EditRingView: View {
     
     // Default provider definitions
     private static let defaultProviders: [ProviderConfig] = [
-        ProviderConfig(type: "CombinedAppsProvider", name: "Apps", description: "Running and favorite applications", isEnabled: true, displayMode: .parent),
+        ProviderConfig(type: "CombinedAppsProvider", name: "Apps", description: "Running and favorite applications", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "FavoriteFilesProvider", name: "Favorite Files", description: "Quick access to favorite files", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "FavoriteFolderProvider", name: "Finder Logic", description: "Browse folders and recent locations", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "SystemActionsProvider", name: "System Actions", description: "Lock, Sleep, Logout, etc.", isEnabled: false, displayMode: .parent),
@@ -351,15 +351,14 @@ struct EditRingView: View {
                             Text("Drag to reorder • Enabled providers appear in ring order")
                                 .font(.caption2)
                                 .foregroundColor(.secondary.opacity(0.8))   
-                            VStack(spacing: 4) {
+                            List {
                                 ForEach(providers.indices, id: \.self) { index in
                                     ProviderRowReorderable(provider: $providers[index])
-                                        .padding(.vertical, 4)
-                                        .padding(.horizontal, 8)
                                 }
+                                .onMove(perform: moveProvider)
                             }
-                            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-                            .cornerRadius(8)
+                            .listStyle(.inset)
+                            .frame(minHeight: 300)
                         }
                         .padding(12)
                     }

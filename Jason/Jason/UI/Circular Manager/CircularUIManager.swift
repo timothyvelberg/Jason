@@ -133,11 +133,7 @@ class CircularUIManager: ObservableObject, UIManager {
         if let fm = functionManager {
             // Refresh providers to clear any internal caches
             for provider in fm.providers {
-                provider.refresh()
-                // Clear nodeCache on providers that have it
-                if let folderProvider = provider as? FavoriteFolderProvider {
-                    folderProvider.clearCache()
-                }
+                provider.clearCache()
             }
             // Reset clears rings, navigation stack, cached configs
             fm.reset()

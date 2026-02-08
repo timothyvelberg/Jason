@@ -38,7 +38,13 @@ protocol FunctionProvider {
     /// Called when navigating into a node that needs dynamic content
     /// Returns fresh children based on node's metadata
     func loadChildren(for node: FunctionNode) async -> [FunctionNode]
+    
+    /// Clean up any cached data held by this provider.
+    /// Called during instance teardown.
+    func clearCache()
 }
+
+
 
 // MARK: - Mutable List Provider Protocol
 
@@ -59,8 +65,14 @@ extension FunctionProvider {
     
     // Default async implementation returns empty array
     func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
-        print("⚠️ Provider '\(providerName)' does not implement loadChildren(for:)")
+        print("Provider '\(providerName)' does not implement loadChildren(for:)")
         return []
+    }
+    
+    
+    // Default clearCache does nothing - providers override if they have caches
+    func clearCache() {
+        // No-op by default
     }
     
     // Default to type-ahead - providers can override
