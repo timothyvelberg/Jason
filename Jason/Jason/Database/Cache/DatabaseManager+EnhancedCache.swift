@@ -468,4 +468,77 @@ extension DatabaseManager {
         sqlite3_finalize(statement)
         return stats
     }
+    
+    /// Remove enhanced cache entries for folders no longer in any favorite or dynamic file config.
+    /// Call this after removing a favorite folder or dynamic file from the database.
+    func reconcileEnhancedCache() {
+        guard let db = db else { return }
+        
+        queue.sync {
+            // Get all folder paths that still need caching
+            // (We're already inside queue.sync, so we query directly to avoid deadlock)
+            
+            var neededPaths = Set<String>()
+            
+            // Favorite folder paths
+            var favStmt: OpaquePointer?
+            let favSQL = "SELECT f.path FROM favorite_folders ff JOIN folders f ON ff.folder_id = f.id;"
+            if sqlite3_prepare_v2(db, favSQL, -1, &favStmt, nil) == SQLITE_OK {
+                while sqlite3_step(favStmt) == SQLITE_ROW {
+                    neededPaths.insert(String(cString: sqlite3_column_text(favStmt, 0)))
+                }
+            }
+            sqlite3_finalize(favStmt)
+            
+            // Dynamic file source folder paths
+            var dynStmt: OpaquePointer?
+            let dynSQL = "SELECT DISTINCT folder_path FROM favorite_dynamic_files;"
+            if sqlite3_prepare_v2(db, dynSQL, -1, &dynStmt, nil) == SQLITE_OK {
+                while sqlite3_step(dynStmt) == SQLITE_ROW {
+                    neededPaths.insert(String(cString: sqlite3_column_text(dynStmt, 0)))
+                }
+            }
+            sqlite3_finalize(dynStmt)
+            
+            // Get all cached folder paths
+            var cachedPaths = Set<String>()
+            var cacheStmt: OpaquePointer?
+            let cacheSQL = "SELECT DISTINCT folder_path FROM folder_contents_enhanced;"
+            if sqlite3_prepare_v2(db, cacheSQL, -1, &cacheStmt, nil) == SQLITE_OK {
+                while sqlite3_step(cacheStmt) == SQLITE_ROW {
+                    cachedPaths.insert(String(cString: sqlite3_column_text(cacheStmt, 0)))
+                }
+            }
+            sqlite3_finalize(cacheStmt)
+            
+            // Delete stale entries
+            let stalePaths = cachedPaths.subtracting(neededPaths)
+            
+            if stalePaths.isEmpty {
+                print("[EnhancedCache] 🧹 Reconcile: all cached folders still needed")
+                return
+            }
+            
+            let deleteSQL = "DELETE FROM folder_contents_enhanced WHERE folder_path = ?;"
+            var deleteStmt: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, deleteSQL, -1, &deleteStmt, nil) == SQLITE_OK {
+                var totalDeleted = 0
+                
+                for path in stalePaths {
+                    sqlite3_reset(deleteStmt)
+                    sqlite3_bind_text(deleteStmt, 1, (path as NSString).utf8String, -1, nil)
+                    
+                    if sqlite3_step(deleteStmt) == SQLITE_DONE {
+                        let deleted = sqlite3_changes(db)
+                        totalDeleted += Int(deleted)
+                        print("[EnhancedCache] 🧹 Reconcile: removed \(deleted) cached items for \(path)")
+                    }
+                }
+                
+                print("[EnhancedCache] 🧹 Reconcile: removed \(stalePaths.count) stale folder(s), \(totalDeleted) total rows")
+            }
+            sqlite3_finalize(deleteStmt)
+        }
+    }
 }
