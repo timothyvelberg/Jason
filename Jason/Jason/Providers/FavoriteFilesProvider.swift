@@ -233,21 +233,28 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             }
         }
         
-        // Cache is already sorted by the folder's sort order
-        // Return the first matching item
-        guard let firstItem = items.first else {
-            return nil
-        }
-        
-        // Verify item still exists (cache might be slightly stale)
-        let topItems = items.prefix(3).filter {
-            FileManager.default.fileExists(atPath: $0.path)
-        }
+        // Apply burst detection for time-based sorts
+        let timeInfo = temporalInfo(for: dynamic.sortOrder)
 
-        guard !topItems.isEmpty else { return nil }
-
-        return topItems.map { $0.path }
-    }
+        if timeInfo.isTemporal, let keyPath = timeInfo.dateKeyPath {
+            let itemsWithDates: [(path: String, date: Date)] = items.map { item in
+                (path: item.path, date: item[keyPath: keyPath])
+            }
+            
+            let burstPaths = detectBurst(from: itemsWithDates)
+            let existingPaths = burstPaths.filter { FileManager.default.fileExists(atPath: $0) }
+            
+            guard !existingPaths.isEmpty else { return nil }
+            
+            print("💥 [FavoriteFiles] Cache burst: \(existingPaths.count) files for '\(dynamic.displayName)'")
+            return existingPaths
+        } else {
+            // Non-temporal sort — just the top item
+            guard let first = items.first, FileManager.default.fileExists(atPath: first.path) else {
+                return nil
+            }
+            return [first.path]
+        }    }
     
     /// Resolve dynamic file by scanning filesystem (fallback)
     private func resolveDynamicFileFromFilesystem(_ dynamic: FavoriteDynamicFileEntry) -> [String] {
@@ -284,16 +291,45 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             }
         }
         
-        // 🎯 Use unified FolderSortingUtility
         let sortedItems = FolderSortingUtility.sortURLs(items, by: dynamic.sortOrder)
-        
+
         // Check if this folder should be cached for future lookups
         if items.count > 100 {
             triggerCachePopulation(for: dynamic.folderPath)
         }
-        
-        // Return the first (best matching) item
-        return Array(sortedItems.prefix(3).map { $0.path })
+
+        // Apply burst detection for time-based sorts
+        let timeInfo = temporalInfo(for: dynamic.sortOrder)
+
+        if timeInfo.isTemporal {
+            let dateKey: URLResourceKey = {
+                switch dynamic.sortOrder {
+                case .modifiedNewest: return .contentModificationDateKey
+                case .createdNewest:  return .creationDateKey
+                case .addedNewest:    return .addedToDirectoryDateKey
+                default:              return .contentModificationDateKey
+                }
+            }()
+            
+            let itemsWithDates: [(path: String, date: Date)] = sortedItems.compactMap { url in
+                guard let values = try? url.resourceValues(forKeys: [dateKey]) else { return nil }
+                let date: Date?
+                switch dynamic.sortOrder {
+                case .modifiedNewest: date = values.contentModificationDate
+                case .createdNewest:  date = values.creationDate
+                case .addedNewest:    date = values.addedToDirectoryDate
+                default:              date = values.contentModificationDate
+                }
+                guard let d = date else { return nil }
+                return (path: url.path, date: d)
+            }
+            
+            let burstPaths = detectBurst(from: itemsWithDates)
+            print("💥 [FavoriteFiles] Filesystem burst: \(burstPaths.count) files for '\(dynamic.displayName)'")
+            return burstPaths
+        } else {
+            return sortedItems.prefix(1).map { $0.path }
+        }
     }
     
     /// Trigger cache population for a heavy folder that isn't cached yet
@@ -578,6 +614,44 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 }),
                 onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             )
+        }
+    }
+    
+    // MARK: - Burst Detection
+
+    private static let burstWindowSeconds: TimeInterval = 60
+    private static let maxBurstSize: Int = 25
+
+    /// Detect a burst of files that arrived close together.
+    /// Items must be sorted newest-first. Walks consecutive pairs —
+    /// if the gap between neighbors ≤ 60s, they're in the same burst.
+    /// Stops at the first gap > 60s.
+    private func detectBurst(from items: [(path: String, date: Date)]) -> [String] {
+        guard let first = items.first else { return [] }
+        
+        var burst = [first.path]
+        
+        for i in 1..<items.count {
+            // Newest-first: items[i-1].date >= items[i].date
+            let gap = items[i - 1].date.timeIntervalSince(items[i].date)
+            if gap <= Self.burstWindowSeconds {
+                burst.append(items[i].path)
+                if burst.count >= Self.maxBurstSize { break }
+            } else {
+                break
+            }
+        }
+        
+        return burst
+    }
+
+    /// Whether a sort order is time-based, and if so, which date to use.
+    private func temporalInfo(for sortOrder: FolderSortOrder) -> (isTemporal: Bool, dateKeyPath: KeyPath<EnhancedFolderItem, Date>?) {
+        switch sortOrder {
+        case .modifiedNewest: return (true, \.modificationDate)
+        case .createdNewest:  return (true, \.creationDate)
+        case .addedNewest:    return (true, \.dateAdded)
+        default:              return (false, nil)
         }
     }
     

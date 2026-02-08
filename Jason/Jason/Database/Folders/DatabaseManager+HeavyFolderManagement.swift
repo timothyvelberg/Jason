@@ -92,7 +92,7 @@ extension DatabaseManager {
     func updateHeavyFolderItemCount(path: String, itemCount: Int) {
         guard let db = db else { return }
         
-        let sql = "UPDATE heavy_folders SET item_count = ? WHERE folder_path = ?;"
+        let sql = "UPDATE heavy_folders SET item_count = ? WHERE path = ?;"
         var statement: OpaquePointer?
         
         if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {

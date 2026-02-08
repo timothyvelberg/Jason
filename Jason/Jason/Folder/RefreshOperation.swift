@@ -52,6 +52,14 @@ class RefreshOperation: Operation, @unchecked Sendable {
             folderPath: path,
             items: items
         )
+        
+        // Notify UI so nodeCache gets invalidated and any visible panel refreshes
+        DispatchQueue.main.async {
+            NotificationCenter.default.postProviderUpdate(
+                providerId: "favorite-folder",
+                folderPath: self.path
+            )
+        }
     }
     
     private func loadFolderContents(at path: String) -> [EnhancedFolderItem] {
@@ -91,7 +99,10 @@ class RefreshOperation: Operation, @unchecked Sendable {
             guard let resourceValues = try? itemURL.resourceValues(forKeys: [
                 .isDirectoryKey,
                 .fileSizeKey,
-                .contentModificationDateKey
+                .contentModificationDateKey,
+                .creationDateKey,
+                .addedToDirectoryDateKey
+
             ]) else {
                 continue
             }
@@ -99,6 +110,8 @@ class RefreshOperation: Operation, @unchecked Sendable {
             let isDirectory = resourceValues.isDirectory ?? false
             let fileSize = Int64(resourceValues.fileSize ?? 0)
             let modificationDate = resourceValues.contentModificationDate ?? Date()
+            let creationDate = resourceValues.creationDate ?? modificationDate
+            let dateAdded = resourceValues.addedToDirectoryDate ?? modificationDate
             let fileExtension = itemURL.pathExtension.lowercased()
             
             // Check if it's an image file
@@ -113,6 +126,8 @@ class RefreshOperation: Operation, @unchecked Sendable {
                 path: itemURL.path,
                 isDirectory: isDirectory,
                 modificationDate: modificationDate,
+                creationDate: creationDate,
+                dateAdded: dateAdded,
                 fileExtension: fileExtension,
                 fileSize: fileSize,
                 hasCustomIcon: false,

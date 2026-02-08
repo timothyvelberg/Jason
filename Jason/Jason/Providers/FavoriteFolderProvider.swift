@@ -21,6 +21,31 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     private let maxItemsPerFolder: Int = 40
     private var nodeCache: [String: [FunctionNode]] = [:]
     
+    // MARK: - Initialization
+        
+        init() {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleProviderUpdate(_:)),
+                name: .providerContentUpdated,
+                object: nil
+            )
+        }
+        
+        deinit {
+            NotificationCenter.default.removeObserver(self)
+        }
+        
+        @objc private func handleProviderUpdate(_ notification: Notification) {
+            guard let updateInfo = ProviderUpdateInfo.from(notification),
+                  updateInfo.providerId == self.providerId,
+                  let folderPath = updateInfo.folderPath else { return }
+            
+            if nodeCache.removeValue(forKey: folderPath) != nil {
+                print("🗑️ [FavoriteFolderProvider] nodeCache invalidated for: \(URL(fileURLWithPath: folderPath).lastPathComponent)")
+            }
+        }
+    
     // MARK: - FunctionProvider Protocol
     
     func provideFunctions() -> [FunctionNode] {
@@ -72,6 +97,11 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         nodeCache.removeAll()
     }
     
+    /// Synchronous cache lookup for use by ListPanelManager (skips debounce on hit)
+    func cachedChildren(forPath path: String) -> [FunctionNode]? {
+        return nodeCache[path]
+    }
+    
     // MARK: - Dynamic Loading
     
     func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
@@ -86,7 +116,13 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         let folderURL = URL(fileURLWithPath: urlString)
         let folderPath = folderURL.path
         let db = DatabaseManager.shared
-        
+
+        // Check in-memory cache first (instant, no filesystem or DB work)
+        if let cachedNodes = nodeCache[folderPath] {
+            print("⚡ [FavoriteFolderProvider] nodeCache HIT for '\(node.name)' (\(cachedNodes.count) items)")
+            return cachedNodes
+        }
+
         // Get sort order
         let requestedSortOrder = getSortOrderForFolder(path: folderPath)
         print("🎯 [SORT] Folder: \(node.name) - Sort: \(requestedSortOrder.displayName)")
@@ -126,11 +162,16 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 nodes = sortNodes(nodes, by: requestedSortOrder)
                 
                 // Add "Open in Finder" if folder has more items than we're showing
+                var resultNodes = nodes
                 if folderExceedsLimit {
-                    nodes.append(createOpenInFinderNode(for: folderURL))
+                    resultNodes.append(createOpenInFinderNode(for: folderURL))
                 }
-                
-                return nodes
+
+                // Cache for instant access on next hover
+                nodeCache[folderPath] = resultNodes
+                print("💾 [FavoriteFolderProvider] Cached \(resultNodes.count) nodes for '\(node.name)'")
+
+                return resultNodes
             } else {
                 print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
             }
@@ -697,29 +738,8 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 settings: settings
             )
         }
-        
-        // Git folder - Alphabetical
-        let gitPath = "/Users/timothy/Files/Git/"
-        if FileManager.default.fileExists(atPath: gitPath) {
-            let settings = FavoriteFolderSettings(
-                maxItems: nil,
-                preferredLayout: nil,
-                itemAngleSize: nil,
-                slicePositioning: nil,
-                childRingThickness: nil,
-                childIconSize: nil,
-                contentSortOrder: .alphabeticalAsc
-            )
-            _ = DatabaseManager.shared.addFavoriteFolder(
-                path: gitPath,
-                title: "Git",
-                settings: settings
-            )
-        }
-        
-        // Screenshots - Newest First
-        let screenshotsPath = "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots"
-        if FileManager.default.fileExists(atPath: screenshotsPath) {
+        // Desktop
+        if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
             let settings = FavoriteFolderSettings(
                 maxItems: nil,
                 preferredLayout: nil,
@@ -730,13 +750,30 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 contentSortOrder: .modifiedNewest
             )
             _ = DatabaseManager.shared.addFavoriteFolder(
-                path: screenshotsPath,
-                title: "Screenshots",
+                path: desktopURL.path,
+                title: "Desktop",
+                settings: settings
+            )
+        }
+        // Documents
+        if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let settings = FavoriteFolderSettings(
+                maxItems: nil,
+                preferredLayout: nil,
+                itemAngleSize: nil,
+                slicePositioning: nil,
+                childRingThickness: nil,
+                childIconSize: nil,
+                contentSortOrder: .modifiedNewest
+            )
+            _ = DatabaseManager.shared.addFavoriteFolder(
+                path: documentsURL.path,
+                title: "Documents",
                 settings: settings
             )
         }
         
-        print("✅ [FavoriteFolderProvider] Added default favorites with smart sorting")
+        print("[FavoriteFolderProvider] Added default favorites with smart sorting")
     }
     
     // MARK: - Enhanced Cache Helpers

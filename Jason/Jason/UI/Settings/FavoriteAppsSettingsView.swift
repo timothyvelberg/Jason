@@ -30,13 +30,6 @@ struct FavoriteAppsSettingsView: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                    
-                    Button {
-                        showingAppPicker = true
-                    } label: {
-                        Label("Add App", systemImage: "plus.circle.fill")
-                    }
-                    .buttonStyle(.borderedProminent)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {

@@ -49,8 +49,6 @@ class FolderWatcherManager: LiveDataStream {
         refreshQueue.maxConcurrentOperationCount = 2  // Max 2 folders refreshing at once
         refreshQueue.qualityOfService = .utility       // Background priority
         refreshQueue.name = "com.jason.folderrefresh"
-        
-//        print("[FolderWatcher] 🎬 Manager initialized (queue: max 2 concurrent)")
     }
     
     // MARK: - Public API

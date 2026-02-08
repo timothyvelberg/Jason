@@ -15,7 +15,6 @@ struct FavoriteFilesSettingsView: View {
     @State private var showingDynamicFileCreator = false
     @State private var editingStaticFile: FavoriteFileEntry?
     @State private var editingDynamicFile: FavoriteDynamicFileEntry?
-    @State private var showingEditSheet = false
     
     // Combined entries for display
     private var allEntries: [(id: String, entry: Any, listSortOrder: Int, isStatic: Bool)] {
@@ -69,7 +68,6 @@ struct FavoriteFilesSettingsView: View {
                                 file: file,
                                 onEdit: {
                                     editingStaticFile = file
-                                    showingEditSheet = true
                                 },
                                 onRemove: {
                                     removeStaticFile(file)
@@ -81,7 +79,6 @@ struct FavoriteFilesSettingsView: View {
                                 file: file,
                                 onEdit: {
                                     editingDynamicFile = file
-                                    showingEditSheet = true
                                 },
                                 onRemove: {
                                     removeDynamicFile(file)
@@ -145,38 +142,37 @@ struct FavoriteFilesSettingsView: View {
                 }
             )
         }
-        .sheet(isPresented: $showingEditSheet) {
-            if let file = editingStaticFile {
-                EditFavoriteFileView(
-                    file: file,
-                    onSave: { displayName, iconData in
-                        updateStaticFile(file, displayName: displayName, iconData: iconData)
-                        showingEditSheet = false
-                    },
-                    onCancel: {
-                        showingEditSheet = false
-                    }
-                )
-            } else if let file = editingDynamicFile {
-                EditFavoriteDynamicFileView(
-                    file: file,
-                    onSave: { displayName, folderPath, sortOrder, extensions, pattern, iconData in
-                        updateDynamicFile(
-                            file,
-                            displayName: displayName,
-                            folderPath: folderPath,
-                            sortOrder: sortOrder,
-                            extensions: extensions,
-                            pattern: pattern,
-                            iconData: iconData
-                        )
-                        showingEditSheet = false
-                    },
-                    onCancel: {
-                        showingEditSheet = false
-                    }
-                )
-            }
+        .sheet(item: $editingStaticFile) { file in
+            EditFavoriteFileView(
+                file: file,
+                onSave: { displayName, iconData in
+                    updateStaticFile(file, displayName: displayName, iconData: iconData)
+                    editingStaticFile = nil
+                },
+                onCancel: {
+                    editingStaticFile = nil
+                }
+            )
+        }
+        .sheet(item: $editingDynamicFile) { file in
+            EditFavoriteDynamicFileView(
+                file: file,
+                onSave: { displayName, folderPath, sortOrder, extensions, pattern, iconData in
+                    updateDynamicFile(
+                        file,
+                        displayName: displayName,
+                        folderPath: folderPath,
+                        sortOrder: sortOrder,
+                        extensions: extensions,
+                        pattern: pattern,
+                        iconData: iconData
+                    )
+                    editingDynamicFile = nil
+                },
+                onCancel: {
+                    editingDynamicFile = nil
+                }
+            )
         }
     }
     
@@ -574,13 +570,14 @@ struct AddDynamicFileView: View {
     
     @State private var displayName: String = ""
     @State private var folderPath: String = ""
-    @State private var sortOrder: FolderSortOrder = .modifiedNewest
+    @State private var sortOrder: FolderSortOrder = .addedNewest
     @State private var fileExtensions: String = ""
     @State private var namePattern: String = ""
     @State private var useExtensionFilter = false
     @State private var useNamePattern = false
     
     private let sortOptions: [FolderSortOrder] = [
+        .addedNewest, .addedOldest,
         .modifiedNewest, .modifiedOldest,
         .createdNewest, .createdOldest,
         .sizeDescending, .sizeAscending,
@@ -751,6 +748,7 @@ struct EditFavoriteDynamicFileView: View {
     @State private var useNamePattern: Bool
     
     private let sortOptions: [FolderSortOrder] = [
+        .addedNewest, .addedOldest,
         .modifiedNewest, .modifiedOldest,
         .createdNewest, .createdOldest,
         .sizeDescending, .sizeAscending,

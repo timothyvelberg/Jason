@@ -18,6 +18,8 @@ struct EnhancedFolderItem {
     let path: String
     let isDirectory: Bool
     let modificationDate: Date
+    let creationDate: Date
+    let dateAdded: Date
     
     // Enhanced fields for instant loading
     let fileExtension: String
@@ -32,6 +34,8 @@ struct EnhancedFolderItem {
         path: String,
         isDirectory: Bool,
         modificationDate: Date,
+        creationDate: Date = Date.distantPast,
+        dateAdded: Date = Date.distantPast,
         fileExtension: String = "",
         fileSize: Int64 = 0,
         hasCustomIcon: Bool = false,
@@ -43,6 +47,8 @@ struct EnhancedFolderItem {
         self.path = path
         self.isDirectory = isDirectory
         self.modificationDate = modificationDate
+        self.creationDate = creationDate
+        self.dateAdded = dateAdded
         self.fileExtension = fileExtension
         self.fileSize = fileSize
         self.hasCustomIcon = hasCustomIcon
@@ -76,6 +82,10 @@ extension DatabaseManager {
             item_path TEXT NOT NULL,
             is_directory INTEGER NOT NULL,
             modification_date INTEGER NOT NULL,
+            creation_date INTEGER NOT NULL DEFAULT 0,
+            date_added INTEGER NOT NULL DEFAULT 0,
+
+
             
             -- Enhanced fields
             file_extension TEXT,
@@ -146,9 +156,10 @@ extension DatabaseManager {
             let insertSQL = """
             INSERT INTO folder_contents_enhanced (
                 folder_path, item_name, item_path, is_directory, modification_date,
+                creation_date, date_added,
                 file_extension, file_size, has_custom_icon, is_image_file,
                 thumbnail_data, folder_config_json, cached_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """
             
             var insertStmt: OpaquePointer?
@@ -170,30 +181,34 @@ extension DatabaseManager {
                 sqlite3_bind_text(insertStmt, 3, (item.path as NSString).utf8String, -1, nil)
                 sqlite3_bind_int(insertStmt, 4, item.isDirectory ? 1 : 0)
                 sqlite3_bind_int64(insertStmt, 5, Int64(item.modificationDate.timeIntervalSince1970))
-                
-                sqlite3_bind_text(insertStmt, 6, (item.fileExtension as NSString).utf8String, -1, nil)
-                sqlite3_bind_int64(insertStmt, 7, item.fileSize)
-                sqlite3_bind_int(insertStmt, 8, item.hasCustomIcon ? 1 : 0)
-                sqlite3_bind_int(insertStmt, 9, item.isImageFile ? 1 : 0)
-                
+
+                sqlite3_bind_int64(insertStmt, 6, Int64(item.creationDate.timeIntervalSince1970))
+                sqlite3_bind_int64(insertStmt, 7, Int64(item.dateAdded.timeIntervalSince1970))
+
+
+                sqlite3_bind_text(insertStmt, 8, (item.fileExtension as NSString).utf8String, -1, nil)
+                sqlite3_bind_int64(insertStmt, 9, item.fileSize)
+                sqlite3_bind_int(insertStmt, 10, item.hasCustomIcon ? 1 : 0)
+                sqlite3_bind_int(insertStmt, 11, item.isImageFile ? 1 : 0)
+
                 // Bind thumbnail data (BLOB)
                 if let thumbnailData = item.thumbnailData {
                     thumbnailData.withUnsafeBytes { bytes in
-                        sqlite3_bind_blob(insertStmt, 10, bytes.baseAddress, Int32(thumbnailData.count), nil)
+                        sqlite3_bind_blob(insertStmt, 12, bytes.baseAddress, Int32(thumbnailData.count), nil)
                     }
                     thumbnailCount += 1
                 } else {
-                    sqlite3_bind_null(insertStmt, 10)
+                    sqlite3_bind_null(insertStmt, 12)
                 }
-                
+
                 // Bind folder config JSON
                 if let configJSON = item.folderConfigJSON {
-                    sqlite3_bind_text(insertStmt, 11, (configJSON as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(insertStmt, 13, (configJSON as NSString).utf8String, -1, nil)
                 } else {
-                    sqlite3_bind_null(insertStmt, 11)
+                    sqlite3_bind_null(insertStmt, 13)
                 }
-                
-                sqlite3_bind_int64(insertStmt, 12, Int64(now))
+
+                sqlite3_bind_int64(insertStmt, 14, Int64(now))
                 
                 if sqlite3_step(insertStmt) == SQLITE_DONE {
                     savedCount += 1
@@ -234,6 +249,7 @@ extension DatabaseManager {
         return queue.sync {
             let sql = """
             SELECT item_name, item_path, is_directory, modification_date,
+                   creation_date, date_added,
                    file_extension, file_size, has_custom_icon, is_image_file,
                    thumbnail_data, folder_config_json
             FROM folder_contents_enhanced
@@ -257,23 +273,25 @@ extension DatabaseManager {
                 let path = String(cString: sqlite3_column_text(statement, 1))
                 let isDirectory = sqlite3_column_int(statement, 2) == 1
                 let modDate = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 3)))
+                let createDate = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 4)))
+                let dateAdded = Date(timeIntervalSince1970: TimeInterval(sqlite3_column_int64(statement, 5)))
                 
-                let fileExtension = sqlite3_column_text(statement, 4) != nil ? String(cString: sqlite3_column_text(statement, 4)) : ""
-                let fileSize = sqlite3_column_int64(statement, 5)
-                let hasCustomIcon = sqlite3_column_int(statement, 6) == 1
-                let isImageFile = sqlite3_column_int(statement, 7) == 1
+                let fileExtension = sqlite3_column_text(statement, 6) != nil ? String(cString: sqlite3_column_text(statement, 6)) : ""
+                let fileSize = sqlite3_column_int64(statement, 7)
+                let hasCustomIcon = sqlite3_column_int(statement, 8) == 1
+                let isImageFile = sqlite3_column_int(statement, 9) == 1
                 
                 // Load thumbnail data (BLOB)
                 var thumbnailData: Data?
-                if let blob = sqlite3_column_blob(statement, 8) {
-                    let blobSize = sqlite3_column_bytes(statement, 8)
+                if let blob = sqlite3_column_blob(statement, 10) {
+                    let blobSize = sqlite3_column_bytes(statement, 10)
                     thumbnailData = Data(bytes: blob, count: Int(blobSize))
                 }
                 
                 // Load folder config JSON
                 var folderConfigJSON: String?
-                if sqlite3_column_text(statement, 9) != nil {
-                    folderConfigJSON = String(cString: sqlite3_column_text(statement, 9))
+                if sqlite3_column_text(statement, 11) != nil {
+                    folderConfigJSON = String(cString: sqlite3_column_text(statement, 11))
                 }
                 
                 let item = EnhancedFolderItem(
@@ -281,6 +299,8 @@ extension DatabaseManager {
                     path: path,
                     isDirectory: isDirectory,
                     modificationDate: modDate,
+                    creationDate: createDate,
+                    dateAdded: dateAdded,
                     fileExtension: fileExtension,
                     fileSize: fileSize,
                     hasCustomIcon: hasCustomIcon,

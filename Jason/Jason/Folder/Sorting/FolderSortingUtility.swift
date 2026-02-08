@@ -81,6 +81,19 @@ class FolderSortingUtility {
                 let size2 = (try? url2.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
                 return size1 < size2  // Smallest first
             }
+        case .addedNewest:
+            return urls.sorted { url1, url2 in
+                let date1 = (try? url1.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate ?? Date.distantPast
+                let date2 = (try? url2.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate ?? Date.distantPast
+                return date1 > date2
+            }
+
+        case .addedOldest:
+            return urls.sorted { url1, url2 in
+                let date1 = (try? url1.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate ?? Date.distantPast
+                let date2 = (try? url2.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate ?? Date.distantPast
+                return date1 < date2
+            }
         }
     }
     
@@ -128,6 +141,7 @@ class FolderSortingUtility {
                     .isDirectoryKey,
                     .contentModificationDateKey,
                     .creationDateKey,
+                    .addedToDirectoryDateKey,
                     .fileSizeKey
                 ],
                 options: [.skipsHiddenFiles, .skipsPackageDescendants]
@@ -162,14 +176,16 @@ class FolderSortingUtility {
             return items.sorted { $0.modificationDate < $1.modificationDate }
             
         case .createdNewest:
-            // Note: EnhancedFolderItem uses modificationDate - would need creationDate field
-            // For now, fall back to modificationDate
-            return items.sorted { $0.modificationDate > $1.modificationDate }
-            
+            return items.sorted { $0.creationDate > $1.creationDate }
+
         case .createdOldest:
-            // Note: EnhancedFolderItem uses modificationDate - would need creationDate field
-            // For now, fall back to modificationDate
-            return items.sorted { $0.modificationDate < $1.modificationDate }
+            return items.sorted { $0.creationDate < $1.creationDate }
+
+        case .addedNewest:
+            return items.sorted { $0.dateAdded > $1.dateAdded }
+
+        case .addedOldest:
+            return items.sorted { $0.dateAdded < $1.dateAdded }
             
         case .foldersFirst:
             return items.sorted { item1, item2 in
@@ -185,6 +201,7 @@ class FolderSortingUtility {
             
         case .sizeAscending:
             return items.sorted { $0.fileSize < $1.fileSize }
+        
         }
     }
 }

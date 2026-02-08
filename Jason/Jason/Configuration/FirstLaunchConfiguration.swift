@@ -106,7 +106,8 @@ class FirstLaunchConfiguration {
                     (type: "CombinedAppsProvider", order: 1, displayMode: "parent", angle: nil),
                     (type: "TodoListProvider", order: 2, displayMode: "parent", angle: nil),
                     (type: "FavoriteFolderProvider", order: 3, displayMode: "parent", angle: nil),
-                    (type: "ClipboardProvider", order: 4, displayMode: "parent", angle: nil)
+                    (type: "ClipboardHistoryProvider", order: 4, displayMode: "parent", angle: nil),
+                    (type: "FavoriteFilesProvider", order: 5, displayMode: "parent", angle: nil)
                 ]
             )
             print("   Created '\(defaultConfig.name)' - \(defaultConfig.triggersSummary)")
@@ -128,80 +129,11 @@ class FirstLaunchConfiguration {
             print("   Created '\(appsDirectRing.name)' - \(appsDirectRing.triggersSummary)")
             print("   Created default configurations")
             
-            createClipboardPanel()
-            createTodoPanel()
-            
         } catch {
             print("   Failed to create default configuration: \(error)")
             
             // This is a critical error - app can't function without at least one ring
             fatalError("Failed to create default ring configuration: \(error)")
-        }
-    }
-    
-    /// Create example configurations for development/testing
-    /// Call this manually if you want pre-made rings for testing
-    @MainActor
-    static func createExampleConfigurations() {
-        let configManager = RingConfigurationManager.shared
-        
-        print("[FirstLaunch] Creating example configurations...")
-        
-        do {
-            // Example: Ring with MULTIPLE triggers (keyboard + trackpad)
-            let folderRing = try configManager.createConfiguration(
-                name: "My Folders",
-                shortcut: "Ctrl+Shift+A",  // For display
-                ringRadius: 80.0,
-                centerHoleRadius: 56.0,
-                iconSize: 32.0,
-                triggers: [
-                    keyboardTrigger(keyCode: 0, modifiers: [.control, .shift]),  // Ctrl+Shift+A
-                    trackpadTrigger(direction: "up", fingerCount: 3)              // 3-finger swipe up
-                ],
-                providers: [
-                    (type: "FavoriteFolderProvider", order: 1, displayMode: "direct", angle: nil)
-                ]
-            )
-            print("   Created '\(folderRing.name)' - \(folderRing.triggersSummary)")
-
-            let filesRing = try configManager.createConfiguration(
-                name: "My Files",
-                shortcut: "Ctrl+Shift+F",  // For display
-                ringRadius: 80.0,
-                centerHoleRadius: 56.0,
-                iconSize: 32.0,
-                triggers: [
-                    keyboardTrigger(keyCode: 3, modifiers: [.control, .shift])  // Ctrl+Shift+F
-                ],
-                providers: [
-                    (type: "FavoriteFilesProvider", order: 1, displayMode: "direct", angle: nil)
-                ]
-            )
-            print("   Created '\(filesRing.name)' - \(filesRing.triggersSummary)")
-  
-            let everythingDirectRing = try configManager.createConfiguration(
-                name: "Everything Direct",
-                shortcut: "Ctrl+Shift+W",  // For display
-                ringRadius: 80.0,
-                centerHoleRadius: 56.0,
-                iconSize: 32.0,
-                triggers: [
-                    keyboardTrigger(keyCode: 13, modifiers: [.control, .shift]),  // Ctrl+Shift+W
-                    trackpadTrigger(direction: "down", fingerCount: 4)             // 4-finger swipe down
-                ],
-                providers: [
-                    (type: "CombinedAppsProvider", order: 1, displayMode: "direct", angle: nil),
-                    (type: "FavoriteFolderProvider", order: 2, displayMode: "direct", angle: nil)
-                ]
-            )
-            print("   Created '\(everythingDirectRing.name)' - \(everythingDirectRing.triggersSummary)")
-            
-            // Reload configurations after all database updates
-            configManager.loadConfigurations()
-            
-        } catch {
-            print("   Failed to create some example configurations: \(error)")
         }
     }
     
@@ -230,68 +162,5 @@ class FirstLaunchConfiguration {
         ensureDefaultConfiguration()
         
         print("   Reset complete")
-    }
-    
-    /// Create a clipboard panel for testing standalone panels
-    @MainActor
-    static func createClipboardPanel() {
-        let configManager = RingConfigurationManager.shared
-        
-        print("[FirstLaunch] Creating clipboard panel...")
-        
-        do {
-            let clipboardPanel = try configManager.createConfiguration(
-                name: "Clipboard",
-                shortcut: "Cmd+Shift+V",  // For display
-                ringRadius: 80.0,         // Not used for panels
-                centerHoleRadius: 56.0,
-                iconSize: 32.0,
-                presentationMode: .panel,  // KEY: Makes it a panel
-                triggers: [
-                    keyboardTrigger(keyCode: 8, modifiers: [.option, .shift])  // Cmd+Shift+V
-                ],
-                providers: [
-                    (type: "ClipboardHistoryProvider", order: 1, displayMode: "direct", angle: nil)
-                ]
-            )
-            print("   Created '\(clipboardPanel.name)' - \(clipboardPanel.triggersSummary) [PANEL MODE]")
-            
-            // Reload to pick up changes
-            configManager.loadConfigurations()
-            
-        } catch {
-            print("   Failed to create clipboard panel: \(error)")
-        }
-    }
-    
-    /// Create a todo list panel
-    @MainActor
-    static func createTodoPanel() {
-        let configManager = RingConfigurationManager.shared
-        
-        print("[FirstLaunch] Creating todo panel...")
-        
-        do {
-            let todoPanel = try configManager.createConfiguration(
-                name: "Todo",
-                shortcut: "Ctrl+Shift+T",
-                ringRadius: 80.0,
-                centerHoleRadius: 56.0,
-                iconSize: 32.0,
-                presentationMode: .panel,
-                triggers: [
-                    keyboardTrigger(keyCode: 17, modifiers: [.control, .shift])  // Ctrl+Shift+T
-                ],
-                providers: [
-                    (type: "TodoListProvider", order: 1, displayMode: "direct", angle: nil)
-                ]
-            )
-            print("   Created '\(todoPanel.name)' - \(todoPanel.triggersSummary) [PANEL MODE]")
-            
-            configManager.loadConfigurations()
-            
-        } catch {
-            print("   Failed to create todo panel: \(error)")
-        }
     }
 }

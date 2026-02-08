@@ -18,19 +18,26 @@ enum FolderSortOrder: String, CaseIterable, Codable {
     case foldersFirst = "folders_first"                 // Folders, then files alphabetically
     case sizeDescending = "size_descending"             // Largest first
     case sizeAscending = "size_ascending"               // Smallest first
+    case addedNewest = "added_newest"                   // Most recently added to folder
+    case addedOldest = "added_oldest"                   // Oldest added to folder
     
     /// Human-readable display name
     var displayName: String {
         switch self {
         case .alphabeticalAsc: return "A → Z"
         case .alphabeticalDesc: return "Z → A"
+            
         case .modifiedNewest: return "Newest Modified"
         case .modifiedOldest: return "Oldest Modified"
+            
         case .createdNewest: return "Newest Created"
         case .createdOldest: return "Oldest Created"
+            
         case .foldersFirst: return "Folders First"
         case .sizeDescending: return "Largest First"
         case .sizeAscending: return "Smallest First"
+        case .addedNewest: return "Recently Added"
+        case .addedOldest: return "Oldest Added"
         }
     }
     
@@ -55,6 +62,10 @@ enum FolderSortOrder: String, CaseIterable, Codable {
             return "ORDER BY file_size DESC"
         case .sizeAscending:
             return "ORDER BY file_size ASC"
+        case .addedNewest: 
+            return "ORDER BY date_added DESC"
+        case .addedOldest: 
+            return "ORDER BY date_added ASC"
         }
     }
     
@@ -70,6 +81,8 @@ enum FolderSortOrder: String, CaseIterable, Codable {
         case .foldersFirst: return "folder.badge.plus"
         case .sizeDescending: return "square.stack.3d.up"
         case .sizeAscending: return "square.stack.3d.down.forward"
+        case .addedNewest: return "clock.badge.checkmark"
+        case .addedOldest: return "clock.badge.checkmark"
         }
     }
 }

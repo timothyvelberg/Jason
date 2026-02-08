@@ -15,7 +15,6 @@ struct FavoriteFoldersViews: View {
     @State private var favorites: [(folder: FolderEntry, settings: FavoriteFolderSettings)] = []
     @State private var editingFavorite: FolderEntry?
     @State private var editingName: String = ""
-    @State private var editingMaxItems: String = ""
     @State private var newFolderPath: String = ""
     
     var body: some View {
@@ -48,11 +47,9 @@ struct FavoriteFoldersViews: View {
                     ForEach(favorites, id: \.folder.id) { item in
                         FavoriteRow(
                             folder: item.folder,
-                            maxItems: item.settings.maxItems,
                             onEdit: {
                                 editingFavorite = item.folder
                                 editingName = item.folder.title
-                                editingMaxItems = item.settings.maxItems.map { String($0) } ?? ""
                             },
                             onRemove: {
                                 removeFavorite(item.folder)
@@ -95,7 +92,6 @@ struct FavoriteFoldersViews: View {
             EditFavoriteView(
                 folder: folder,
                 name: $editingName,
-                maxItems: $editingMaxItems,
                 currentSettings: currentSettings,
                 onSave: {
                     editingFavorite = nil
@@ -164,7 +160,6 @@ struct FavoriteFoldersViews: View {
 
 struct FavoriteRow: View {
     let folder: FolderEntry
-    let maxItems: Int?
     let onEdit: () -> Void
     let onRemove: () -> Void
     
@@ -207,18 +202,10 @@ struct FavoriteRow: View {
                     .font(.body)
                     .fontWeight(.medium)
                 
-                HStack(spacing: 8) {
-                    Text(folder.path)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                    
-                    if let maxItems = maxItems {
-                        Text("• Max: \(maxItems)")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    }
-                }
+                Text(folder.path)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
             }
             
             Spacer()
@@ -251,16 +238,8 @@ struct EditFavoriteView: View {
     @Environment(\.dismiss) var dismiss
     let folder: FolderEntry
     @Binding var name: String
-    @Binding var maxItems: String
     let currentSettings: FavoriteFolderSettings?
     let onSave: () -> Void
-    
-    @State private var selectedLayout: String = "fullCircle"
-    @State private var itemAngleSize: String = "30"
-    @State private var useCustomAngle: Bool = false
-    @State private var slicePositioning: String = "startClockwise"
-    @State private var childRingThickness: String = "80"
-    @State private var childIconSize: String = "32"
     
     // Icon customization
     @State private var iconName: String = ""
@@ -273,128 +252,95 @@ struct EditFavoriteView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            ScrollView {
-                Form {
-                    Section("Basic Settings") {
-                        TextField("Name", text: $name)
-                        TextField("Max Items (optional)", text: $maxItems)
-                            .help("Leave empty for no limit")
+            Form {
+                Section("Basic Settings") {
+                    TextField("Name", text: $name)
+                }
+                
+                Picker("Sort By", selection: $selectedSortOrder) {
+                    ForEach(FolderSortOrder.allCases, id: \.self) { sortOrder in
+                        Label(sortOrder.displayName, systemImage: sortOrder.icon)
+                            .tag(sortOrder)
                     }
-                    
-                    Picker("Sort By", selection: $selectedSortOrder) {
-                        ForEach(FolderSortOrder.allCases, id: \.self) { sortOrder in
-                            Label(sortOrder.displayName, systemImage: sortOrder.icon)
-                                .tag(sortOrder)
+                }
+                .help("How items are sorted when you open this folder")
+                
+                // Icon Customization Section
+                Section("Icon Customization") {
+                    HStack {
+                        TextField("Folder Color (hex)", text: $folderColorHex)
+                            .textFieldStyle(.roundedBorder)
+                        
+                        // Color preview swatch
+                        if let color = NSColor(hex: folderColorHex) {
+                            Circle()
+                                .fill(Color(nsColor: color))
+                                .frame(width: 20, height: 20)
+                                .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                        } else {
+                            Circle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 20, height: 20)
+                                .overlay(
+                                    Image(systemName: "xmark")
+                                        .font(.caption2)
+                                        .foregroundColor(.red)
+                                )
                         }
                     }
-                    .help("How items are sorted when you open this folder")
+                    .help("Enter a hex color like #55C2EE or #FF9500")
                     
-                    // Icon Customization Section
-                    Section("Icon Customization") {
-                        HStack {
-                            TextField("Folder Color (hex)", text: $folderColorHex)
-                                .textFieldStyle(.roundedBorder)
-                            
-                            // Color preview swatch
-                            if let color = NSColor(hex: folderColorHex) {
-                                Circle()
-                                    .fill(Color(nsColor: color))
-                                    .frame(width: 20, height: 20)
-                                    .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                            } else {
-                                Circle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 20, height: 20)
-                                    .overlay(
-                                        Image(systemName: "xmark")
-                                            .font(.caption2)
-                                            .foregroundColor(.red)
+                    TextField("SF Symbol Name (optional)", text: $iconName)
+                        .help("e.g., star.fill, camera.fill, music.note")
+                    
+                    // Live Preview
+                    HStack {
+                        Text("Preview:")
+                            .foregroundColor(.secondary)
+                        
+                        if let folderColor = NSColor(hex: folderColorHex) {
+                            let previewIcon: NSImage = {
+                                let trimmedIcon = iconName.trimmingCharacters(in: .whitespaces)
+                                if trimmedIcon.isEmpty {
+                                    return IconProvider.shared.createLayeredFolderIcon(
+                                        color: folderColor,
+                                        size: 48,
+                                        cornerRadius: 4
                                     )
-                            }
-                        }
-                        .help("Enter a hex color like #55C2EE or #FF9500")
-                        
-                        TextField("SF Symbol Name (optional)", text: $iconName)
-                            .help("e.g., star.fill, camera.fill, music.note")
-                        
-                        // Live Preview
-                        HStack {
-                            Text("Preview:")
-                                .foregroundColor(.secondary)
+                                } else {
+                                    return IconProvider.shared.createLayeredFolderIconWithSymbol(
+                                        color: folderColor,
+                                        symbolName: trimmedIcon,
+                                        symbolColor: .white,
+                                        size: 48,
+                                        symbolSize: 20,
+                                        cornerRadius: 4,
+                                        symbolOffset: -4
+                                    )
+                                }
+                            }()
                             
-                            if let folderColor = NSColor(hex: folderColorHex) {
-                                let previewIcon: NSImage = {
-                                    let trimmedIcon = iconName.trimmingCharacters(in: .whitespaces)
-                                    if trimmedIcon.isEmpty {
-                                        return IconProvider.shared.createLayeredFolderIcon(
-                                            color: folderColor,
-                                            size: 48,
-                                            cornerRadius: 4
-                                        )
-                                    } else {
-                                        return IconProvider.shared.createLayeredFolderIconWithSymbol(
-                                            color: folderColor,
-                                            symbolName: trimmedIcon,
-                                            symbolColor: .white,
-                                            size: 48,
-                                            symbolSize: 20,
-                                            cornerRadius: 4,
-                                            symbolOffset: -4
-                                        )
-                                    }
-                                }()
-                                
-                                Image(nsImage: previewIcon)
-                                    .frame(width: 48, height: 48)
-                            } else {
-                                Text("Invalid hex")
+                            Image(nsImage: previewIcon)
+                                .frame(width: 48, height: 48)
+                        } else {
+                            Text("Invalid hex")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                        
+                        // Symbol validation
+                        if !iconName.trimmingCharacters(in: .whitespaces).isEmpty {
+                            if NSImage(systemSymbolName: iconName.trimmingCharacters(in: .whitespaces), accessibilityDescription: nil) == nil {
+                                Text("Invalid symbol")
                                     .foregroundColor(.red)
                                     .font(.caption)
                             }
-                            
-                            // Symbol validation
-                            if !iconName.trimmingCharacters(in: .whitespaces).isEmpty {
-                                if NSImage(systemSymbolName: iconName.trimmingCharacters(in: .whitespaces), accessibilityDescription: nil) == nil {
-                                    Text("Invalid symbol")
-                                        .foregroundColor(.red)
-                                        .font(.caption)
-                                }
-                            }
-                            
-                            Spacer()
-                        }
-                    }
-                    
-                    Section("Layout") {
-                        Picker("Preferred Layout", selection: $selectedLayout) {
-                            Text("Full Circle").tag("fullCircle")
-                            Text("Partial Slice").tag("partialSlice")
                         }
                         
-                        Toggle("Use Custom Angle", isOn: $useCustomAngle)
-                            .help("When OFF, uses smart default angle calculation. When ON, uses custom angle below.")
-                        
-                        TextField("Item Angle (degrees)", text: $itemAngleSize)
-                            .help("Angle per item: 15-60 degrees")
-                            .disabled(!useCustomAngle)
-                        
-                        Picker("Slice Positioning", selection: $slicePositioning) {
-                            Text("Start Clockwise").tag("startClockwise")
-                            Text("Start Counter-Clockwise").tag("startCounterClockwise")
-                            Text("Center").tag("center")
-                        }
-                    }
-                    
-                    Section("Child Ring Appearance") {
-                        TextField("Child Ring Thickness (px)", text: $childRingThickness)
-                            .help("Thickness in pixels: 40-120")
-                        
-                        TextField("Child Icon Size (px)", text: $childIconSize)
-                            .help("Icon size in pixels: 16-48")
+                        Spacer()
                     }
                 }
             }
-            .frame(height: 450)
             
             HStack(spacing: 12) {
                 Button("Cancel") {
@@ -412,18 +358,11 @@ struct EditFavoriteView: View {
             loadCurrentSettings()
         }
         .padding()
-        .frame(width: 500, height: 600)
+        .frame(width: 500, height: 420)
     }
     
     private func loadCurrentSettings() {
-        // Load layout settings
         if let settings = currentSettings {
-            selectedLayout = settings.preferredLayout ?? "fullCircle"
-            itemAngleSize = settings.itemAngleSize.map { String($0) } ?? "30"
-            slicePositioning = settings.slicePositioning ?? "startClockwise"
-            childRingThickness = settings.childRingThickness.map { String($0) } ?? "80"
-            childIconSize = settings.childIconSize.map { String($0) } ?? "32"
-            useCustomAngle = settings.itemAngleSize != nil
             selectedSortOrder = settings.contentSortOrder ?? .modifiedNewest
         }
         
@@ -441,23 +380,17 @@ struct EditFavoriteView: View {
     }
     
     private func saveChanges() {
-        // Parse numeric values
-        let maxItemsValue = Int(maxItems.trimmingCharacters(in: .whitespaces))
-        let itemAngleValue = useCustomAngle ? Int(itemAngleSize.trimmingCharacters(in: .whitespaces)) : nil
-        let thicknessValue = Int(childRingThickness.trimmingCharacters(in: .whitespaces))
-        let iconSizeValue = Int(childIconSize.trimmingCharacters(in: .whitespaces))
-        
+        // Save with layout fields and maxItems reset to defaults (nil)
         let settings = FavoriteFolderSettings(
-            maxItems: maxItemsValue,
-            preferredLayout: selectedLayout,
-            itemAngleSize: itemAngleValue,
-            slicePositioning: slicePositioning,
-            childRingThickness: thicknessValue,
-            childIconSize: iconSizeValue,
+            maxItems: nil,
+            preferredLayout: nil,
+            itemAngleSize: nil,
+            slicePositioning: nil,
+            childRingThickness: nil,
+            childIconSize: nil,
             contentSortOrder: selectedSortOrder
         )
         
-        // Update layout settings in database
         if DatabaseManager.shared.updateFavoriteSettings(path: folder.path, title: name, settings: settings) {
             print("✅ Updated favorite settings for: \(folder.title)")
             

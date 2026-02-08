@@ -319,11 +319,31 @@ extension ListPanelManager {
             return
         }
         
-        // Dynamic loading — debounce before hitting the filesystem
+        // Dynamic loading needed
         guard node.needsDynamicLoading,
               let providerId = node.providerId,
               let provider = findProvider?(providerId) else {
             popToLevel(level)
+            return
+        }
+        
+        // Fast path: check if provider has cached results (synchronous, no debounce)
+        if let folderProvider = provider as? FavoriteFolderProvider,
+           let folderPath = (node.metadata?["folderURL"] as? String),
+           let cachedChildren = folderProvider.cachedChildren(forPath: folderPath),
+           !cachedChildren.isEmpty {
+            print("⚡ [handleItemHover] Cache hit for '\(node.name)' — pushing immediately")
+            pushPanel(
+                title: node.name,
+                items: cachedChildren,
+                fromPanelAtLevel: level,
+                sourceNodeId: node.id,
+                sourceRowIndex: rowIndex,
+                providerId: providerId,
+                contentIdentifier: contentIdentifier,
+                contextActions: node.contextActions
+            )
+            activateInputModeIfNeeded(for: providerId, atLevel: level + 1)
             return
         }
         
