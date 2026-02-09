@@ -88,8 +88,6 @@ struct CircularUIView: View {
                     
                     // Use currentPosition which accounts for overlap state
                     let currentPos = listPanelManager.currentPosition(for: panel)
-                    
-                    let _ = print("🖼️ [View] Panel \(panel.level) isOverlapping:\(panel.isOverlapping) rendered at x=\(Int(currentPos.x))")
 
                     let panelLocalX = currentPos.x - screenOriginX
                     let panelLocalY = currentPos.y - screenOriginY

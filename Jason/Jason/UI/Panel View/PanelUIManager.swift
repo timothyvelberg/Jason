@@ -290,20 +290,15 @@ class PanelUIManager: ObservableObject, UIManager {
         var allItems: [FunctionNode] = []
         
         for provider in providers {
-            let providerConfig = configuration.providers.first {
-                ProviderFactory.normalizeProviderName($0.providerType) == ProviderFactory.normalizeProviderName(provider.providerId)
-            }
-            
             var items = provider.provideFunctions()
             
-            // If display mode is direct and provider returns a category wrapper, unwrap it
-            if providerConfig?.effectiveDisplayMode == .direct {
-                if items.count == 1,
-                   items[0].type == .category,
-                   let children = items[0].children {
-                    items = children
-                    print("   Unwrapped category for \(provider.providerName): \(items.count) items")
-                }
+            // Standalone panels always unwrap category wrappers —
+            // .parent mode (show as ring node) is meaningless without a ring
+            if items.count == 1,
+               items[0].type == .category,
+               let children = items[0].children {
+                items = children
+                print("   Unwrapped category for \(provider.providerName): \(items.count) items")
             }
             
             allItems.append(contentsOf: items)

@@ -414,6 +414,7 @@ class ListPanelManager: ObservableObject {
             }
             panelStack[index].items = items
         }
+        
     }
     
     // MARK: - Estimated Panel Height (before measurement)
