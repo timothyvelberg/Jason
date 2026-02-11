@@ -68,11 +68,20 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
 
         var nodes: [FunctionNode] = []
 
+        // Group header
+        nodes.append(FunctionNode(
+            id: "group-default",
+            name: "DPG",
+            type: .sectionHeader(style: .category),
+            icon: NSImage(),
+            providerId: providerId
+        ))
+
         if !incomplete.isEmpty {
             nodes.append(FunctionNode(
                 id: "section-todo",
                 name: "To Do",
-                type: .sectionHeader,
+                type: .sectionHeader(style: .subtle),
                 icon: NSImage(),
                 providerId: providerId
             ))
@@ -83,7 +92,7 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
             nodes.append(FunctionNode(
                 id: "section-done",
                 name: "Done",
-                type: .sectionHeader,
+                type: .sectionHeader(style: .subtle),
                 icon: NSImage(),
                 providerId: providerId
             ))

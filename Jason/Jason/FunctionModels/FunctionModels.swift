@@ -7,12 +7,75 @@
 
 import Foundation
 import AppKit
+import SwiftUI
+
+
+// MARK: - Section Header Style
+
+struct SectionHeaderStyle: Equatable {
+    // Lines
+    var showTopLine: Bool
+    var showBottomLine: Bool
+    var lineOpacity: Double
+    
+    // Margins
+    var horizontalPadding: CGFloat
+    var topPadding: CGFloat
+    var bottomPadding: CGFloat
+    
+    // Text
+    var textOpacity: Double
+    var fontSize: CGFloat
+    var fontWeight: Font.Weight
+    var uppercase: Bool
+    
+    // MARK: - Presets
+    
+    static let `default` = SectionHeaderStyle(
+        showTopLine: false,
+        showBottomLine: false,
+        lineOpacity: 0.18,
+        horizontalPadding: 12,
+        topPadding: 12,
+        bottomPadding: 4,
+        textOpacity: 0.45,
+        fontSize: 11,
+        fontWeight: .semibold,
+        uppercase: true
+    )
+    
+    static let category = SectionHeaderStyle(
+        showTopLine: false,
+        showBottomLine: true,
+        lineOpacity: 0.18,
+        horizontalPadding: 0,
+        topPadding: 12,
+        bottomPadding: 12,
+        textOpacity: 1,
+        fontSize: 12,
+        fontWeight: .semibold,
+        uppercase: true
+    )
+    
+    static let subtle = SectionHeaderStyle(
+        showTopLine: false,
+        showBottomLine: false,
+        lineOpacity: 0.18,
+        horizontalPadding: 0,
+        topPadding: 10,
+        bottomPadding: 4,
+        textOpacity: 0.35,
+        fontSize: 10,
+        fontWeight: .medium,
+        uppercase: true
+    )
+}
 
 // MARK: - Function Node Type
 
 /// Explicit type declaration for function nodes
 /// Defines the node's intent and capabilities independent of current state
-enum FunctionNodeType {
+enum FunctionNodeType: Equatable {
     /// Executes a system function (Mission Control, Screenshot, etc.)
     /// - Always leaf node (no children)
     /// - Minimal or no context menu
@@ -49,8 +112,10 @@ enum FunctionNodeType {
     /// - Can have children (grouped items) but uses positional grouping in flat lists
     /// - Non-interactive (keyboard navigation skips it)
     /// - Only used in panel display mode
-    case sectionHeader
+    case sectionHeader(style: SectionHeaderStyle)
 }
+
+
 
 // MARK: - Display Mode
 
@@ -285,7 +350,8 @@ class FunctionNode: Identifiable, ObservableObject {
     
     // Leaf nodes are determined by type (actions, files, and spacers are always leaves)
     var isLeaf: Bool {
-        return type == .action || type == .file || type == .spacer || type == .sectionHeader
+        return type == .action || type == .file || type == .spacer || type.isSectionHeader
+
     }
     
     // Branch nodes are determined by type (categories, folders, and apps can have children)
@@ -582,5 +648,17 @@ extension FunctionNode {
             onMiddleClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
+    }
+}
+
+extension FunctionNodeType {
+    var isSectionHeader: Bool {
+        if case .sectionHeader = self { return true }
+        return false
+    }
+    
+    var sectionHeaderStyle: SectionHeaderStyle {
+        if case .sectionHeader(let style) = self { return style }
+        return .default
     }
 }

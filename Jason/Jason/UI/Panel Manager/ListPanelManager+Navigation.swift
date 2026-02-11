@@ -54,7 +54,7 @@ extension ListPanelManager {
     func firstSelectableRow(in level: Int) -> Int {
         guard let panel = panelStack.first(where: { $0.level == level }) else { return 0 }
         for i in 0..<panel.items.count {
-            if panel.items[i].type != .sectionHeader {
+            if panel.items[i].type.isSectionHeader {
                 return i
             }
         }
@@ -152,7 +152,7 @@ extension ListPanelManager {
         var newSelection = min(currentSelection + 1, maxIndex)
 
         // Skip section headers
-        while newSelection <= maxIndex && panel.items[newSelection].type == .sectionHeader {
+        while newSelection <= maxIndex && panel.items[newSelection].type.isSectionHeader {
             newSelection += 1
         }
         if newSelection > maxIndex {
@@ -205,10 +205,10 @@ extension ListPanelManager {
         var newSelection = max(currentSelection - 1, 0)
 
         // Skip section headers
-        while newSelection > 0 && panel.items[newSelection].type == .sectionHeader {
+        while newSelection > 0 && panel.items[newSelection].type.isSectionHeader {
             newSelection -= 1
         }
-        if panel.items[newSelection].type == .sectionHeader {
+        if panel.items[newSelection].type.isSectionHeader {
             newSelection = currentSelection  // Stay put if nothing above
         }
         

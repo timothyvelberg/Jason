@@ -393,7 +393,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 fileNodes.append(FunctionNode(
                     id: "section-\(group.directory)",
                     name: group.directory,
-                    type: .sectionHeader,
+                    type: .sectionHeader(style: .default),
                     icon: NSImage(),
                     providerId: providerId
                 ))

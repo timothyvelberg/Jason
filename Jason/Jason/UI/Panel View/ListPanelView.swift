@@ -148,7 +148,7 @@ struct ListPanelView: View {
                         VStack(spacing: 0) {
                             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                                 Group {
-                                    if item.type == .sectionHeader {
+                                    if item.type.isSectionHeader {
                                         ListPanelSectionHeader(
                                             item: item,
                                             baseRowHeight: config.baseRowHeight
@@ -210,9 +210,6 @@ struct ListPanelView: View {
                     .coordinateSpace(name: "panelScroll")
                     .frame(maxHeight: scrollAreaHeight)
                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 2))
-                    .padding(.horizontal, 4)
-                    .padding(.bottom,8)
-                    .padding(.top, 8)
                     .onChange(of: hoveredRowIndex) { oldIndex, newIndex in
                         // Auto-scroll only when KEYBOARD navigates outside visible area
                         guard isKeyboardDriven, let index = newIndex else { return }
@@ -304,18 +301,41 @@ struct ListPanelSectionHeader: View {
     let item: FunctionNode
     let baseRowHeight: CGFloat
     
+    private var style: SectionHeaderStyle {
+        item.type.sectionHeaderStyle
+    }
+    
     var body: some View {
-        HStack {
-            Text(item.name)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.white.opacity(0.45))
-                .textCase(.uppercase)
+        VStack(spacing: 0) {
+            if style.showTopLine {
+                Rectangle()
+                    .fill(Color.white.opacity(style.lineOpacity))
+                    .frame(height: 1)
+                    .padding(.horizontal, style.horizontalPadding)
+            }
             
-            Spacer()
+            HStack {
+                HStack {
+                    Text(item.name)
+                        .font(.system(size: style.fontSize, weight: style.fontWeight))
+                        .foregroundColor(.white.opacity(style.textOpacity))
+                        .textCase(style.uppercase ? .uppercase : nil)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal,16)
+            }
+            .padding(.horizontal, style.horizontalPadding)
+            .padding(.top, style.topPadding)
+            .padding(.bottom, style.bottomPadding)
+            
+            if style.showBottomLine {
+                Rectangle()
+                    .fill(Color.white.opacity(style.lineOpacity))
+                    .frame(height: 1)
+                    .padding(.horizontal, style.horizontalPadding)
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
         .frame(maxWidth: .infinity)
     }
 }

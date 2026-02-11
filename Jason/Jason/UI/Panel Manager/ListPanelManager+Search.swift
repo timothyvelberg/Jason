@@ -71,13 +71,13 @@ extension ListPanelManager {
             while i < originalItems.count {
                 let item = originalItems[i]
                 
-                if item.type == .sectionHeader {
+                if item.type.isSectionHeader {
                     // Check if header matches
                     if item.name.lowercased().contains(query) {
                         // Include header + all items until next header
                         filtered.append(item)
                         i += 1
-                        while i < originalItems.count && originalItems[i].type != .sectionHeader {
+                        while i < originalItems.count && originalItems[i].type.isSectionHeader {
                             filtered.append(originalItems[i])
                             i += 1
                         }
@@ -85,7 +85,7 @@ extension ListPanelManager {
                         // Header doesn't match — check children individually
                         var matchingChildren: [FunctionNode] = []
                         i += 1
-                        while i < originalItems.count && originalItems[i].type != .sectionHeader {
+                        while i < originalItems.count && originalItems[i].type.isSectionHeader {
                             if originalItems[i].name.lowercased().contains(query) {
                                 matchingChildren.append(originalItems[i])
                             }

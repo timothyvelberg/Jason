@@ -73,7 +73,7 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
             children.append(FunctionNode(
                 id: "section-snippets",
                 name: "Snippets",
-                type: .sectionHeader,
+                type: .sectionHeader(style: .default),
                 icon: NSImage(),
                 providerId: providerId
             ))
