@@ -17,6 +17,7 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
         let id: String
         var title: String
         var isCompleted: Bool
+        var group: String
         let createdAt: Date
     }
     
@@ -63,42 +64,57 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
             ]
         }
         
-        let incomplete = todos.filter { !$0.isCompleted }
-        let completed = todos.filter { $0.isCompleted }
-
+        // Group todos by group name, preserving order of first appearance
+        var groupOrder: [String] = []
+        var grouped: [String: [TodoItem]] = [:]
+        
+        for todo in todos {
+            if grouped[todo.group] == nil {
+                groupOrder.append(todo.group)
+            }
+            grouped[todo.group, default: []].append(todo)
+        }
+        
         var nodes: [FunctionNode] = []
-
-        // Group header
-        nodes.append(FunctionNode(
-            id: "group-default",
-            name: "DPG",
-            type: .sectionHeader(style: .category),
-            icon: NSImage(),
-            providerId: providerId
-        ))
-
-        if !incomplete.isEmpty {
+        
+        for (index, group) in groupOrder.enumerated() {
+            guard let groupTodos = grouped[group] else { continue }
+            
+            let incomplete = groupTodos.filter { !$0.isCompleted }
+            let completed = groupTodos.filter { $0.isCompleted }
+            
+            // Group header
             nodes.append(FunctionNode(
-                id: "section-todo",
-                name: "To Do",
-                type: .sectionHeader(style: .subtle),
+                id: "group-\(group)",
+                name: group.capitalized,
+                type: .sectionHeader(style: .category.withTopLine(index > 0)),
                 icon: NSImage(),
                 providerId: providerId
             ))
-            nodes.append(contentsOf: incomplete.map { makeTodoNode($0) })
+            
+            if !incomplete.isEmpty {
+                nodes.append(FunctionNode(
+                    id: "section-\(group)-todo",
+                    name: "To Do",
+                    type: .sectionHeader(style: .subtle),
+                    icon: NSImage(),
+                    providerId: providerId
+                ))
+                nodes.append(contentsOf: incomplete.map { makeTodoNode($0) })
+            }
+            
+            if !completed.isEmpty {
+                nodes.append(FunctionNode(
+                    id: "section-\(group)-done",
+                    name: "Done",
+                    type: .sectionHeader(style: .subtle),
+                    icon: NSImage(),
+                    providerId: providerId
+                ))
+                nodes.append(contentsOf: completed.map { makeTodoNode($0) })
+            }
         }
-
-        if !completed.isEmpty {
-            nodes.append(FunctionNode(
-                id: "section-done",
-                name: "Done",
-                type: .sectionHeader(style: .subtle),
-                icon: NSImage(),
-                providerId: providerId
-            ))
-            nodes.append(contentsOf: completed.map { makeTodoNode($0) })
-        }
-
+        
         return nodes
     }
     
@@ -132,15 +148,36 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     }
     
     func addItem(title: String) {
+        let (group, cleanTitle) = parseInput(title)
+        
         let todo = TodoItem(
             id: UUID().uuidString,
-            title: title,
+            title: cleanTitle,
             isCompleted: false,
+            group: group,
             createdAt: Date()
         )
         todos.insert(todo, at: 0)
-        DatabaseManager.shared.saveTodo(id: todo.id, title: todo.title, createdAt: todo.createdAt)
-        print("[TodoListProvider] Added: '\(title)' (\(todos.count) total)")
+        DatabaseManager.shared.saveTodo(id: todo.id, title: todo.title, group: todo.group, createdAt: todo.createdAt)
+        print("[TodoListProvider] Added: '\(cleanTitle)' in group '\(group)' (\(todos.count) total)")
+    }
+
+    private func parseInput(_ raw: String) -> (group: String, title: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        
+        // Match <group> prefix
+        if let range = trimmed.range(of: #"^<([^>]+)>\s*"#, options: .regularExpression) {
+            let groupName = String(trimmed[trimmed.index(trimmed.startIndex, offsetBy: 1)..<trimmed.firstIndex(of: ">")!])
+                .trimmingCharacters(in: .whitespaces)
+                .lowercased()
+            let title = String(trimmed[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+            
+            if !title.isEmpty {
+                return (groupName, title)
+            }
+        }
+        
+        return ("default", trimmed)
     }
     
     private func deleteTodo(id: String) {

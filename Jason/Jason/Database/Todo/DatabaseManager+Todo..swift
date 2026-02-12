@@ -12,23 +12,24 @@ private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.sel
 extension DatabaseManager {
     
     /// Save a new todo to the database
-    func saveTodo(id: String, title: String, createdAt: Date) {
+    func saveTodo(id: String, title: String, group: String, createdAt: Date) {
         queue.sync {
             guard let db = db else {
                 print("❌ [DatabaseManager] Database not initialized")
                 return
             }
             
-            let sql = "INSERT OR REPLACE INTO todos (id, title, is_completed, created_at) VALUES (?, ?, 0, ?);"
+            let sql = "INSERT OR REPLACE INTO todos (id, title, is_completed, group_name, created_at) VALUES (?, ?, 0, ?, ?);"
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_text(statement, 1, id, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_text(statement, 2, title, -1, SQLITE_TRANSIENT)
-                sqlite3_bind_double(statement, 3, createdAt.timeIntervalSince1970)
+                sqlite3_bind_text(statement, 3, group, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_double(statement, 4, createdAt.timeIntervalSince1970)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("✅ [DatabaseManager] Saved todo: \"\(title)\"")
+                    print("✅ [DatabaseManager] Saved todo: \"\(title)\" in group: \(group)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
                         print("❌ [DatabaseManager] Failed to save todo: \(String(cString: error))")
@@ -104,7 +105,7 @@ extension DatabaseManager {
                 return
             }
             
-            let sql = "SELECT id, title, is_completed, created_at FROM todos ORDER BY created_at DESC;"
+            let sql = "SELECT id, title, is_completed, group_name, created_at FROM todos ORDER BY created_at DESC;"
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
@@ -117,12 +118,19 @@ extension DatabaseManager {
                     let id = String(cString: idCString)
                     let title = String(cString: titleCString)
                     let isCompleted = sqlite3_column_int(statement, 2) == 1
-                    let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(statement, 3))
+                    let group: String
+                    if let groupCString = sqlite3_column_text(statement, 3) {
+                        group = String(cString: groupCString)
+                    } else {
+                        group = "default"
+                    }
+                    let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(statement, 4))
                     
                     items.append(TodoListProvider.TodoItem(
                         id: id,
                         title: title,
                         isCompleted: isCompleted,
+                        group: group,
                         createdAt: createdAt
                     ))
                 }
@@ -133,5 +141,5 @@ extension DatabaseManager {
         
         print("📋 [DatabaseManager] Loaded \(items.count) todos")
         return items
-    }
+    }   
 }

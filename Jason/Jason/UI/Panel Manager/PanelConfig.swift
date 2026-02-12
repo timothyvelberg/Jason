@@ -41,8 +41,8 @@ struct PanelConfig {
     
     // MARK: - Constants (not configurable per-provider)
     
-    static let titleHeight: CGFloat = 40
-    static let padding: CGFloat = 8
+    static let titleHeight: CGFloat = 56
+    static let padding: CGFloat = 0
     static let cascadeSlideDistance: CGFloat = 30
     
     // MARK: - Derived Properties

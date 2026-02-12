@@ -33,6 +33,7 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
     
     private let clipboardManager = ClipboardManager.shared
     private let snippetsProvider = SnippetsProvider()
+    var panelConfig: PanelConfig { PanelConfig(panelWidth:320) }
     
     // MARK: - Initialization
     
@@ -110,6 +111,14 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
         let displayText = truncateForDisplay(entry.content, maxLength: 50)
         let timeAgo = formatTimeAgo(entry.copiedAt)
         
+        let icon: NSImage
+        if let bundleId = entry.sourceAppBundleId,
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            icon = NSWorkspace.shared.icon(forFile: appURL.path)
+        } else {
+            icon = iconForContent(entry.content)
+        }
+        
         let deleteAction = FunctionNode(
             id: "clipboard-delete-\(entry.id.uuidString)",
             name: "Delete",
@@ -128,7 +137,7 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
             id: "clipboard-\(entry.id.uuidString)",
             name: displayText,
             type: .file,
-            icon: iconForContent(entry.content),
+            icon: icon,
             contextActions: [deleteAction],
             metadata: [
                 "fullContent": entry.content,

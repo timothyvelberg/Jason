@@ -15,23 +15,26 @@ struct ClipboardEntry: Identifiable, Equatable {
     let content: String
     let rtfData: Data?
     let htmlData: Data?
+    let sourceAppBundleId: String?
     let copiedAt: Date
     
-    // New entry (generates UUID and timestamp)
-    init(content: String, rtfData: Data? = nil, htmlData: Data? = nil) {
+    // New entry
+    init(content: String, rtfData: Data? = nil, htmlData: Data? = nil, sourceAppBundleId: String? = nil) {
         self.id = UUID()
         self.content = content
         self.rtfData = rtfData
         self.htmlData = htmlData
+        self.sourceAppBundleId = sourceAppBundleId
         self.copiedAt = Date()
     }
-    
+
     // Load from database
-    init(id: UUID, content: String, rtfData: Data? = nil, htmlData: Data? = nil, copiedAt: Date) {
+    init(id: UUID, content: String, rtfData: Data? = nil, htmlData: Data? = nil, sourceAppBundleId: String? = nil, copiedAt: Date) {
         self.id = id
         self.content = content
         self.rtfData = rtfData
         self.htmlData = htmlData
+        self.sourceAppBundleId = sourceAppBundleId
         self.copiedAt = copiedAt
     }
     
@@ -169,6 +172,7 @@ class ClipboardManager: ObservableObject {
         lastChangeCount = currentChangeCount
         
         let pasteboard = NSPasteboard.general
+        let sourceAppBundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         
         // Read string content from clipboard (required)
         guard let content = pasteboard.string(forType: .string),
@@ -189,10 +193,14 @@ class ClipboardManager: ObservableObject {
             print("📋 [ClipboardManager] Captured HTML data (\(htmlData!.count) bytes)")
         }
         
-        addEntry(content: content, rtfData: rtfData, htmlData: htmlData)
+        if let bundleId = sourceAppBundleId {
+            print("📋 [ClipboardManager] Source app: \(bundleId)")
+        }
+        
+        addEntry(content: content, rtfData: rtfData, htmlData: htmlData, sourceAppBundleId: sourceAppBundleId)
     }
     
-    private func addEntry(content: String, rtfData: Data? = nil, htmlData: Data? = nil) {
+    private func addEntry(content: String, rtfData: Data? = nil, htmlData: Data? = nil, sourceAppBundleId: String? = nil) {
         // Deduplication: check if this content already exists
         if let existingIndex = history.firstIndex(where: { $0.content == content }) {
             // Remove the old entry from memory and database
@@ -201,14 +209,14 @@ class ClipboardManager: ObservableObject {
             print("[ClipboardManager] Dedup: moving existing entry to top")
             
             // Create new entry with fresh timestamp and insert at top
-            let newEntry = ClipboardEntry(content: content, rtfData: rtfData, htmlData: htmlData)
+            let newEntry = ClipboardEntry(content: content, rtfData: rtfData, htmlData: htmlData, sourceAppBundleId: sourceAppBundleId)
             history.insert(newEntry, at: 0)
             DatabaseManager.shared.saveClipboardEntry(newEntry)
             
             print("[ClipboardManager] Entry moved to top: \"\(content.prefix(30))...\" (was at index \(existingIndex))")
         } else {
             // New entry - insert at top
-            let entry = ClipboardEntry(content: content, rtfData: rtfData, htmlData: htmlData)
+            let entry = ClipboardEntry(content: content, rtfData: rtfData, htmlData: htmlData, sourceAppBundleId: sourceAppBundleId)
             history.insert(entry, at: 0)
             DatabaseManager.shared.saveClipboardEntry(entry)
             

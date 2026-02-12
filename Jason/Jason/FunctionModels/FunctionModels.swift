@@ -45,7 +45,7 @@ struct SectionHeaderStyle: Equatable {
     )
     
     static let category = SectionHeaderStyle(
-        showTopLine: false,
+        showTopLine: true,
         showBottomLine: true,
         lineOpacity: 0.18,
         horizontalPadding: 0,
@@ -69,7 +69,15 @@ struct SectionHeaderStyle: Equatable {
         fontWeight: .medium,
         uppercase: true
     )
+    
+    func withTopLine(_ show: Bool) -> SectionHeaderStyle {
+        var copy = self
+        copy.showTopLine = show
+        return copy
+    }
 }
+
+
 
 // MARK: - Function Node Type
 

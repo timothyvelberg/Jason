@@ -279,7 +279,6 @@ extension ListPanelManager {
     
     /// Handle item hover — manages folder cascading, child panel push/pop, and dynamic loading.
     func handleItemHover(node: FunctionNode?, level: Int, rowIndex: Int) {
-        print("[handleItemHover] node: '\(node?.name ?? "nil")', level: \(level), rowIndex: \(rowIndex), type: \(String(describing: node?.type))")
 
         // Cancel any in-flight dynamic load from previous hover
         cancelDynamicLoad()

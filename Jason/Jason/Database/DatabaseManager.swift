@@ -248,6 +248,7 @@ class DatabaseManager {
             rtf_data BLOB,
             html_data BLOB,
             copied_at REAL NOT NULL
+            source_app_bundle_id TEXT
         );
         """
         
@@ -256,6 +257,7 @@ class DatabaseManager {
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             is_completed INTEGER DEFAULT 0,
+            group_name TEXT DEFAULT 'default',
             created_at REAL NOT NULL
         );
         """

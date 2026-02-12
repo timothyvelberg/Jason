@@ -25,8 +25,8 @@ extension DatabaseManager {
             }
             
             let sql = """
-            INSERT OR REPLACE INTO clipboard_history (id, content, rtf_data, html_data, copied_at)
-            VALUES (?, ?, ?, ?, ?);
+            INSERT OR REPLACE INTO clipboard_history (id, content, rtf_data, html_data, copied_at, source_app_bundle_id)
+            VALUES (?, ?, ?, ?, ?, ?);
             """
             
             var statement: OpaquePointer?
@@ -55,10 +55,18 @@ extension DatabaseManager {
                 
                 sqlite3_bind_double(statement, 5, entry.copiedAt.timeIntervalSince1970)
                 
+                // Bind source app bundle ID or NULL
+                if let bundleId = entry.sourceAppBundleId {
+                    sqlite3_bind_text(statement, 6, bundleId, -1, SQLITE_TRANSIENT)
+                } else {
+                    sqlite3_bind_null(statement, 6)
+                }
+                
                 if sqlite3_step(statement) == SQLITE_DONE {
                     let rtfInfo = entry.rtfData != nil ? " RTF:\(entry.rtfData!.count)" : ""
                     let htmlInfo = entry.htmlData != nil ? " HTML:\(entry.htmlData!.count)" : ""
-                    print("📋 [DatabaseManager] Saved clipboard entry: \"\(entry.content.prefix(30))...\"\(rtfInfo)\(htmlInfo)")
+                    let appInfo = entry.sourceAppBundleId != nil ? " from:\(entry.sourceAppBundleId!)" : ""
+                    print("📋 [DatabaseManager] Saved clipboard entry: \"\(entry.content.prefix(30))...\"\(rtfInfo)\(htmlInfo)\(appInfo)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
                         print("❌ [DatabaseManager] Failed to save clipboard entry: \(String(cString: error))")
@@ -107,7 +115,7 @@ extension DatabaseManager {
                 return
             }
             
-            let sql = "SELECT id, content, rtf_data, html_data, copied_at FROM clipboard_history ORDER BY copied_at DESC;"
+            let sql = "SELECT id, content, rtf_data, html_data, copied_at, source_app_bundle_id FROM clipboard_history ORDER BY copied_at DESC;"
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
@@ -140,13 +148,20 @@ extension DatabaseManager {
                     
                     let copiedAt = sqlite3_column_double(statement, 4)
                     
+                    // Read source app bundle ID - may be NULL
+                    var sourceAppBundleId: String? = nil
+                    if let bundleIdCString = sqlite3_column_text(statement, 5) {
+                        sourceAppBundleId = String(cString: bundleIdCString)
+                    }
+                    
                     if let uuid = UUID(uuidString: idString) {
                         let entry = ClipboardEntry(
                             id: uuid,
                             content: content,
                             rtfData: rtfData,
                             htmlData: htmlData,
-                            copiedAt: Date(timeIntervalSince1970: copiedAt)
+                            sourceAppBundleId: sourceAppBundleId,
+                            copiedAt: copiedAt > 0 ? Date(timeIntervalSince1970: copiedAt) : Date()
                         )
                         entries.append(entry)
                     }
