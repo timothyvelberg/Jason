@@ -247,7 +247,7 @@ class DatabaseManager {
             content TEXT NOT NULL,
             rtf_data BLOB,
             html_data BLOB,
-            copied_at REAL NOT NULL
+            copied_at REAL NOT NULL,
             source_app_bundle_id TEXT
         );
         """
