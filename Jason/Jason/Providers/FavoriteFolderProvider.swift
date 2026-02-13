@@ -721,7 +721,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     }
     
     private func addDefaultFavorites() {
-        // Downloads - Newest First
+        // Downloads
         if let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
             let settings = FavoriteFolderSettings(
                 maxItems: nil,
@@ -730,7 +730,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 slicePositioning: nil,
                 childRingThickness: nil,
                 childIconSize: nil,
-                contentSortOrder: .modifiedNewest
+                contentSortOrder: .addedNewest
             )
             _ = DatabaseManager.shared.addFavoriteFolder(
                 path: downloadsURL.path,
@@ -738,6 +738,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 settings: settings
             )
         }
+        
         // Desktop
         if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
             let settings = FavoriteFolderSettings(
@@ -747,15 +748,15 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 slicePositioning: nil,
                 childRingThickness: nil,
                 childIconSize: nil,
-                contentSortOrder: .modifiedNewest
+                contentSortOrder: .addedNewest
             )
             _ = DatabaseManager.shared.addFavoriteFolder(
                 path: desktopURL.path,
                 title: "Desktop",
                 settings: settings
-            )
-        }
-        // Documents
+            )        }
+        
+        // Documents (folder only, no dynamic file)
         if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             let settings = FavoriteFolderSettings(
                 maxItems: nil,
@@ -773,7 +774,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             )
         }
         
-        print("[FavoriteFolderProvider] Added default favorites with smart sorting")
+        print("✅ [FavoriteFilesProvider] Added default favorites (Downloads + Desktop + Documents)")
     }
     
     // MARK: - Enhanced Cache Helpers

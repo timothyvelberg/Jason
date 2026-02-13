@@ -60,6 +60,18 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         
         // 1. Load static favorite files
         let staticFiles = DatabaseManager.shared.getFavoriteFiles()
+        
+        // 2. Load dynamic favorite files
+        let dynamicFiles = DatabaseManager.shared.getFavoriteDynamicFiles()
+        
+        // If no favorites at all, add defaults and reload once
+        if staticFiles.isEmpty && dynamicFiles.isEmpty {
+            print("📋 [FavoriteFiles] No favorites found - adding defaults")
+            addDefaultFavorites()
+            loadFiles()
+            return
+        }
+        
         print("📋 [FavoriteFiles] Loaded \(staticFiles.count) static favorite files")
         
         for file in staticFiles {
@@ -100,8 +112,6 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             ))
         }
         
-        // 2. Load dynamic favorite files
-        let dynamicFiles = DatabaseManager.shared.getFavoriteDynamicFiles()
         print("📋 [FavoriteFiles] Loaded \(dynamicFiles.count) dynamic favorite files")
         
         for dynamic in dynamicFiles {
@@ -656,87 +666,33 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
     }
     
     private func addDefaultFavorites() {
-        // Downloads - Newest First
         if let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
-            let settings = FavoriteFolderSettings(
-                maxItems: nil,
-                preferredLayout: nil,
-                itemAngleSize: nil,
-                slicePositioning: nil,
-                childRingThickness: nil,
-                childIconSize: nil,
-                contentSortOrder: .modifiedNewest
-            )
-            _ = DatabaseManager.shared.addFavoriteFolder(
-                path: downloadsURL.path,
-                title: "Downloads",
-                settings: settings
-            )
-            
-            // Also add dynamic file for latest download
             _ = DatabaseManager.shared.addFavoriteDynamicFile(
-                displayName: "Latest Download",
+                displayName: "Downloads",
                 folderPath: downloadsURL.path,
-                sortOrder: .modifiedNewest,
+                sortOrder: .addedNewest,
                 fileExtensions: nil,
                 namePattern: nil,
                 iconData: nil
             )
         }
         
-        // Git folder - Alphabetical
-        let gitPath = "/Users/timothy/Files/Git/"
-        if FileManager.default.fileExists(atPath: gitPath) {
-            let settings = FavoriteFolderSettings(
-                maxItems: nil,
-                preferredLayout: nil,
-                itemAngleSize: nil,
-                slicePositioning: nil,
-                childRingThickness: nil,
-                childIconSize: nil,
-                contentSortOrder: .alphabeticalAsc
-            )
-            _ = DatabaseManager.shared.addFavoriteFolder(
-                path: gitPath,
-                title: "Git",
-                settings: settings
-            )
-        }
-        
-        // Screenshots - Newest First
-        let screenshotsPath = "/Users/timothy/Library/CloudStorage/Dropbox/Screenshots"
-        if FileManager.default.fileExists(atPath: screenshotsPath) {
-            let settings = FavoriteFolderSettings(
-                maxItems: nil,
-                preferredLayout: nil,
-                itemAngleSize: nil,
-                slicePositioning: nil,
-                childRingThickness: nil,
-                childIconSize: nil,
-                contentSortOrder: .modifiedNewest
-            )
-            _ = DatabaseManager.shared.addFavoriteFolder(
-                path: screenshotsPath,
-                title: "Screenshots",
-                settings: settings
-            )
-            
-            // Also add dynamic file for latest screenshot
+        if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
             _ = DatabaseManager.shared.addFavoriteDynamicFile(
-                displayName: "Latest Screenshot",
-                folderPath: screenshotsPath,
-                sortOrder: .modifiedNewest,
-                fileExtensions: "png,jpg,jpeg,heic",
+                displayName: "Desktop",
+                folderPath: desktopURL.path,
+                sortOrder: .addedNewest,
+                fileExtensions: nil,
                 namePattern: nil,
                 iconData: nil
             )
         }
         
-        print("✅ [FavoriteFolderProvider] Added default favorites with smart sorting")
+        print("✅ [FavoriteFilesProvider] Added default dynamic favorites (Downloads + Desktop)")
     }
     
     func refresh() {
-        print("🔄 [FavoriteFiles] Refreshing files")
+        print("FavoriteFiles] Refreshing files")
         loadFiles()
     }
     
