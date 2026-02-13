@@ -11,12 +11,14 @@ import EventKit
 
 class CalendarProvider: ObservableObject, FunctionProvider {
     
+    var panelConfig: PanelConfig { PanelConfig(lineLimit: 3, panelWidth:320) }
+    
     // MARK: - Provider Info
     
     var providerId: String { "calendar" }
     var providerName: String { "Calendar" }
     var providerIcon: NSImage {
-        return NSWorkspace.shared.icon(forFile: "/System/Applications/Calendar.app")
+        return NSImage(named: "parent-calendar") ?? NSImage()
     }
     
     // MARK: - EventKit
@@ -30,6 +32,7 @@ class CalendarProvider: ObservableObject, FunctionProvider {
     
     private var cachedNodes: [FunctionNode]?
     private var lastFetchDate: Date?
+    
     
     // MARK: - Initialization
     
@@ -53,7 +56,7 @@ class CalendarProvider: ObservableObject, FunctionProvider {
     // MARK: - FunctionProvider Protocol
     
     func provideFunctions() -> [FunctionNode] {
-        print("📅 [CalendarProvider] provideFunctions() called")
+        print("[CalendarProvider] provideFunctions() called")
         
         switch authorizationStatus {
         case .authorized, .fullAccess:
@@ -178,9 +181,18 @@ class CalendarProvider: ObservableObject, FunctionProvider {
             return []
         }
         
-        // Only include actual user calendars — skip subscriptions (holidays) and birthdays
-        let calendars = eventStore.calendars(for: .event).filter { calendar in
-            calendar.type != .subscription && calendar.type != .birthday
+        // Filter to only user-enabled calendars from Settings
+        let enabledIDs = CalendarSettingsView.loadEnabledCalendarIDs()
+        
+        let calendars: [EKCalendar]?
+        if enabledIDs.isEmpty {
+            // No preferences saved yet — show nothing until user configures in Settings > Calendar
+            print("📅 [CalendarProvider] No calendars enabled — configure in Settings > Calendar")
+            calendars = []
+        } else {
+            calendars = eventStore.calendars(for: .event).filter { calendar in
+                enabledIDs.contains(calendar.calendarIdentifier)
+            }
         }
         
         let predicate = eventStore.predicateForEvents(

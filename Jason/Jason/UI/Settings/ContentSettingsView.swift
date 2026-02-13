@@ -13,6 +13,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case folders = "Folders"
     case files = "Files"
     case snippets = "Snippets"
+    case calendar = "Calendar"
     
     case settings = "Settings"
     
@@ -50,6 +51,8 @@ struct ContentSettingsView: View {
                     FavoriteAppsSettingsView()
                 case .snippets:
                     SnippetsSettingsView()
+                case .calendar:
+                    CalendarSettingsView()
                 case .settings:
                     Text("Settings")
                 }
