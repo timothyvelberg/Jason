@@ -72,6 +72,8 @@ class ProviderFactory {
             
         case "TodoListProvider":
             provider = createTodoListProvider(config: config)
+        case "CalendarProvider":
+            provider = createCalendarProvider(config: config)
             
         default:
             return nil
@@ -154,6 +156,10 @@ class ProviderFactory {
         return TodoListProvider()
     }
     
+    private func createCalendarProvider(config: ProviderConfiguration) -> CalendarProvider? {
+        return CalendarProvider()
+    }
+    
     // MARK: - Provider Type Validation
     static func isProviderTypeSupported(_ type: String) -> Bool {
         return supportedProviderTypes().contains(type)
@@ -170,7 +176,8 @@ class ProviderFactory {
             "WindowManagementProvider",
             "ShortcutExecuteProvider",
             "ClipboardHistoryProvider",
-            "TodoListProvider"
+            "TodoListProvider",
+            "CalendarProvider"
         ]
     }
 }
