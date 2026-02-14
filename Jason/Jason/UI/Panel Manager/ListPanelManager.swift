@@ -1000,10 +1000,15 @@ class ListPanelManager: ObservableObject {
         let angleInRadians = (angle - 90) * (.pi / 180)
         
         // Gap between ring edge and panel
-        let gapFromRing: CGFloat = 8
+        let gapFromRing: CGFloat = 0
         
-        // Calculate anchor point at ring edge
-        let anchorRadius = ring.outerRadius + gapFromRing
+        // ring.outerRadius is to icon centers, actual edge includes half icon size
+        // Typical icon size is 64pt, so radius is 32pt
+        let iconRadius: CGFloat = 32
+        let actualRingEdge = ring.outerRadius + iconRadius
+        
+        // Calculate anchor point at actual ring edge (not just icon centers)
+        let anchorRadius = actualRingEdge + gapFromRing
         let anchorX = ring.center.x + anchorRadius * cos(angleInRadians)
         let anchorY = ring.center.y - anchorRadius * sin(angleInRadians)
         
