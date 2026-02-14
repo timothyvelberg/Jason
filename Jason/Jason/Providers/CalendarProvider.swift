@@ -113,7 +113,6 @@ class CalendarProvider: ObservableObject, FunctionProvider {
             }
         }
     }
-    
     // MARK: - Event Fetching
     
     private func buildEventNodes() -> [FunctionNode] {
@@ -151,7 +150,7 @@ class CalendarProvider: ObservableObject, FunctionProvider {
             nodes.append(createEventNode(for: event))
         }
         
-        print("📅 [CalendarProvider] Built \(nodes.count) event nodes (\(allDayEvents.count) all-day, \(timedEvents.count) timed)")
+        print("[CalendarProvider] Built \(nodes.count) event nodes (\(allDayEvents.count) all-day, \(timedEvents.count) timed)")
         
         // Wrap in category node (applyDisplayMode will unwrap if displayMode == .direct)
         let categoryNode = FunctionNode(
@@ -187,7 +186,7 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         let calendars: [EKCalendar]?
         if enabledIDs.isEmpty {
             // No preferences saved yet — show nothing until user configures in Settings > Calendar
-            print("📅 [CalendarProvider] No calendars enabled — configure in Settings > Calendar")
+            print("[CalendarProvider] No calendars enabled — configure in Settings > Calendar")
             calendars = []
         } else {
             calendars = eventStore.calendars(for: .event).filter { calendar in
@@ -202,7 +201,7 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         )
         
         let events = eventStore.events(matching: predicate)
-        print("📅 [CalendarProvider] Fetched \(events.count) events for today")
+        print("[CalendarProvider] Fetched \(events.count) events for today")
         return events
     }
     
