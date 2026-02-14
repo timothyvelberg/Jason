@@ -14,6 +14,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case files = "Files"
     case snippets = "Snippets"
     case calendar = "Calendar"
+    case reminder = "Reminder"
     
     case settings = "Settings"
     
@@ -53,6 +54,8 @@ struct ContentSettingsView: View {
                     SnippetsSettingsView()
                 case .calendar:
                     CalendarSettingsView()
+                case .reminder:
+                    RemindersSettingsView()
                 case .settings:
                     Text("Settings")
                 }

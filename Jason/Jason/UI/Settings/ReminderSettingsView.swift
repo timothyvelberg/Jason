@@ -1,16 +1,17 @@
 //
-//  CalendarSettingsView.swift
+//  RemindersSettingsView.swift
 //  Jason
 //
-//  Created by Timothy Velberg on 13/02/2026.
-//  Settings view for selecting which calendars appear in the CalendarProvider
+//  Created by Timothy Velberg on 16/02/2026.
+//  Settings view for selecting which reminder lists appear in the TodoListProvider
+//
 
 import SwiftUI
 import EventKit
 
-struct CalendarSettingsView: View {
-    @State private var sources: [CalendarSource] = []
-    @State private var enabledCalendarIDs: Set<String> = []
+struct RemindersSettingsView: View {
+    @State private var sources: [ReminderSource] = []
+    @State private var enabledListIDs: Set<String> = []
     @State private var authorizationStatus: EKAuthorizationStatus = .notDetermined
     @State private var isLoading = true
     
@@ -19,16 +20,16 @@ struct CalendarSettingsView: View {
         PermissionManager.shared.getEventStore()
     }
     
-    // UserDefaults key for storing enabled calendar IDs
-    static let enabledCalendarsKey = "CalendarProvider.enabledCalendarIDs"
+    // UserDefaults key for storing enabled reminder list IDs
+    static let enabledListsKey = "TodoListProvider.enabledListIDs"
     
-    struct CalendarSource: Identifiable {
+    struct ReminderSource: Identifiable {
         let id: String
         let name: String
-        let calendars: [CalendarEntry]
+        let lists: [ReminderListEntry]
     }
     
-    struct CalendarEntry: Identifiable {
+    struct ReminderListEntry: Identifiable {
         let id: String  // calendarIdentifier
         let title: String
         let color: NSColor
@@ -42,17 +43,17 @@ struct CalendarSettingsView: View {
                     VStack(spacing: 16) {
                         ProgressView()
                             .scaleEffect(1.5)
-                        Text("Loading calendars...")
+                        Text("Loading reminder lists...")
                             .foregroundColor(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if sources.isEmpty {
                     VStack(spacing: 16) {
-                        Image(systemName: "calendar.badge.exclamationmark")
+                        Image(systemName: "checklist")
                             .font(.system(size: 48))
                             .foregroundColor(.secondary)
                         
-                        Text("No calendars found")
+                        Text("No reminder lists found")
                             .font(.headline)
                             .foregroundColor(.secondary)
                     }
@@ -61,12 +62,12 @@ struct CalendarSettingsView: View {
                     List {
                         ForEach(sources) { source in
                             Section(header: Text(source.name)) {
-                                ForEach(source.calendars) { calendar in
-                                    CalendarToggleRow(
-                                        calendar: calendar,
-                                        isEnabled: enabledCalendarIDs.contains(calendar.id),
+                                ForEach(source.lists) { list in
+                                    ReminderListToggleRow(
+                                        list: list,
+                                        isEnabled: enabledListIDs.contains(list.id),
                                         onToggle: { enabled in
-                                            toggleCalendar(id: calendar.id, enabled: enabled)
+                                            toggleList(id: list.id, enabled: enabled)
                                         }
                                     )
                                 }
@@ -77,14 +78,14 @@ struct CalendarSettingsView: View {
                 }
             } else if authorizationStatus == .notDetermined {
                 VStack(spacing: 16) {
-                    Image(systemName: "calendar.badge.plus")
+                    Image(systemName: "checklist")
                         .font(.system(size: 48))
                         .foregroundColor(.secondary)
                     
-                    Text("Calendar access required")
+                    Text("Reminders access required")
                         .font(.headline)
                     
-                    Text("Grant access to manage which calendars appear in Jason.")
+                    Text("Grant access to manage which reminder lists appear in Jason.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -97,20 +98,20 @@ struct CalendarSettingsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(spacing: 16) {
-                    Image(systemName: "calendar.badge.exclamationmark")
+                    Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 48))
                         .foregroundColor(.red)
                     
-                    Text("Calendar access denied")
+                    Text("Reminders access denied")
                         .font(.headline)
                     
-                    Text("Open System Settings to grant Jason calendar access.")
+                    Text("Open System Settings to grant Jason reminders access.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                     
                     Button("Open Settings") {
-                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders") {
                             NSWorkspace.shared.open(url)
                         }
                     }
@@ -122,8 +123,8 @@ struct CalendarSettingsView: View {
             Divider()
             
             HStack {
-                let totalCount = sources.flatMap(\.calendars).count
-                Text("\(enabledCalendarIDs.count) of \(totalCount) calendar\(totalCount == 1 ? "" : "s") enabled")
+                let totalCount = sources.flatMap(\.lists).count
+                Text("\(enabledListIDs.count) of \(totalCount) list\(totalCount == 1 ? "" : "s") enabled")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
@@ -147,7 +148,7 @@ struct CalendarSettingsView: View {
             checkAuthorizationAndLoad()
             // Listen for permission changes
             NotificationCenter.default.addObserver(
-                forName: .calendarPermissionChanged,
+                forName: .remindersPermissionChanged,
                 object: nil,
                 queue: .main
             ) { _ in
@@ -159,10 +160,10 @@ struct CalendarSettingsView: View {
     // MARK: - Data Loading
     
     private func checkAuthorizationAndLoad() {
-        authorizationStatus = EKEventStore.authorizationStatus(for: .event)
+        authorizationStatus = EKEventStore.authorizationStatus(for: .reminder)
         
         if authorizationStatus == .authorized || authorizationStatus == .fullAccess {
-            loadCalendars()
+            loadReminderLists()
         } else {
             isLoading = false
         }
@@ -170,102 +171,94 @@ struct CalendarSettingsView: View {
     
     private func requestAccess() {
         // Use PermissionManager instead of local request
-        PermissionManager.shared.requestCalendarAccess { granted in
+        PermissionManager.shared.requestRemindersAccess { granted in
             // The notification will trigger checkAuthorizationAndLoad()
             // No need to manually reload here
         }
     }
     
-    private func loadCalendars() {
+    private func loadReminderLists() {
         // Load saved enabled IDs
-        enabledCalendarIDs = Self.loadEnabledCalendarIDs()
+        enabledListIDs = Self.loadEnabledListIDs()
         
-        // Build source → calendar hierarchy
-        let allCalendars = eventStore.calendars(for: .event)
+        // Build source → list hierarchy
+        let allLists = eventStore.calendars(for: .reminder)
         
         // Group by source
-        var sourceDict: [String: (name: String, calendars: [CalendarEntry])] = [:]
+        var sourceDict: [String: (name: String, lists: [ReminderListEntry])] = [:]
         
-        for cal in allCalendars {
-            let sourceName = cal.source?.title ?? "Unknown"
-            let sourceId = cal.source?.sourceIdentifier ?? "unknown"
+        for list in allLists {
+            let sourceName = list.source?.title ?? "Unknown"
+            let sourceId = list.source?.sourceIdentifier ?? "unknown"
             
-            let entry = CalendarEntry(
-                id: cal.calendarIdentifier,
-                title: cal.title,
-                color: NSColor(cgColor: cal.cgColor) ?? .systemBlue,
-                typeName: calendarTypeName(cal.type)
+            let entry = ReminderListEntry(
+                id: list.calendarIdentifier,
+                title: list.title,
+                color: NSColor(cgColor: list.cgColor) ?? .systemBlue,
+                typeName: listTypeName(list.type)
             )
             
             if sourceDict[sourceId] == nil {
-                sourceDict[sourceId] = (name: sourceName, calendars: [])
+                sourceDict[sourceId] = (name: sourceName, lists: [])
             }
-            sourceDict[sourceId]?.calendars.append(entry)
+            sourceDict[sourceId]?.lists.append(entry)
         }
         
         // Convert to sorted array, skip empty sources
         sources = sourceDict
-            .filter { !$0.value.calendars.isEmpty }
-            .map { CalendarSource(id: $0.key, name: $0.value.name, calendars: $0.value.calendars) }
+            .filter { !$0.value.lists.isEmpty }
+            .map { ReminderSource(id: $0.key, name: $0.value.name, lists: $0.value.lists) }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         
-        // If no saved preferences exist yet, enable nothing (user picks explicitly)
-        // OR if you prefer all-on by default, uncomment the block below:
-        // if enabledCalendarIDs.isEmpty {
-        //     enabledCalendarIDs = Set(allCalendars.map { $0.calendarIdentifier })
-        //     saveEnabledCalendarIDs()
-        // }
-        
         isLoading = false
-        print("📅 [CalendarSettings] Loaded \(sources.count) sources, \(enabledCalendarIDs.count) enabled calendars")
+        print("✅ [RemindersSettings] Loaded \(sources.count) sources, \(enabledListIDs.count) enabled lists")
     }
     
-    private func calendarTypeName(_ type: EKCalendarType) -> String {
+    private func listTypeName(_ type: EKCalendarType) -> String {
         switch type {
         case .local: return "Local"
         case .calDAV: return "CalDAV"
         case .exchange: return "Exchange"
         case .subscription: return "Subscription"
-        case .birthday: return "Birthday"
         @unknown default: return "Other"
         }
     }
     
     // MARK: - Toggle Actions
     
-    private func toggleCalendar(id: String, enabled: Bool) {
+    private func toggleList(id: String, enabled: Bool) {
         if enabled {
-            enabledCalendarIDs.insert(id)
+            enabledListIDs.insert(id)
         } else {
-            enabledCalendarIDs.remove(id)
+            enabledListIDs.remove(id)
         }
-        saveEnabledCalendarIDs()
+        saveEnabledListIDs()
         notifyProvider()
     }
     
     private func enableAll() {
-        let allIDs = sources.flatMap(\.calendars).map(\.id)
-        enabledCalendarIDs = Set(allIDs)
-        saveEnabledCalendarIDs()
+        let allIDs = sources.flatMap(\.lists).map(\.id)
+        enabledListIDs = Set(allIDs)
+        saveEnabledListIDs()
         notifyProvider()
     }
     
     private func disableAll() {
-        enabledCalendarIDs.removeAll()
-        saveEnabledCalendarIDs()
+        enabledListIDs.removeAll()
+        saveEnabledListIDs()
         notifyProvider()
     }
     
     // MARK: - Persistence
     
-    private func saveEnabledCalendarIDs() {
-        let array = Array(enabledCalendarIDs)
-        UserDefaults.standard.set(array, forKey: Self.enabledCalendarsKey)
-        print("💾 [CalendarSettings] Saved \(array.count) enabled calendar IDs")
+    private func saveEnabledListIDs() {
+        let array = Array(enabledListIDs)
+        UserDefaults.standard.set(array, forKey: Self.enabledListsKey)
+        print("💾 [RemindersSettings] Saved \(array.count) enabled list IDs")
     }
     
-    static func loadEnabledCalendarIDs() -> Set<String> {
-        guard let array = UserDefaults.standard.stringArray(forKey: enabledCalendarsKey) else {
+    static func loadEnabledListIDs() -> Set<String> {
+        guard let array = UserDefaults.standard.stringArray(forKey: enabledListsKey) else {
             return []
         }
         return Set(array)
@@ -278,26 +271,26 @@ struct CalendarSettingsView: View {
     }
 }
 
-// MARK: - Calendar Toggle Row
+// MARK: - Reminder List Toggle Row
 
-struct CalendarToggleRow: View {
-    let calendar: CalendarSettingsView.CalendarEntry
+struct ReminderListToggleRow: View {
+    let list: RemindersSettingsView.ReminderListEntry
     let isEnabled: Bool
     let onToggle: (Bool) -> Void
     
     var body: some View {
         HStack(spacing: 12) {
-            // Calendar color dot
+            // List color dot
             Circle()
-                .fill(Color(nsColor: calendar.color))
+                .fill(Color(nsColor: list.color))
                 .frame(width: 12, height: 12)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(calendar.title)
+                Text(list.title)
                     .font(.body)
                     .fontWeight(.medium)
                 
-                Text(calendar.typeName)
+                Text(list.typeName)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

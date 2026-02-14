@@ -12,64 +12,66 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     var panelConfig: PanelConfig { PanelConfig(lineLimit: 3, panelWidth: 320, maxVisibleItems: 24) }
     var onItemsChanged: (() -> Void)?
     
-    // MARK: - EventKit
+    // MARK: - Data
     
-    private let eventStore = EKEventStore()
     private var reminders: [EKReminder] = []
-    private var hasAccess = false
     
     // MARK: - Init
     
     init() {
-        requestAccess()
-        
         // Listen for external changes (Reminders app, other devices via iCloud)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(storeChanged),
             name: .EKEventStoreChanged,
-            object: eventStore
+            object: PermissionManager.shared.getEventStore()
         )
+        
+        // Listen for permission changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(permissionGranted),
+            name: .remindersPermissionChanged,
+            object: nil
+        )
+        
+        // Fetch reminders if we already have access
+        if PermissionManager.shared.hasRemindersAccess {
+            fetchReminders()
+        }
     }
     
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
     
-    // MARK: - Permissions
+    // MARK: - Permission Handling
     
-    private func requestAccess() {
-        if #available(macOS 14.0, *) {
-            eventStore.requestFullAccessToReminders { [weak self] granted, error in
-                DispatchQueue.main.async {
-                    self?.handleAccessResult(granted: granted, error: error)
-                }
-            }
-        } else {
-            eventStore.requestAccess(to: .reminder) { [weak self] granted, error in
-                DispatchQueue.main.async {
-                    self?.handleAccessResult(granted: granted, error: error)
-                }
+    private func showPermissionAlert() {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Reminders Access Required"
+            alert.informativeText = "Jason needs access to your Reminders. Please configure permissions in Settings."
+            alert.addButton(withTitle: "Open Settings")
+            alert.addButton(withTitle: "Cancel")
+            
+            if alert.runModal() == .alertFirstButtonReturn {
+                // Open Jason Settings window
+                NotificationCenter.default.post(name: .openSettingsWindow, object: nil)
             }
         }
     }
     
-    private func handleAccessResult(granted: Bool, error: Error?) {
-        if let error = error {
-            print("❌ [TodoListProvider] Reminders access error: \(error.localizedDescription)")
-        }
-        hasAccess = granted
-        if granted {
-            print("✅ [TodoListProvider] Reminders access granted")
-            fetchReminders()
-        } else {
-            print("⚠️ [TodoListProvider] Reminders access denied")
-        }
+    @objc private func permissionGranted() {
+        print("✅ [TodoListProvider] Permission granted - fetching reminders")
+        fetchReminders()
     }
     
     // MARK: - Fetching
     
     private func fetchReminders() {
+        let eventStore = PermissionManager.shared.getEventStore()
+        
         let predicate = eventStore.predicateForIncompleteReminders(
             withDueDateStarting: nil,
             ending: nil,
@@ -80,13 +82,13 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
             guard let self = self else { return }
             
             // Also fetch recently completed (last 24h) so toggles feel responsive
-            let completedPredicate = self.eventStore.predicateForCompletedReminders(
+            let completedPredicate = eventStore.predicateForCompletedReminders(
                 withCompletionDateStarting: Calendar.current.date(byAdding: .day, value: -1, to: Date()),
                 ending: Date(),
                 calendars: nil
             )
             
-            self.eventStore.fetchReminders(matching: completedPredicate) { [weak self] completedFetched in
+            eventStore.fetchReminders(matching: completedPredicate) { [weak self] completedFetched in
                 guard let self = self else { return }
                 
                 let incomplete = fetched ?? []
@@ -118,6 +120,12 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     // MARK: - FunctionProvider
     
     func provideFunctions() -> [FunctionNode] {
+        guard PermissionManager.shared.hasRemindersAccess else {
+            // Show alert to configure in Settings
+            showPermissionAlert()
+            return []
+        }
+        
         let items = buildTodoNodes()
         return [
             FunctionNode(
@@ -147,22 +155,6 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     }
     
     private func buildTodoNodes() -> [FunctionNode] {
-        guard hasAccess else {
-            return [
-                FunctionNode(
-                    id: "todo-no-access",
-                    name: "Grant Reminders access in System Settings",
-                    type: .action,
-                    icon: NSImage(systemSymbolName: "lock.shield", accessibilityDescription: nil) ?? NSImage(),
-                    showLabel: true,
-                    providerId: providerId,
-                    onLeftClick: ModifierAwareInteraction(base: .execute {
-                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders")!)
-                    })
-                )
-            ]
-        }
-        
         if reminders.isEmpty {
             return [
                 FunctionNode(
@@ -285,11 +277,13 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     // MARK: - MutableListProvider
     
     func addItem(title: String) {
-        guard hasAccess else {
+        guard PermissionManager.shared.hasRemindersAccess else {
             print("⚠️ [TodoListProvider] Cannot add - no Reminders access")
+            showPermissionAlert()
             return
         }
         
+        let eventStore = PermissionManager.shared.getEventStore()
         let (listName, cleanTitle) = parseInput(title)
         
         let reminder = EKReminder(eventStore: eventStore)
@@ -329,6 +323,8 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     
     /// Find a Reminders list by name, or return the default list
     private func findOrDefaultList(named name: String) -> EKCalendar {
+        let eventStore = PermissionManager.shared.getEventStore()
+        
         if !name.isEmpty {
             let calendars = eventStore.calendars(for: .reminder)
             
@@ -364,6 +360,7 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     private func toggleReminder(id: String) {
         guard let reminder = reminders.first(where: { $0.calendarItemIdentifier == id }) else { return }
         
+        let eventStore = PermissionManager.shared.getEventStore()
         reminder.isCompleted.toggle()
         
         do {
@@ -381,6 +378,8 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
         guard let index = reminders.firstIndex(where: { $0.calendarItemIdentifier == id }) else { return }
         let reminder = reminders[index]
         let title = reminder.title ?? "Untitled"
+        
+        let eventStore = PermissionManager.shared.getEventStore()
         
         do {
             try eventStore.remove(reminder, commit: true)

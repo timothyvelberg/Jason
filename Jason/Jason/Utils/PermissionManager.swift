@@ -3,17 +3,207 @@
 //  Jason
 //
 //  Created by Timothy Velberg on 16/01/2026.
-//  Handles upfront permission requests for protected folders
+//  Handles permission requests for protected resources
 //
 
 import Foundation
 import AppKit
+import EventKit
+
+// MARK: - Permission Status Enum
+
+enum PermissionStatus {
+    case notDetermined
+    case denied
+    case restricted
+    case granted
+}
+
+// MARK: - Permission Manager
 
 class PermissionManager {
     
     static let shared = PermissionManager()
     
+    // MARK: - EventKit
+    
+    private let eventStore = EKEventStore()
+    
     private init() {}
+    
+    // MARK: - Calendar Permission Status
+    
+    var hasCalendarAccess: Bool {
+        if #available(macOS 14.0, *) {
+            let status = EKEventStore.authorizationStatus(for: .event)
+            return status == .fullAccess || status == .writeOnly
+        } else {
+            let status = EKEventStore.authorizationStatus(for: .event)
+            return status == .authorized
+        }
+    }
+    
+    func calendarStatus() -> PermissionStatus {
+        if #available(macOS 14.0, *) {
+            switch EKEventStore.authorizationStatus(for: .event) {
+            case .notDetermined:
+                return .notDetermined
+            case .restricted:
+                return .restricted
+            case .denied:
+                return .denied
+            case .fullAccess, .writeOnly:
+                return .granted
+            case .authorized:
+                return .granted
+            @unknown default:
+                return .denied
+            }
+        } else {
+            switch EKEventStore.authorizationStatus(for: .event) {
+            case .notDetermined:
+                return .notDetermined
+            case .restricted:
+                return .restricted
+            case .denied:
+                return .denied
+            case .authorized:
+                return .granted
+            case .fullAccess, .writeOnly:
+                return .granted
+            @unknown default:
+                return .denied
+            }
+        }
+    }
+
+    func remindersStatus() -> PermissionStatus {
+        if #available(macOS 14.0, *) {
+            switch EKEventStore.authorizationStatus(for: .reminder) {
+            case .notDetermined:
+                return .notDetermined
+            case .restricted:
+                return .restricted
+            case .denied:
+                return .denied
+            case .fullAccess, .writeOnly:
+                return .granted
+            case .authorized:
+                return .granted
+            @unknown default:
+                return .denied
+            }
+        } else {
+            switch EKEventStore.authorizationStatus(for: .reminder) {
+            case .notDetermined:
+                return .notDetermined
+            case .restricted:
+                return .restricted
+            case .denied:
+                return .denied
+            case .authorized:
+                return .granted
+            case .fullAccess, .writeOnly:
+                return .granted
+            @unknown default:
+                return .denied
+            }
+        }
+    }
+    
+    var hasRemindersAccess: Bool {
+        if #available(macOS 14.0, *) {
+            let status = EKEventStore.authorizationStatus(for: .reminder)
+            return status == .fullAccess || status == .writeOnly
+        } else {
+            let status = EKEventStore.authorizationStatus(for: .reminder)
+            return status == .authorized
+        }
+    }
+    
+    // MARK: - Request Calendar Access
+    
+    func requestCalendarAccess(completion: @escaping (Bool) -> Void) {
+        if #available(macOS 14.0, *) {
+            eventStore.requestFullAccessToEvents { [weak self] granted, error in
+                if let error = error {
+                    print("❌ [PermissionManager] Calendar access error: \(error.localizedDescription)")
+                }
+                print("📅 [PermissionManager] Calendar access: \(granted)")
+                DispatchQueue.main.async {
+                    completion(granted)
+                    if granted {
+                        self?.notifyPermissionChanged(type: .calendar)
+                    }
+                }
+            }
+        } else {
+            eventStore.requestAccess(to: .event) { [weak self] granted, error in
+                if let error = error {
+                    print("❌ [PermissionManager] Calendar access error: \(error.localizedDescription)")
+                }
+                print("📅 [PermissionManager] Calendar access: \(granted)")
+                DispatchQueue.main.async {
+                    completion(granted)
+                    if granted {
+                        self?.notifyPermissionChanged(type: .calendar)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Request Reminders Access
+    
+    func requestRemindersAccess(completion: @escaping (Bool) -> Void) {
+        if #available(macOS 14.0, *) {
+            eventStore.requestFullAccessToReminders { [weak self] granted, error in
+                if let error = error {
+                    print("❌ [PermissionManager] Reminders access error: \(error.localizedDescription)")
+                }
+                print("✅ [PermissionManager] Reminders access: \(granted)")
+                DispatchQueue.main.async {
+                    completion(granted)
+                    if granted {
+                        self?.notifyPermissionChanged(type: .reminders)
+                    }
+                }
+            }
+        } else {
+            eventStore.requestAccess(to: .reminder) { [weak self] granted, error in
+                if let error = error {
+                    print("❌ [PermissionManager] Reminders access error: \(error.localizedDescription)")
+                }
+                print("✅ [PermissionManager] Reminders access: \(granted)")
+                DispatchQueue.main.async {
+                    completion(granted)
+                    if granted {
+                        self?.notifyPermissionChanged(type: .reminders)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Shared EventStore Access
+    
+    func getEventStore() -> EKEventStore {
+        return eventStore
+    }
+    
+    // MARK: - Notifications
+    
+    enum PermissionType {
+        case calendar
+        case reminders
+    }
+    
+    private func notifyPermissionChanged(type: PermissionType) {
+        let name: Notification.Name = type == .calendar ? .calendarPermissionChanged : .remindersPermissionChanged
+        NotificationCenter.default.post(name: name, object: nil)
+    }
+    
+    // MARK: - File Permissions (Existing)
     
     /// Call this early at app launch, before any UI
     func requestAccessToFavoriteFolders() {
@@ -63,4 +253,11 @@ class PermissionManager {
             print("   ❌ Access denied or error: \(url.lastPathComponent) - \(error.localizedDescription)")
         }
     }
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    static let calendarPermissionChanged = Notification.Name("calendarPermissionChanged")
+    static let remindersPermissionChanged = Notification.Name("remindersPermissionChanged")
 }

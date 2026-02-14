@@ -21,18 +21,10 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         return NSImage(named: "parent-calendar") ?? NSImage()
     }
     
-    // MARK: - EventKit
-    
-    private let eventStore = EKEventStore()
-    private var authorizationStatus: EKAuthorizationStatus {
-        return EKEventStore.authorizationStatus(for: .event)
-    }
-    
     // MARK: - Cache
     
     private var cachedNodes: [FunctionNode]?
     private var lastFetchDate: Date?
-    
     
     // MARK: - Initialization
     
@@ -42,7 +34,15 @@ class CalendarProvider: ObservableObject, FunctionProvider {
             self,
             selector: #selector(calendarStoreChanged),
             name: .EKEventStoreChanged,
-            object: eventStore
+            object: PermissionManager.shared.getEventStore()
+        )
+        
+        // Listen for permission changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(permissionGranted),
+            name: .calendarPermissionChanged,
+            object: nil
         )
         
         // Schedule midnight refresh so "today" rolls over
@@ -58,20 +58,13 @@ class CalendarProvider: ObservableObject, FunctionProvider {
     func provideFunctions() -> [FunctionNode] {
         print("[CalendarProvider] provideFunctions() called")
         
-        switch authorizationStatus {
-        case .authorized, .fullAccess:
-            return buildEventNodes()
-            
-        case .notDetermined:
-            // Return a prompt node — actual request happens on interaction
-            return [createRequestAccessNode()]
-            
-        case .denied, .restricted:
-            return [createAccessDeniedNode()]
-            
-        @unknown default:
-            return [createAccessDeniedNode()]
+        guard PermissionManager.shared.hasCalendarAccess else {
+            // Show alert to configure in Settings
+            showPermissionAlert()
+            return []
         }
+        
+        return buildEventNodes()
     }
     
     func refresh() {
@@ -88,31 +81,27 @@ class CalendarProvider: ObservableObject, FunctionProvider {
     
     // MARK: - Permission Handling
     
-    /// Request calendar access. Call this once (e.g., from the "Grant Access" node action).
-    func requestAccess(completion: @escaping (Bool) -> Void) {
-        if #available(macOS 14.0, *) {
-            eventStore.requestFullAccessToEvents { granted, error in
-                if let error = error {
-                    print("❌ [CalendarProvider] Access request error: \(error.localizedDescription)")
-                }
-                print("📅 [CalendarProvider] Access granted: \(granted)")
-                DispatchQueue.main.async {
-                    completion(granted)
-                }
-            }
-        } else {
-            // Fallback for macOS 13 and earlier
-            eventStore.requestAccess(to: .event) { granted, error in
-                if let error = error {
-                    print("❌ [CalendarProvider] Access request error: \(error.localizedDescription)")
-                }
-                print("📅 [CalendarProvider] Access granted: \(granted)")
-                DispatchQueue.main.async {
-                    completion(granted)
-                }
+    private func showPermissionAlert() {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Calendar Access Required"
+            alert.informativeText = "Jason needs access to your Calendar. Please configure permissions in Settings."
+            alert.addButton(withTitle: "Open Settings")
+            alert.addButton(withTitle: "Cancel")
+            
+            if alert.runModal() == .alertFirstButtonReturn {
+                // Open Jason Settings window
+                NotificationCenter.default.post(name: .openSettingsWindow, object: nil)
             }
         }
     }
+    
+    @objc private func permissionGranted() {
+        print("✅ [CalendarProvider] Permission granted - refreshing")
+        refresh()
+        NotificationCenter.default.post(name: .providerContentUpdated, object: nil)
+    }
+    
     // MARK: - Event Fetching
     
     private func buildEventNodes() -> [FunctionNode] {
@@ -173,6 +162,7 @@ class CalendarProvider: ObservableObject, FunctionProvider {
     }
     
     private func fetchTodaysEvents() -> [EKEvent] {
+        let eventStore = PermissionManager.shared.getEventStore()
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: Date())
         guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
@@ -245,44 +235,6 @@ class CalendarProvider: ObservableObject, FunctionProvider {
             providerId: providerId,
             onLeftClick: ModifierAwareInteraction(base: .execute {
                 NSWorkspace.shared.open(URL(string: "x-apple-calevent://")!)
-            }),
-            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
-        )
-    }
-    
-    private func createRequestAccessNode() -> FunctionNode {
-        return FunctionNode(
-            id: "calendar-request-access",
-            name: "Grant Calendar Access",
-            type: .action,
-            icon: providerIcon,
-            showLabel: true,
-            providerId: providerId,
-            onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
-                self?.requestAccess { granted in
-                    if granted {
-                        print("✅ [CalendarProvider] Access granted — posting refresh")
-                        NotificationCenter.default.post(name: .providerContentUpdated, object: nil)
-                    }
-                }
-            }),
-            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
-        )
-    }
-    
-    private func createAccessDeniedNode() -> FunctionNode {
-        return FunctionNode(
-            id: "calendar-access-denied",
-            name: "Calendar Access Denied — Open Settings",
-            type: .action,
-            icon: providerIcon,
-            showLabel: true,
-            providerId: providerId,
-            onLeftClick: ModifierAwareInteraction(base: .execute {
-                // Open System Settings > Privacy > Calendars
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
-                    NSWorkspace.shared.open(url)
-                }
             }),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
@@ -374,7 +326,7 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + timeInterval) { [weak self] in
             guard let self = self else { return }
-            print("🌅 [CalendarProvider] Midnight rollover — refreshing for new day")
+            print("[CalendarProvider] Midnight rollover — refreshing for new day")
             self.refresh()
             NotificationCenter.default.post(name: .providerContentUpdated, object: nil)
             
@@ -382,4 +334,10 @@ class CalendarProvider: ObservableObject, FunctionProvider {
             self.scheduleMidnightRefresh()
         }
     }
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    static let openSettingsWindow = Notification.Name("openSettingsWindow")
 }
