@@ -442,7 +442,7 @@ class ListPanelManager: ObservableObject {
         screen: NSScreen? = nil,
         typingMode: TypingMode = .typeAhead,
         config: PanelConfig = .default,
-        mainRing: (center: CGPoint, outerRadius: CGFloat)? = nil
+        mainRing: (center: CGPoint, outerRadius: CGFloat, thickness: CGFloat)?
     ) {
         // Store ring context for cascading
         self.currentAngle = angle
@@ -1002,34 +1002,44 @@ class ListPanelManager: ObservableObject {
         fromRing ring: (center: CGPoint, outerRadius: CGFloat, angle: Double),
         config: PanelConfig,
         itemCount: Int,
-        mainRing: (center: CGPoint, outerRadius: CGFloat)? = nil
+        mainRing: (center: CGPoint, outerRadius: CGFloat, thickness: CGFloat)? = nil
     ) -> CGPoint {
+        
+        
         let angle = ring.angle
         let angleInRadians = (angle - 90) * (.pi / 180)
         
-        // Gap between ring edge and panel
-        let gapFromRing: CGFloat = 0
-        
-        // ring.outerRadius is to icon centers, actual edge includes half icon size
-        let iconRadius: CGFloat = 32
-        let actualRingEdge = ring.outerRadius
-        
-        print("🎯 [PanelPosition Debug]")
+        print("🎯 [PanelPosition FULL Debug]")
         print("   Angle: \(angle)°")
-        print("   Active ring.outerRadius: \(ring.outerRadius)")
-        print("   Active ring edge (+ iconRadius): \(actualRingEdge)")
-        
-        // If we have a main ring (nested ring scenario), account for it
-        let baseRadius: CGFloat
+        print("   Received ring.outerRadius: \(ring.outerRadius)")
         if let mainRing = mainRing {
-            let mainRingEdge = mainRing.outerRadius + iconRadius
-            print("   Main ring.outerRadius: \(mainRing.outerRadius)")
-            print("   Main ring edge (+ iconRadius): \(mainRingEdge)")
-            baseRadius = max(actualRingEdge, mainRingEdge)
-            print("   Using base radius (max): \(baseRadius)")
+            print("   Received mainRing.outerRadius: \(mainRing.outerRadius)")
+            print("   Received mainRing.thickness: \(mainRing.thickness)")
+        }
+        
+        // Gap between ring edge and panel
+        let gapFromRing: CGFloat = 8
+
+        // Icons are positioned differently for Ring 0 vs child rings
+        let iconRadius: CGFloat = 32
+        let actualRingEdge: CGFloat
+
+        if mainRing == nil {
+            // Ring 0: Icons are at the center of the thickness, subtract the difference
+            // Actual edge = outerRadius - (thickness/2 - iconSize/2) = outerRadius - 24
+            actualRingEdge = ring.outerRadius
         } else {
-            baseRadius = actualRingEdge
-            print("   No main ring - using active ring edge: \(baseRadius)")
+            // Ring 1+: Use current formula (works correctly)
+            actualRingEdge = ring.outerRadius + iconRadius
+        }
+
+        let baseRadius = actualRingEdge
+
+        if let mainRing = mainRing {
+            print("   [PanelPosition] Nested ring detected - main ring outerRadius: \(mainRing.outerRadius)")
+            print("   [PanelPosition] Using active ring actual edge: \(baseRadius)")
+        } else {
+            print("   [PanelPosition] Single ring - using actual edge: \(baseRadius)")
         }
         
         // Calculate anchor point at actual ring edge

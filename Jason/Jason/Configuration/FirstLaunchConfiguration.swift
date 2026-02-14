@@ -95,7 +95,7 @@ class FirstLaunchConfiguration {
         do {
             let defaultConfig = try configManager.createConfiguration(
                 name: "Everything",
-                shortcut: "Ctrl+Shift+D",  // For display only
+                shortcut: "Ctrl+Shift+D",
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
                 iconSize: 32.0,

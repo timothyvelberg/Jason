@@ -160,14 +160,14 @@ extension CircularUIManager {
             print("[ExpandToPanel] node: '\(node.name)', providerId: \(providerId ?? "nil"), typingMode: \(typingMode)")
             
             // Check if we're spawning from a nested ring (need to pass main ring geometry)
-            let mainRingGeometry: (center: CGPoint, outerRadius: CGFloat)?
+            let mainRingGeometry: (center: CGPoint, outerRadius: CGFloat, thickness: CGFloat)?
             if let functionManager = self.functionManager,
                functionManager.rings.count > 1,
                let ring0Config = functionManager.ringConfigurations.first {
-                // Multiple rings exist - pass Ring 0's geometry for proper spacing
+                // We have multiple rings - pass Ring 0's geometry including thickness
                 let ring0OuterRadius = ring0Config.startRadius + ring0Config.thickness
-                mainRingGeometry = (ringCenter, ring0OuterRadius)
-                print("[ExpandToPanel] Detected nested ring - passing Ring 0 geometry (outerRadius: \(ring0OuterRadius))")
+                mainRingGeometry = (ringCenter, ring0OuterRadius, ring0Config.thickness)
+                print("[ExpandToPanel] Detected nested ring - passing Ring 0 geometry (outerRadius: \(ring0OuterRadius), thickness: \(ring0Config.thickness))")
             } else {
                 mainRingGeometry = nil
             }
@@ -186,6 +186,22 @@ extension CircularUIManager {
             } else {
                 panelItems = []
             }
+            
+            // In the onExpandToPanel callback, after detecting nested rings:
+            print("🔍 [Ring Geometry Debug] About to spawn panel from ring")
+            if let functionManager = self.functionManager {
+                print("   Total rings: \(functionManager.rings.count)")
+                for (index, config) in functionManager.ringConfigurations.enumerated() {
+                    print("   Ring \(index):")
+                    print("      startRadius: \(config.startRadius)")
+                    print("      thickness: \(config.thickness)")
+                    print("      outerRadius: \(config.startRadius + config.thickness)")
+                    print("      iconSize: \(config.iconSize)")
+                    print("      Icon center at: \(config.startRadius + config.thickness/2)")
+                    print("      Icon actual edge: \(config.startRadius + config.thickness/2 + config.iconSize/2)")
+                }
+            }
+            print("   Spawning from ringOuterRadius: \(ringOuterRadius)")
 
             if !panelItems.isEmpty {
                 self.listPanelManager?.show(
