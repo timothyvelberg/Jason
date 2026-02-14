@@ -1024,13 +1024,40 @@ class ListPanelManager: ObservableObject {
         let iconRadius: CGFloat = 32
         let actualRingEdge: CGFloat
 
+        // Helper function to calculate shortest angular distance
+        func shortestAngularDistance(from angle: Double, to target: Double) -> Double {
+            let diff = abs(angle - target)
+            return min(diff, 360 - diff)
+        }
+
+        // Check if we're at a diagonal angle
+        let normalizedAngle = angle.truncatingRemainder(dividingBy: 360)
+        let cardinalAngles: [Double] = [0, 90, 180, 270]
+        let isNearCardinal = cardinalAngles.contains { shortestAngularDistance(from: normalizedAngle, to: $0) < 20 }
+
         if mainRing == nil {
-            // Ring 0: Icons are at the center of the thickness, subtract the difference
-            // Actual edge = outerRadius - (thickness/2 - iconSize/2) = outerRadius - 24
-            actualRingEdge = ring.outerRadius
+            // Ring 0: Base edge calculation
+            let baseEdge = ring.outerRadius
+            
+            if isNearCardinal {
+                actualRingEdge = baseEdge
+                print("   [Angle] Ring 0 cardinal - no extra clearance")
+            } else {
+                actualRingEdge = baseEdge + 40
+                print("   [Angle] Ring 0 diagonal - adding 40px extra clearance")
+            }
         } else {
-            // Ring 1+: Use current formula (works correctly)
-            actualRingEdge = ring.outerRadius + iconRadius
+            // Ring 1+: Need angle-aware clearance
+            let baseEdge = ring.outerRadius + iconRadius
+            
+            if isNearCardinal {
+                actualRingEdge = baseEdge
+                print("   [Angle] Ring 1 cardinal - no extra clearance")
+            } else {
+                let ring0Thickness = mainRing!.thickness
+                actualRingEdge = baseEdge + (ring0Thickness / 2)
+                print("   [Angle] Ring 1 diagonal - adding \(ring0Thickness / 2)px extra clearance")
+            }
         }
 
         let baseRadius = actualRingEdge
