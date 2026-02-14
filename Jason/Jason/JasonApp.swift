@@ -27,7 +27,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         
-        PermissionManager.shared.requestAccessToFavoriteFolders()
         ClipboardManager.shared.startMonitoring()
         
         // Run ALL database operations sequentially on main thread
