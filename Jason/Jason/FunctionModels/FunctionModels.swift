@@ -25,9 +25,11 @@ struct SectionHeaderStyle: Equatable {
     
     // Text
     var textOpacity: Double
+    var textColor: Color?
     var fontSize: CGFloat
     var fontWeight: Font.Weight
     var uppercase: Bool
+    
     
     // MARK: - Presets
     
@@ -42,6 +44,21 @@ struct SectionHeaderStyle: Equatable {
         fontSize: 11,
         fontWeight: .semibold,
         uppercase: true
+    )
+    
+    static let spacer = SectionHeaderStyle(
+        showTopLine: false,
+        showBottomLine: false,
+        lineOpacity: 0,
+        horizontalPadding: 0,
+        topPadding: 0,
+        bottomPadding: 0,
+        textOpacity: 0,
+        textColor: nil,
+        fontSize: 0,
+        fontWeight: .regular,
+        uppercase: false,
+        
     )
     
     static let category = SectionHeaderStyle(
@@ -73,6 +90,12 @@ struct SectionHeaderStyle: Equatable {
     func withTopLine(_ show: Bool) -> SectionHeaderStyle {
         var copy = self
         copy.showTopLine = show
+        return copy
+    }
+    
+    func withTextColor(_ color: Color) -> SectionHeaderStyle {
+        var copy = self
+        copy.textColor = color
         return copy
     }
 }

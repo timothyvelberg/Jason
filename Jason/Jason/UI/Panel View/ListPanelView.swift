@@ -209,7 +209,6 @@ struct ListPanelView: View {
                     }
                     .coordinateSpace(name: "panelScroll")
                     .frame(maxHeight: scrollAreaHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 2))
                     .onChange(of: hoveredRowIndex) { oldIndex, newIndex in
                         // Auto-scroll only when KEYBOARD navigates outside visible area
                         guard isKeyboardDriven, let index = newIndex else { return }
@@ -249,6 +248,10 @@ struct ListPanelView: View {
                             withAnimation(.easeInOut(duration: 0.15)) {
                                 proxy.scrollTo(index, anchor: .bottom)
                             }
+                        }
+                    }.onChange(of: items.first?.id) { _, _ in
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            proxy.scrollTo(0, anchor: .top)
                         }
                     }
                 }
@@ -318,12 +321,12 @@ struct ListPanelSectionHeader: View {
                 HStack {
                     Text(item.name)
                         .font(.system(size: style.fontSize, weight: style.fontWeight))
-                        .foregroundColor(.white.opacity(style.textOpacity))
+                        .foregroundColor(style.textColor)
                         .textCase(style.uppercase ? .uppercase : nil)
                     
                     Spacer()
                 }
-                .padding(.horizontal,16)
+                .padding(.horizontal, 16)
             }
             .padding(.horizontal, style.horizontalPadding)
             .padding(.top, style.topPadding)

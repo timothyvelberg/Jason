@@ -300,8 +300,9 @@
 				"INFOPLIST_FILE[sdk=*]" = Jason/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "This app needs access to control other applications for app switching.";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "ason displays your today's calendar events for quick reference.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Jason displays your today's calendar events for quick reference.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSRemindersUsageDescription = "Jason creates and manages reminders for your todo items.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -343,8 +344,9 @@
 				INFOPLIST_FILE = Jason/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "This app needs access to control other applications for app switching.";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "ason displays your today's calendar events for quick reference.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Jason displays your today's calendar events for quick reference.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSRemindersUsageDescription = "Jason creates and manages reminders for your todo items.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
