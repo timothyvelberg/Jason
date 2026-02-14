@@ -1,11 +1,18 @@
+//
+//  RemindersProvider.swift
+//  Jason
+//
+//  Created by Timothy Velberg on 14/02/2026.
+//
+
 import Foundation
 import AppKit
 import SwiftUI
 import EventKit
 
-class TodoListProvider: FunctionProvider, MutableListProvider {
+class RemindersProvider: FunctionProvider, MutableListProvider {
 
-    var providerId: String { "todo-list" }
+    var providerId: String { "reminders" }
     var providerName: String { "Todo List" }
     var providerIcon: NSImage { NSImage(systemSymbolName: "checklist", accessibilityDescription: "Todo List") ?? NSImage() }
     var defaultTypingMode: TypingMode { .input }
@@ -63,7 +70,7 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     }
     
     @objc private func permissionGranted() {
-        print("✅ [TodoListProvider] Permission granted - fetching reminders")
+        print("[RemindersProvider] Permission granted - fetching reminders")
         fetchReminders()
     }
     
@@ -72,10 +79,27 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     private func fetchReminders() {
         let eventStore = PermissionManager.shared.getEventStore()
         
+        // Filter to only user-enabled lists from Settings
+        let enabledIDs = RemindersSettingsView.loadEnabledListIDs()
+        
+        // If no lists are enabled, don't fetch anything
+        if enabledIDs.isEmpty {
+            print("[RemindersProvider] No reminder lists enabled — configure in Settings > Reminders")
+            DispatchQueue.main.async {
+                self.reminders = []
+                self.onItemsChanged?()
+            }
+            return  // Exit early, don't fetch
+        }
+        
+        let calendars = eventStore.calendars(for: .reminder).filter { list in
+            enabledIDs.contains(list.calendarIdentifier)
+        }
+        
         let predicate = eventStore.predicateForIncompleteReminders(
             withDueDateStarting: nil,
             ending: nil,
-            calendars: nil
+            calendars: calendars
         )
         
         eventStore.fetchReminders(matching: predicate) { [weak self] fetched in
@@ -85,7 +109,7 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
             let completedPredicate = eventStore.predicateForCompletedReminders(
                 withCompletionDateStarting: Calendar.current.date(byAdding: .day, value: -1, to: Date()),
                 ending: Date(),
-                calendars: nil
+                calendars: calendars
             )
             
             eventStore.fetchReminders(matching: completedPredicate) { [weak self] completedFetched in
@@ -105,7 +129,7 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
                 
                 DispatchQueue.main.async {
                     self.reminders = merged
-                    print("📋 [TodoListProvider] Loaded \(incomplete.count) incomplete + \(completed.count) recently completed reminders")
+                    print("📋 [RemindersProvider] Loaded \(incomplete.count) incomplete + \(completed.count) recently completed reminders")
                     self.onItemsChanged?()
                 }
             }
@@ -113,7 +137,7 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     }
     
     @objc private func storeChanged() {
-        print("🔄 [TodoListProvider] Reminders store changed - refreshing")
+        print("[RemindersProvider] Reminders store changed - refreshing")
         fetchReminders()
     }
     
@@ -129,13 +153,13 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
         let items = buildTodoNodes()
         return [
             FunctionNode(
-                id: "todo-list",
+                id: "reminders-list",
                 name: "Todo List",
                 type: .category,
                 icon: NSImage(named: "parent-todo") ?? NSImage(),
                 children: items,
                 childDisplayMode: .panel,
-                providerId: "todo-list",
+                providerId: providerId,
                 onLeftClick: ModifierAwareInteraction(base: .doNothing),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
@@ -158,7 +182,7 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
         if reminders.isEmpty {
             return [
                 FunctionNode(
-                    id: "todo-empty",
+                    id: "reminders-empty",
                     name: "No reminders",
                     type: .action,
                     icon: NSImage(systemSymbolName: "checklist", accessibilityDescription: nil) ?? NSImage(),
@@ -278,7 +302,7 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     
     func addItem(title: String) {
         guard PermissionManager.shared.hasRemindersAccess else {
-            print("⚠️ [TodoListProvider] Cannot add - no Reminders access")
+            print("[RemindersProvider] Cannot add - no Reminders access")
             showPermissionAlert()
             return
         }
@@ -293,10 +317,10 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
         do {
             try eventStore.save(reminder, commit: true)
             reminders.insert(reminder, at: 0)
-            print("✅ [TodoListProvider] Added: '\(cleanTitle)' to list '\(reminder.calendar.title)'")
+            print("[RemindersProvider] Added: '\(cleanTitle)' to list '\(reminder.calendar.title)'")
             onItemsChanged?()
         } catch {
-            print("❌ [TodoListProvider] Failed to save reminder: \(error.localizedDescription)")
+            print("[RemindersProvider] Failed to save reminder: \(error.localizedDescription)")
         }
     }
     
@@ -345,10 +369,10 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
             
             do {
                 try eventStore.saveCalendar(newList, commit: true)
-                print("✅ [TodoListProvider] Created new Reminders list: '\(newList.title)'")
+                print("[RemindersProvider] Created new Reminders list: '\(newList.title)'")
                 return newList
             } catch {
-                print("❌ [TodoListProvider] Failed to create list '\(name)': \(error.localizedDescription)")
+                print("[RemindersProvider] Failed to create list '\(name)': \(error.localizedDescription)")
             }
         }
         
@@ -365,12 +389,12 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
         
         do {
             try eventStore.save(reminder, commit: true)
-            print("✅ [TodoListProvider] Toggled: '\(reminder.title ?? "")' → \(reminder.isCompleted ? "done" : "undone")")
+            print("[RemindersProvider] Toggled: '\(reminder.title ?? "")' → \(reminder.isCompleted ? "done" : "undone")")
             onItemsChanged?()
         } catch {
             // Revert on failure
             reminder.isCompleted.toggle()
-            print("❌ [TodoListProvider] Failed to toggle: \(error.localizedDescription)")
+            print("[RemindersProvider] Failed to toggle: \(error.localizedDescription)")
         }
     }
     
@@ -384,10 +408,10 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
         do {
             try eventStore.remove(reminder, commit: true)
             reminders.remove(at: index)
-            print("🗑️ [TodoListProvider] Deleted: '\(title)' (\(reminders.count) remaining)")
+            print("[RemindersProvider] Deleted: '\(title)' (\(reminders.count) remaining)")
             onItemsChanged?()
         } catch {
-            print("❌ [TodoListProvider] Failed to delete: \(error.localizedDescription)")
+            print("[RemindersProvider] Failed to delete: \(error.localizedDescription)")
         }
     }
     
@@ -396,7 +420,7 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     private func deleteAction(for reminder: EKReminder) -> FunctionNode {
         let reminderId = reminder.calendarItemIdentifier
         return FunctionNode(
-            id: "delete-todo-\(reminderId)",
+            id: "delete-reminder-\(reminderId)",
             name: "Delete",
             type: .action,
             icon: NSImage(named: "context_actions_delete") ?? NSImage(),
@@ -415,12 +439,12 @@ class TodoListProvider: FunctionProvider, MutableListProvider {
     // MARK: - Refresh
     
     func refresh() {
-        print("🔄 [TodoListProvider] Manual refresh requested")
+        print("[RemindersProvider] Manual refresh requested")
         fetchReminders()
     }
     
     func clearCache() {
         reminders.removeAll()
-        print("🗑️ [TodoListProvider] Cache cleared")
+        print("[RemindersProvider] Cache cleared")
     }
 }

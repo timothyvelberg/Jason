@@ -172,7 +172,11 @@ struct CalendarSettingsView: View {
         // Use PermissionManager instead of local request
         PermissionManager.shared.requestCalendarAccess { granted in
             // The notification will trigger checkAuthorizationAndLoad()
-            // No need to manually reload here
+            // Bring the settings window back to front
+            DispatchQueue.main.async {
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.windows.first(where: { $0.title == "Jason Settings" })?.makeKeyAndOrderFront(nil)
+            }
         }
     }
     

@@ -70,8 +70,8 @@ class ProviderFactory {
         case "ClipboardHistoryProvider":
             provider = createClipboardHistoryProvider(config: config)
             
-        case "TodoListProvider":
-            provider = createTodoListProvider(config: config)
+        case "RemindersProvider":
+            provider = createRemindersProvider(config: config)
         case "CalendarProvider":
             provider = createCalendarProvider(config: config)
             
@@ -152,12 +152,15 @@ class ProviderFactory {
         return provider
     }
     
-    private func createTodoListProvider(config: ProviderConfiguration) -> TodoListProvider? {
-        return TodoListProvider()
+    private func createRemindersProvider(config: ProviderConfiguration) -> RemindersProvider? {
+        let provider = RemindersProvider()
+        return provider
     }
     
     private func createCalendarProvider(config: ProviderConfiguration) -> CalendarProvider? {
-        return CalendarProvider()
+        let provider = CalendarProvider()
+        
+        return provider
     }
     
     // MARK: - Provider Type Validation
@@ -176,7 +179,7 @@ class ProviderFactory {
             "WindowManagementProvider",
             "ShortcutExecuteProvider",
             "ClipboardHistoryProvider",
-            "TodoListProvider",
+            "RemindersProvider",
             "CalendarProvider"
         ]
     }
