@@ -158,6 +158,19 @@ extension CircularUIManager {
             let panelConfig: PanelConfig = provider?.panelConfig ?? .default
             
             print("[ExpandToPanel] node: '\(node.name)', providerId: \(providerId ?? "nil"), typingMode: \(typingMode)")
+            
+            // Check if we're spawning from a nested ring (need to pass main ring geometry)
+            let mainRingGeometry: (center: CGPoint, outerRadius: CGFloat)?
+            if let functionManager = self.functionManager,
+               functionManager.rings.count > 1,
+               let ring0Config = functionManager.ringConfigurations.first {
+                // Multiple rings exist - pass Ring 0's geometry for proper spacing
+                let ring0OuterRadius = ring0Config.startRadius + ring0Config.thickness
+                mainRingGeometry = (ringCenter, ring0OuterRadius)
+                print("[ExpandToPanel] Detected nested ring - passing Ring 0 geometry (outerRadius: \(ring0OuterRadius))")
+            } else {
+                mainRingGeometry = nil
+            }
 
             // Resolve panel items: prefer fresh data from provider, fall back to cached children
             let panelItems: [FunctionNode]
@@ -185,7 +198,8 @@ extension CircularUIManager {
                     contentIdentifier: contentIdentifier,
                     screen: self.overlayWindow?.currentScreen,
                     typingMode: typingMode,
-                    config: panelConfig
+                    config: panelConfig,
+                    mainRing: mainRingGeometry
                 )
                 self.inputCoordinator?.focusPanel(level: 0)
                 self.listPanelManager?.activateInputModeIfNeeded(for: providerId, atLevel: 0)
@@ -222,7 +236,8 @@ extension CircularUIManager {
                         contentIdentifier: contentIdentifier,
                         screen: self.overlayWindow?.currentScreen,
                         typingMode: typingMode,
-                        config: provider.panelConfig
+                        config: provider.panelConfig,
+                        mainRing: mainRingGeometry
                     )
                     self.inputCoordinator?.focusPanel(level: 0)
                     self.listPanelManager?.activateInputModeIfNeeded(for: providerId, atLevel: 0)

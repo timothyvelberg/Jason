@@ -428,6 +428,9 @@ class ListPanelManager: ObservableObject {
     // MARK: - Show Panel (from Ring)
     
     /// Show a panel as an extension of a ring item
+    // MARK: - Show Panel (from Ring)
+
+    /// Show a panel as an extension of a ring item
     func show(
         title: String,
         items: [FunctionNode],
@@ -438,7 +441,8 @@ class ListPanelManager: ObservableObject {
         contentIdentifier: String? = nil,
         screen: NSScreen? = nil,
         typingMode: TypingMode = .typeAhead,
-        config: PanelConfig = .default
+        config: PanelConfig = .default,
+        mainRing: (center: CGPoint, outerRadius: CGFloat)? = nil
     ) {
         // Store ring context for cascading
         self.currentAngle = angle
@@ -450,7 +454,8 @@ class ListPanelManager: ObservableObject {
         let position = calculatePanelPosition(
             fromRing: (center: ringCenter, outerRadius: ringOuterRadius, angle: angle),
             config: config,
-            itemCount: items.count
+            itemCount: items.count,
+            mainRing: mainRing
         )
         
         // Use estimated height for boundary check (measurements come later)
@@ -463,6 +468,9 @@ class ListPanelManager: ObservableObject {
         print("   Items: \(items.count)")
         print("   Panel center: \(position)")
         print("   Config: width=\(config.panelWidth), maxVisible=\(config.maxVisibleItems), lineLimit=\(config.lineLimit)")
+        if mainRing != nil {
+            print("   Main ring geometry provided - accounting for nested rings")
+        }
         
         // Clear any existing panels and push new one
         panelStack = [
@@ -486,7 +494,6 @@ class ListPanelManager: ObservableObject {
             )
         ]
     }
-    
     /// Show panel at a specific position (for standalone panels)
     func show(
         title: String,
@@ -994,7 +1001,8 @@ class ListPanelManager: ObservableObject {
     func calculatePanelPosition(
         fromRing ring: (center: CGPoint, outerRadius: CGFloat, angle: Double),
         config: PanelConfig,
-        itemCount: Int
+        itemCount: Int,
+        mainRing: (center: CGPoint, outerRadius: CGFloat)? = nil
     ) -> CGPoint {
         let angle = ring.angle
         let angleInRadians = (angle - 90) * (.pi / 180)
@@ -1003,35 +1011,46 @@ class ListPanelManager: ObservableObject {
         let gapFromRing: CGFloat = 0
         
         // ring.outerRadius is to icon centers, actual edge includes half icon size
-        // Typical icon size is 64pt, so radius is 32pt
         let iconRadius: CGFloat = 32
-        let actualRingEdge = ring.outerRadius + iconRadius
+        let actualRingEdge = ring.outerRadius
         
-        // Calculate anchor point at actual ring edge (not just icon centers)
-        let anchorRadius = actualRingEdge + gapFromRing
+        print("🎯 [PanelPosition Debug]")
+        print("   Angle: \(angle)°")
+        print("   Active ring.outerRadius: \(ring.outerRadius)")
+        print("   Active ring edge (+ iconRadius): \(actualRingEdge)")
+        
+        // If we have a main ring (nested ring scenario), account for it
+        let baseRadius: CGFloat
+        if let mainRing = mainRing {
+            let mainRingEdge = mainRing.outerRadius + iconRadius
+            print("   Main ring.outerRadius: \(mainRing.outerRadius)")
+            print("   Main ring edge (+ iconRadius): \(mainRingEdge)")
+            baseRadius = max(actualRingEdge, mainRingEdge)
+            print("   Using base radius (max): \(baseRadius)")
+        } else {
+            baseRadius = actualRingEdge
+            print("   No main ring - using active ring edge: \(baseRadius)")
+        }
+        
+        // Calculate anchor point at actual ring edge
+        let anchorRadius = baseRadius + gapFromRing
         let anchorX = ring.center.x + anchorRadius * cos(angleInRadians)
         let anchorY = ring.center.y - anchorRadius * sin(angleInRadians)
         
-        // Estimate panel height using base row height (before measurement)
+        print("   Anchor radius: \(anchorRadius)")
+        print("   Anchor point: (\(anchorX), \(anchorY))")
+        
+        // Estimate panel dimensions
         let itemCountClamped = min(itemCount, config.maxVisibleItems)
         let panelHeight = CGFloat(itemCountClamped) * config.baseRowHeight + ((PanelConfig.padding * 2) + PanelConfig.padding / 2)
         let panelWidth = config.panelWidth
         
-        // Base offset: half-dimensions in angle direction
-        let offsetX = (panelWidth / 2) * cos(angleInRadians)
-        let offsetY = (panelHeight / 2) * -sin(angleInRadians)
+        // Panel center: anchor point + half-dimensions in angle direction
+        let panelX = anchorX + (panelWidth / 2) * cos(angleInRadians)
+        let panelY = anchorY + (panelHeight / 2) * -sin(angleInRadians)
         
-        // Diagonal factor: peaks at 45°, 135°, 225°, 315° (0 at cardinal angles)
-        let angleWithinQuadrant = angle.truncatingRemainder(dividingBy: 90)
-        let diagonalFactor = sin(angleWithinQuadrant * 2 * .pi / 180)
-        
-        // Extra offset for diagonal angles (18% extra at peak)
-        let extraFactor: CGFloat = 0.18 * CGFloat(diagonalFactor)
-        let extraOffsetX = extraFactor * panelWidth * cos(angleInRadians)
-        let extraOffsetY = extraFactor * panelHeight * -sin(angleInRadians)
-        
-        let panelX = anchorX + offsetX + extraOffsetX
-        let panelY = anchorY + offsetY + extraOffsetY
+        print("   Panel width: \(panelWidth), height: \(panelHeight)")
+        print("   Final panel position: (\(panelX), \(panelY))")
         
         return CGPoint(x: panelX, y: panelY)
     }
@@ -1073,63 +1092,5 @@ class ListPanelManager: ObservableObject {
         // RIGHT boundary: intentionally NOT constrained
         
         return CGPoint(x: constrainedX, y: constrainedY)
-    }
-    
-    // MARK: - Test Helpers
-    
-    /// Show panel with sample test data
-    func showTestPanel(at position: CGPoint = NSEvent.mouseLocation) {
-        let testItems: [FunctionNode] = [
-            createTestFolderWithChildren(name: "Documents"),
-            createTestFolderWithChildren(name: "Screenshots"),
-            createTestFileNode(name: "report.pdf", utType: .pdf),
-            createTestFileNode(name: "notes.txt", utType: .plainText),
-            createTestFolderWithChildren(name: "Projects"),
-        ]
-        
-        show(title: "Test Panel", items: testItems, at: position)
-    }
-    
-    private func createTestFolderWithChildren(name: String, depth: Int = 0) -> FunctionNode {
-        let icon = NSWorkspace.shared.icon(for: .folder)
-        
-        let children: [FunctionNode]
-        if depth < 3 {
-            children = [
-                createTestFolderWithChildren(name: "Subfolder A", depth: depth + 1),
-                createTestFolderWithChildren(name: "Subfolder B", depth: depth + 1),
-                createTestFileNode(name: "file1.txt", utType: .plainText),
-                createTestFileNode(name: "file2.pdf", utType: .pdf),
-            ]
-        } else {
-            children = [
-                createTestFileNode(name: "file1.txt", utType: .plainText),
-                createTestFileNode(name: "file2.pdf", utType: .pdf),
-            ]
-        }
-        
-        return FunctionNode(
-            id: UUID().uuidString,
-            name: name,
-            type: .folder,
-            icon: icon,
-            children: children,
-            childDisplayMode: .panel,
-            onLeftClick: ModifierAwareInteraction(base: .navigateInto)
-        )
-    }
-
-    private func createTestFileNode(name: String, utType: UTType) -> FunctionNode {
-        let icon = NSWorkspace.shared.icon(for: utType)
-        
-        return FunctionNode(
-            id: UUID().uuidString,
-            name: name,
-            type: .file,
-            icon: icon,
-            onLeftClick: ModifierAwareInteraction(base: .execute {
-                print("[Test] Would open: \(name)")
-            })
-        )
     }
 }
