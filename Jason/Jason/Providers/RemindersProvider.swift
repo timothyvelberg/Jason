@@ -227,13 +227,13 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
             // List header with Reminders color
             let listColor = Color(cgColor: listReminders.first!.calendar.cgColor)
 
-//            nodes.append(FunctionNode(
-//                id: "group-\(listName)",
-//                name: listName,
-//                type: .sectionHeader(style: .category.withTopLine(index > 0).withTextColor(listColor)),
-//                icon: NSImage(),
-//                providerId: providerId
-//            ))
+            nodes.append(FunctionNode(
+                id: "group-\(listName)",
+                name: listName,
+                type: .sectionHeader(style: .category.withTopLine(index > 0).withTextColor(listColor)),
+                icon: NSImage(),
+                providerId: providerId
+            ))
             
             // Spacer after header
 //            nodes.append(spacerNode(after: "after-\(listName)"))
