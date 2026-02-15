@@ -1050,7 +1050,7 @@ class ListPanelManager: ObservableObject {
         }
         
         // Gap between ring edge and panel
-        let gapFromRing: CGFloat = 0
+        let gapFromRing: CGFloat = 8
 
         // Icons are positioned differently for Ring 0 vs child rings
         let iconRadius: CGFloat = 32
