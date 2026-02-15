@@ -71,7 +71,7 @@ struct PanelState: Identifiable {
         if index < rowHeights.count {
             return rowHeights[index]
         }
-        return config.baseRowHeight
+        return config.estimatedRowHeight
     }
     
     /// Total content height for all items

@@ -16,7 +16,7 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
     var providerName: String { "Todo List" }
     var providerIcon: NSImage { NSImage(systemSymbolName: "checklist", accessibilityDescription: "Todo List") ?? NSImage() }
     var defaultTypingMode: TypingMode { .input }
-    var panelConfig: PanelConfig { PanelConfig(lineLimit: 3, panelWidth: 320, maxVisibleItems: 24) }
+//    var panelConfig: PanelConfig { PanelConfig(lineLimit: 1, panelWidth: 320, maxVisibleItems: 4) }
     var onItemsChanged: (() -> Void)?
     
     // MARK: - Data
@@ -220,23 +220,23 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
             let completed = listReminders.filter { $0.isCompleted }
             
             // Spacer before header (not before first)
-            if index > 0 {
-                nodes.append(spacerNode(after: "before-\(listName)"))
-            }
+//            if index > 0 {
+//                nodes.append(spacerNode(after: "before-\(listName)"))
+//            }
             
             // List header with Reminders color
             let listColor = Color(cgColor: listReminders.first!.calendar.cgColor)
 
-            nodes.append(FunctionNode(
-                id: "group-\(listName)",
-                name: listName,
-                type: .sectionHeader(style: .category.withTopLine(index > 0).withTextColor(listColor)),
-                icon: NSImage(),
-                providerId: providerId
-            ))
+//            nodes.append(FunctionNode(
+//                id: "group-\(listName)",
+//                name: listName,
+//                type: .sectionHeader(style: .category.withTopLine(index > 0).withTextColor(listColor)),
+//                icon: NSImage(),
+//                providerId: providerId
+//            ))
             
             // Spacer after header
-            nodes.append(spacerNode(after: "after-\(listName)"))
+//            nodes.append(spacerNode(after: "after-\(listName)"))
             
             // Incomplete first
             let sortedIncomplete = incomplete.sorted { a, b in
@@ -250,9 +250,9 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
             // Completed after
             nodes.append(contentsOf: completed.map { makeReminderNode($0) })
         }
-        if !listOrder.isEmpty {
-            nodes.append(spacerNode(after: "end"))
-        }
+//        if !listOrder.isEmpty {
+//            nodes.append(spacerNode(after: "end"))
+//        }
         return nodes
     }
     

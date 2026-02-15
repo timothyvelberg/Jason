@@ -26,8 +26,8 @@ struct PanelConfig {
     
     /// Estimated rendered row height including view padding.
     /// Used as fallback when measured heights aren't available yet.
-    var estimatedRowHeight: CGFloat { baseRowHeight + 4 }
-    
+    var estimatedRowHeight: CGFloat { 36.0 }  // Match actual SwiftUI rendering
+
     /// Padding below the scroll content
     static let scrollBottomPadding: CGFloat = 8
 

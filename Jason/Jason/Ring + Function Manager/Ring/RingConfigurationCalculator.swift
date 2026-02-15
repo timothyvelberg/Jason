@@ -240,13 +240,13 @@ class RingConfigurationCalculator {
                 
                 if let existingSliceConfig = ringState.sliceConfig,
                    existingSliceConfig.itemCount == nodes.count {
-                    print("   ♻️  Ring \(index) has existing sliceConfig - preserving it (isFullCircle: \(existingSliceConfig.isFullCircle))")
+                    print("   Ring \(index) has existing sliceConfig - preserving it (isFullCircle: \(existingSliceConfig.isFullCircle))")
                     sliceConfig = existingSliceConfig
                 } else {
                     if let existingSliceConfig = ringState.sliceConfig {
-                        print("   🔄 Ring \(index) item count changed (\(existingSliceConfig.itemCount) → \(nodes.count)) - recalculating...")
+                        print("   Ring \(index) item count changed (\(existingSliceConfig.itemCount) → \(nodes.count)) - recalculating...")
                     } else {
-                        print("   🆕 Ring \(index) needs new sliceConfig - calculating...")
+                        print("   Ring \(index) needs new sliceConfig - calculating...")
                     }
                     sliceConfig = calculateNewRingSliceConfig(
                         index: index,

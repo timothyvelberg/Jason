@@ -266,6 +266,11 @@ struct ListPanelView: View {
         for i in 0..<items.count {
             ordered.append(measuredRowHeights[i] ?? config.baseRowHeight)
         }
+        
+        let totalHeight = ordered.prefix(config.maxVisibleItems).reduce(0, +)
+        print("📏 [Measured Heights] '\(title)': \(ordered.prefix(config.maxVisibleItems).map { "\($0)" }.joined(separator: ", "))")
+        print("   Total content: \(totalHeight)px")
+        
         onRowHeightsMeasured?(ordered)
     }
     

@@ -453,9 +453,6 @@ class ListPanelManager: ObservableObject {
     }
     
     // MARK: - Show Panel (from Ring)
-    
-    /// Show a panel as an extension of a ring item
-    // MARK: - Show Panel (from Ring)
 
     /// Show a panel as an extension of a ring item
     func show(
@@ -484,6 +481,13 @@ class ListPanelManager: ObservableObject {
             items: items,
             mainRing: mainRing
         )
+        
+        print("📊 [Panel Estimation Debug]")
+        for (index, item) in items.prefix(config.maxVisibleItems).enumerated() {
+            let estimated = estimateItemHeight(for: item, config: config)
+            print("   Item \(index): '\(item.name)' type=\(item.type) → \(estimated)px")
+        }
+        print("   Total estimated: \(estimatedPanelHeight(items: items, config: config))px")
         
         // Use estimated height for boundary check (measurements come later)
         let panelHeight = estimatedPanelHeight(items: items, config: config)
@@ -1046,7 +1050,7 @@ class ListPanelManager: ObservableObject {
         }
         
         // Gap between ring edge and panel
-        let gapFromRing: CGFloat = 8
+        let gapFromRing: CGFloat = 0
 
         // Icons are positioned differently for Ring 0 vs child rings
         let iconRadius: CGFloat = 32
