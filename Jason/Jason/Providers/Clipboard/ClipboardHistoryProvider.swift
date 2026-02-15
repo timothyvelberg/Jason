@@ -33,7 +33,7 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
     
     private let clipboardManager = ClipboardManager.shared
     private let snippetsProvider = SnippetsProvider()
-    var panelConfig: PanelConfig { PanelConfig(panelWidth:320) }
+    var panelConfig: PanelConfig { PanelConfig(panelWidth:320, maxVisibleItems: 4) }
     
     // MARK: - Initialization
     

@@ -5,6 +5,9 @@
 //  Manages state and logic for the list panel UI.
 //  Supports stack-based cascading panels (column view).
 //
+//  MODIFIED: Updated panel height estimation to use actual item types
+//  instead of assuming uniform baseRowHeight for all items.
+//
 
 import Foundation
 import AppKit
@@ -419,10 +422,34 @@ class ListPanelManager: ObservableObject {
     
     // MARK: - Estimated Panel Height (before measurement)
     
-    /// Estimate panel height using baseRowHeight (for initial positioning before SwiftUI measures)
-    private func estimatedPanelHeight(itemCount: Int, config: PanelConfig) -> CGFloat {
-        let visibleCount = min(itemCount, config.maxVisibleItems)
-        return PanelConfig.titleHeight + CGFloat(visibleCount) * config.baseRowHeight + ((PanelConfig.padding * 2) + PanelConfig.padding / 2)
+    /// Estimate the rendered height of a single item based on its type
+    /// Used for initial panel positioning before SwiftUI provides actual measurements
+    private func estimateItemHeight(for node: FunctionNode, config: PanelConfig) -> CGFloat {
+        switch node.type {
+        case .sectionHeader(let style):
+            if style == .spacer {
+                return 8.0  // Minimal spacer height
+            }
+            // Header: padding + text height + padding
+            // Text height ≈ fontSize + line spacing
+            let textHeight = style.fontSize + 4
+            return style.topPadding + textHeight + style.bottomPadding
+            
+        case .spacer:
+            return 8.0  // Non-header spacer
+            
+        default:  // .action, .file, .folder, .app, .category
+            return config.estimatedRowHeight
+        }
+    }
+    
+    /// Estimate panel height based on actual item types (for initial positioning before SwiftUI measures)
+    private func estimatedPanelHeight(items: [FunctionNode], config: PanelConfig) -> CGFloat {
+        let visibleItems = Array(items.prefix(config.maxVisibleItems))
+        let contentHeight = visibleItems.reduce(0.0) { sum, node in
+            sum + estimateItemHeight(for: node, config: config)
+        }
+        return PanelConfig.titleHeight + contentHeight + ((PanelConfig.padding * 2) + PanelConfig.padding / 2)
     }
     
     // MARK: - Show Panel (from Ring)
@@ -454,15 +481,16 @@ class ListPanelManager: ObservableObject {
         let position = calculatePanelPosition(
             fromRing: (center: ringCenter, outerRadius: ringOuterRadius, angle: angle),
             config: config,
-            itemCount: items.count,
+            items: items,
             mainRing: mainRing
         )
         
         // Use estimated height for boundary check (measurements come later)
-        let panelHeight = estimatedPanelHeight(itemCount: items.count, config: config)
+        let panelHeight = estimatedPanelHeight(items: items, config: config)
 
         // Constrain to screen boundaries (left, top, bottom only)
-        let constrainedPosition = constrainToScreenBounds(position: position, panelWidth: config.panelWidth, panelHeight: panelHeight)
+//        let constrainedPosition = constrainToScreenBounds(position: position, panelWidth: config.panelWidth, panelHeight: panelHeight)
+        let constrainedPosition = position
         
         print("[ListPanelManager] Showing panel at angle \(angle)°")
         print("   Items: \(items.count)")
@@ -511,7 +539,7 @@ class ListPanelManager: ObservableObject {
         self.currentScreen = screen ?? NSScreen.main
         
         // Use estimated height for constraint checking
-        let panelHeight = estimatedPanelHeight(itemCount: items.count, config: config)
+        let panelHeight = estimatedPanelHeight(items: items, config: config)
         
         // Constrain position to screen bounds
         let constrainedPosition = constrainToScreenBounds(
@@ -764,7 +792,7 @@ class ListPanelManager: ObservableObject {
         let gap: CGFloat = 8
         
         let newPanelWidth = config.panelWidth
-        let newPanelHeight = estimatedPanelHeight(itemCount: items.count, config: config)
+        let newPanelHeight = estimatedPanelHeight(items: items, config: config)
         
         // New panel's left edge aligns with source panel's right edge + gap
         let newX = sourceBounds.maxX + gap + (newPanelWidth / 2)
@@ -1001,7 +1029,7 @@ class ListPanelManager: ObservableObject {
     func calculatePanelPosition(
         fromRing ring: (center: CGPoint, outerRadius: CGFloat, angle: Double),
         config: PanelConfig,
-        itemCount: Int,
+        items: [FunctionNode],
         mainRing: (center: CGPoint, outerRadius: CGFloat, thickness: CGFloat)? = nil
     ) -> CGPoint {
         
@@ -1048,7 +1076,8 @@ class ListPanelManager: ObservableObject {
             }
         } else {
             // Ring 1+: Need angle-aware clearance
-            let baseEdge = ring.outerRadius + iconRadius
+            // Reduce base clearance since we now account for full panel height including title
+            let baseEdge = ring.outerRadius  // Remove the + iconRadius for now
             
             if isNearCardinal {
                 actualRingEdge = baseEdge
@@ -1077,9 +1106,8 @@ class ListPanelManager: ObservableObject {
         print("   Anchor radius: \(anchorRadius)")
         print("   Anchor point: (\(anchorX), \(anchorY))")
         
-        // Estimate panel dimensions
-        let itemCountClamped = min(itemCount, config.maxVisibleItems)
-        let panelHeight = CGFloat(itemCountClamped) * config.baseRowHeight + ((PanelConfig.padding * 2) + PanelConfig.padding / 2)
+        // Estimate panel dimensions using new accurate method
+        let panelHeight = estimatedPanelHeight(items: items, config: config)
         let panelWidth = config.panelWidth
         
         // Panel center: anchor point + half-dimensions in angle direction
