@@ -129,7 +129,7 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
                 
                 DispatchQueue.main.async {
                     self.reminders = merged
-                    print("📋 [RemindersProvider] Loaded \(incomplete.count) incomplete + \(completed.count) recently completed reminders")
+                    print("[RemindersProvider] Loaded \(incomplete.count) incomplete + \(completed.count) recently completed reminders")
                     self.onItemsChanged?()
                 }
             }

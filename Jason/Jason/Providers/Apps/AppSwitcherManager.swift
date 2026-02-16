@@ -59,7 +59,7 @@ class AppSwitcherManager: ObservableObject {
         
         print("[AppSwitcherManager] Monitoring NSWorkspace for app changes")
         
-        // 🆕 ADDED: Start polling as backup (detects changes if notifications miss anything)
+        // Start polling as backup (detects changes if notifications miss anything)
         startAutoRefresh()
     }
     
@@ -174,9 +174,6 @@ class AppSwitcherManager: ObservableObject {
             // NOW do the expensive MRU sorting
             let sortedApps = sortAppsByMRU(deduplicatedApps)
             
-            let oldCount = runningApps.count
-            let newCount = sortedApps.count
-            
             // Log what changed BEFORE updating the state (using bundle IDs)
             let added = newAppBundleIDs.subtracting(oldAppBundleIDs)
             let removed = oldAppBundleIDs.subtracting(newAppBundleIDs)
@@ -254,7 +251,6 @@ class AppSwitcherManager: ObservableObject {
     
     private func sortAppsByMRU(_ apps: [NSRunningApplication]) -> [NSRunningApplication] {
         // Note: This function now only gets called when there's an actual change
-        print("Sorting apps by MRU. Usage history: \(appUsageHistory)")
         
         // Apps are already deduplicated by caller, but we still filter invalid PIDs
         let validApps = apps.filter { $0.processIdentifier > 0 }
@@ -284,15 +280,12 @@ class AppSwitcherManager: ObservableObject {
         
         sortedApps.append(contentsOf: newApps)
         
-        print("Final sorted order: \(sortedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: " → "))")
-        
         return sortedApps
     }
     
     private func addToUsageHistory(_ pid: pid_t) {
         // Don't track invalid PIDs (safety check)
         guard pid > 0 else {
-            print("Ignoring invalid PID in usage history")
             return
         }
         // Remove if already exists
@@ -311,7 +304,6 @@ class AppSwitcherManager: ObservableObject {
     }
     
     func recordAppUsage(_ app: NSRunningApplication) {
-        print("Recording usage for: \(app.localizedName ?? "Unknown") (PID: \(app.processIdentifier))")
         
         // Don't record apps with invalid process IDs
         guard app.processIdentifier > 0 else {
@@ -328,7 +320,6 @@ class AppSwitcherManager: ObservableObject {
     }
     
     private func forceResortApps() {
-        print("Force resorting apps by MRU")
         let allApps = NSWorkspace.shared.runningApplications
         
         let newApps = allApps.filter { app in
@@ -430,8 +421,6 @@ extension AppSwitcherManager {
     
     /// Quit an application
     func quitApp(_ app: NSRunningApplication) {
-        print("🚪 Quitting app: \(app.localizedName ?? "Unknown")")
-        
         // Ignore focus changes for 500ms to prevent UI from hiding when app window closes
         activeCircularUIManager?.ignoreFocusChangesTemporarily(duration: 0.5)
         
@@ -440,19 +429,16 @@ extension AppSwitcherManager {
     
     /// Hide an application
     func hideApp(_ app: NSRunningApplication) {
-        print("Hiding app: \(app.localizedName ?? "Unknown")")
         app.hide()
     }
     
     /// Unhide an application (show it)
     func unhideApp(_ app: NSRunningApplication) {
-        print("Unhiding app: \(app.localizedName ?? "Unknown")")
         app.unhide()
     }
     
     /// Force quit an application (future)
     func forceQuitApp(_ app: NSRunningApplication) {
-        print("Force quitting app: \(app.localizedName ?? "Unknown")")
         app.forceTerminate()
     }
 }

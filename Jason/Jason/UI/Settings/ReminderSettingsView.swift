@@ -213,7 +213,7 @@ struct RemindersSettingsView: View {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         
         isLoading = false
-        print("✅ [RemindersSettings] Loaded \(sources.count) sources, \(enabledListIDs.count) enabled lists")
+        print("[RemindersSettings] Loaded \(sources.count) sources, \(enabledListIDs.count) enabled lists")
     }
     
     private func listTypeName(_ type: EKCalendarType) -> String {
@@ -256,7 +256,7 @@ struct RemindersSettingsView: View {
     private func saveEnabledListIDs() {
         let array = Array(enabledListIDs)
         UserDefaults.standard.set(array, forKey: Self.enabledListsKey)
-        print("💾 [RemindersSettings] Saved \(array.count) enabled list IDs")
+        print("[RemindersSettings] Saved \(array.count) enabled list IDs")
     }
     
     static func loadEnabledListIDs() -> Set<String> {
