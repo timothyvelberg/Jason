@@ -493,8 +493,8 @@ class ListPanelManager: ObservableObject {
         let panelHeight = estimatedPanelHeight(items: items, config: config)
 
         // Constrain to screen boundaries (left, top, bottom only)
-//        let constrainedPosition = constrainToScreenBounds(position: position, panelWidth: config.panelWidth, panelHeight: panelHeight)
-        let constrainedPosition = position
+        let constrainedPosition = constrainToScreenBounds(position: position, panelWidth: config.panelWidth, panelHeight: panelHeight)
+//        let constrainedPosition = position
         
         print("[ListPanelManager] Showing panel at angle \(angle)°")
         print("   Items: \(items.count)")
@@ -1041,19 +1041,10 @@ class ListPanelManager: ObservableObject {
         let angle = ring.angle
         let angleInRadians = (angle - 90) * (.pi / 180)
         
-        print("🎯 [PanelPosition FULL Debug]")
-        print("   Angle: \(angle)°")
-        print("   Received ring.outerRadius: \(ring.outerRadius)")
-        if let mainRing = mainRing {
-            print("   Received mainRing.outerRadius: \(mainRing.outerRadius)")
-            print("   Received mainRing.thickness: \(mainRing.thickness)")
-        }
-        
         // Gap between ring edge and panel
         let gapFromRing: CGFloat = 8
 
         // Icons are positioned differently for Ring 0 vs child rings
-        let iconRadius: CGFloat = 32
         let actualRingEdge: CGFloat
 
         // Helper function to calculate shortest angular distance
@@ -1073,42 +1064,27 @@ class ListPanelManager: ObservableObject {
             
             if isNearCardinal {
                 actualRingEdge = baseEdge
-                print("   [Angle] Ring 0 cardinal - no extra clearance")
             } else {
                 actualRingEdge = baseEdge + 40
-                print("   [Angle] Ring 0 diagonal - adding 40px extra clearance")
             }
         } else {
             // Ring 1+: Need angle-aware clearance
             // Reduce base clearance since we now account for full panel height including title
-            let baseEdge = ring.outerRadius  // Remove the + iconRadius for now
+            let baseEdge = ring.outerRadius
             
             if isNearCardinal {
                 actualRingEdge = baseEdge
-                print("   [Angle] Ring 1 cardinal - no extra clearance")
             } else {
                 let ring0Thickness = mainRing!.thickness
                 actualRingEdge = baseEdge + (ring0Thickness / 2)
-                print("   [Angle] Ring 1 diagonal - adding \(ring0Thickness / 2)px extra clearance")
             }
         }
 
         let baseRadius = actualRingEdge
-
-        if let mainRing = mainRing {
-            print("   [PanelPosition] Nested ring detected - main ring outerRadius: \(mainRing.outerRadius)")
-            print("   [PanelPosition] Using active ring actual edge: \(baseRadius)")
-        } else {
-            print("   [PanelPosition] Single ring - using actual edge: \(baseRadius)")
-        }
-        
         // Calculate anchor point at actual ring edge
         let anchorRadius = baseRadius + gapFromRing
         let anchorX = ring.center.x + anchorRadius * cos(angleInRadians)
         let anchorY = ring.center.y - anchorRadius * sin(angleInRadians)
-        
-        print("   Anchor radius: \(anchorRadius)")
-        print("   Anchor point: (\(anchorX), \(anchorY))")
         
         // Estimate panel dimensions using new accurate method
         let panelHeight = estimatedPanelHeight(items: items, config: config)
@@ -1117,9 +1093,6 @@ class ListPanelManager: ObservableObject {
         // Panel center: anchor point + half-dimensions in angle direction
         let panelX = anchorX + (panelWidth / 2) * cos(angleInRadians)
         let panelY = anchorY + (panelHeight / 2) * -sin(angleInRadians)
-        
-        print("   Panel width: \(panelWidth), height: \(panelHeight)")
-        print("   Final panel position: (\(panelX), \(panelY))")
         
         return CGPoint(x: panelX, y: panelY)
     }

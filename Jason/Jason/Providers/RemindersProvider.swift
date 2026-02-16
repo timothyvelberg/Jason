@@ -16,7 +16,7 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
     var providerName: String { "Todo List" }
     var providerIcon: NSImage { NSImage(systemSymbolName: "checklist", accessibilityDescription: "Todo List") ?? NSImage() }
     var defaultTypingMode: TypingMode { .input }
-//    var panelConfig: PanelConfig { PanelConfig(lineLimit: 1, panelWidth: 320, maxVisibleItems: 4) }
+    var panelConfig: PanelConfig { PanelConfig(lineLimit: 1, panelWidth: 320) }
     var onItemsChanged: (() -> Void)?
     
     // MARK: - Data
