@@ -58,12 +58,13 @@ class DatabaseManager {
             throw DatabaseError.pathNotFound
         }
         
-        // Create Jason directory if it doesn't exist
-        let jasonDir = appSupport.appendingPathComponent("Jason", isDirectory: true)
+        // Use bundle identifier for directory name (falls back to "Jason" if not available)
+        let bundleID = Bundle.main.bundleIdentifier ?? "Jason"
+        let jasonDir = appSupport.appendingPathComponent(bundleID, isDirectory: true)
         
         if !fileManager.fileExists(atPath: jasonDir.path) {
             try fileManager.createDirectory(at: jasonDir, withIntermediateDirectories: true)
-            print("📁 [DatabaseManager] Created Jason directory at: \(jasonDir.path)")
+            print("📁 [DatabaseManager] Created directory at: \(jasonDir.path)")
         }
         
         let dbPath = jasonDir.appendingPathComponent(databaseFileName).path
