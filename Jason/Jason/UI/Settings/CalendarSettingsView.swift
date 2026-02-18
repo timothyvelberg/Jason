@@ -302,7 +302,7 @@ struct CalendarToggleRow: View {
                     .fontWeight(.medium)
                 
                 Text(calendar.typeName)
-                    .font(.caption)
+                    .font(.caption) 
                     .foregroundColor(.secondary)
             }
             

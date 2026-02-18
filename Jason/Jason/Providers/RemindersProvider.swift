@@ -16,7 +16,7 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
     var providerName: String { "Todo List" }
     var providerIcon: NSImage { NSImage(systemSymbolName: "checklist", accessibilityDescription: "Todo List") ?? NSImage() }
     var defaultTypingMode: TypingMode { .input }
-    var panelConfig: PanelConfig { PanelConfig(lineLimit: 1, panelWidth: 320) }
+    var panelConfig: PanelConfig { PanelConfig(lineLimit: 3, panelWidth: 320) }
     var onItemsChanged: (() -> Void)?
     
     // MARK: - Data
@@ -78,58 +78,68 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
     
     private func fetchReminders() {
         let eventStore = PermissionManager.shared.getEventStore()
-        
-        // Filter to only user-enabled lists from Settings
         let enabledIDs = RemindersSettingsView.loadEnabledListIDs()
         
-        // If no lists are enabled, don't fetch anything
         if enabledIDs.isEmpty {
-            print("[RemindersProvider] No reminder lists enabled — configure in Settings > Reminders")
+            print("[RemindersProvider] No reminder lists enabled")
             DispatchQueue.main.async {
                 self.reminders = []
                 self.onItemsChanged?()
             }
-            return  // Exit early, don't fetch
+            return
         }
         
         let calendars = eventStore.calendars(for: .reminder).filter { list in
             enabledIDs.contains(list.calendarIdentifier)
         }
         
-        let predicate = eventStore.predicateForIncompleteReminders(
+        // Fetch 1: Items due today or earlier (has due date)
+        let datedPredicate = eventStore.predicateForIncompleteReminders(
+            withDueDateStarting: nil,
+            ending: Date(),
+            calendars: calendars
+        )
+        
+        // Fetch 2: Items with NO due date
+        let noDatePredicate = eventStore.predicateForIncompleteReminders(
             withDueDateStarting: nil,
             ending: nil,
             calendars: calendars
         )
         
-        eventStore.fetchReminders(matching: predicate) { [weak self] fetched in
+        eventStore.fetchReminders(matching: datedPredicate) { [weak self] datedReminders in
             guard let self = self else { return }
             
-            // Also fetch recently completed (last 24h) so toggles feel responsive
-            let completedPredicate = eventStore.predicateForCompletedReminders(
-                withCompletionDateStarting: Calendar.current.date(byAdding: .day, value: -1, to: Date()),
-                ending: Date(),
-                calendars: calendars
-            )
-            
-            eventStore.fetchReminders(matching: completedPredicate) { [weak self] completedFetched in
+            eventStore.fetchReminders(matching: noDatePredicate) { [weak self] allReminders in
                 guard let self = self else { return }
                 
-                let incomplete = fetched ?? []
-                let completed = completedFetched ?? []
+                // Filter: only keep items with NO due date from the second fetch
+                let noDueDateItems = (allReminders ?? []).filter { $0.dueDateComponents == nil }
+                let datedItems = datedReminders ?? []
                 
-                // Merge, deduplicating by calendarItemIdentifier
-                var seen = Set<String>()
-                var merged: [EKReminder] = []
-                for r in incomplete + completed {
-                    if seen.insert(r.calendarItemIdentifier).inserted {
-                        merged.append(r)
+                let combined = datedItems + noDueDateItems
+                
+                // Debug logging
+                print("\n[RemindersProvider] 📋 Fetch Results:")
+                for r in combined {
+                    let title = r.title ?? "Untitled"
+                    let completed = r.isCompleted ? "✅" : "⬜️"
+                    let recurring = r.hasRecurrenceRules ? "🔁" : "  "
+                    let dueDate = r.dueDateComponents?.date.map {
+                        DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short)
+                    } ?? "no due date"
+                    
+                    print("  \(completed) \(recurring) \(title) - \(dueDate)")
+                    
+                    if r.hasRecurrenceRules {
+                        print("    ↳ Recurrence rules: \(r.recurrenceRules?.count ?? 0)")
                     }
                 }
+                print("")
                 
                 DispatchQueue.main.async {
-                    self.reminders = merged
-                    print("[RemindersProvider] Loaded \(incomplete.count) incomplete + \(completed.count) recently completed reminders")
+                    self.reminders = combined
+                    print("[RemindersProvider] Loaded \(combined.count) incomplete reminders")
                     self.onItemsChanged?()
                 }
             }
@@ -270,15 +280,7 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
             icon = NSImage(named: "icon_todo") ?? NSImage()
         }
         
-        // Build subtitle with due date if present
-        var name = reminder.title ?? "Untitled"
-        if let dueDate = reminder.dueDateComponents?.date {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .short
-            formatter.timeStyle = .short
-            name += " · \(formatter.string(from: dueDate))"
-        }
-        
+        let name = reminder.title ?? "Untitled"
         let reminderId = reminder.calendarItemIdentifier
         
         return FunctionNode(
@@ -387,14 +389,22 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
         let eventStore = PermissionManager.shared.getEventStore()
         reminder.isCompleted.toggle()
         
+        let shouldRemove = reminder.isCompleted  // ← Capture state BEFORE save
+        
         do {
             try eventStore.save(reminder, commit: true)
-            print("[RemindersProvider] Toggled: '\(reminder.title ?? "")' → \(reminder.isCompleted ? "done" : "undone")")
+            print("[RemindersProvider] Toggled: '\(reminder.title ?? "")' → \(shouldRemove ? "done" : "undone")")
+            
+            // Remove based on captured state, not current state
+            if shouldRemove {
+                print("[RemindersProvider] 🗑️ Removing from local array")
+                reminders.removeAll { $0.calendarItemIdentifier == id }
+            }
+            
             onItemsChanged?()
         } catch {
-            // Revert on failure
             reminder.isCompleted.toggle()
-            print("[RemindersProvider] Failed to toggle: \(error.localizedDescription)")
+            print("[RemindersProvider] ❌ Failed to toggle: \(error.localizedDescription)")
         }
     }
     
