@@ -68,7 +68,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupContentWindow()
         
         // Initialize Sparkle for updates
-        setupSparkle() 
+        setupSparkle()
     }
     
     func setupMenuBar() {

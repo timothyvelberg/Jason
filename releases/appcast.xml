@@ -8,11 +8,14 @@
             <title>Version 1.0.0</title>
             <description>Initial release</description>
             <pubDate>Tue, 18 Feb 2026 12:00:00 +0000</pubDate>
-            <sparkle:version>1.0.0</sparkle:version>
+            <sparkle:version>1</sparkle:version>
             <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
             <enclosure 
-                url="https://github.com/timothyvelberg/Jason/releases/download/v1.0.0/Jason.zip"
-                sparkle:version="1.0.0"
+                url="https://github.com/timothyvelberg/Jason/releases/download/v1.0.0/Jason-1.0.0.zip"
+                sparkle:version="1"
+                sparkle:shortVersionString="1.0.0"
+                sparkle:edSignature="dGtK2EIDsSCRlBcXf8ufgDBbuhr6lwquuzb69OSfUgG8j6OxYY6jbzw1NjAch64ATqb2/NzLzzTq+PuAq/dDDQ=="
+                length="4955027"
                 type="application/octet-stream"
             />
         </item>
