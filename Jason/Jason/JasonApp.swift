@@ -91,7 +91,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
-        print("Sparkle updater initialized")
+        print("✨ Sparkle updater initialized")
+        
+        // Temporary: Force check for updates on startup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.updaterController?.updater.checkForUpdates()
+        }
     }
     
     func setupContentWindow() {
