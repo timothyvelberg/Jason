@@ -93,8 +93,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         print("✨ Sparkle updater initialized")
         
-        // Temporary: Force check for updates on startup
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            print("🔍 Current version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "unknown")")
+            print("🔍 Current build: \(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "unknown")")
             self.updaterController?.updater.checkForUpdates()
         }
     }
