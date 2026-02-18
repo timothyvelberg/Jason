@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Sparkle
 
 @main
 struct JasonApp: App {
@@ -24,6 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var keyMonitor: Any?
     var statusItem: NSStatusItem?
     var contentWindow: NSWindow?
+    var updaterController: SPUStandardUpdaterController?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         
@@ -64,6 +66,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Create the ContentWindow (hidden initially)
         setupContentWindow()
+        
+        // Initialize Sparkle for updates
+        setupSparkle() 
     }
     
     func setupMenuBar() {
@@ -78,6 +83,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         print("Menu bar item created")
+    }
+    
+    func setupSparkle() {
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
+        print("Sparkle updater initialized")
     }
     
     func setupContentWindow() {

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1C31ED812F45D6BB00590161 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 1C31ED802F45D6BB00590161 /* Sparkle */; };
 		1CE7E8932ECB10FB003A174B /* MultitouchSupport.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1CE7E8922ECB10FB003A174B /* MultitouchSupport.framework */; };
 /* End PBXBuildFile section */
 
@@ -42,6 +43,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1CE7E8932ECB10FB003A174B /* MultitouchSupport.framework in Frameworks */,
+				1C31ED812F45D6BB00590161 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -93,6 +95,7 @@
 			);
 			name = Jason;
 			packageProductDependencies = (
+				1C31ED802F45D6BB00590161 /* Sparkle */,
 			);
 			productName = Jason;
 			productReference = 1C0298022E3B9914002661DB /* Jason Dev.app */;
@@ -124,6 +127,7 @@
 			mainGroup = 1C0297F92E3B9914002661DB;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				1C31ED7F2F45D6BB00590161 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1C0298032E3B9914002661DB /* Products */;
@@ -388,6 +392,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1C31ED7F2F45D6BB00590161 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1C31ED802F45D6BB00590161 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1C31ED7F2F45D6BB00590161 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 1C0297FA2E3B9914002661DB /* Project object */;
 }
