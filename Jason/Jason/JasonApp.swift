@@ -21,7 +21,7 @@ struct JasonApp: App {
 }
 
 // App Delegate to handle keyboard events and menu bar
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var keyMonitor: Any?
     var statusItem: NSStatusItem?
     var contentWindow: NSWindow?
@@ -114,6 +114,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         contentWindow?.title = "Jason Settings"
         contentWindow?.contentView = NSHostingView(rootView: contentView)
         contentWindow?.isReleasedWhenClosed = false
+        contentWindow?.delegate = self  // 👈 ADD THIS LINE
         
         // Set minimum size constraints
         contentWindow?.minSize = NSSize(width: 1024, height: 640)
@@ -129,10 +130,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let window = contentWindow else { return }
         
         if window.isVisible {
-            print("[Hiding Window]")
+            print("[Hiding Window] Switching to accessory mode")
             window.orderOut(nil)
+            NSApp.setActivationPolicy(.accessory)  // 👈 Remove dock icon
         } else {
-            print("[Show Window]")
+            print("[Show Window] Switching to regular mode")
+            
+            // Switch to regular app mode (shows dock icon & app switcher)
+            NSApp.setActivationPolicy(.regular)  // 👈 Show dock icon
             
             // Center window on screen
             window.center()
@@ -151,5 +156,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Prevent app from quitting when window closes
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
+    }
+    
+    // MARK: - NSWindowDelegate
+
+    func windowWillClose(_ notification: Notification) {
+        print("[Window Closing] Switching back to accessory mode")
+        NSApp.setActivationPolicy(.accessory)  // 👈 Remove dock icon when user clicks X
     }
 }

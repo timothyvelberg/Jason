@@ -119,24 +119,6 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
                 
                 let combined = datedItems + noDueDateItems
                 
-                // Debug logging
-                print("\n[RemindersProvider] 📋 Fetch Results:")
-                for r in combined {
-                    let title = r.title ?? "Untitled"
-                    let completed = r.isCompleted ? "✅" : "⬜️"
-                    let recurring = r.hasRecurrenceRules ? "🔁" : "  "
-                    let dueDate = r.dueDateComponents?.date.map {
-                        DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short)
-                    } ?? "no due date"
-                    
-                    print("  \(completed) \(recurring) \(title) - \(dueDate)")
-                    
-                    if r.hasRecurrenceRules {
-                        print("    ↳ Recurrence rules: \(r.recurrenceRules?.count ?? 0)")
-                    }
-                }
-                print("")
-                
                 DispatchQueue.main.async {
                     self.reminders = combined
                     print("[RemindersProvider] Loaded \(combined.count) incomplete reminders")
