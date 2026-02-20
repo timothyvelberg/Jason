@@ -25,6 +25,10 @@ class MultitouchCoordinator {
     var isMonitoring: Bool { source.isMonitoring }
     
     var recognizerCount: Int { recognizers.count }
+    
+    /// Track pending restart to allow cancellation
+    private var pendingRestartWork: DispatchWorkItem?
+    
     // MARK: - Debug
     
     var debugLogging: Bool = false {
@@ -59,6 +63,7 @@ class MultitouchCoordinator {
     }
     
     deinit {
+        pendingRestartWork?.cancel()
         stopMonitoring()
         print("[MultitouchCoordinator] Deallocated")
     }
@@ -103,6 +108,10 @@ class MultitouchCoordinator {
     
     /// Stop monitoring
     func stopMonitoring() {
+        // Cancel any pending restart
+        pendingRestartWork?.cancel()
+        pendingRestartWork = nil
+        
         source.stopMonitoring()
         resetAllRecognizers()
         print("[MultitouchCoordinator] Stopped")
@@ -110,6 +119,10 @@ class MultitouchCoordinator {
     
     /// Prepare for system sleep
     func prepareForSleep() {
+        // Cancel any pending restart
+        pendingRestartWork?.cancel()
+        pendingRestartWork = nil
+        
         source.prepareForSleep()
         resetAllRecognizers()
     }
@@ -194,10 +207,18 @@ extension MultitouchCoordinator: LiveDataStream {
     
     func restartMonitoring() {
         print("🔄 [MultitouchCoordinator] Restarting after wake...")
+        
+        // Cancel any pending restart (handles rapid sleep/wake cycles)
+        pendingRestartWork?.cancel()
+        
         source.stopMonitoring()
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+        // Create cancellable work item
+        let work = DispatchWorkItem { [weak self] in
             self?.source.startMonitoring()
         }
+        pendingRestartWork = work
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
     }
 }
