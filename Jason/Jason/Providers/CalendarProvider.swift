@@ -67,7 +67,7 @@ class CalendarProvider: ObservableObject, FunctionProvider {
     }
     
     func refresh() {
-        print("🔄 [CalendarProvider] refresh() called")
+        print("[CalendarProvider] refresh() called")
         cachedNodes = nil
         lastFetchDate = nil
     }
@@ -75,11 +75,11 @@ class CalendarProvider: ObservableObject, FunctionProvider {
     func clearCache() {
         cachedNodes = nil
         lastFetchDate = nil
-        print("🗑️ [CalendarProvider] Cache cleared")
+        print("[CalendarProvider] Cache cleared")
     }
     
     @objc private func permissionGranted() {
-        print("✅ [CalendarProvider] Permission granted - refreshing")
+        print("[CalendarProvider] Permission granted - refreshing")
         refresh()
         NotificationCenter.default.post(name: .providerContentUpdated, object: nil)
     }
@@ -91,7 +91,7 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         if let cached = cachedNodes,
            let fetchDate = lastFetchDate,
            Calendar.current.isDateInToday(fetchDate) {
-            print("⚡ [CalendarProvider] Using cached nodes (\(cached.count) events)")
+            print("[CalendarProvider] Using cached nodes (\(cached.count) events)")
             return cached
         }
         
@@ -148,7 +148,7 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: Date())
         guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
-            print("❌ [CalendarProvider] Failed to calculate end of day")
+            print("[CalendarProvider] Failed to calculate end of day")
             return []
         }
         

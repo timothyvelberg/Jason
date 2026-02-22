@@ -258,6 +258,7 @@ struct ListPanelView: View {
             }
         }
         .frame(width: panelWidth, height: panelHeight)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
     
     /// Build ordered array from measured heights and report to manager
