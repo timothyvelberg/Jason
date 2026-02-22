@@ -55,18 +55,7 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
     // MARK: - Permission Handling
     
     private func showPermissionAlert() {
-        DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = "Reminders Access Required"
-            alert.informativeText = "Jason needs access to your Reminders. Please configure permissions in Settings."
-            alert.addButton(withTitle: "Open Settings")
-            alert.addButton(withTitle: "Cancel")
-            
-            if alert.runModal() == .alertFirstButtonReturn {
-                // Open Jason Settings window
-                NotificationCenter.default.post(name: .openSettingsWindow, object: nil)
-            }
-        }
+        PermissionManager.shared.showPermissionAlert(for: .reminders)
     }
     
     @objc private func permissionGranted() {

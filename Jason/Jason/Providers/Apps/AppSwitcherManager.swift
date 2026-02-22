@@ -20,7 +20,9 @@ class AppSwitcherManager: ObservableObject {
     @Published var runningApps: [NSRunningApplication] = []
     @Published var isVisible: Bool = false
     @Published var selectedAppIndex: Int = 0
-    @Published var hasAccessibilityPermission: Bool = false
+    var hasAccessibilityPermission: Bool {
+        return PermissionManager.shared.hasAccessibilityAccess
+    }
     
     // MARK: - Instance Management
     
@@ -39,7 +41,8 @@ class AppSwitcherManager: ObservableObject {
     
     private init() {
         print("[AppSwitcherManager] Initializing SHARED instance")
-        checkAccessibilityPermission()
+        // Check accessibility permission via PermissionManager
+        print("Accessibility permission check: \(PermissionManager.shared.hasAccessibilityAccess ? "GRANTED" : "DENIED")")
         setupServices()
         
         // 🆕 ADDED: Listen to NSWorkspace notifications for instant app change detection
@@ -63,31 +66,13 @@ class AppSwitcherManager: ObservableObject {
         startAutoRefresh()
     }
     
-    // MARK: - Permission Management
-    
-    func checkAccessibilityPermission() {
-        let trusted = AXIsProcessTrusted()
-        hasAccessibilityPermission = trusted
-        
-        print("Accessibility permission check: \(trusted ? "GRANTED" : "DENIED")")
-        
-        if trusted {
-            setupServices()
-        }
-    }
-    
-    func openAccessibilityPreferences() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-        NSWorkspace.shared.open(url)
-    }
-    
     // MARK: - Service Setup
     
     func setupServices() {
         loadRunningApplications()
         
         // Only initialize MRU if we have permission
-        if hasAccessibilityPermission {
+        if PermissionManager.shared.hasAccessibilityAccess {
             initializeMRUHistory()
         } else {
             print("MRU tracking disabled (no accessibility permission)")

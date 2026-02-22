@@ -77,7 +77,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         
         if let button = statusItem?.button {
             // Set the icon - using SF Symbol
-            button.image = NSImage(systemSymbolName: "circle.circle", accessibilityDescription: "Jason App Switcher")
+            button.image = NSImage(named: "icon_menu_bar") ?? NSImage()
             button.action = #selector(toggleContentWindow)
             button.target = self
         }

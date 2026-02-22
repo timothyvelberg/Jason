@@ -127,6 +127,11 @@ class HotkeyManager {
     
     /// Start monitoring for hotkeys
     func startMonitoring() {
+        
+        guard PermissionManager.shared.hasAccessibilityAccess else {
+            print("[HotkeyManager] No accessibility permission - cannot start monitoring")
+            return
+        }
         guard globalKeyMonitor == nil else {
             print("[HotkeyManager] Already monitoring")
             return

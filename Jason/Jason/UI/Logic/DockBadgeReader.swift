@@ -29,13 +29,13 @@ class DockBadgeReader {
     
     /// Whether we have accessibility permission
     var isAvailable: Bool {
-        return AXIsProcessTrusted()
+        return PermissionManager.shared.hasAccessibilityAccess
     }
     
     // MARK: - Initialization
     
     private init() {
-        if isAvailable {
+        if PermissionManager.shared.hasAccessibilityAccess {
             print("[DockBadgeReader] Accessibility API available")
         } else {
             print("[DockBadgeReader] Accessibility permission not granted")

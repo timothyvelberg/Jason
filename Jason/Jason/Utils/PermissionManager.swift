@@ -193,9 +193,44 @@ class PermissionManager {
     
     // MARK: - Notifications
     
+    // MARK: - Unified Permission Alerts
+
     enum PermissionType {
         case calendar
         case reminders
+        case accessibility
+    }
+
+    func showPermissionAlert(for type: PermissionType) {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            
+            switch type {
+            case .calendar:
+                alert.messageText = "Calendar Access Required"
+                alert.informativeText = "Jason needs access to your Calendar. Please configure permissions in Settings."
+            case .reminders:
+                alert.messageText = "Reminders Access Required"
+                alert.informativeText = "Jason needs access to your Reminders. Please configure permissions in Settings."
+            case .accessibility:
+                alert.messageText = "Accessibility Access Required"
+                alert.informativeText = "Jason needs Accessibility permissions for advanced features like app switching and gesture detection. Please enable in System Settings > Privacy & Security > Accessibility."
+            }
+            
+            alert.addButton(withTitle: "Open Settings")
+            alert.addButton(withTitle: "Cancel")
+            
+            if alert.runModal() == .alertFirstButtonReturn {
+                switch type {
+                case .calendar, .reminders:
+                    // Open Jason Settings window
+                    NotificationCenter.default.post(name: .openSettingsWindow, object: nil)
+                case .accessibility:
+                    // Open System Settings
+                    self.openAccessibilityPreferences()
+                }
+            }
+        }
     }
     
     private func notifyPermissionChanged(type: PermissionType) {
@@ -253,8 +288,30 @@ class PermissionManager {
             print("   ❌ Access denied or error: \(url.lastPathComponent) - \(error.localizedDescription)")
         }
     }
-}
 
+    // MARK: - Accessibility Permission Status
+
+    var hasAccessibilityAccess: Bool {
+        return AXIsProcessTrusted()
+    }
+
+    func accessibilityStatus() -> PermissionStatus {
+        return AXIsProcessTrusted() ? .granted : .denied
+    }
+
+    // MARK: - Request Accessibility Access
+
+    func requestAccessibilityAccess() {
+        // Accessibility can't be requested programmatically like Calendar/Reminders
+        // We need to open System Settings
+        openAccessibilityPreferences()
+    }
+
+    func openAccessibilityPreferences() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
+    }
+}
 // MARK: - Notification Names
 
 extension Notification.Name {
