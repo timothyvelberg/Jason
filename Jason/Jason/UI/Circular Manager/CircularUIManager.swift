@@ -15,6 +15,7 @@ class CircularUIManager: ObservableObject, UIManager {
     
     @Published var isVisible: Bool = false
     @Published var mousePosition: CGPoint = .zero
+    @Published var isInCloseZone: Bool = false
     
     // Drag support
     @Published var currentDragProvider: DragProvider?
@@ -25,6 +26,7 @@ class CircularUIManager: ObservableObject, UIManager {
     
     var draggedNode: FunctionNode?
     var panelMouseMonitor: Any?
+    var hasLeftCloseZone: Bool = false
     
     var overlayWindow: OverlayWindow?
     var combinedAppsProvider: CombinedAppsProvider?

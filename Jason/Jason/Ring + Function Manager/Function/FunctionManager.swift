@@ -44,7 +44,7 @@ class FunctionManager: ObservableObject {
     // MARK: - Close Zone Configuration
 
     /// Radius of the center close zone. Mouse inside this radius will not select any item.
-    static let closeZoneRadius: CGFloat = 20
+    static let closeZoneRadius: CGFloat = 24
     
     // MARK: - Cache for Ring Configurations
     

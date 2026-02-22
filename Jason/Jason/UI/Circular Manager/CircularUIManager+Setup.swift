@@ -105,6 +105,7 @@ extension CircularUIManager {
         guard let functionManager = functionManager else { return }
         
         self.mouseTracker = MouseTracker(functionManager: functionManager)
+        mouseTracker?.circularUIManager = self
         
         mouseTracker?.inputCoordinator = inputCoordinator
         listPanelManager?.inputCoordinator = inputCoordinator

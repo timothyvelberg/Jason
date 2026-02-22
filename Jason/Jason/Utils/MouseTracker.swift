@@ -20,6 +20,7 @@ class MouseTracker {
     private var wasOutsideBoundary: Bool = false
     
     weak var inputCoordinator: InputCoordinator?
+    weak var circularUIManager: CircularUIManager?
     
     var onPieHover: ((Int?) -> Void)?
     var onCollapse: (() -> Void)?
@@ -145,6 +146,11 @@ class MouseTracker {
                 
                 // Check if mouse is in close zone (center of donut)
                 if distance < FunctionManager.closeZoneRadius {
+                    // Only show close button if we've left the zone at least once
+                    if let circularUI = circularUIManager, circularUI.hasLeftCloseZone {
+                        circularUI.isInCloseZone = true
+                    }
+                    
                     // Clear selection when in close zone
                     if lastFunctionIndex != nil || lastRingLevel != nil {
                         print("🎯 [Track] In close zone (distance: \(String(format: "%.1f", distance))) - clearing selection")
@@ -153,6 +159,12 @@ class MouseTracker {
                         onPieHover?(nil)
                     }
                     return
+                } else {
+                    // Outside close zone - mark that we've left and update state
+                    if let circularUI = circularUIManager {
+                        circularUI.hasLeftCloseZone = true
+                        circularUI.isInCloseZone = false
+                    }
                 }
                 
                 let angle = self.calculateAngle(from: start, to: current)

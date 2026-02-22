@@ -55,7 +55,7 @@ struct CircularUIView: View {
                 
                 ZStack {
                     // Close button in center
-                    CloseButtonView()
+                    CloseButtonView(isVisible: circularUI.isInCloseZone)
                         .animation(nil, value: rings.count)
                     
                     // Generate rings dynamically
@@ -189,29 +189,32 @@ struct CircularUIView: View {
 
 struct CloseButtonView: View {
     private let size: CGFloat = FunctionManager.closeZoneRadius * 2
+    let isVisible: Bool
     
     var body: some View {
-            ZStack {
-                // Dark tint layer
-                Circle()
-                    .fill(Color.black.opacity(0.33))
-                
-                // Blur material layer
-                Circle()
-                    .fill(.ultraThinMaterial)
-                
-                // Border
-                Circle()
-                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                
-                // X icon
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.6))
-            }
-            .frame(width: size, height: size)
-            .allowsHitTesting(false)
+        ZStack {
+            // Dark tint layer
+            Circle()
+                .fill(Color.black.opacity(0.33))
+            
+            // Blur material layer
+            Circle()
+                .fill(.ultraThinMaterial)
+            
+            // Border
+            Circle()
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+            
+            // X icon
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.white.opacity(0.6))
         }
+        .frame(width: size, height: size)
+        .opacity(isVisible ? 1 : 0)
+        .animation(.easeInOut(duration: 0.15), value: isVisible)
+        .allowsHitTesting(false)
+    }
 }
 
 // MARK: - Ring Configuration
