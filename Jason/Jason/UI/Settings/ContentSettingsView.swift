@@ -65,6 +65,11 @@ struct ContentSettingsView: View {
         .onAppear {
             setupApplication()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openSettingsWindow)) { notification in
+            if let tab = notification.userInfo?["selectedTab"] as? SettingsTab {
+                selectedTab = tab
+            }
+        }
     }
     
     // MARK: - Application Setup

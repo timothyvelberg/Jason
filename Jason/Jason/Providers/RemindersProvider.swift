@@ -52,12 +52,6 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
         NotificationCenter.default.removeObserver(self)
     }
     
-    // MARK: - Permission Handling
-    
-    private func showPermissionAlert() {
-        PermissionManager.shared.showPermissionAlert(for: .reminders)
-    }
-    
     @objc private func permissionGranted() {
         print("[RemindersProvider] Permission granted - fetching reminders")
         fetchReminders()
@@ -122,13 +116,15 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
         fetchReminders()
     }
     
+
+    
     // MARK: - FunctionProvider
     
     func provideFunctions() -> [FunctionNode] {
+        
         guard PermissionManager.shared.hasRemindersAccess else {
-            // Show alert to configure in Settings
-            showPermissionAlert()
-            return []
+            // Return a placeholder node that user can click to grant permission
+            return [createPermissionRequestNode()]
         }
         
         let items = buildTodoNodes()
@@ -241,6 +237,26 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
         return buildTodoNodes()
     }
     
+    private func createPermissionRequestNode() -> FunctionNode {
+        return FunctionNode(
+            id: "reminders-permission-request",
+            name: "Grant Reminders Access",
+            type: .action,
+            icon: NSImage(named: "parent-todo") ?? NSImage(),
+            preferredLayout: .partialSlice,
+            showLabel: true,
+            slicePositioning: .center,
+            providerId: providerId,
+            onLeftClick: ModifierAwareInteraction(base: .execute {
+                Notification.openSettings(tab: .reminder)
+            }),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .execute {
+                Notification.openSettings(tab: .reminder)
+            })
+        )
+    }
+    
     // MARK: - Node Creation
     
     private func makeReminderNode(_ reminder: EKReminder) -> FunctionNode {
@@ -276,7 +292,6 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
     func addItem(title: String) {
         guard PermissionManager.shared.hasRemindersAccess else {
             print("[RemindersProvider] Cannot add - no Reminders access")
-            showPermissionAlert()
             return
         }
         

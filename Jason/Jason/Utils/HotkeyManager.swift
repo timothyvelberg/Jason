@@ -128,17 +128,28 @@ class HotkeyManager {
     /// Start monitoring for hotkeys
     func startMonitoring() {
         
-        guard PermissionManager.shared.hasAccessibilityAccess else {
-            print("[HotkeyManager] No accessibility permission - cannot start monitoring")
-            return
-        }
         guard globalKeyMonitor == nil else {
             print("[HotkeyManager] Already monitoring")
             return
         }
         
-        // Use CGEventTap for keyboard shortcuts (intercepts before other apps)
-        startKeyboardEventTap()
+        // Check accessibility permission status
+        let hasAccessibility = PermissionManager.shared.hasAccessibilityAccess
+        
+        if !hasAccessibility {
+            print("[HotkeyManager] ⚠️ No accessibility permission - advanced features disabled")
+            print("   • Keyboard event tap: DISABLED (shortcuts may not intercept other apps)")
+            print("   • Mouse buttons 3+: DISABLED")
+            print("   • Trackpad gestures: DISABLED")
+            print("   • Basic shortcuts via NSEvent: ENABLED")
+        }
+        
+        // Start keyboard event tap ONLY if we have permission
+        if hasAccessibility {
+            startKeyboardEventTap()
+        } else {
+            print("[HotkeyManager] Skipping keyboard event tap (no accessibility permission)")
+        }
         
         // Listen for global modifier key changes
         globalFlagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged]) { [weak self] event in
@@ -206,9 +217,11 @@ class HotkeyManager {
                 let display = formatMouseButton(buttonNumber: registration.buttonNumber, modifiers: registration.modifierFlags)
                 print("      Config \(configId): \(display) (button=\(registration.buttonNumber), modifiers=\(registration.modifierFlags))")
             }
-            // Start mouse monitoring if needed
-            if mouseEventTap == nil {
+            // Start mouse monitoring if needed (requires accessibility)
+            if mouseEventTap == nil && hasAccessibility {
                 startMouseMonitoring()
+            } else if !hasAccessibility {
+                print("   ⚠️ Cannot monitor mouse buttons - no accessibility permission")
             }
         }
         

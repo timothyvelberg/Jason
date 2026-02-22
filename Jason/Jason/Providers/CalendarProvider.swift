@@ -60,8 +60,7 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         
         guard PermissionManager.shared.hasCalendarAccess else {
             // Show alert to configure in Settings
-            showPermissionAlert()
-            return []
+            return [createPermissionRequestNode()]
         }
         
         return buildEventNodes()
@@ -77,12 +76,6 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         cachedNodes = nil
         lastFetchDate = nil
         print("🗑️ [CalendarProvider] Cache cleared")
-    }
-    
-    // MARK: - Permission Handling
-    
-    private func showPermissionAlert() {
-        PermissionManager.shared.showPermissionAlert(for: .calendar)
     }
     
     @objc private func permissionGranted() {
@@ -276,10 +269,30 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         return image
     }
     
+    private func createPermissionRequestNode() -> FunctionNode {
+        return FunctionNode(
+            id: "calendar-permission-request",
+            name: "Grant Calendar Access",
+            type: .action,
+            icon: NSImage(named: "parent-calendar") ?? NSImage(),
+            preferredLayout: .partialSlice,
+            showLabel: true,
+            slicePositioning: .center,
+            providerId: providerId,
+            onLeftClick: ModifierAwareInteraction(base: .execute {
+                Notification.openSettings(tab: .calendar)
+            }),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .execute {
+                Notification.openSettings(tab: .calendar)
+            })
+        )
+    }
+    
     // MARK: - Time Formatting
     
     private func formatEventTime(_ event: EKEvent) -> String {
-        if event.isAllDay {
+        if event.isAllDay { 
             return "All Day"
         }
         
@@ -287,6 +300,8 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: event.startDate)
     }
+    
+    
     
     // MARK: - Change Notifications
     
@@ -329,4 +344,15 @@ class CalendarProvider: ObservableObject, FunctionProvider {
 
 extension Notification.Name {
     static let openSettingsWindow = Notification.Name("openSettingsWindow")
+}
+
+// Helper for opening settings to a specific tab
+extension Notification {
+    static func openSettings(tab: SettingsTab) {
+        NotificationCenter.default.post(
+            name: .openSettingsWindow,
+            object: nil,
+            userInfo: ["selectedTab": tab]
+        )
+    }
 }
