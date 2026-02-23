@@ -94,8 +94,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         print("✨ Sparkle updater initialized")
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            print("🔍 Current version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "unknown")")
-            print("🔍 Current build: \(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "unknown")")
+            print("Current version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "unknown")")
+            print("Current build: \(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "unknown")")
             self.updaterController?.updater.checkForUpdates()
         }
     }
@@ -105,7 +105,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         
         // Create window with size appropriate for settings interface
         contentWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1024, height: 800),
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 400),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -114,7 +114,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         contentWindow?.title = "Jason Settings"
         contentWindow?.contentView = NSHostingView(rootView: contentView)
         contentWindow?.isReleasedWhenClosed = false
-        contentWindow?.delegate = self  // 👈 ADD THIS LINE
+        contentWindow?.delegate = self
         
         // Set minimum size constraints
         contentWindow?.minSize = NSSize(width: 1024, height: 640)
@@ -132,12 +132,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if window.isVisible {
             print("[Hiding Window] Switching to accessory mode")
             window.orderOut(nil)
-            NSApp.setActivationPolicy(.accessory)  // 👈 Remove dock icon
+            NSApp.setActivationPolicy(.accessory)  // Remove dock icon
         } else {
             print("[Show Window] Switching to regular mode")
             
             // Switch to regular app mode (shows dock icon & app switcher)
-            NSApp.setActivationPolicy(.regular)  // 👈 Show dock icon
+            NSApp.setActivationPolicy(.regular)  // Show dock icon
             
             // Center window on screen
             window.center()
@@ -162,6 +162,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         print("[Window Closing] Switching back to accessory mode")
-        NSApp.setActivationPolicy(.accessory)  // 👈 Remove dock icon when user clicks X
+        NSApp.setActivationPolicy(.accessory)
     }
 }
