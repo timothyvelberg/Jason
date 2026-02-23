@@ -111,9 +111,11 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
         PrivateFrameworkSource.shared = nil
         
         // THEN unregister (callbacks may still fire but will be ignored)
+        // Only unregister if devices are valid (not after wake where they're stale)
         for device in devices {
+            // The framework will handle cleanup - just unregister callback
+            // Don't call MTDeviceStop as device may be invalid after sleep
             MTUnregisterContactFrameCallback(device, privateFrameworkTouchCallback)
-            MTDeviceStop(device)
         }
         
         devices.removeAll()
@@ -131,21 +133,15 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
         
         deviceLock.lock()
         
-        // Clear everything BEFORE unregistering to prevent race
-        let oldDevices = devices
+        // After wake, device references are stale/invalid
+        // Just clear state and start fresh - don't try to stop dead devices
         devices.removeAll()
         isMonitoring = false
         PrivateFrameworkSource.shared = nil
         
         deviceLock.unlock()
         
-        // Unregister callbacks (they may still fire but will be ignored by guard)
-        for device in oldDevices {
-            MTUnregisterContactFrameCallback(device, privateFrameworkTouchCallback)
-            MTDeviceStop(device)
-        }
-        
-        // Now safe to restart - callback guard handles any spurious events
+        // Now safe to restart with fresh device list
         startMonitoring()
     }
     

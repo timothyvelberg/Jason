@@ -96,7 +96,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             print("Current version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "unknown")")
             print("Current build: \(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "unknown")")
-            self.updaterController?.updater.checkForUpdates()
+            self.updaterController?.updater.checkForUpdatesInBackground()
         }
     }
     
