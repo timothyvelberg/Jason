@@ -3,6 +3,7 @@
 //  Jason
 //
 //  Created by Timothy Velberg on 07/02/2026.
+//
 
 import SwiftUI
 
@@ -11,65 +12,31 @@ import SwiftUI
 struct SnippetsSettingsView: View {
     @State private var snippets: [SnippetsProvider.Snippet] = []
     @State private var editingSnippet: SnippetsProvider.Snippet?
-    @State private var isAddingNew: Bool = false
+    @State private var isAddingNew = false
     
     var body: some View {
-        VStack(spacing: 0) {
-            if snippets.isEmpty {
-                VStack(spacing: 20) {
-                    Image(systemName: "pencil.line")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    
-                    Text("No snippets yet")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    
-                    Text("Add text snippets for quick pasting from clipboard history")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+        SettingsListShell(
+            title: "Snippets",
+            emptyIcon: "pencil.line",
+            emptyTitle: "No snippets yet",
+            emptySubtitle: "Add text snippets for quick pasting from clipboard history",
+            primaryLabel: "Add Snippet",
+            primaryAction: { isAddingNew = true },
+            secondaryLabel: nil,
+            secondaryAction: nil,
+            isEmpty: snippets.isEmpty
+        ) {
+            ForEach(snippets, id: \.id) { snippet in
+                SnippetRow(snippet: snippet) {
+                    editingSnippet = snippet
+                } onDelete: {
+                    deleteSnippet(snippet)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(snippets, id: \.id) { snippet in
-                        SnippetRow(
-                            snippet: snippet,
-                            onEdit: {
-                                editingSnippet = snippet
-                            },
-                            onRemove: {
-                                deleteSnippet(snippet)
-                            }
-                        )
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                    }
-                    .onMove(perform: moveSnippet)
-                }
-                .listStyle(.inset)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
             }
-            
-            Divider()
-            
-            HStack {
-                Button {
-                    isAddingNew = true
-                } label: {
-                    Label("Add Snippet", systemImage: "plus")
-                }
-                .buttonStyle(.borderedProminent)
-                
-                Spacer()
-                
-                Text("\(snippets.count) snippet(s)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding()
+            .onMove(perform: moveSnippet)
         }
-        .onAppear {
-            loadSnippets()
-        }
+        .onAppear { loadSnippets() }
         .sheet(isPresented: $isAddingNew) {
             EditSnippetView(
                 mode: .add,
@@ -77,9 +44,7 @@ struct SnippetsSettingsView: View {
                     addSnippet(title: title, content: content, triggerText: triggerText)
                     isAddingNew = false
                 },
-                onCancel: {
-                    isAddingNew = false
-                }
+                onCancel: { isAddingNew = false }
             )
         }
         .sheet(item: $editingSnippet) { snippet in
@@ -89,9 +54,7 @@ struct SnippetsSettingsView: View {
                     updateSnippet(id: snippet.id, title: title, content: content, triggerText: triggerText)
                     editingSnippet = nil
                 },
-                onCancel: {
-                    editingSnippet = nil
-                }
+                onCancel: { editingSnippet = nil }
             )
         }
     }
@@ -121,74 +84,40 @@ struct SnippetsSettingsView: View {
     
     private func moveSnippet(from source: IndexSet, to destination: Int) {
         snippets.move(fromOffsets: source, toOffset: destination)
-        
         for (index, snippet) in snippets.enumerated() {
             DatabaseManager.shared.reorderSnippet(id: snippet.id, newSortOrder: index)
         }
-        
         loadSnippets()
     }
 }
 
 // MARK: - Snippet Row
 
-struct SnippetRow: View {
+private struct SnippetRow: View {
     let snippet: SnippetsProvider.Snippet
     let onEdit: () -> Void
-    let onRemove: () -> Void
+    let onDelete: () -> Void
     
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 14))
-                .foregroundColor(.secondary.opacity(0.5))
-                .help("Drag to reorder")
-            
-            Image(systemName: "pencil.line")
-                .font(.title3)
-                .foregroundColor(.blue)
-                .frame(width: 28)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(snippet.title)
-                    .font(.body)
-                    .fontWeight(.medium)
-                
-                HStack(spacing: 8) {
-                    Text(snippet.content)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                    
-                    if let trigger = snippet.triggerText, !trigger.isEmpty {
-                        Text("• Trigger: \(trigger)")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                    }
+        SettingsRow(
+            icon: .systemSymbol("pencil.line", .blue),
+            title: snippet.title,
+            subtitle: snippet.content,
+            showDragHandle: true,
+            onEdit: onEdit,
+            onDelete: onDelete,
+            metadata: {
+                if let trigger = snippet.triggerText, !trigger.isEmpty {
+                    Text(trigger)
+                        .font(.caption2)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.orange)
+                        .cornerRadius(4)
                 }
             }
-            
-            Spacer()
-            
-            HStack(spacing: 8) {
-                Button(action: onEdit) {
-                    Image(systemName: "pencil.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.blue)
-                }
-                .buttonStyle(.borderless)
-                .help("Edit snippet")
-                
-                Button(action: onRemove) {
-                    Image(systemName: "trash.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.red)
-                }
-                .buttonStyle(.borderless)
-                .help("Delete snippet")
-            }
-        }
-        .padding(.vertical, 4)
+        )
     }
 }
 
@@ -258,11 +187,9 @@ struct EditSnippetView: View {
             .formStyle(.grouped)
             
             HStack(spacing: 12) {
-                Button("Cancel") {
-                    onCancel()
-                }
-                .buttonStyle(.bordered)
-                .keyboardShortcut(.cancelAction)
+                Button("Cancel") { onCancel() }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut(.cancelAction)
                 
                 Button("Save") {
                     let trimmedTrigger = triggerText.trimmingCharacters(in: .whitespaces)
@@ -289,6 +216,6 @@ struct EditSnippetView: View {
     }
 }
 
-// MARK: - Make Snippet Identifiable for .sheet(item:)
+// MARK: - Identifiable conformance for sheet(item:)
 
 extension SnippetsProvider.Snippet: Identifiable {}

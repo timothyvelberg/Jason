@@ -3,7 +3,6 @@
 //  Jason
 //
 //  Settings view for managing ring configurations.
-//  Shows a list of all rings with ability to add, edit, test, and delete.
 //
 
 import SwiftUI
@@ -11,105 +10,51 @@ import SwiftUI
 struct RingsSettingsView: View {
     @State private var configurations: [StoredRingConfiguration] = []
     @State private var activeSheet: SheetConfig?
-    @State private var showingDeleteConfirmation: Bool = false
+    @State private var showingDeleteConfirmation = false
     @State private var configToDelete: StoredRingConfiguration?
     
     private struct SheetConfig: Identifiable {
-        let id: Int  // -1 for new, config.id for edit
+        let id: Int
         let configuration: StoredRingConfiguration?
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            if configurations.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "circle.grid.cross")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    
-                    Text("No instances configured")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    
-                    Text("Instances are circular launchers activated by keyboard shortcuts")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                    
-                    Button {
-                        addNewConfiguration()
-                    } label: {
-                        Label("Add Instance", systemImage: "plus.circle.fill")
-                    }
-                    .buttonStyle(.borderedProminent)
+        SettingsListShell(
+            title: "Instances",
+            emptyIcon: "circle.grid.cross",
+            emptyTitle: "No instances configured",
+            emptySubtitle: "Instances are circular launchers activated by keyboard shortcuts",
+            primaryLabel: "Add Instance",
+            primaryAction: addNewConfiguration,
+            secondaryLabel: nil,
+            secondaryAction: nil,
+            isEmpty: configurations.isEmpty
+        ) {
+            ForEach(configurations) { config in
+                InstanceRow(config: config) {
+                    activeSheet = SheetConfig(id: config.id, configuration: config)
+                } onDelete: {
+                    configToDelete = config
+                    showingDeleteConfirmation = true
+                } onTap: {
+                    testRing(config)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(configurations) { config in
-                        RingConfigurationRow(
-                            config: config,
-                            onEdit: {
-                                activeSheet = SheetConfig(id: config.id, configuration: config)
-                            },
-                            onTest: {
-                                testRing(config)
-                            },
-                            onDelete: {
-                                configToDelete = config
-                                showingDeleteConfirmation = true
-                            }
-                        )
-//                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                        .contextMenu {
-                            Button("Edit...") {
-                                activeSheet = SheetConfig(id: config.id, configuration: config)
-                            }
-                            
-                            Button("Test") {
-                                testRing(config)
-                            }
-                            
-                            Divider()
-                            
-                            Button("Duplicate") {
-                                duplicateConfiguration(config)
-                            }
-                            
-                            Divider()
-                            
-                            Button("Delete", role: .destructive) {
-                                configToDelete = config
-                                showingDeleteConfirmation = true
-                            }
-                        }
+                .contextMenu {
+                    Button("Edit...") {
+                        activeSheet = SheetConfig(id: config.id, configuration: config)
+                    }
+                    Button("Test") { testRing(config) }
+                    Divider()
+                    Button("Duplicate") { duplicateConfiguration(config) }
+                    Divider()
+                    Button("Delete", role: .destructive) {
+                        configToDelete = config
+                        showingDeleteConfirmation = true
                     }
                 }
-//                .listStyle(.inset)
             }
-            
-            Divider()
-            
-            HStack {
-                Button {
-                    addNewConfiguration()
-                } label: {
-                    Label("Add Instance", systemImage: "plus.circle.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                
-                Spacer()
-                
-                Text("\(configurations.count) instance(s)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding()
         }
-        .onAppear {
-            loadConfigurations()
-        }
+        .onAppear { loadConfigurations() }
         .sheet(item: $activeSheet) { sheet in
             EditRingView(configuration: sheet.configuration, onSave: {
                 loadConfigurations()
@@ -120,9 +65,7 @@ struct RingsSettingsView: View {
         .alert("Delete Instance?", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
-                if let config = configToDelete {
-                    deleteConfiguration(config)
-                }
+                if let config = configToDelete { deleteConfiguration(config) }
             }
         } message: {
             if let config = configToDelete {
@@ -136,9 +79,6 @@ struct RingsSettingsView: View {
     private func loadConfigurations() {
         RingConfigurationManager.shared.loadConfigurations()
         configurations = RingConfigurationManager.shared.getAllConfigurations()
-        
-        print("🔧 [RingsSettings] Loaded \(configurations.count) configuration(s)")
-        
         CircularUIInstanceManager.shared.syncWithConfigurations()
         CircularUIInstanceManager.shared.stopHotkeyMonitoring()
         CircularUIInstanceManager.shared.registerInputTriggers()
@@ -150,22 +90,16 @@ struct RingsSettingsView: View {
     }
     
     private func duplicateConfiguration(_ config: StoredRingConfiguration) {
-        // TODO: Implement duplication via database
         print("📋 Duplicate configuration: \(config.name)")
     }
     
     private func deleteConfiguration(_ config: StoredRingConfiguration) {
-        print("🗑️ Deleting configuration: \(config.name)")
-        
         CircularUIInstanceManager.shared.removeInstance(forConfigId: config.id)
-        
         do {
             try RingConfigurationManager.shared.deleteConfiguration(id: config.id)
-            print("✅ Deleted ring configuration: \(config.name)")
         } catch {
             print("❌ Failed to delete: \(error)")
         }
-        
         CircularUIInstanceManager.shared.registerInputTriggers()
         loadConfigurations()
     }
@@ -177,60 +111,40 @@ struct RingsSettingsView: View {
     }
 }
 
-// MARK: - Ring Configuration Row
+// MARK: - Instance Row
 
-struct RingConfigurationRow: View {
+private struct InstanceRow: View {
     let config: StoredRingConfiguration
     let onEdit: () -> Void
-    let onTest: () -> Void
     let onDelete: () -> Void
+    let onTap: () -> Void
+    
+    /// Replace the asset name logic once the Ring/Panel property on
+    /// StoredRingConfiguration is confirmed.
+    private var iconAsset: SettingsRowIcon {
+        .asset("core_settings_menu_instance")
+    }
     
     var body: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 8) {
-                Text(config.name)
-                    .font(.body)
-                    .fontWeight(.medium)
-                
-                HStack(spacing: 8) {
-                    Text(config.shortcutDescription)
+        SettingsRow(
+            icon: iconAsset,
+            title: config.name,
+            subtitle: config.shortcutDescription,
+            showDragHandle: false,
+            onEdit: onEdit,
+            onDelete: onDelete,
+            onTap: onTap,
+            metadata: {
+                if !config.isActive {
+                    Text("Inactive")
                         .font(.caption)
-                        .foregroundColor(.white)
-                        .opacity(0.4)
-                    
-                    if !config.isActive {
-                        Text("Inactive")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.2))
-                            .cornerRadius(4)
-                    }
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.orange.opacity(0.2))
+                        .cornerRadius(4)
                 }
-            }.padding(.vertical,8)
-            
-            Spacer()
-            
-            HStack(spacing: 16) {
-                Button(action: onEdit) {
-                    Image("context_actions_edit")
-                }
-                .buttonStyle(.borderless)
-                .help("Edit instance")
-                
-                Button(action: onDelete) {
-                    Image("context_actions_delete")
-                }
-                .buttonStyle(.plain)
-                .help("Delete instance")
-                
             }
-        }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onTest()
-        }
+        )
     }
 }

@@ -12,86 +12,45 @@ struct FavoriteAppsSettingsView: View {
     @State private var favoriteApps: [FavoriteAppEntry] = []
     @State private var showingAppPicker = false
     @State private var editingApp: FavoriteAppEntry?
-    @State private var showingEditSheet = false
     
     var body: some View {
-        VStack(spacing: 0) {
-            if favoriteApps.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "star.slash")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    
-                    Text("No favorite apps yet")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    
-                    Text("Click the + button below to add your first favorite app")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+        SettingsListShell(
+            title: "Apps",
+            emptyIcon: "star.slash",
+            emptyTitle: "No favourite apps yet",
+            emptySubtitle: "Click the + button below to add your first favourite app",
+            primaryLabel: "Add App",
+            primaryAction: { showingAppPicker = true },
+            secondaryLabel: nil,
+            secondaryAction: nil,
+            isEmpty: favoriteApps.isEmpty
+        ) {
+            ForEach(favoriteApps) { app in
+                AppRow(app: app) {
+                    editingApp = app
+                } onDelete: {
+                    removeApp(app)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(favoriteApps) { app in
-                        FavoriteAppRow(
-                            app: app,
-                            onEdit: {
-                                editingApp = app
-                                showingEditSheet = true
-                            },
-                            onRemove: {
-                                removeApp(app)
-                            }
-                        )
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                    }
-                    .onMove(perform: moveApp)
-                }
-                .listStyle(.inset)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
             }
-            
-            Divider()
-            
-            HStack {
-                Button {
-                    showingAppPicker = true
-                } label: {
-                    Label("Add App", systemImage: "plus.circle.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                
-                Spacer()
-                
-                Text("\(favoriteApps.count) favorite app\(favoriteApps.count == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding()
+            .onMove(perform: moveApp)
         }
-        .onAppear {
-            loadFavoriteApps()
-        }
+        .onAppear { loadFavoriteApps() }
         .sheet(isPresented: $showingAppPicker) {
-            AppPickerView(onAppSelected: { bundleId, appName in
+            AppPickerView { bundleId, appName in
                 addApp(bundleId: bundleId, name: appName)
                 showingAppPicker = false
-            })
-        }
-        .sheet(isPresented: $showingEditSheet) {
-            if let app = editingApp {
-                EditFavoriteAppView(
-                    app: app,
-                    onSave: { updatedName, iconOverride in
-                        updateApp(app, name: updatedName, iconOverride: iconOverride)
-                        showingEditSheet = false
-                    },
-                    onCancel: {
-                        showingEditSheet = false
-                    }
-                )
             }
+        }
+        .sheet(item: $editingApp) { app in
+            EditFavoriteAppView(
+                app: app,
+                onSave: { updatedName, iconOverride in
+                    updateApp(app, name: updatedName, iconOverride: iconOverride)
+                    editingApp = nil
+                },
+                onCancel: { editingApp = nil }
+            )
         }
     }
     
@@ -99,7 +58,6 @@ struct FavoriteAppsSettingsView: View {
     
     private func loadFavoriteApps() {
         favoriteApps = DatabaseManager.shared.getFavoriteApps()
-        print("📋 Loaded \(favoriteApps.count) favorite apps")
     }
     
     private func addApp(bundleId: String, name: String) {
@@ -129,14 +87,12 @@ struct FavoriteAppsSettingsView: View {
     
     private func moveApp(from source: IndexSet, to destination: Int) {
         favoriteApps.move(fromOffsets: source, toOffset: destination)
-        
         for (index, app) in favoriteApps.enumerated() {
             DatabaseManager.shared.reorderFavoriteApps(
                 bundleIdentifier: app.bundleIdentifier,
                 newSortOrder: index
             )
         }
-        
         loadFavoriteApps()
         notifyProvider()
     }
@@ -146,84 +102,42 @@ struct FavoriteAppsSettingsView: View {
     }
 }
 
-// MARK: - Favorite App Row
+// MARK: - App Row
 
-struct FavoriteAppRow: View {
+private struct AppRow: View {
     let app: FavoriteAppEntry
     let onEdit: () -> Void
-    let onRemove: () -> Void
+    let onDelete: () -> Void
     
     @State private var appIcon: NSImage?
     
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 14))
-                .foregroundColor(.secondary.opacity(0.5))
-                .help("Drag to reorder")
-            
-            if let icon = appIcon {
-                Image(nsImage: icon)
-                    .resizable()
-                    .frame(width: 32, height: 32)
-            } else {
-                Image(systemName: "app.fill")
-                    .font(.system(size: 24))
-                    .foregroundColor(.secondary)
-                    .frame(width: 32, height: 32)
-            }
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(app.displayName)
-                    .font(.body)
-                    .fontWeight(.medium)
-                
-                Text(app.bundleIdentifier)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            if let lastAccessed = app.lastAccessed {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(app.accessCount) launches")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Text(formatDate(lastAccessed))
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+        SettingsRow(
+            icon: appIcon.map { .nsImage($0) } ?? .systemSymbol("app.fill", .secondary),
+            title: app.displayName,
+            subtitle: app.bundleIdentifier,
+            showDragHandle: true,
+            onEdit: onEdit,
+            onDelete: onDelete,
+            metadata: {
+                if let lastAccessed = app.lastAccessed {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(app.accessCount) launches")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(formatDate(lastAccessed))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
-            
-            HStack(spacing: 8) {
-                Button(action: onEdit) {
-                    Image(systemName: "pencil.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.blue)
-                }
-                .buttonStyle(.borderless)
-                .help("Edit app settings")
-                
-                Button(action: onRemove) {
-                    Image(systemName: "trash.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.red)
-                }
-                .buttonStyle(.borderless)
-                .help("Remove from favorites")
-            }
-        }
-        .padding(.vertical, 4)
-        .onAppear {
-            loadAppIcon()
-        }
+        )
+        .onAppear { loadIcon() }
     }
     
-    private func loadAppIcon() {
-        if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleIdentifier) {
-            appIcon = NSWorkspace.shared.icon(forFile: appURL.path)
+    private func loadIcon() {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleIdentifier) {
+            appIcon = NSWorkspace.shared.icon(forFile: url.path)
         }
     }
     
@@ -246,12 +160,10 @@ struct AppPickerView: View {
     @State private var isLoading = true
     
     var filteredApps: [(name: String, bundleId: String, icon: NSImage)] {
-        if searchText.isEmpty {
-            return allApps
-        }
-        return allApps.filter { app in
-            app.name.localizedCaseInsensitiveContains(searchText) ||
-            app.bundleId.localizedCaseInsensitiveContains(searchText)
+        if searchText.isEmpty { return allApps }
+        return allApps.filter {
+            $0.name.localizedCaseInsensitiveContains(searchText) ||
+            $0.bundleId.localizedCaseInsensitiveContains(searchText)
         }
     }
     
@@ -261,9 +173,7 @@ struct AppPickerView: View {
                 Text("Choose an Application")
                     .font(.title2)
                     .fontWeight(.semibold)
-                
                 Spacer()
-                
                 Button(action: { dismiss() }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title2)
@@ -276,10 +186,8 @@ struct AppPickerView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
-                
                 TextField("Search applications...", text: $searchText)
                     .textFieldStyle(.plain)
-                
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
@@ -298,10 +206,8 @@ struct AppPickerView: View {
             
             if isLoading {
                 VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                    Text("Loading applications...")
-                        .foregroundColor(.secondary)
+                    ProgressView().scaleEffect(1.5)
+                    Text("Loading applications...").foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if filteredApps.isEmpty {
@@ -309,7 +215,6 @@ struct AppPickerView: View {
                     Image(systemName: "app.dashed")
                         .font(.system(size: 48))
                         .foregroundColor(.secondary)
-                    
                     Text(searchText.isEmpty ? "No applications found" : "No results for \"\(searchText)\"")
                         .font(.headline)
                 }
@@ -318,24 +223,19 @@ struct AppPickerView: View {
                 ScrollView {
                     LazyVStack(spacing: 1) {
                         ForEach(filteredApps, id: \.bundleId) { app in
-                            Button(action: {
-                                onAppSelected(app.bundleId, app.name)
-                            }) {
+                            Button(action: { onAppSelected(app.bundleId, app.name) }) {
                                 HStack(spacing: 12) {
                                     Image(nsImage: app.icon)
                                         .resizable()
                                         .frame(width: 32, height: 32)
-                                    
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(app.name)
                                             .font(.headline)
                                             .foregroundColor(.primary)
-                                        
                                         Text(app.bundleId)
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                     }
-                                    
                                     Spacer()
                                 }
                                 .padding(.horizontal)
@@ -343,13 +243,8 @@ struct AppPickerView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .background(Color(NSColor.controlBackgroundColor).opacity(0.01))
                             .onHover { hovering in
-                                if hovering {
-                                    NSCursor.pointingHand.push()
-                                } else {
-                                    NSCursor.pop()
-                                }
+                                hovering ? NSCursor.pointingHand.push() : NSCursor.pop()
                             }
                         }
                     }
@@ -363,15 +258,12 @@ struct AppPickerView: View {
                 Text("\(filteredApps.count) application\(filteredApps.count == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
                 Spacer()
             }
             .padding()
         }
         .frame(width: 600, height: 500)
-        .onAppear {
-            loadAllApplications()
-        }
+        .onAppear { loadAllApplications() }
     }
     
     private func loadAllApplications() {
@@ -388,21 +280,15 @@ struct AppPickerView: View {
             
             for dir in applicationDirs {
                 guard let contents = try? fileManager.contentsOfDirectory(atPath: dir) else { continue }
-                
                 for item in contents where item.hasSuffix(".app") {
                     let appPath = (dir as NSString).appendingPathComponent(item)
                     let appURL = URL(fileURLWithPath: appPath)
-                    
                     guard let bundle = Bundle(url: appURL),
                           let bundleId = bundle.bundleIdentifier else { continue }
-                    
-                    let appName = bundle.infoDictionary?["CFBundleName"] as? String ??
-                                  bundle.infoDictionary?["CFBundleDisplayName"] as? String ??
-                                  appURL.deletingPathExtension().lastPathComponent
-                    
-                    let icon = NSWorkspace.shared.icon(forFile: appPath)
-                    
-                    apps.append((name: appName, bundleId: bundleId, icon: icon))
+                    let appName = bundle.infoDictionary?["CFBundleName"] as? String
+                        ?? bundle.infoDictionary?["CFBundleDisplayName"] as? String
+                        ?? appURL.deletingPathExtension().lastPathComponent
+                    apps.append((name: appName, bundleId: bundleId, icon: NSWorkspace.shared.icon(forFile: appPath)))
                 }
             }
             
@@ -411,22 +297,12 @@ struct AppPickerView: View {
             DispatchQueue.main.async {
                 self.allApps = apps
                 self.isLoading = false
-                print("📱 [AppPicker] Loaded \(apps.count) applications")
             }
         }
     }
 }
 
-struct ProviderConfig: Identifiable {
-    let id = UUID()
-    let type: String
-    let name: String
-    let description: String
-    var isEnabled: Bool
-    var displayMode: ProviderDisplayMode
-}
-
-// MARK: - Edit Favorite App View
+// MARK: - Edit Favourite App View
 
 struct EditFavoriteAppView: View {
     let app: FavoriteAppEntry
@@ -441,7 +317,6 @@ struct EditFavoriteAppView: View {
         self.app = app
         self.onSave = onSave
         self.onCancel = onCancel
-        
         _displayName = State(initialValue: app.displayName)
         _iconOverride = State(initialValue: app.iconOverride ?? "")
         _useCustomIcon = State(initialValue: app.iconOverride != nil)
@@ -467,9 +342,7 @@ struct EditFavoriteAppView: View {
                         
                         if !iconOverride.isEmpty {
                             HStack {
-                                Text("Preview:")
-                                    .foregroundColor(.secondary)
-                                
+                                Text("Preview:").foregroundColor(.secondary)
                                 if let image = NSImage(systemSymbolName: iconOverride, accessibilityDescription: nil) {
                                     Image(nsImage: image)
                                         .resizable()
@@ -490,11 +363,9 @@ struct EditFavoriteAppView: View {
             Spacer()
             
             HStack(spacing: 12) {
-                Button("Cancel") {
-                    onCancel()
-                }
-                .buttonStyle(.bordered)
-                .keyboardShortcut(.cancelAction)
+                Button("Cancel") { onCancel() }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut(.cancelAction)
                 
                 Button("Save") {
                     let finalIconOverride = useCustomIcon && !iconOverride.isEmpty ? iconOverride : nil
@@ -509,5 +380,3 @@ struct EditFavoriteAppView: View {
         .frame(width: 450, height: 350)
     }
 }
-
-
