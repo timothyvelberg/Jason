@@ -340,17 +340,13 @@ struct SettingsRow<Metadata: View>: View {
     private var actionButtons: some View {
         HStack(spacing: 8) {
             Button(action: onEdit) {
-                Image(systemName: "pencil.circle.fill")
-                    .font(.title3)
-                    .foregroundColor(.blue)
+                Image("context_actions_edit")
             }
             .buttonStyle(.borderless)
             .help("Edit")
-
+            
             Button(action: onDelete) {
-                Image(systemName: "trash.circle.fill")
-                    .font(.title3)
-                    .foregroundColor(.red)
+                Image("context_actions_delete")
             }
             .buttonStyle(.borderless)
             .help("Delete")
