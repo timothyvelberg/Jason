@@ -4,41 +4,93 @@
 //
 //  Shared structural components for settings list views.
 //  Provides a consistent layout shell and row template used by
-//  Apps, Folders, Snippets, and Instances settings views.
+//  Apps, Folders, Files, Snippets, Instances, Calendar, and Reminders.
 //
 
 import SwiftUI
 import AppKit
 
+// MARK: - Permission Support
+
+enum SettingsPermissionState {
+    case notDetermined
+    case authorized
+    case denied
+}
+
+struct SettingsPermissionConfig {
+    let state: SettingsPermissionState
+    let icon: String
+    let notDeterminedMessage: String
+    let deniedMessage: String
+    let onRequestAccess: () -> Void
+    let onOpenSettings: () -> Void
+}
+
 // MARK: - Settings List Shell
 
 /// Outer frame shared by all settings list views.
-/// Handles the page title, empty state, the list body, divider, and bottom toolbar.
+/// Handles the page title, optional permission gating, empty state,
+/// list body, divider, and bottom toolbar.
+///
+/// Permission: pass a `SettingsPermissionConfig` for views that require
+/// system access (Calendar, Reminders). When nil, no permission layer is shown.
 ///
 /// Note: reordering (.onMove) is handled inside the caller's ForEach, not here,
 /// since .onMove can only be applied to ForEach — not to a generic View.
 struct SettingsListShell<RowContent: View>: View {
-    
+
     // Page title — mirrors the active sidebar item label
     let title: String
-    
+
     // Empty state
     let emptyIcon: String
     let emptyTitle: String
     let emptySubtitle: String
-    
-    // Toolbar
+
+    // Toolbar — primaryIcon is optional (nil renders plain text button)
     let primaryLabel: String
+    let primaryIcon: String?
     let primaryAction: () -> Void
     let secondaryLabel: String?
     let secondaryAction: (() -> Void)?
-    
+
+    // Optional permission gating
+    let permission: SettingsPermissionConfig?
+
     // isEmpty must come before the @ViewBuilder rows closure
-    // so Swift can use rows as a trailing closure at the call site
     let isEmpty: Bool
-    
+
     @ViewBuilder let rows: () -> RowContent
-    
+
+    init(
+        title: String,
+        emptyIcon: String,
+        emptyTitle: String,
+        emptySubtitle: String = "",
+        primaryLabel: String,
+        primaryIcon: String? = "plus.circle.fill",
+        primaryAction: @escaping () -> Void,
+        secondaryLabel: String? = nil,
+        secondaryAction: (() -> Void)? = nil,
+        permission: SettingsPermissionConfig? = nil,
+        isEmpty: Bool,
+        @ViewBuilder rows: @escaping () -> RowContent
+    ) {
+        self.title = title
+        self.emptyIcon = emptyIcon
+        self.emptyTitle = emptyTitle
+        self.emptySubtitle = emptySubtitle
+        self.primaryLabel = primaryLabel
+        self.primaryIcon = primaryIcon
+        self.primaryAction = primaryAction
+        self.secondaryLabel = secondaryLabel
+        self.secondaryAction = secondaryAction
+        self.permission = permission
+        self.isEmpty = isEmpty
+        self.rows = rows
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -51,59 +103,101 @@ struct SettingsListShell<RowContent: View>: View {
             .padding(.horizontal)
             .padding(.top, 20)
             .padding(.bottom, 12)
-            
+
             Divider()
-            
-            if isEmpty {
+
+            // Content area
+            if let permission, permission.state != .authorized {
+                permissionView(permission)
+            } else if isEmpty {
                 emptyState
             } else {
-                List {
-                    rows()
-                }
-                .listStyle(.inset)
+                List { rows() }
+                    .listStyle(.inset)
             }
-            
+
             Divider()
-            
-            bottomToolbar
+
+            // Footer — hidden when permission not yet granted
+            if permission == nil || permission?.state == .authorized {
+                bottomToolbar
+            }
         }
     }
-    
+
     // MARK: - Subviews
-    
+
+    private func permissionView(_ config: SettingsPermissionConfig) -> some View {
+        VStack(spacing: 16) {
+            switch config.state {
+            case .notDetermined:
+                Image(systemName: config.icon)
+                    .font(.system(size: 48))
+                    .foregroundColor(.secondary)
+                Text(config.notDeterminedMessage)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+                Button("Grant Access", action: config.onRequestAccess)
+                    .buttonStyle(.borderedProminent)
+
+            case .denied:
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 48))
+                    .foregroundColor(.red)
+                Text(config.deniedMessage)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+                Button("Open Settings", action: config.onOpenSettings)
+                    .buttonStyle(.borderedProminent)
+
+            case .authorized:
+                EmptyView()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private var emptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: emptyIcon)
                 .font(.system(size: 48))
                 .foregroundColor(.secondary)
-            
             Text(emptyTitle)
                 .font(.headline)
                 .foregroundColor(.secondary)
-            
-            Text(emptySubtitle)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+            if !emptySubtitle.isEmpty {
+                Text(emptySubtitle)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    
+
     private var bottomToolbar: some View {
         HStack(spacing: 8) {
             Button(action: primaryAction) {
-                Label(primaryLabel, systemImage: "plus.circle.fill")
+                if let icon = primaryIcon {
+                    Label(primaryLabel, systemImage: icon)
+                } else {
+                    Text(primaryLabel)
+                }
             }
             .buttonStyle(.borderedProminent)
-            
+
             if let secondaryLabel, let secondaryAction {
                 Button(action: secondaryAction) {
                     Text(secondaryLabel)
                 }
                 .buttonStyle(.bordered)
             }
-            
+
             Spacer()
         }
         .padding()
@@ -113,7 +207,6 @@ struct SettingsListShell<RowContent: View>: View {
 // MARK: - View Helpers
 
 extension View {
-    /// Conditionally applies a transform to a view.
     @ViewBuilder
     func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
         if condition {
@@ -124,6 +217,7 @@ extension View {
     }
 }
 
+// MARK: - Shared Models
 
 /// Shared model used by EditRingView and settings views to represent a content provider.
 struct ProviderConfig: Identifiable {
@@ -137,7 +231,6 @@ struct ProviderConfig: Identifiable {
 
 // MARK: - Settings Row Icon
 
-/// Icon type for a settings row.
 enum SettingsRowIcon {
     case nsImage(NSImage)
     case systemSymbol(String, Color)
@@ -152,7 +245,7 @@ enum SettingsRowIcon {
 /// - `metadata`: labelled view slot for badges, counts, etc.
 /// - `onTap`: optional — used by Instances for tap-to-test
 struct SettingsRow<Metadata: View>: View {
-    
+
     let icon: SettingsRowIcon
     let title: String
     let subtitle: String
@@ -161,7 +254,9 @@ struct SettingsRow<Metadata: View>: View {
     let onDelete: () -> Void
     let onTap: (() -> Void)?
     let metadata: () -> Metadata
-    
+
+    @State private var isHovered = false
+
     init(
         icon: SettingsRowIcon,
         title: String,
@@ -181,45 +276,48 @@ struct SettingsRow<Metadata: View>: View {
         self.onTap = onTap
         self.metadata = metadata
     }
-    
+
     var body: some View {
         HStack(spacing: 12) {
-            
+
             if showDragHandle {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 14))
                     .foregroundColor(.secondary.opacity(0.5))
                     .help("Drag to reorder")
             }
-            
+
             rowIcon
                 .frame(width: 32, height: 32)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.body)
                     .fontWeight(.medium)
-                
+
                 Text(subtitle)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-            
+
             Spacer()
-            
+
             metadata()
-            
-            actionButtons
+
+            if isHovered {
+                actionButtons
+            }
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
         .if(onTap != nil) { view in
             view.onTapGesture { onTap?() }
         }
     }
-    
+
     @ViewBuilder
     private var rowIcon: some View {
         switch icon {
@@ -227,30 +325,32 @@ struct SettingsRow<Metadata: View>: View {
             Image(nsImage: image)
                 .resizable()
                 .scaledToFit()
-            
         case .systemSymbol(let name, let color):
             Image(systemName: name)
                 .font(.system(size: 20))
                 .foregroundColor(color)
                 .frame(width: 32, height: 32)
-            
         case .asset(let name):
             Image(name)
                 .resizable()
                 .scaledToFit()
         }
     }
-    
+
     private var actionButtons: some View {
         HStack(spacing: 8) {
             Button(action: onEdit) {
-                Image("context_actions_edit")
+                Image(systemName: "pencil.circle.fill")
+                    .font(.title3)
+                    .foregroundColor(.blue)
             }
             .buttonStyle(.borderless)
             .help("Edit")
-            
+
             Button(action: onDelete) {
-                Image("context_actions_delete")
+                Image(systemName: "trash.circle.fill")
+                    .font(.title3)
+                    .foregroundColor(.red)
             }
             .buttonStyle(.borderless)
             .help("Delete")
