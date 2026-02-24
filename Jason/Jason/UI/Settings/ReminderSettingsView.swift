@@ -175,7 +175,7 @@ struct RemindersSettingsView: View {
             // Bring the settings window back to front
             DispatchQueue.main.async {
                 NSApp.activate(ignoringOtherApps: true)
-                NSApp.windows.first(where: { $0.title == "Jason" })?.makeKeyAndOrderFront(nil)
+                NSApp.windows.first(where: { $0.title == "Jason Settings" })?.makeKeyAndOrderFront(nil)
             }
         }
     }

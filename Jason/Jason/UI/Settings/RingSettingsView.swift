@@ -61,7 +61,7 @@ struct RingsSettingsView: View {
                                 showingDeleteConfirmation = true
                             }
                         )
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+//                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         .contextMenu {
                             Button("Edit...") {
                                 activeSheet = SheetConfig(id: config.id, configuration: config)
@@ -86,7 +86,7 @@ struct RingsSettingsView: View {
                         }
                     }
                 }
-                .listStyle(.inset)
+//                .listStyle(.inset)
             }
             
             Divider()
@@ -187,7 +187,7 @@ struct RingConfigurationRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
                 Text(config.name)
                     .font(.body)
                     .fontWeight(.medium)
@@ -196,55 +196,41 @@ struct RingConfigurationRow: View {
                     Text(config.shortcutDescription)
                         .font(.caption)
                         .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.blue)
-                        .cornerRadius(4)
-                    
-                    Text("\(config.providerCount) provider(s)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .opacity(0.4)
                     
                     if !config.isActive {
                         Text("Inactive")
                             .font(.caption)
                             .foregroundColor(.orange)
-                            .padding(.horizontal, 6)
+                            .padding(.horizontal, 4)
                             .padding(.vertical, 2)
                             .background(Color.orange.opacity(0.2))
-                            .cornerRadius(3)
+                            .cornerRadius(4)
                     }
                 }
-            }
+            }.padding(.vertical,8)
             
             Spacer()
             
-            HStack(spacing: 8) {
-                Button(action: onTest) {
-                    Image(systemName: "play.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.green)
-                }
-                .buttonStyle(.borderless)
-                .help("Test instance")
-                
+            HStack(spacing: 16) {
                 Button(action: onEdit) {
-                    Image(systemName: "pencil.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.blue)
+                    Image("context_actions_edit")
                 }
                 .buttonStyle(.borderless)
                 .help("Edit instance")
                 
                 Button(action: onDelete) {
-                    Image(systemName: "trash.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.red)
+                    Image("context_actions_delete")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .help("Delete instance")
+                
             }
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTest()
+        }
     }
 }
