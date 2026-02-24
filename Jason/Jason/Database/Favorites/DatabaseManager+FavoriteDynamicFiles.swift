@@ -31,9 +31,9 @@ extension DatabaseManager {
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 while sqlite3_step(statement) == SQLITE_ROW {
                     let id = Int(sqlite3_column_int(statement, 0))
-                    let displayName = String(cString: sqlite3_column_text(statement, 1))
-                    let folderPath = String(cString: sqlite3_column_text(statement, 2))
-                    let sortOrderRaw = String(cString: sqlite3_column_text(statement, 3))
+                    let displayName = sqlite3_column_text(statement, 1).map { String(cString: $0) } ?? ""
+                    let folderPath = sqlite3_column_text(statement, 2).map { String(cString: $0) } ?? ""
+                    let sortOrderRaw = sqlite3_column_text(statement, 3).map { String(cString: $0) } ?? ""
                     let fileExtensions = sqlite3_column_text(statement, 4) != nil ? String(cString: sqlite3_column_text(statement, 4)) : nil
                     let namePattern = sqlite3_column_text(statement, 5) != nil ? String(cString: sqlite3_column_text(statement, 5)) : nil
                     let listSortOrder = Int(sqlite3_column_int(statement, 6))
@@ -242,9 +242,9 @@ extension DatabaseManager {
                 
                 if sqlite3_step(statement) == SQLITE_ROW {
                     let id = Int(sqlite3_column_int(statement, 0))
-                    let displayName = String(cString: sqlite3_column_text(statement, 1))
-                    let folderPath = String(cString: sqlite3_column_text(statement, 2))
-                    let sortOrderRaw = String(cString: sqlite3_column_text(statement, 3))
+                    let displayName = sqlite3_column_text(statement, 1).map { String(cString: $0) } ?? ""
+                    let folderPath = sqlite3_column_text(statement, 2).map { String(cString: $0) } ?? ""
+                    let sortOrderRaw = sqlite3_column_text(statement, 3).map { String(cString: $0) } ?? ""
                     let fileExtensions = sqlite3_column_text(statement, 4) != nil ? String(cString: sqlite3_column_text(statement, 4)) : nil
                     let namePattern = sqlite3_column_text(statement, 5) != nil ? String(cString: sqlite3_column_text(statement, 5)) : nil
                     let listSortOrder = Int(sqlite3_column_int(statement, 6))

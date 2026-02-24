@@ -15,10 +15,22 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case snippets = "Snippets"
     case calendar = "Calendar"
     case reminder = "Reminder"
-    
     case settings = "Settings"
     
     var id: String { rawValue }
+    
+    var icon: String {
+        switch self {
+        case .instance:  return "core_settings_menu_instance"
+        case .apps:      return "core_settings_menu_apps"
+        case .folders:   return "core_settings_menu_folders"
+        case .files:     return "core_settings_menu_files"
+        case .snippets:  return "core_settings_menu_snippets"
+        case .calendar:  return "core_settings_menu_calendar"
+        case .reminder:  return "core_settings_menu_reminders"
+        case .settings:  return "core_settings_menu_settings"
+        }
+    }
 }
 
 struct ContentSettingsView: View {
@@ -28,17 +40,34 @@ struct ContentSettingsView: View {
     private let instanceManager = CircularUIInstanceManager.shared
     
     var body: some View {
+        
         HStack(spacing: 0) {
-            // Sidebar
-            List(SettingsTab.allCases, selection: $selectedTab) { tab in
-                Text(tab.rawValue)
-                    .tag(tab)
+            List(selection: $selectedTab) {
+                Section {
+                    ForEach(SettingsTab.allCases) { tab in
+                        Label {
+                            Text(tab.rawValue)
+                                .font(.system(size: 14))
+                        } icon: {
+                            Image(tab.icon)
+                                .resizable()
+                                .frame(width: 16, height: 16)
+                        }
+                        .tag(tab)
+                    }
+                } header: {
+                    Image("core_logo")
+                        .resizable()
+                        .frame(width: 48, height: 48)
+                        .padding(.top, 48)
+                        .padding(.bottom, 16)
+                        .frame(maxWidth: .infinity)
+                }
             }
             .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
             .frame(width: 200)
-            
             Divider()
-            
             // Detail
             Group {
                 switch selectedTab {
