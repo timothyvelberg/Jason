@@ -339,20 +339,3 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         }
     }
 }
-
-// MARK: - Notification Names
-
-extension Notification.Name {
-    static let openSettingsWindow = Notification.Name("openSettingsWindow")
-}
-
-// Helper for opening settings to a specific tab
-extension Notification {
-    static func openSettings(tab: SettingsTab) {
-        NotificationCenter.default.post(
-            name: .openSettingsWindow,
-            object: nil,
-            userInfo: ["selectedTab": tab]
-        )
-    }
-}

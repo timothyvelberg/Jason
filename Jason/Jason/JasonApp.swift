@@ -191,3 +191,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 }
+
+extension NSApplication {
+    func relaunch() {
+        let url = Bundle.main.bundleURL
+        let task = Process()
+        task.launchPath = "/usr/bin/open"
+        task.arguments = [url.path]
+        task.launch()
+        terminate(nil)
+    }
+}

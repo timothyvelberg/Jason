@@ -81,3 +81,19 @@ extension NotificationCenter {
         postProviderUpdate(ProviderUpdateInfo(providerId: providerId, folderPath: folderPath))
     }
 }
+
+// MARK: - Settings Navigation
+
+extension Notification.Name {
+    static let openSettingsWindow = Notification.Name("openSettingsWindow")
+}
+
+extension Notification {
+    static func openSettings(tab: SettingsTab) {
+        NotificationCenter.default.post(
+            name: .openSettingsWindow,
+            object: nil,
+            userInfo: ["selectedTab": tab]
+        )
+    }
+}

@@ -103,11 +103,12 @@ class FirstLaunchConfiguration {
                     keyboardTrigger(keyCode: 2, modifiers: [.control, .shift])  // Ctrl+Shift+D
                 ],
                 providers: [
-                    (type: "FavoriteFolderProvider", order: 1, displayMode: "parent", angle: nil),
-                    (type: "RemindersProvider", order: 2, displayMode: "parent", angle: nil),
-                    (type: "ClipboardHistoryProvider", order: 3, displayMode: "parent", angle: nil),
-                    (type: "FavoriteFilesProvider", order: 4, displayMode: "parent", angle: nil),
-                    (type: "CalendarProvider", order: 5, displayMode: "parent", angle: nil)
+                    (type: "CombinedAppsProvider", order: 1, displayMode: "parent", angle: nil),
+                    (type: "FavoriteFolderProvider", order: 2, displayMode: "parent", angle: nil),
+                    (type: "RemindersProvider", order: 3, displayMode: "parent", angle: nil),
+                    (type: "ClipboardHistoryProvider", order: 4, displayMode: "parent", angle: nil),
+                    (type: "FavoriteFilesProvider", order: 5, displayMode: "parent", angle: nil),
+                    (type: "CalendarProvider", order: 6, displayMode: "parent", angle: nil)
                 ]
             )
             print("   Created '\(defaultConfig.name)' - \(defaultConfig.triggersSummary)")
