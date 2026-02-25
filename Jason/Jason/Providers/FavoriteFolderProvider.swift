@@ -56,9 +56,37 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         
         // If no favorites in database, add defaults
         if favoritesFromDB.isEmpty {
-            print("📁 [FavoriteFolderProvider] No favorites found - adding defaults")
-            addDefaultFavorites()
-            return provideFunctions() // Recurse once after adding defaults
+            return [FunctionNode(
+                id: "favorite-folders-section",
+                name: "Folders",
+                type: .category,
+                icon: NSImage(named: "parent-folders") ?? NSImage(),
+                children: [
+                    FunctionNode(
+                        id: "favorite-folders-empty",
+                        name: "Add Favourite Folders",
+                        type: .action,
+                        icon: NSImage(systemSymbolName: "folder.badge.plus", accessibilityDescription: nil) ?? NSImage(),
+                        preferredLayout: .partialSlice,
+                        showLabel: true,
+                        slicePositioning: .center,
+                        providerId: providerId,
+                        onLeftClick: ModifierAwareInteraction(base: .execute {
+                            AppDelegate.shared?.openSettings(tab: .folders)
+                        }),
+                        onRightClick: ModifierAwareInteraction(base: .doNothing),
+                        onBoundaryCross: ModifierAwareInteraction(base: .execute {
+                            AppDelegate.shared?.openSettings(tab: .folders)
+                        })
+                    )
+                ],
+                preferredLayout: .partialSlice,
+                slicePositioning: .center,
+                providerId: providerId,
+                onLeftClick: ModifierAwareInteraction(base: .doNothing),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .expand)
+            )]
         }
         
         let favoriteChildren = favoritesFromDB.map { (folder, settings) in
@@ -719,64 +747,6 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             onBoundaryCross: ModifierAwareInteraction(base: .navigateInto)
         )
     }
-    
-    private func addDefaultFavorites() {
-        // Downloads
-        if let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
-            let settings = FavoriteFolderSettings(
-                maxItems: nil,
-                preferredLayout: nil,
-                itemAngleSize: nil,
-                slicePositioning: nil,
-                childRingThickness: nil,
-                childIconSize: nil,
-                contentSortOrder: .addedNewest
-            )
-            _ = DatabaseManager.shared.addFavoriteFolder(
-                path: downloadsURL.path,
-                title: "Downloads",
-                settings: settings
-            )
-        }
-        
-        // Desktop
-        if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
-            let settings = FavoriteFolderSettings(
-                maxItems: nil,
-                preferredLayout: nil,
-                itemAngleSize: nil,
-                slicePositioning: nil,
-                childRingThickness: nil,
-                childIconSize: nil,
-                contentSortOrder: .addedNewest
-            )
-            _ = DatabaseManager.shared.addFavoriteFolder(
-                path: desktopURL.path,
-                title: "Desktop",
-                settings: settings
-            )        }
-        
-        // Documents (folder only, no dynamic file)
-        if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let settings = FavoriteFolderSettings(
-                maxItems: nil,
-                preferredLayout: nil,
-                itemAngleSize: nil,
-                slicePositioning: nil,
-                childRingThickness: nil,
-                childIconSize: nil,
-                contentSortOrder: .modifiedNewest
-            )
-            _ = DatabaseManager.shared.addFavoriteFolder(
-                path: documentsURL.path,
-                title: "Documents",
-                settings: settings
-            )
-        }
-        
-        print("✅ [FavoriteFilesProvider] Added default favorites (Downloads + Desktop + Documents)")
-    }
-    
     // MARK: - Enhanced Cache Helpers
     
     private func convertToEnhancedFolderItems(nodes: [FunctionNode], folderURL: URL) -> [EnhancedFolderItem] {

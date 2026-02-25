@@ -248,11 +248,11 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
             slicePositioning: .center,
             providerId: providerId,
             onLeftClick: ModifierAwareInteraction(base: .execute {
-                Notification.openSettings(tab: .reminder)
+                AppDelegate.shared?.openSettings(tab: .reminder)
             }),
             onRightClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .execute {
-                Notification.openSettings(tab: .reminder)
+                AppDelegate.shared?.openSettings(tab: .reminder)
             })
         )
     }

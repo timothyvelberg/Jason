@@ -11,11 +11,12 @@ import AppKit
 struct FavoriteFilesSettingsView: View {
     @State private var staticFiles: [FavoriteFileEntry] = []
     @State private var dynamicFiles: [FavoriteDynamicFileEntry] = []
-    
+
+    @State private var showingFilePicker = false
     @State private var showingDynamicFileCreator = false
     @State private var editingStaticFile: FavoriteFileEntry?
     @State private var editingDynamicFile: FavoriteDynamicFileEntry?
-    
+
     private var allEntries: [(id: String, entry: Any, listSortOrder: Int, isStatic: Bool)] {
         var combined: [(id: String, entry: Any, listSortOrder: Int, isStatic: Bool)] = []
         for file in staticFiles {
@@ -26,7 +27,7 @@ struct FavoriteFilesSettingsView: View {
         }
         return combined.sorted { $0.listSortOrder < $1.listSortOrder }
     }
-    
+
     var body: some View {
         SettingsListShell(
             title: "Files",
@@ -34,9 +35,9 @@ struct FavoriteFilesSettingsView: View {
             emptyTitle: "No favourite files yet",
             emptySubtitle: "Add static files or create dynamic file rules",
             primaryLabel: "Add File",
-            primaryAction: showFilePicker,
-            secondaryLabel: "Add Rule",
-            secondaryAction: { showingDynamicFileCreator = true },
+            primaryAction: { showingFilePicker = true },
+            secondaryLabel: nil,
+            secondaryAction: nil,
             isEmpty: allEntries.isEmpty
         ) {
             ForEach(Array(allEntries.enumerated()), id: \.element.id) { _, item in
@@ -59,6 +60,21 @@ struct FavoriteFilesSettingsView: View {
             .onMove(perform: moveFile)
         }
         .onAppear { loadFavoriteFiles() }
+        .sheet(isPresented: $showingFilePicker) {
+            FilePickerView(
+                onFileSelected: { path in
+                    addStaticFile(path: path)
+                    showingFilePicker = false
+                },
+                onAddDynamic: {
+                    showingFilePicker = false
+                    // Small delay so the first sheet fully dismisses before the second presents
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showingDynamicFileCreator = true
+                    }
+                }
+            )
+        }
         .sheet(isPresented: $showingDynamicFileCreator) {
             AddDynamicFileView(
                 onSave: { displayName, folderPath, sortOrder, extensions, pattern in
@@ -89,46 +105,35 @@ struct FavoriteFilesSettingsView: View {
             )
         }
     }
-    
+
     // MARK: - Actions
-    
+
     private func loadFavoriteFiles() {
         staticFiles = DatabaseManager.shared.getFavoriteFiles()
         dynamicFiles = DatabaseManager.shared.getFavoriteDynamicFiles()
     }
-    
-    private func showFilePicker() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.message = "Select a file to add to favourites"
-        if panel.runModal() == .OK, let url = panel.url {
-            addStaticFile(path: url.path)
-        }
-    }
-    
+
     private func addStaticFile(path: String) {
         if DatabaseManager.shared.addFavoriteFile(path: path, displayName: nil, iconData: nil) {
             loadFavoriteFiles()
             notifyProvider()
         }
     }
-    
+
     private func addDynamicFile(displayName: String, folderPath: String, sortOrder: FolderSortOrder, extensions: String?, pattern: String?) {
         if DatabaseManager.shared.addFavoriteDynamicFile(displayName: displayName, folderPath: folderPath, sortOrder: sortOrder, fileExtensions: extensions, namePattern: pattern, iconData: nil) {
             loadFavoriteFiles()
             notifyProvider()
         }
     }
-    
+
     private func removeStaticFile(_ file: FavoriteFileEntry) {
         if DatabaseManager.shared.removeFavoriteFile(path: file.path) {
             loadFavoriteFiles()
             notifyProvider()
         }
     }
-    
+
     private func removeDynamicFile(_ file: FavoriteDynamicFileEntry) {
         guard let id = file.id else { return }
         if DatabaseManager.shared.removeFavoriteDynamicFile(id: id) {
@@ -138,14 +143,14 @@ struct FavoriteFilesSettingsView: View {
             notifyProvider()
         }
     }
-    
+
     private func updateStaticFile(_ file: FavoriteFileEntry, displayName: String?, iconData: Data?) {
         if DatabaseManager.shared.updateFavoriteFile(path: file.path, displayName: displayName, iconData: iconData) {
             loadFavoriteFiles()
             notifyProvider()
         }
     }
-    
+
     private func updateDynamicFile(_ file: FavoriteDynamicFileEntry, displayName: String, folderPath: String, sortOrder: FolderSortOrder, extensions: String?, pattern: String?, iconData: Data?) {
         guard let id = file.id else { return }
         if DatabaseManager.shared.updateFavoriteDynamicFile(id: id, displayName: displayName, folderPath: folderPath, sortOrder: sortOrder, fileExtensions: extensions, namePattern: pattern, iconData: iconData) {
@@ -153,7 +158,7 @@ struct FavoriteFilesSettingsView: View {
             notifyProvider()
         }
     }
-    
+
     private func moveFile(from source: IndexSet, to destination: Int) {
         guard let sourceIndex = source.first else { return }
         var entries = allEntries
@@ -170,9 +175,144 @@ struct FavoriteFilesSettingsView: View {
         loadFavoriteFiles()
         notifyProvider()
     }
-    
+
     private func notifyProvider() {
         NotificationCenter.default.postProviderUpdate(providerId: "favorite-files")
+    }
+}
+
+// MARK: - File Picker View
+
+struct FilePickerView: View {
+    let onFileSelected: (String) -> Void
+    let onAddDynamic: () -> Void
+    @Environment(\.dismiss) var dismiss
+
+    @State private var pathInput: String = ""
+    @State private var pathError: String? = nil
+
+    var body: some View {
+        VStack(spacing: 0) {
+
+            // Header
+            HStack {
+                Text("Add a File")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+
+            Divider()
+
+            // Body
+            VStack(alignment: .leading, spacing: 20) {
+
+                // Browse for a static file
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Add File")
+                        .font(.headline)
+                    Text("Open a Finder dialog to pick a file. It is added immediately on selection.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Button("Open Finder…") {
+                        browseForFile()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+
+                Divider()
+
+                // Add a dynamic file rule
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Add Dynamic File")
+                        .font(.headline)
+                    Text("Create a rule that always resolves to the newest, oldest, or largest file matching your criteria.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Button("Add Dynamic File…") {
+                        onAddDynamic()
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Divider()
+
+                // Paste a path manually (always static)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Paste a path")
+                        .font(.headline)
+                    Text("Paste or type an absolute file path, then tap Add. Always added as a static file.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 8) {
+                        TextField("/Users/you/Documents/report.pdf", text: $pathInput)
+                            .textFieldStyle(.roundedBorder)
+                            .onChange(of: pathInput) { _ in pathError = nil }
+
+                        Button("Add") {
+                            submitPath()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(pathInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+
+                    if let error = pathError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer()
+
+            Divider()
+
+            // Footer
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut(.cancelAction)
+            }
+            .padding()
+        }
+        .frame(width: 500, height: 420)
+    }
+
+    // MARK: - Actions
+
+    private func browseForFile() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Add File"
+        if panel.runModal() == .OK, let url = panel.url {
+            onFileSelected(url.path)
+        }
+    }
+
+    private func submitPath() {
+        let path = pathInput.trimmingCharacters(in: .whitespaces)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), !isDirectory.boolValue else {
+            pathError = isDirectory.boolValue
+                ? "Path points to a folder, not a file."
+                : "File does not exist at this path."
+            return
+        }
+        onFileSelected(path)
     }
 }
 
@@ -182,10 +322,10 @@ private struct StaticFileRow: View {
     let file: FavoriteFileEntry
     let onEdit: () -> Void
     let onDelete: () -> Void
-    
+
     @State private var fileIcon: NSImage?
     @State private var fileExists = true
-    
+
     var body: some View {
         SettingsRow(
             icon: fileIcon.map { .nsImage($0) },
@@ -228,11 +368,11 @@ private struct StaticFileRow: View {
             fileExists = FileManager.default.fileExists(atPath: file.path)
         }
     }
-    
+
     private var titleText: String {
         file.displayName ?? URL(fileURLWithPath: file.path).lastPathComponent
     }
-    
+
     private func formatDate(_ timestamp: Int) -> String {
         let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
         let formatter = RelativeDateTimeFormatter()
@@ -247,10 +387,10 @@ private struct DynamicFileRow: View {
     let file: FavoriteDynamicFileEntry
     let onEdit: () -> Void
     let onDelete: () -> Void
-    
+
     @State private var fileIcon: NSImage?
     @State private var resolvedFileName: String?
-    
+
     var body: some View {
         SettingsRow(
             title: file.displayName,
@@ -283,15 +423,15 @@ private struct DynamicFileRow: View {
         )
         .onAppear { resolveFile() }
     }
-    
+
     private var subtitleText: String {
         if let resolved = resolvedFileName {
-            return "\(file.sortOrder.displayName)"
+            return "\(file.sortOrder.displayName) • \(resolved)"
         } else {
             return "\(file.sortOrder.displayName) • No file found"
         }
     }
-    
+
     private func resolveFile() {
         DispatchQueue.global(qos: .userInitiated).async {
             let folderURL = URL(fileURLWithPath: file.folderPath)
@@ -300,18 +440,18 @@ private struct DynamicFileRow: View {
                 includingPropertiesForKeys: [.contentModificationDateKey, .creationDateKey, .fileSizeKey],
                 options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
             ) else { return }
-            
+
             var files = contents.filter {
                 (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == false
             }
-            
+
             if let extensions = file.fileExtensions, !extensions.isEmpty {
                 let extArray = extensions.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces).lowercased() }
                 files = files.filter { extArray.contains($0.pathExtension.lowercased()) }
             }
-            
+
             let sortedFiles = FolderSortingUtility.sortURLs(files, by: file.sortOrder)
-            
+
             if let firstFile = sortedFiles.first {
                 DispatchQueue.main.async {
                     self.resolvedFileName = firstFile.lastPathComponent
@@ -320,7 +460,7 @@ private struct DynamicFileRow: View {
             }
         }
     }
-    
+
     private func formatDate(_ timestamp: Int) -> String {
         let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
         let formatter = RelativeDateTimeFormatter()
@@ -334,7 +474,7 @@ private struct DynamicFileRow: View {
 struct AddDynamicFileView: View {
     let onSave: (String, String, FolderSortOrder, String?, String?) -> Void
     let onCancel: () -> Void
-    
+
     @State private var displayName: String = ""
     @State private var folderPath: String = ""
     @State private var sortOrder: FolderSortOrder = .addedNewest
@@ -342,19 +482,19 @@ struct AddDynamicFileView: View {
     @State private var namePattern: String = ""
     @State private var useExtensionFilter = false
     @State private var useNamePattern = false
-    
+
     private let sortOptions: [FolderSortOrder] = [
         .addedNewest, .addedOldest, .modifiedNewest, .modifiedOldest,
         .createdNewest, .createdOldest, .sizeDescending, .sizeAscending,
         .alphabeticalAsc, .alphabeticalDesc
     ]
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Text("Add Dynamic File Rule")
                 .font(.title2)
                 .fontWeight(.semibold)
-            
+
             Form {
                 Section {
                     TextField("Display Name", text: $displayName)
@@ -383,9 +523,9 @@ struct AddDynamicFileView: View {
                 }
             }
             .formStyle(.grouped)
-            
+
             Spacer()
-            
+
             HStack(spacing: 12) {
                 Button("Cancel") { onCancel() }
                     .buttonStyle(.bordered)
@@ -403,7 +543,7 @@ struct AddDynamicFileView: View {
         .padding()
         .frame(width: 500, height: 500)
     }
-    
+
     private func showFolderPicker() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -422,10 +562,10 @@ struct EditFavoriteFileView: View {
     let file: FavoriteFileEntry
     let onSave: (String?, Data?) -> Void
     let onCancel: () -> Void
-    
+
     @State private var displayName: String
     @State private var useCustomName: Bool
-    
+
     init(file: FavoriteFileEntry, onSave: @escaping (String?, Data?) -> Void, onCancel: @escaping () -> Void) {
         self.file = file
         self.onSave = onSave
@@ -434,13 +574,13 @@ struct EditFavoriteFileView: View {
         _displayName = State(initialValue: file.displayName ?? fileName)
         _useCustomName = State(initialValue: file.displayName != nil)
     }
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Text("Edit Favourite File")
                 .font(.title2)
                 .fontWeight(.semibold)
-            
+
             Form {
                 Section {
                     Text(file.path)
@@ -456,9 +596,9 @@ struct EditFavoriteFileView: View {
                 }
             }
             .formStyle(.grouped)
-            
+
             Spacer()
-            
+
             HStack(spacing: 12) {
                 Button("Cancel") { onCancel() }
                     .buttonStyle(.bordered)
@@ -482,7 +622,7 @@ struct EditFavoriteDynamicFileView: View {
     let file: FavoriteDynamicFileEntry
     let onSave: (String, String, FolderSortOrder, String?, String?, Data?) -> Void
     let onCancel: () -> Void
-    
+
     @State private var displayName: String
     @State private var folderPath: String
     @State private var sortOrder: FolderSortOrder
@@ -490,13 +630,13 @@ struct EditFavoriteDynamicFileView: View {
     @State private var namePattern: String
     @State private var useExtensionFilter: Bool
     @State private var useNamePattern: Bool
-    
+
     private let sortOptions: [FolderSortOrder] = [
         .addedNewest, .addedOldest, .modifiedNewest, .modifiedOldest,
         .createdNewest, .createdOldest, .sizeDescending, .sizeAscending,
         .alphabeticalAsc, .alphabeticalDesc
     ]
-    
+
     init(file: FavoriteDynamicFileEntry, onSave: @escaping (String, String, FolderSortOrder, String?, String?, Data?) -> Void, onCancel: @escaping () -> Void) {
         self.file = file
         self.onSave = onSave
@@ -509,13 +649,13 @@ struct EditFavoriteDynamicFileView: View {
         _useExtensionFilter = State(initialValue: file.fileExtensions != nil)
         _useNamePattern = State(initialValue: file.namePattern != nil)
     }
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Text("Edit Dynamic File Rule")
                 .font(.title2)
                 .fontWeight(.semibold)
-            
+
             Form {
                 Section {
                     TextField("Display Name", text: $displayName)
@@ -543,9 +683,9 @@ struct EditFavoriteDynamicFileView: View {
                 }
             }
             .formStyle(.grouped)
-            
+
             Spacer()
-            
+
             HStack(spacing: 12) {
                 Button("Cancel") { onCancel() }
                     .buttonStyle(.bordered)
@@ -564,7 +704,7 @@ struct EditFavoriteDynamicFileView: View {
         .padding()
         .frame(width: 500, height: 500)
     }
-    
+
     private func showFolderPicker() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false

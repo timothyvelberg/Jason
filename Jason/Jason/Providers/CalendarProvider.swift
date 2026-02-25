@@ -280,11 +280,11 @@ class CalendarProvider: ObservableObject, FunctionProvider {
             slicePositioning: .center,
             providerId: providerId,
             onLeftClick: ModifierAwareInteraction(base: .execute {
-                Notification.openSettings(tab: .calendar)
+                AppDelegate.shared?.openSettings(tab: .calendar)
             }),
             onRightClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .execute {
-                Notification.openSettings(tab: .calendar)
+                AppDelegate.shared?.openSettings(tab: .calendar)
             })
         )
     }

@@ -22,6 +22,10 @@ struct JasonApp: App {
 
 // App Delegate to handle keyboard events and menu bar
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    
+    static weak var shared: AppDelegate?
+
+    private var pendingSettingsTab: SettingsTab?
     var keyMonitor: Any?
     var statusItem: NSStatusItem?
     var contentWindow: NSWindow?
@@ -29,6 +33,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         
+        AppDelegate.shared = self
+        
+
         ClipboardManager.shared.startMonitoring()
         
         // Run ALL database operations sequentially on main thread
@@ -132,18 +139,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if window.isVisible {
             print("[Hiding Window] Switching to accessory mode")
             window.orderOut(nil)
-            NSApp.setActivationPolicy(.accessory)  // Remove dock icon
+            NSApp.setActivationPolicy(.accessory)
         } else {
             print("[Show Window] Switching to regular mode")
             
-            // Switch to regular app mode (shows dock icon & app switcher)
-            NSApp.setActivationPolicy(.regular)  // Show dock icon
-            
-            // Center window on screen
-            window.center()
-            
-            window.makeKeyAndOrderFront(nil)
+            // Activate the app first so the window becomes properly key
+            NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)
+            
+            // Then bring the window forward
+            window.center()
+            window.makeKeyAndOrderFront(nil)
         }
     }
     
@@ -163,5 +169,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         print("[Window Closing] Switching back to accessory mode")
         NSApp.setActivationPolicy(.accessory)
+    }
+    
+    func openSettings(tab: SettingsTab) {
+        DispatchQueue.main.async {
+            if !(self.contentWindow?.isVisible ?? false) {
+                self.pendingSettingsTab = tab
+                self.toggleContentWindow()
+            } else {
+                Notification.openSettings(tab: tab)
+            }
+        }
+    }
+    
+    func windowDidBecomeKey(_ notification: Notification) {
+        if let tab = pendingSettingsTab {
+            pendingSettingsTab = nil
+            DispatchQueue.main.async {
+                Notification.openSettings(tab: tab)
+            }
+        }
     }
 }

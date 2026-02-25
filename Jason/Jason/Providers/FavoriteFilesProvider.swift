@@ -66,9 +66,8 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         
         // If no favorites at all, add defaults and reload once
         if staticFiles.isEmpty && dynamicFiles.isEmpty {
-            print("📋 [FavoriteFiles] No favorites found - adding defaults")
-            addDefaultFavorites()
-            loadFiles()
+            print("📋 [FavoriteFiles] No favorites found - showing placeholder")
+            fileEntries = []
             return
         }
         
@@ -414,16 +413,37 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         if fileNodes.isEmpty {
             return [
                 FunctionNode(
-                    id: "no-favorite-files",
-                    name: "No Favorite Files",
-                    type: .action,
-                    icon: NSImage(systemSymbolName: "star.slash", accessibilityDescription: nil) ?? NSImage(),
+                    id: providerId,
+                    name: providerName,
+                    type: .category,
+                    icon: providerIcon,
+                    children: [
+                        FunctionNode(
+                            id: "favorite-files-empty",
+                            name: "Add Favourite Files",
+                            type: .action,
+                            icon: NSImage(systemSymbolName: "doc.badge.plus", accessibilityDescription: nil) ?? NSImage(),
+                            preferredLayout: .partialSlice,
+                            showLabel: true,
+                            slicePositioning: .center,
+                            providerId: providerId,
+                            onLeftClick: ModifierAwareInteraction(base: .execute {
+                                AppDelegate.shared?.openSettings(tab: .files)
+                            }),
+                            onRightClick: ModifierAwareInteraction(base: .doNothing),
+                            onBoundaryCross: ModifierAwareInteraction(base: .execute {
+                                AppDelegate.shared?.openSettings(tab: .files)
+                            })
+                        )
+                    ],
+                    childDisplayMode: .panel,
                     preferredLayout: .partialSlice,
+                    slicePositioning: .center,
                     providerId: providerId,
                     onLeftClick: ModifierAwareInteraction(base: .doNothing),
                     onRightClick: ModifierAwareInteraction(base: .doNothing),
                     onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                    onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+                    onBoundaryCross: ModifierAwareInteraction(base: .expand)
                 )
             ]
         }
@@ -663,32 +683,6 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         case .addedNewest:    return (true, \.dateAdded)
         default:              return (false, nil)
         }
-    }
-    
-    private func addDefaultFavorites() {
-        if let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first {
-            _ = DatabaseManager.shared.addFavoriteDynamicFile(
-                displayName: "Downloads",
-                folderPath: downloadsURL.path,
-                sortOrder: .addedNewest,
-                fileExtensions: nil,
-                namePattern: nil,
-                iconData: nil
-            )
-        }
-        
-        if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
-            _ = DatabaseManager.shared.addFavoriteDynamicFile(
-                displayName: "Desktop",
-                folderPath: desktopURL.path,
-                sortOrder: .addedNewest,
-                fileExtensions: nil,
-                namePattern: nil,
-                iconData: nil
-            )
-        }
-        
-        print("✅ [FavoriteFilesProvider] Added default dynamic favorites (Downloads + Desktop)")
     }
     
     func refresh() {
