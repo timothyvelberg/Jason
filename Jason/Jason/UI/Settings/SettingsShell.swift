@@ -113,7 +113,7 @@ struct SettingsListShell<RowContent: View>: View {
                 emptyState
             } else {
                 List { rows() }
-                    .listStyle(.inset)
+                    .listStyle(.plain)
             }
 
             Divider()
@@ -246,9 +246,9 @@ enum SettingsRowIcon {
 /// - `onTap`: optional — used by Instances for tap-to-test
 struct SettingsRow<Metadata: View>: View {
 
-    let icon: SettingsRowIcon
+    let icon: SettingsRowIcon?
     let title: String
-    let subtitle: String
+    let subtitle: String?
     let showDragHandle: Bool
     let onEdit: () -> Void
     let onDelete: () -> Void
@@ -258,9 +258,9 @@ struct SettingsRow<Metadata: View>: View {
     @State private var isHovered = false
 
     init(
-        icon: SettingsRowIcon,
+        icon: SettingsRowIcon? = nil,
         title: String,
-        subtitle: String,
+        subtitle: String? = nil,
         showDragHandle: Bool = true,
         onEdit: @escaping () -> Void,
         onDelete: @escaping () -> Void,
@@ -278,53 +278,66 @@ struct SettingsRow<Metadata: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
 
-            if showDragHandle {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary.opacity(0.5))
-                    .help("Drag to reorder")
+                if showDragHandle {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary.opacity(0.5))
+                        .help("Drag to reorder")
+                }
+
+                if let icon {
+                    rowIcon(icon)
+                }
+
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(.body)
+                        .fontWeight(.medium)
+
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                .padding(.vertical, 2)
+
+                Spacer()
+
+                metadata()
+
+                if isHovered {
+                    actionButtons
+                }
             }
-
-            rowIcon
-                .frame(width: 32, height: 32)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.body)
-                    .fontWeight(.medium)
-
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
-            Spacer()
-
-            metadata()
-
-            if isHovered {
-                actionButtons
-            }
+            .padding(.vertical, 16)
+            .padding(.horizontal, 8)
+            
+            Divider()
+                .padding(.horizontal, -8)
         }
-        .padding(.vertical, 4)
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .if(onTap != nil) { view in
             view.onTapGesture { onTap?() }
         }
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
     }
 
     @ViewBuilder
-    private var rowIcon: some View {
+    private func rowIcon(_ icon: SettingsRowIcon) -> some View {
         switch icon {
         case .nsImage(let image):
             Image(nsImage: image)
                 .resizable()
                 .scaledToFit()
+                .frame(width: 18, height: 18)
         case .systemSymbol(let name, let color):
             Image(systemName: name)
                 .font(.system(size: 20))
@@ -334,6 +347,7 @@ struct SettingsRow<Metadata: View>: View {
             Image(name)
                 .resizable()
                 .scaledToFit()
+                .frame(width: 18, height: 18)
         }
     }
 
@@ -344,7 +358,7 @@ struct SettingsRow<Metadata: View>: View {
             }
             .buttonStyle(.borderless)
             .help("Edit")
-            
+
             Button(action: onDelete) {
                 Image("context_actions_delete")
             }

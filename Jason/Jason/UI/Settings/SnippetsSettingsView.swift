@@ -100,9 +100,8 @@ private struct SnippetRow: View {
     
     var body: some View {
         SettingsRow(
-            icon: .systemSymbol("pencil.line", .blue),
             title: snippet.title,
-            subtitle: snippet.content,
+            subtitle: "Pasting: \(snippet.content)",
             showDragHandle: true,
             onEdit: onEdit,
             onDelete: onDelete,

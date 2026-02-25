@@ -105,7 +105,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         
         // Create window with size appropriate for settings interface
         contentWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 480),
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 480),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false

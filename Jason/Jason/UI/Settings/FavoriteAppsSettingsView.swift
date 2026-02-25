@@ -115,7 +115,6 @@ private struct AppRow: View {
         SettingsRow(
             icon: appIcon.map { .nsImage($0) } ?? .systemSymbol("app.fill", .secondary),
             title: app.displayName,
-            subtitle: app.bundleIdentifier,
             showDragHandle: true,
             onEdit: onEdit,
             onDelete: onDelete,

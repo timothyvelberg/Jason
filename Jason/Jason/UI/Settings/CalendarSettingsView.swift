@@ -62,15 +62,31 @@ struct CalendarSettingsView: View {
             ),
             isEmpty: sources.isEmpty
         ) {
-            ForEach(sources) { source in
-                Section(header: Text(source.name)) {
-                    ForEach(source.calendars) { calendar in
-                        CalendarToggleRow(
-                            calendar: calendar,
-                            isEnabled: enabledCalendarIDs.contains(calendar.id),
-                            onToggle: { toggleCalendar(id: calendar.id, enabled: $0) }
-                        )
+            ForEach(Array(sources.enumerated()), id: \.element.id) { index, source in
+                // Header row
+                VStack(spacing: 4) {
+                    if index > 0 {
+                        Divider()
+                            .padding(.horizontal, -8)
                     }
+                    Text(source.name)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 4)
+                    Divider()
+                        .padding(.horizontal, -8)
+                }
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets())
+
+                // Calendar rows
+                ForEach(source.calendars) { calendar in
+                    CalendarToggleRow(
+                        calendar: calendar,
+                        isEnabled: enabledCalendarIDs.contains(calendar.id),
+                        onToggle: { toggleCalendar(id: calendar.id, enabled: $0) }
+                    )
                 }
             }
         }
@@ -188,7 +204,7 @@ struct CalendarToggleRow: View {
                 Text(calendar.typeName)
                     .font(.caption)
                     .foregroundColor(.secondary)
-            }
+            }.padding(.vertical, 4)
 
             Spacer()
 
@@ -197,5 +213,6 @@ struct CalendarToggleRow: View {
                 .labelsHidden()
         }
         .padding(.vertical, 2)
+        .listRowSeparator(.hidden)
     }
 }

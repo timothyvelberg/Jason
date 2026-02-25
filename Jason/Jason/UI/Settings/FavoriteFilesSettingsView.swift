@@ -188,7 +188,7 @@ private struct StaticFileRow: View {
     
     var body: some View {
         SettingsRow(
-            icon: fileIcon.map { .nsImage($0) } ?? .systemSymbol("doc.fill", .secondary),
+            icon: fileIcon.map { .nsImage($0) },
             title: titleText,
             subtitle: file.path,
             showDragHandle: true,
@@ -253,7 +253,6 @@ private struct DynamicFileRow: View {
     
     var body: some View {
         SettingsRow(
-            icon: fileIcon.map { .nsImage($0) } ?? .systemSymbol("wand.and.stars", .purple),
             title: file.displayName,
             subtitle: subtitleText,
             showDragHandle: true,
@@ -286,11 +285,10 @@ private struct DynamicFileRow: View {
     }
     
     private var subtitleText: String {
-        let folderName = URL(fileURLWithPath: file.folderPath).lastPathComponent
         if let resolved = resolvedFileName {
-            return "\(folderName) • \(file.sortOrder.displayName) → \(resolved)"
+            return "\(file.sortOrder.displayName)"
         } else {
-            return "\(folderName) • \(file.sortOrder.displayName) • No file found"
+            return "\(file.sortOrder.displayName) • No file found"
         }
     }
     

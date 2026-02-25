@@ -62,15 +62,31 @@ struct RemindersSettingsView: View {
             ),
             isEmpty: sources.isEmpty
         ) {
-            ForEach(sources) { source in
-                Section(header: Text(source.name)) {
-                    ForEach(source.lists) { list in
-                        ReminderListToggleRow(
-                            list: list,
-                            isEnabled: enabledListIDs.contains(list.id),
-                            onToggle: { toggleList(id: list.id, enabled: $0) }
-                        )
+            ForEach(Array(sources.enumerated()), id: \.element.id) { index, source in
+                // Header row
+                VStack(spacing: 4) {
+                    if index > 0 {
+                        Divider()
+                            .padding(.horizontal, -8)
                     }
+                    Text(source.name)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 4)
+                    Divider()
+                        .padding(.horizontal, -8)
+                }
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets())
+
+                // Reminder list rows
+                ForEach(source.lists) { list in
+                    ReminderListToggleRow(
+                        list: list,
+                        isEnabled: enabledListIDs.contains(list.id),
+                        onToggle: { toggleList(id: list.id, enabled: $0) }
+                    )
                 }
             }
         }
@@ -196,5 +212,6 @@ struct ReminderListToggleRow: View {
                 .labelsHidden()
         }
         .padding(.vertical, 2)
+        .listRowSeparator(.hidden)
     }
 }
