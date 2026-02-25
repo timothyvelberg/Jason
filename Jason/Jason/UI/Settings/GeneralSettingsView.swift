@@ -62,6 +62,9 @@ struct GeneralSettingsView: View {
         } message: {
             Text("Accessibility access has been granted. Jason needs to restart to activate hotkey monitoring.")
         }
+        .onAppear {
+            permissionManager.update()
+        }
     }
 
     // MARK: - Accessibility Card
