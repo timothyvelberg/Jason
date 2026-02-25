@@ -5,7 +5,22 @@
         <description>Latest Jason updates</description>
         <language>en</language>
         
-        <!-- Latest release v0.0.4 -->
+        <!-- Latest release v0.0.5 -->
+        <item>
+            <title>Version 0.0.5</title>
+            <description>First time users experience</description>
+            <pubDate>Wed, 35 Feb 2026 18:22:00 +0000</pubDate>
+            <sparkle:version>5</sparkle:version>
+            <sparkle:shortVersionString>0.0.5</sparkle:shortVersionString>
+            <enclosure
+                url="https://github.com/timothyvelberg/Jason/releases/download/v0.0.5/Jason_v0.0.5.zip"
+                sparkle:edSignature="J07wG/ogH6ElcHOmEBP9UllGIAVppjG+fy8+6grNeeEmqaiC0owQxvxKw5zvMsf4Ptwoxz70zuFEe2MxP320BQ=="
+                length="6290761"
+                type="application/octet-stream"
+            />
+        </item>
+        
+        <!-- release v0.0.4 -->
         <item>
             <title>Version 0.0.4</title>
             <description>Bug fixes and improvements</description>
