@@ -9,11 +9,11 @@
         <item>
             <title>Version 0.0.4</title>
             <description>Streamline release mechanics</description>
-            <pubDate>Mon, 23 Feb 2026 14:50:00 +0000</pubDate>
+            <pubDate>Wed, 35 Feb 2026 13:40:00 +0000</pubDate>
             <sparkle:version>4</sparkle:version>
-            <sparkle:shortVersionString>0.0.3</sparkle:shortVersionString>
+            <sparkle:shortVersionString>0.0.4</sparkle:shortVersionString>
             <enclosure
-                url="https://github.com/timothyvelberg/Jason/releases/download/v0.0.3/Jason_v0.0.3.zip"
+                url="https://github.com/timothyvelberg/Jason/releases/download/v0.0.4/Jason_v0.0.4.zip"
                 sparkle:edSignature="bwj1HUZzfErzIv3XZancHCH7069uYJYgW3SGrVhT6SP2IjrPgfSSYbjlwLgvgNmhUdLuLcH8kziYXvgGgCf4Dg=="
                 length="6221919"
                 type="application/octet-stream"
