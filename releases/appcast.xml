@@ -8,13 +8,13 @@
         <!-- Latest release v0.0.4 -->
         <item>
             <title>Version 0.0.4</title>
-            <description>Streamline release mechanics</description>
-            <pubDate>Wed, 35 Feb 2026 13:40:00 +0000</pubDate>
+            <description>Bug fixes and improvements</description>
+            <pubDate>Wed, 35 Feb 2026 13:58:00 +0000</pubDate>
             <sparkle:version>4</sparkle:version>
             <sparkle:shortVersionString>0.0.4</sparkle:shortVersionString>
             <enclosure
                 url="https://github.com/timothyvelberg/Jason/releases/download/v0.0.4/Jason_v0.0.4.zip"
-                sparkle:edSignature="bwj1HUZzfErzIv3XZancHCH7069uYJYgW3SGrVhT6SP2IjrPgfSSYbjlwLgvgNmhUdLuLcH8kziYXvgGgCf4Dg=="
+                sparkle:edSignature="0j9RjotcgB5ae5igl9L54hX+BmBw2Hrkrbz25A4Kfa8Fb9ZyhwAX2sDcbiTB8HpOvrHMEnAhB/GY7BwjxyYEBw=="
                 length="6221919"
                 type="application/octet-stream"
             />
