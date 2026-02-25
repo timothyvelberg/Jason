@@ -135,20 +135,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     
     @objc func toggleContentWindow() {
         guard let window = contentWindow else { return }
-        
-        if window.isVisible {
+
+        if window.isVisible && window.isKeyWindow {
             print("[Hiding Window] Switching to accessory mode")
             window.orderOut(nil)
             NSApp.setActivationPolicy(.accessory)
         } else {
             print("[Show Window] Switching to regular mode")
-            
-            // Activate the app first so the window becomes properly key
             NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)
-            
-            // Then bring the window forward
-            window.center()
             window.makeKeyAndOrderFront(nil)
         }
     }
@@ -177,6 +172,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self.pendingSettingsTab = tab
                 self.toggleContentWindow()
             } else {
+                NSApp.activate(ignoringOtherApps: true)
+                self.contentWindow?.makeKeyAndOrderFront(nil)
                 Notification.openSettings(tab: tab)
             }
         }
