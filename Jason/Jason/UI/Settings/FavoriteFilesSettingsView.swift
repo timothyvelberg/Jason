@@ -295,10 +295,17 @@ struct FilePickerView: View {
     private func browseForFile() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
-        panel.canChooseDirectories = false
+        panel.canChooseDirectories = true  // Needed for .app bundles
         panel.allowsMultipleSelection = false
         panel.prompt = "Add File"
         if panel.runModal() == .OK, let url = panel.url {
+            // Reject plain directories — only allow .app bundles (and regular files)
+            var isDirectory: ObjCBool = false
+            FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+            if isDirectory.boolValue && !url.pathExtension.lowercased().hasPrefix("app") {
+                // User picked a plain folder — ignore it
+                return
+            }
             onFileSelected(url.path)
         }
     }
@@ -306,15 +313,17 @@ struct FilePickerView: View {
     private func submitPath() {
         let path = pathInput.trimmingCharacters(in: .whitespaces)
         var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), !isDirectory.boolValue else {
-            pathError = isDirectory.boolValue
-                ? "Path points to a folder, not a file."
-                : "File does not exist at this path."
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else {
+            pathError = "File does not exist at this path."
+            return
+        }
+        // .app bundles are directories on disk but are launchable apps, not folders
+        if isDirectory.boolValue && !path.hasSuffix(".app") {
+            pathError = "Path points to a folder, not a file."
             return
         }
         onFileSelected(path)
-    }
-}
+    }}
 
 // MARK: - Static File Row
 

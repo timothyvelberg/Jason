@@ -359,12 +359,9 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             // App is already running - switch to it
             print("🔄 Switching to running app: \(entry.name)")
             
-            // Record app usage in MRU tracker
-            // Now using shared instance
-            appSwitcherManager?.recordAppUsage(runningApp)
-            
-            // Hide UI and switch to app
-            circularUIManager?.hideAndSwitchTo(app: runningApp)
+            // Route through AppSwitcherManager so unminimizing, MRU recording,
+            // and UI hiding all happen in one place
+            appSwitcherManager?.switchToApp(runningApp)
             
         } else {
             // App is not running - launch it

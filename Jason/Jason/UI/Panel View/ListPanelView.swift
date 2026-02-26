@@ -329,6 +329,8 @@ struct ListPanelSectionHeader: View {
                         .font(.system(size: style.fontSize, weight: style.fontWeight))
                         .foregroundColor(style.textColor)
                         .textCase(style.uppercase ? .uppercase : nil)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                     
                     Spacer()
                 }

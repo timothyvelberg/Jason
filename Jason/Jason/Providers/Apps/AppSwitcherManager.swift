@@ -387,6 +387,9 @@ class AppSwitcherManager: ObservableObject {
             print("Calling hideAndSwitchTo on active instance...")
         }
         
+        // Restore any minimized windows before activating, so they surface correctly
+        unminimizeAllWindows(for: app)
+        
         // Hide the circular UI and activate the selected app
         // This uses the special hideAndSwitchTo which doesn't restore previous app
         activeCircularUIManager?.hideAndSwitchTo(app: app)
@@ -396,6 +399,45 @@ class AppSwitcherManager: ObservableObject {
         // Force a refresh to update the active state indicators and MRU order
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             self.loadRunningApplications()
+        }
+    }
+    
+    /// Restores all minimized windows for the given app using the Accessibility API.
+    /// Called before activating the app so windows surface at the same time as activation.
+    private func unminimizeAllWindows(for app: NSRunningApplication) {
+        guard hasAccessibilityPermission else {
+            print("⚠️ [AppSwitcher] No accessibility permission - cannot unminimize windows for \(app.localizedName ?? "Unknown")")
+            return
+        }
+        
+        let axApp = AXUIElementCreateApplication(app.processIdentifier)
+        
+        var windowsRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
+              let windows = windowsRef as? [AXUIElement] else {
+            print("🪟 [AppSwitcher] Could not retrieve windows for \(app.localizedName ?? "Unknown")")
+            return
+        }
+        
+        var restoredCount = 0
+        for window in windows {
+            var minimizedRef: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &minimizedRef) == .success,
+                  let isMinimized = minimizedRef as? Bool,
+                  isMinimized else {
+                continue
+            }
+            
+            let result = AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, false as CFTypeRef)
+            if result == .success {
+                restoredCount += 1
+            } else {
+                print("⚠️ [AppSwitcher] Failed to unminimize a window for \(app.localizedName ?? "Unknown") (AXError: \(result.rawValue))")
+            }
+        }
+        
+        if restoredCount > 0 {
+            print("🪟 [AppSwitcher] Restored \(restoredCount) minimized window(s) for \(app.localizedName ?? "Unknown")")
         }
     }
 }
