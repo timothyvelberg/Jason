@@ -119,53 +119,12 @@ extension ListPanelManager {
     }
     
     // MARK: - Escape Handling
-    
-    /// Handle escape key during search
-    /// Returns true if escape was consumed (search handled it)
-    func handleSearchEscape() -> Bool {
-        print("[Search] handleSearchEscape called, activePanelLevel=\(activePanelLevel), panelStack.count=\(panelStack.count)")
 
-        guard let index = panelStack.firstIndex(where: { $0.level == activePanelLevel }),
-              panelStack[index].isSearchActive else {
-            print("[Search] No panel at active level")
-            return false
-        }
-        
-        if !panelStack[index].searchQuery.isEmpty {
-            // Has text - clear it and restore all items
-            panelStack[index].searchQuery = ""
-            if let originalItems = panelStack[index].unfilteredItems {
-                panelStack[index].items = originalItems
-            }
-            keyboardSelectedRow[activePanelLevel] = firstSelectableRow(in: activePanelLevel)
-            print("[Search] Cleared query")
-            return true
-        } else {
-            // Empty query - exit search mode
-            if let originalItems = panelStack[index].unfilteredItems {
-                panelStack[index].items = originalItems
-                panelStack[index].unfilteredItems = nil
-            }
-            
-            if panelStack[index].typingMode == .input {
-                if panelStack[index].activeTypingMode == .input {
-                    // Already in input mode — let escape dismiss the panel
-                    panelStack[index].isSearchActive = false
-                    panelStack[index].searchAnchorHeight = nil
-                    print("[Input] Exiting input mode")
-                    return false  // Let escape propagate to dismiss
-                }
-                // Returning from search to input mode — keep field active
-                panelStack[index].activeTypingMode = .input
-                panelStack[index].searchAnchorHeight = panelStack[index].panelHeight
-                print("[Input] Returned to input mode")
-            } else {
-                panelStack[index].isSearchActive = false
-                panelStack[index].searchAnchorHeight = nil
-                print("[Search] Exited search mode")
-            }
-            return true
-        }
+    /// Handle escape key during search
+    /// Always returns false so escape propagates to close the UI
+    func handleSearchEscape() -> Bool {
+        print("[Search] handleSearchEscape called — letting escape close UI")
+        return false
     }
     
     /// Handle backspace during search
