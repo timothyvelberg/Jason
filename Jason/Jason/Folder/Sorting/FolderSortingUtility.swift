@@ -29,71 +29,60 @@ class FolderSortingUtility {
             }
             
         case .modifiedNewest:
-            return urls.sorted { url1, url2 in
-                let date1 = (try? url1.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date.distantPast
-                let date2 = (try? url2.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date.distantPast
-                return date1 > date2  // Newest first
-            }
+            let dates = Dictionary(uniqueKeysWithValues: urls.map { url in
+                (url, (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date.distantPast)
+            })
+            return urls.sorted { dates[$0, default: .distantPast] > dates[$1, default: .distantPast] }
             
         case .modifiedOldest:
-            return urls.sorted { url1, url2 in
-                let date1 = (try? url1.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date.distantPast
-                let date2 = (try? url2.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date.distantPast
-                return date1 < date2  // Oldest first
-            }
+            let dates = Dictionary(uniqueKeysWithValues: urls.map { url in
+                (url, (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date.distantPast)
+            })
+            return urls.sorted { dates[$0, default: .distantPast] < dates[$1, default: .distantPast] }
             
         case .createdNewest:
-            return urls.sorted { url1, url2 in
-                let date1 = (try? url1.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date.distantPast
-                let date2 = (try? url2.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date.distantPast
-                return date1 > date2  // Newest first
-            }
+            let dates = Dictionary(uniqueKeysWithValues: urls.map { url in
+                (url, (try? url.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date.distantPast)
+            })
+            return urls.sorted { dates[$0, default: .distantPast] > dates[$1, default: .distantPast] }
             
         case .createdOldest:
-            return urls.sorted { url1, url2 in
-                let date1 = (try? url1.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date.distantPast
-                let date2 = (try? url2.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date.distantPast
-                return date1 < date2  // Oldest first
-            }
+            let dates = Dictionary(uniqueKeysWithValues: urls.map { url in
+                (url, (try? url.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date.distantPast)
+            })
+            return urls.sorted { dates[$0, default: .distantPast] < dates[$1, default: .distantPast] }
+            
+        case .addedNewest:
+            let dates = Dictionary(uniqueKeysWithValues: urls.map { url in
+                (url, (try? url.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate ?? Date.distantPast)
+            })
+            return urls.sorted { dates[$0, default: .distantPast] > dates[$1, default: .distantPast] }
+            
+        case .addedOldest:
+            let dates = Dictionary(uniqueKeysWithValues: urls.map { url in
+                (url, (try? url.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate ?? Date.distantPast)
+            })
+            return urls.sorted { dates[$0, default: .distantPast] < dates[$1, default: .distantPast] }
             
         case .foldersFirst:
             return urls.sorted { url1, url2 in
                 let isDir1 = (try? url1.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
                 let isDir2 = (try? url2.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-                
-                if isDir1 != isDir2 {
-                    return isDir1  // Folders first
-                }
-                // Then alphabetical
+                if isDir1 != isDir2 { return isDir1 }
                 return url1.lastPathComponent.localizedStandardCompare(url2.lastPathComponent) == .orderedAscending
             }
             
         case .sizeDescending:
-            return urls.sorted { url1, url2 in
-                let size1 = (try? url1.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-                let size2 = (try? url2.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-                return size1 > size2  // Largest first
-            }
+            let sizes = Dictionary(uniqueKeysWithValues: urls.map { url in
+                (url, (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
+            })
+            return urls.sorted { sizes[$0, default: 0] > sizes[$1, default: 0] }
             
         case .sizeAscending:
-            return urls.sorted { url1, url2 in
-                let size1 = (try? url1.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-                let size2 = (try? url2.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-                return size1 < size2  // Smallest first
-            }
-        case .addedNewest:
-            return urls.sorted { url1, url2 in
-                let date1 = (try? url1.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate ?? Date.distantPast
-                let date2 = (try? url2.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate ?? Date.distantPast
-                return date1 > date2
-            }
-
-        case .addedOldest:
-            return urls.sorted { url1, url2 in
-                let date1 = (try? url1.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate ?? Date.distantPast
-                let date2 = (try? url2.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate ?? Date.distantPast
-                return date1 < date2
-            }
+            let sizes = Dictionary(uniqueKeysWithValues: urls.map { url in
+                (url, (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
+            })
+            return urls.sorted { sizes[$0, default: 0] < sizes[$1, default: 0] }
         }
     }
     

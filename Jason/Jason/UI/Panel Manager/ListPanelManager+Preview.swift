@@ -55,10 +55,17 @@ extension ListPanelManager {
             }
 
             if imageExtensions.contains(ext) {
-                if let image = NSImage(contentsOf: url) {
+                let options: [CFString: Any] = [
+                    kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 640
+                ]
+                if let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                   let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) {
+                    let image = NSImage(cgImage: cgImage, size: .zero)
                     return .image(image)
                 }
-            } else {
+            }else {
                 // Check file size before reading
                 let fileSizeLimit: Int = 512 * 1024  // 512KB
                 if let fileSize = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,

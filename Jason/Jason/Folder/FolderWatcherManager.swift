@@ -18,8 +18,7 @@ class FolderWatcherManager: LiveDataStream {
     var streamId: String { "folder-watcher" }
     
     var isMonitoring: Bool {
-        // We're monitoring if we have any active watchers
-        return !watchers.isEmpty
+        return watcherQueue.sync { !watchers.isEmpty }
     }
     
     func startMonitoring() {
@@ -96,10 +95,6 @@ class FolderWatcherManager: LiveDataStream {
         var foldersToWatch: [(path: String, name: String)] = []
         
         for folderPath in uniqueFolderPaths {
-            // Skip if already being watched (e.g., it's also a favorite folder)
-            if watchers[folderPath] != nil {
-                continue
-            }
             
             // Verify folder exists
             var isDirectory: ObjCBool = false

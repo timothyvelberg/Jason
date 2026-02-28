@@ -122,7 +122,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     
     func refresh() {
         print("🔄 [FavoriteFolderProvider] refresh() called")
-        nodeCache.removeAll()
+//        nodeCache.removeAll()
     }
     
     /// Synchronous cache lookup for use by ListPanelManager (skips debounce on hit)
@@ -151,9 +151,13 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             return cachedNodes
         }
 
-        // Get sort order
-        let requestedSortOrder = getSortOrderForFolder(path: folderPath)
-        print("🎯 [SORT] Folder: \(node.name) - Sort: \(requestedSortOrder.displayName)")
+        // Single DB fetch — reused throughout this function
+        let favorites = db.getFavoriteFolders()
+
+
+        // Get sort order using pre-fetched favorites
+          let requestedSortOrder = getSortOrderForFolder(path: folderPath, favorites: favorites)
+        print("[SORT] Folder: \(node.name) - Sort: \(requestedSortOrder.displayName)")
         
         // Early cancellation check — bail before any filesystem work
         try? Task.checkCancellation()
@@ -162,22 +166,17 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         // Record folder access
         db.recordFolderAccess(folderPath: folderPath)
         
-        // Check actual folder size for heavy folder handling
-        let actualItemCount = countFolderItems(at: folderURL)
-        let folderExceedsLimit = actualItemCount > maxItemsPerFolder
-        
-        // Cancellation check — after counting but before heavy work
+        // Cancellation check — before heavy work
         try? Task.checkCancellation()
         if Task.isCancelled { return [] }
         
         // Check if this is a HEAVY folder and try ENHANCED CACHE
         if db.isHeavyFolder(path: folderPath) {
-            print("📦 [FavoriteFolderProvider] Heavy folder detected: \(node.name)")
+            print("[FavoriteFolderProvider] Heavy folder detected: \(node.name)")
             
             if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
-                print("⚡ [EnhancedCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
+                print("[EnhancedCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
                 
-                // Convert to nodes
                 var nodes = cachedItems.map { item in
                     if item.isDirectory {
                         return createFolderNodeFromCache(item: item)
@@ -186,115 +185,109 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                     }
                 }
                 
-                // Apply sort order
                 nodes = sortNodes(nodes, by: requestedSortOrder)
                 
-                // Add "Open in Finder" if folder has more items than we're showing
+                // We don't know the true total count here without a disk read,
+                // so check against cached item count as proxy
                 var resultNodes = nodes
-                if folderExceedsLimit {
+                if cachedItems.count >= maxItemsPerFolder {
                     resultNodes.append(createOpenInFinderNode(for: folderURL))
                 }
 
-                // Cache for instant access on next hover
                 nodeCache[folderPath] = resultNodes
-                print("💾 [FavoriteFolderProvider] Cached \(resultNodes.count) nodes for '\(node.name)'")
+                print("[FavoriteFolderProvider] nodeCache stored \(resultNodes.count) nodes for '\(node.name)'")
 
                 return resultNodes
             } else {
-                print("⚠️ [EnhancedCache] Cache miss for heavy folder - will reload and cache")
+                print("[EnhancedCache] Cache miss for heavy folder - will reload and cache")
             }
         }
         
         // CACHE MISS OR NOT HEAVY - Load from disk
-        print("💿 [START] Loading from disk: \(folderURL.path)")
+        print("[START] Loading from disk: \(folderURL.path)")
         let startTime = Date()
-        
-        print("📊 [FavoriteFolderProvider] Actual folder contains: \(actualItemCount) items")
         
         // Cancellation check — before expensive disk + thumbnail work
         try? Task.checkCancellation()
         if Task.isCancelled {
-            print("🚫 [FavoriteFolderProvider] Cancelled before disk load: \(node.name)")
+            print("[FavoriteFolderProvider] Cancelled before disk load: \(node.name)")
             return []
         }
         
-        let nodes: [FunctionNode] = await Task.detached(priority: .userInitiated) { [weak self] () -> [FunctionNode] in
+        let (nodes, actualItemCount): ([FunctionNode], Int) = await Task.detached(priority: .userInitiated) { [weak self] () -> ([FunctionNode], Int) in
             guard let self = self else {
-                print("❌ [FavoriteFolderProvider] Self deallocated during load")
-                return []
+                print("[FavoriteFolderProvider] Self deallocated during load")
+                return ([], 0)
             }
             
-            // Check cancellation inside detached task
             if Task.isCancelled {
-                print("🚫 [FavoriteFolderProvider] Cancelled at start of background load")
-                return []
+                print("[FavoriteFolderProvider] Cancelled at start of background load")
+                return ([], 0)
             }
             
             print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
             
             let result = self.getFolderContents(at: folderURL, sortOrder: requestedSortOrder)
             
-            // Check cancellation after loading but before returning
             if Task.isCancelled {
-                print("🚫 [FavoriteFolderProvider] Cancelled after disk load: \(folderURL.lastPathComponent)")
-                return []
+                print("[FavoriteFolderProvider] Cancelled after disk load: \(folderURL.lastPathComponent)")
+                return ([], 0)
             }
             
-            print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.count) items")
-            return result
+            print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.nodes.count) items")
+            return (result.nodes, result.totalCount)
         }.value
         
         // Cancellation check — before caching work
         if Task.isCancelled {
-            print("🚫 [FavoriteFolderProvider] Cancelled before caching: \(node.name)")
+            print("[FavoriteFolderProvider] Cancelled before caching: \(node.name)")
             return []
         }
         
         let elapsed = Date().timeIntervalSince(startTime)
-        print("✅ [END] Loaded \(nodes.count) nodes in \(String(format: "%.2f", elapsed))s")
+        print("[END] Loaded \(nodes.count) nodes in \(String(format: "%.2f", elapsed))s")
+        
+        let folderExceedsLimit = actualItemCount > maxItemsPerFolder
         
         // Handle folder watching status dynamically
-        handleFolderWatchingStatus(folderPath: folderPath, itemCount: actualItemCount, folderName: node.name)
+        handleFolderWatchingStatus(folderPath: folderPath, itemCount: actualItemCount, folderName: node.name, favorites: favorites)
         
-        // Cache heavy folders
+        // Cache heavy folders to enhanced cache
         if actualItemCount > 100 {
-            // Final cancellation check — don't bother caching if we're about to be discarded
             if Task.isCancelled {
-                print("🚫 [FavoriteFolderProvider] Cancelled before enhanced cache write: \(node.name)")
+                print("[FavoriteFolderProvider] Cancelled before enhanced cache write: \(node.name)")
                 return []
             }
             
-            print("📊 [EnhancedCache] Folder has \(actualItemCount) items - caching with thumbnails")
+            print("[EnhancedCache] Folder has \(actualItemCount) items - caching with thumbnails")
             
-            // Convert nodes to EnhancedFolderItem format WITH THUMBNAILS
             let enhancedItems = convertToEnhancedFolderItems(nodes: nodes, folderURL: folderURL)
-            
-            // Save to Enhanced Cache
             db.saveEnhancedFolderContents(folderPath: folderPath, items: enhancedItems)
-            print("💾 [EnhancedCache] Cached \(nodes.count) items for future instant loads!")
+            print("[EnhancedCache] Cached \(nodes.count) items for future instant loads!")
         } else {
             print("ℹ️ [EnhancedCache] Folder has only \(actualItemCount) items - not caching (threshold: 100)")
         }
         
-        // Add "Open in Finder" if folder has more items than we're showing
+        // Add "Open in Finder" if folder exceeds display limit
         var resultNodes = nodes
         if folderExceedsLimit {
             resultNodes.append(createOpenInFinderNode(for: folderURL))
         }
+        
+        // cache result so subsequent hovers are instant
+        nodeCache[folderPath] = resultNodes
+        print("💾 [FavoriteFolderProvider] nodeCache stored \(resultNodes.count) nodes for '\(node.name)'")
         
         return resultNodes
     }
     
     // MARK: - Sorting
     
-    private func getSortOrderForFolder(path: String) -> FolderSortOrder {
-        let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
-        
-        if let favoriteFolder = favoriteFolders.first(where: { $0.folder.path == path }),
+    private func getSortOrderForFolder(path: String, favorites: [(folder: FolderEntry, settings: FavoriteFolderSettings)]) -> FolderSortOrder {
+        if let favoriteFolder = favorites.first(where: { $0.folder.path == path }),
            let sortOrder = favoriteFolder.settings.contentSortOrder {
             return sortOrder
         }
-        
         return .alphabeticalAsc
     }
     
@@ -328,58 +321,50 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     
     // MARK: - Folder Watching
     
-    private func isFavoriteFolder(path: String) -> Bool {
-        let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
-        return favoriteFolders.contains { $0.folder.path == path }
+    private func isFavoriteFolder(path: String, favorites: [(folder: FolderEntry, settings: FavoriteFolderSettings)]) -> Bool {
+        return favorites.contains { $0.folder.path == path }
     }
+
     
-    private func handleFolderWatchingStatus(folderPath: String, itemCount: Int, folderName: String) {
+    private func handleFolderWatchingStatus(folderPath: String, itemCount: Int, folderName: String, favorites: [(folder: FolderEntry, settings: FavoriteFolderSettings)]) {
         let db = DatabaseManager.shared
         let isCurrentlyHeavy = db.isHeavyFolder(path: folderPath)
         let shouldBeHeavy = itemCount > 100
-        let isFavorite = isFavoriteFolder(path: folderPath)
+        let isFavorite = isFavoriteFolder(path: folderPath, favorites: favorites)
         
         if shouldBeHeavy && !isCurrentlyHeavy {
-            // FOLDER JUST BECAME HEAVY
-            print("📊 [FavoriteFolderProvider] Folder crossed threshold: \(itemCount) items")
-            
+            print("[FavoriteFolderProvider] Folder crossed threshold: \(itemCount) items")
             db.markAsHeavyFolder(path: folderPath, itemCount: itemCount)
-            
             if isFavorite {
                 FolderWatcherManager.shared.startWatching(path: folderPath, itemName: folderName)
-                print("👀 [FSEvents] Started watching newly-heavy favorite folder: \(folderName)")
+                print("[FSEvents] Started watching newly-heavy favorite folder: \(folderName)")
             }
-            
         } else if !shouldBeHeavy && isCurrentlyHeavy {
-            // FOLDER JUST BECAME LIGHT
-            print("📉 [FavoriteFolderProvider] Folder dropped below threshold: \(itemCount) items")
-            
+            print("[FavoriteFolderProvider] Folder dropped below threshold: \(itemCount) items")
             db.removeHeavyFolder(path: folderPath)
             FolderWatcherManager.shared.stopWatching(path: folderPath)
-            print("🛑 [FSEvents] Stopped watching - folder is now light: \(folderName)")
-            
+            print("[FSEvents] Stopped watching - folder is now light: \(folderName)")
             db.invalidateEnhancedCache(for: folderPath)
-            
         } else if shouldBeHeavy && isCurrentlyHeavy {
-            // FOLDER IS STILL HEAVY - update count
             db.updateHeavyFolderItemCount(path: folderPath, itemCount: itemCount)
         }
     }
     
     // MARK: - Folder Contents
     
-    private func getFolderContents(at url: URL, sortOrder: FolderSortOrder) -> [FunctionNode] {
+    private func getFolderContents(at url: URL, sortOrder: FolderSortOrder) -> (nodes: [FunctionNode], totalCount: Int) {
         do {
             let contents = try FileManager.default.contentsOfDirectory(
                 at: url,
                 includingPropertiesForKeys: [.isDirectoryKey, .nameKey, .contentModificationDateKey, .creationDateKey, .fileSizeKey],
-                options: [.skipsHiddenFiles]
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
             )
             
+            let totalCount = contents.count
             let sortedContents = FolderSortingUtility.sortURLs(contents, by: sortOrder)
             let limitedContents = Array(sortedContents.prefix(maxItemsPerFolder))
             
-            return limitedContents.map { contentURL in
+            let nodes = limitedContents.map { contentURL -> FunctionNode in
                 if contentURL.isNavigableDirectory {
                     return createFolderNode(for: contentURL)
                 } else {
@@ -387,9 +372,11 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 }
             }
             
+            return (nodes: nodes, totalCount: totalCount)
+            
         } catch {
-            print("❌ [FavoriteFolderProvider] Failed to get folder contents: \(error)")
-            return []
+            print("[FavoriteFolderProvider] Failed to get folder contents: \(error)")
+            return (nodes: [], totalCount: 0)
         }
     }
     
@@ -402,7 +389,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             )
             return items.count
         } catch {
-            print("⚠️ [FavoriteFolderProvider] Failed to count folder items: \(error)")
+            print("[FavoriteFolderProvider] Failed to count folder items: \(error)")
             return 0
         }
     }
@@ -434,9 +421,15 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     
     private func createFileNode(for url: URL) -> FunctionNode {
         let fileName = url.lastPathComponent
-        let dragImage = createThumbnail(for: url)
+        let thumbnail = createThumbnail(for: url)
+        let dragImage = thumbnail.image
         let folderPath = url.deletingLastPathComponent().path
         let providerId = self.providerId
+        
+        var metadata: [String: Any] = [:]
+        if let data = thumbnail.data {
+            metadata["thumbnailData"] = data
+        }
         
         return FunctionNode(
             id: "file-\(url.path)",
@@ -460,30 +453,29 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             previewURL: url,
             showLabel: true,
             slicePositioning: .center,
-            
+            metadata: metadata,
             onLeftClick: ModifierAwareInteraction(base: .drag(DragProvider(
                 fileURLs: [url],
                 dragImage: dragImage,
                 allowedOperations: .move,
                 onClick: {
-                    print("📂 Opening file: \(fileName)")
+                    print("Opening file: \(fileName)")
                     NSWorkspace.shared.openAndActivate(url)
-
                 },
                 onDragStarted: {
-                    print("📦 Started dragging: \(fileName)")
+                    print("Started dragging: \(fileName)")
                 },
                 onDragCompleted: { success in
                     if success {
-                        print("✅ Successfully dragged: \(fileName)")
+                        print("Successfully dragged: \(fileName)")
                     } else {
-                        print("❌ Drag cancelled: \(fileName)")
+                        print("Drag cancelled: \(fileName)")
                     }
                 }
             ))),
             onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
-                print("🖱️ Middle-click opening: \(fileName)")
+                print("Middle-click opening: \(fileName)")
                 NSWorkspace.shared.openAndActivate(url)
             }),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
@@ -518,13 +510,13 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 allowedOperations: [.move, .copy],
                 clickBehavior: .navigate,
                 onDragStarted: {
-                    print("📦 Started dragging folder: \(folderName)")
+                    print("Started dragging folder: \(folderName)")
                 },
                 onDragCompleted: { success in
                     if success {
-                        print("✅ Successfully dragged folder: \(folderName)")
+                        print("Successfully dragged folder: \(folderName)")
                     } else {
-                        print("❌ Drag cancelled: \(folderName)")
+                        print("Drag cancelled: \(folderName)")
                     }
                 }
             ))),
@@ -580,23 +572,23 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 dragImage: icon,
                 allowedOperations: .move,
                 onClick: {
-                    print("📂 Opening file: \(fileName)")
+                    print("Opening file: \(fileName)")
                     NSWorkspace.shared.openAndActivate(url)
                 },
                 onDragStarted: {
-                    print("📦 Started dragging: \(fileName)")
+                    print("Started dragging: \(fileName)")
                 },
                 onDragCompleted: { success in
                     if success {
-                        print("✅ Successfully dragged: \(fileName)")
+                        print("Successfully dragged: \(fileName)")
                     } else {
-                        print("❌ Drag cancelled: \(fileName)")
+                        print("Drag cancelled: \(fileName)")
                     }
                 }
             ))),
             onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
-                print("🖱️ Middle-click opening: \(fileName)")
+                print("Middle-click opening: \(fileName)")
                 NSWorkspace.shared.openAndActivate(url)
             }),
             onBoundaryCross: ModifierAwareInteraction(base: .navigateInto)
@@ -641,13 +633,13 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 allowedOperations: [.move, .copy],
                 clickBehavior: .navigate,
                 onDragStarted: {
-                    print("📦 Started dragging folder: \(folderName)")
+                    print("Started dragging folder: \(folderName)")
                 },
                 onDragCompleted: { success in
                     if success {
-                        print("✅ Successfully dragged folder: \(folderName)")
+                        print("Successfully dragged folder: \(folderName)")
                     } else {
-                        print("❌ Drag cancelled: \(folderName)")
+                        print("Drag cancelled: \(folderName)")
                     }
                 }
             ))),
@@ -729,13 +721,13 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 dragImage: folderIcon,
                 allowedOperations: [.move, .copy],
                 onDragStarted: {
-                    print("📦 Started dragging favorite folder: \(folderEntry.title)")
+                    print("Started dragging favorite folder: \(folderEntry.title)")
                 },
                 onDragCompleted: { success in
                     if success {
-                        print("✅ Successfully dragged favorite folder: \(folderEntry.title)")
+                        print("Successfully dragged favorite folder: \(folderEntry.title)")
                     } else {
-                        print("❌ Drag cancelled: \(folderEntry.title)")
+                        print("Drag cancelled: \(folderEntry.title)")
                     }
                 }
             ))),
@@ -809,36 +801,41 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     
     // MARK: - Thumbnail Creation
     
-    private func createThumbnail(for url: URL) -> NSImage {
-        let thumbnailSize = NSSize(width: 64, height: 64)
+    private func createThumbnail(for url: URL) -> (image: NSImage, data: Data?) {
+        let thumbnailSize: CGFloat = 40
         let cornerRadius: CGFloat = 8
         
         let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
         let fileExtension = url.pathExtension.lowercased()
         
         if imageExtensions.contains(fileExtension) {
-            if let image = NSImage(contentsOf: url) {
-                let thumbnail = NSImage(size: thumbnailSize)
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: thumbnailSize
+            ]
+            
+            if let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+               let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) {
                 
+                let thumbnail = NSImage(size: NSSize(width: thumbnailSize, height: thumbnailSize))
                 thumbnail.lockFocus()
                 
-                let rect = NSRect(origin: .zero, size: thumbnailSize)
+                let rect = NSRect(origin: .zero, size: NSSize(width: thumbnailSize, height: thumbnailSize))
                 let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
                 path.addClip()
                 
-                image.draw(
-                    in: rect,
-                    from: NSRect(origin: .zero, size: image.size),
-                    operation: .sourceOver,
-                    fraction: 1.0
-                )
+                NSGraphicsContext.current?.cgContext.draw(cgImage, in: rect)
                 
                 thumbnail.unlockFocus()
                 
-                return thumbnail
+                let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
+                let pngData = bitmapRep.representation(using: .png, properties: [:])
+                
+                return (image: thumbnail, data: pngData)
             }
         }
         
-        return IconProvider.shared.getFileIcon(for: url, size: thumbnailSize.width, cornerRadius: cornerRadius)
+        return (image: IconProvider.shared.getFileIcon(for: url, size: thumbnailSize, cornerRadius: cornerRadius), data: nil)
     }
 }
