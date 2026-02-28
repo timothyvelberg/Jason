@@ -23,7 +23,7 @@ extension ListPanelManager {
         }
 
         // Get the currently selected node
-        guard let selectedRow = keyboardSelectedRow[activePanelLevel],
+        guard let selectedRow = effectiveSelectedRow(for: activePanelLevel) ?? hoveredRow[activePanelLevel],
               let panel = panelStack.first(where: { $0.level == activePanelLevel }),
               selectedRow < panel.items.count else {
             print("[Preview] No item selected")
@@ -86,10 +86,14 @@ extension ListPanelManager {
         let gap: CGFloat = 8
         let newX = sourceBounds.maxX + gap + (previewWidth / 2)
 
-        // Align vertically with the source row
         let rowTopOffset = sourcePanel.yOffsetForRow(sourceRowIndex)
         let rowHeight = sourcePanel.heightForRow(sourceRowIndex)
-        let rowCenterY = sourceBounds.maxY - PanelConfig.contentTopInset - rowTopOffset + (rowHeight / 2)
+
+        let visualOffset = rowTopOffset - sourcePanel.scrollOffset
+        let visibleContentHeight = sourcePanel.visibleContentHeight
+        let clampedOffset = max(0, min(visualOffset, visibleContentHeight - rowHeight))
+
+        let rowCenterY = sourceBounds.maxY - PanelConfig.contentTopInset - clampedOffset - (rowHeight / 2)
         let newY = rowCenterY
 
         let position = CGPoint(x: newX, y: newY)
