@@ -130,5 +130,9 @@ struct PanelOnlyView: View {
             }
         }
         .position(x: localX, y: adjustedViewY)
+        .transition(panel.level == 0
+            ? .slideFromAngle(angle: panel.spawnAngle ?? 0, distance: PanelConfig.cascadeSlideDistance)
+            : .slideFromLeft(distance: PanelConfig.cascadeSlideDistance))
+        .animation(.easeInOut(duration: 0.2), value: panel.isOverlapping)
     }
 }

@@ -100,55 +100,64 @@ struct CircularUIView: View {
                         ? panelSwiftUIY - ((panel.searchAnchorHeight! - panel.panelHeight) / 2)
                         : panelSwiftUIY
                     
-                    ListPanelView(
-                        title: panel.title,
-                        items: panel.items,
-                        onItemLeftClick: listPanelManager.onItemLeftClick,
-                        onItemRightClick: listPanelManager.onItemRightClick,
-                        onContextAction: listPanelManager.onContextAction,
-                        onItemHover: { node, rowIndex in
-                            listPanelManager.handleViewHover(node: node, level: panel.level, rowIndex: rowIndex)
-                        },
-                        onHeaderHover: {
-                            listPanelManager.handleHeaderHover(level: panelLevel)
-                        },
-                        onScrollOffsetChanged: { offset in
-                            listPanelManager.updateScrollOffset(offset, forLevel: panelLevel)
-                        },
-                        onScrollStateChanged: { isScrolling in
-                            listPanelManager.handleScrollStateChanged(isScrolling: isScrolling, forLevel: panelLevel)
-                        },
-                        onRowHeightsMeasured: { heights in
-                            listPanelManager.updateRowHeights(heights, forLevel: panelLevel)
-                        },
-                        contextActions: panel.contextActions,
-                        typingMode: panel.activeTypingMode,
-                        expandedItemId: expandedItemIdBinding(for: panel.level),
-                        isSearchActive: Binding(
-                            get: { panel.isSearchActive },
-                            set: { newValue in
-                                if let index = listPanelManager.panelStack.firstIndex(where: { $0.id == panel.id }) {
-                                    listPanelManager.panelStack[index].isSearchActive = newValue
-                                }
-                            }
-                        ),
-                        searchQuery: Binding(
-                            get: { panel.searchQuery },
-                            set: { newValue in
-                                if let index = listPanelManager.panelStack.firstIndex(where: { $0.id == panel.id }) {
-                                    listPanelManager.panelStack[index].searchQuery = newValue
-                                }
-                            }
-                        ),
-                        hoveredRowIndex: listPanelManager.effectiveSelectedRow(for: panelLevel),
-                        isKeyboardDriven: listPanelManager.isKeyboardDriven,
-                        config: panel.config
-                    )
+                    Group {
+                        if let previewContent = panel.previewContent {
+                            PreviewPanelView(
+                                content: previewContent,
+                                config: panel.config,
+                                title: panel.title
+                            )
+                        } else {
+                            ListPanelView(
+                                title: panel.title,
+                                items: panel.items,
+                                onItemLeftClick: listPanelManager.onItemLeftClick,
+                                onItemRightClick: listPanelManager.onItemRightClick,
+                                onContextAction: listPanelManager.onContextAction,
+                                onItemHover: { node, rowIndex in
+                                    listPanelManager.handleViewHover(node: node, level: panel.level, rowIndex: rowIndex)
+                                },
+                                onHeaderHover: {
+                                    listPanelManager.handleHeaderHover(level: panelLevel)
+                                },
+                                onScrollOffsetChanged: { offset in
+                                    listPanelManager.updateScrollOffset(offset, forLevel: panelLevel)
+                                },
+                                onScrollStateChanged: { isScrolling in
+                                    listPanelManager.handleScrollStateChanged(isScrolling: isScrolling, forLevel: panelLevel)
+                                },
+                                onRowHeightsMeasured: { heights in
+                                    listPanelManager.updateRowHeights(heights, forLevel: panelLevel)
+                                },
+                                contextActions: panel.contextActions,
+                                typingMode: panel.activeTypingMode,
+                                expandedItemId: expandedItemIdBinding(for: panel.level),
+                                isSearchActive: Binding(
+                                    get: { panel.isSearchActive },
+                                    set: { newValue in
+                                        if let index = listPanelManager.panelStack.firstIndex(where: { $0.id == panel.id }) {
+                                            listPanelManager.panelStack[index].isSearchActive = newValue
+                                        }
+                                    }
+                                ),
+                                searchQuery: Binding(
+                                    get: { panel.searchQuery },
+                                    set: { newValue in
+                                        if let index = listPanelManager.panelStack.firstIndex(where: { $0.id == panel.id }) {
+                                            listPanelManager.panelStack[index].searchQuery = newValue
+                                        }
+                                    }
+                                ),
+                                hoveredRowIndex: listPanelManager.effectiveSelectedRow(for: panelLevel),
+                                isKeyboardDriven: listPanelManager.isKeyboardDriven,
+                                config: panel.config
+                            )
+                        }
+                    }
                     .position(x: panelLocalX, y: adjustedPanelY)
-                        
                     .transition(panel.level == 0
-                                ? .slideFromAngle(angle: panel.spawnAngle ?? 0, distance: PanelConfig.cascadeSlideDistance)
-                                : .slideFromLeft(distance: PanelConfig.cascadeSlideDistance))
+                        ? .slideFromAngle(angle: panel.spawnAngle ?? 0, distance: PanelConfig.cascadeSlideDistance)
+                        : .slideFromLeft(distance: PanelConfig.cascadeSlideDistance))
                     .animation(.easeInOut(duration: 0.2), value: panel.isOverlapping)
                 }
             }

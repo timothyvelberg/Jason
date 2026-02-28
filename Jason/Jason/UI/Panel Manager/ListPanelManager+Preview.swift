@@ -43,16 +43,29 @@ extension ListPanelManager {
 
     /// Extract preview content from a node
     func loadPreviewContent(for node: FunctionNode) -> PreviewContent {
+        print("[Preview] node: '\(node.name)' previewURL: \(node.previewURL?.path ?? "nil") metadata keys: \(node.metadata?.keys.map { $0 } ?? [])")
         // Case 1: Has a previewURL — file from FavoriteFolderProvider
         if let url = node.previewURL {
             let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
+            let unsupportedExtensions = ["nzb", "zip", "dmg", "mkv", "mp4", "mov", "avi", "mp3", "pdf", "exe", "pkg"]
             let ext = url.pathExtension.lowercased()
+
+            if unsupportedExtensions.contains(ext) {
+                return .unsupported
+            }
 
             if imageExtensions.contains(ext) {
                 if let image = NSImage(contentsOf: url) {
                     return .image(image)
                 }
             } else {
+                // Check file size before reading
+                let fileSizeLimit: Int = 512 * 1024  // 512KB
+                if let fileSize = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                   fileSize > fileSizeLimit {
+                    return .unsupported
+                }
+
                 if let text = try? String(contentsOf: url, encoding: .utf8) {
                     return .text(text)
                 } else if let text = try? String(contentsOf: url, encoding: .isoLatin1) {
@@ -83,6 +96,8 @@ extension ListPanelManager {
 
         // Position to the right of the source panel
         let sourceBounds = currentBounds(for: sourcePanel)
+        print("[Preview] sourcePanel level: \(level), sourceBounds: \(sourceBounds), currentPos: \(currentPosition(for: sourcePanel))")
+
         let gap: CGFloat = 8
         let newX = sourceBounds.maxX + gap + (previewWidth / 2)
 

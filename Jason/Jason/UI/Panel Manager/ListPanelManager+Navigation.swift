@@ -72,28 +72,27 @@ extension ListPanelManager {
         
         let parentLevel = activePanelLevel - 1
         
-        // Pop all panels above parent (including current active)
-        popToLevel(parentLevel)
+        // If current active panel is a preview panel, just deactivate it
+        // without popping — it should remain visible as a preview
+        let isLeavingPreview = panelStack.first(where: { $0.level == activePanelLevel })?.previewContent != nil
+        
+        if !isLeavingPreview {
+            popToLevel(parentLevel)
+        }
         
         // Move focus back to parent
         activePanelLevel = parentLevel
         inputCoordinator?.switchToKeyboard()
         inputCoordinator?.focusPanel(level: parentLevel)
         
-        // Un-overlap the parent (it's now active, not background)
         if let parentIndex = panelStack.firstIndex(where: { $0.level == parentLevel }) {
             panelStack[parentIndex].areChildrenArmed = true
         }
         
-        print("[Exit] activePanelLevel=\(activePanelLevel), isKeyboardDriven=\(isKeyboardDriven)")
-        print("[Exit] keyboardSelectedRow=\(keyboardSelectedRow)")
-        
-        // Clear keyboard selection in old level
         keyboardSelectedRow.removeValue(forKey: parentLevel + 1)
         
         print("[Keyboard] EXITED ← active panel now level \(activePanelLevel)")
         
-        // Re-trigger preview for currently selected item in parent
         if let selection = keyboardSelectedRow[parentLevel],
            let panel = panelStack.first(where: { $0.level == parentLevel }),
            selection < panel.items.count {
@@ -287,6 +286,14 @@ extension ListPanelManager {
         
         // Only cascade for folders
         guard node.type == .folder else {
+            if let child = panelStack.first(where: { $0.level == level + 1 }),
+               child.previewContent != nil {
+                // Close preview if hovering a different row than it was spawned from
+                if child.sourceRowIndex != rowIndex {
+                    popToLevel(level)
+                }
+                return
+            }
             popToLevel(level)
             return
         }
@@ -294,7 +301,9 @@ extension ListPanelManager {
         // Check if this node's panel is already showing at level+1
         if let existingPanel = panelStack.first(where: { $0.level == level + 1 }),
            existingPanel.sourceNodeId == node.id {
-            popToLevel(level + 1)
+            if existingPanel.previewContent == nil {
+                popToLevel(level + 1)
+            }
             return
         }
         

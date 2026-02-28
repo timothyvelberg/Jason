@@ -685,6 +685,7 @@ class ListPanelManager: ObservableObject {
             
             // Find child panel (level + 1) for overlap logic
             guard let childIndex = panelStack.firstIndex(where: { $0.level == panel.level + 1 }),
+                  panelStack[childIndex].previewContent == nil,
                   let sourceRowIndex = panelStack[childIndex].sourceRowIndex else {
                 continue
             }
@@ -856,6 +857,8 @@ class ListPanelManager: ObservableObject {
             activeTypingMode: inheritedTypingMode
         )
         
+        print("[Push] level \(level) position: \(position), currentBounds: \(currentBounds(for: newPanel))")
+        
         panelStack.append(newPanel)
         
         print("[ListPanelManager] Pushed panel '\(title)' at level \(level + 1)")
@@ -938,6 +941,10 @@ class ListPanelManager: ObservableObject {
     
     /// Get the current position for a panel (accounting for overlap state)
     func currentPosition(for panel: PanelState) -> CGPoint {
+        // Preview panels store their absolute position directly
+        if panel.previewContent != nil {
+            return panel.position
+        }
         guard panel.isOverlapping else {
             // Not overlapping, but ancestors might be shifted - need to adjust
             if panel.level > 0,
