@@ -21,12 +21,18 @@ struct PanelConfig {
     /// Maximum number of visible rows before scrolling
     var maxVisibleItems: Int = 10
     
+    /// Width of the preview panel
+    var previewPanelWidth: CGFloat = 320
+
+    /// Maximum height of the preview panel
+    var previewPanelMaxHeight: CGFloat = 400
+    
     /// Padding above the scroll content (between title bar and first row)
     static let scrollTopPadding: CGFloat = 8
     
     /// Estimated rendered row height including view padding.
     /// Used as fallback when measured heights aren't available yet.
-    var estimatedRowHeight: CGFloat { 36.0 }  // Match actual SwiftUI rendering
+    var estimatedRowHeight: CGFloat { 36.0 }
 
     /// Padding below the scroll content
     static let scrollBottomPadding: CGFloat = 8

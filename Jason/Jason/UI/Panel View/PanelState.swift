@@ -23,6 +23,15 @@ enum TypingMode {
     case input
 }
 
+
+// MARK: - Preview Content
+
+enum PreviewContent {
+    case image(NSImage)
+    case text(String)
+    case unsupported
+}
+
 // MARK: - Panel State
 
 struct PanelState: Identifiable {
@@ -35,6 +44,10 @@ struct PanelState: Identifiable {
     let sourceRowIndex: Int?
     let spawnAngle: Double?
     let contextActions: [FunctionNode]?
+    
+    
+    /// Preview content for preview panels (nil = standard row list panel)
+    var previewContent: PreviewContent? = nil
     
     /// Panel layout configuration (dimensions, line limit, etc.)
     let config: PanelConfig

@@ -16,8 +16,8 @@ class HotkeyManager {
     /// Called when Escape is pressed while UI is visible
     var onHide: (() -> Void)?
     
-    /// Called when Shift is pressed (for preview toggle)
-    var onShiftPressed: (() -> Void)?
+    /// Called when Space is pressed (for preview toggle)
+    var onSpacePressed: (() -> Void)?
     
     /// Called when Ctrl is released in app switcher mode
     var onCtrlReleasedInAppSwitcher: (() -> Void)?
@@ -802,6 +802,10 @@ class HotkeyManager {
                 print("[HotkeyManager] Enter pressed")
                 onEnter?()
                 return true
+            case 49:  // Space
+                print("[HotkeyManager] Space pressed")
+                onSpacePressed?()
+                return true
             case 51:  // Backspace
                 if eventModifiers.contains(.command) {
                     print("[HotkeyManager] CMD+Backspace pressed")
@@ -938,14 +942,6 @@ class HotkeyManager {
         
         // Track Ctrl state
         wasCtrlPressed = isCtrlPressed
-        
-        // Only trigger on SHIFT press (transition from not-pressed to pressed)
-        if isShiftPressed && !wasShiftPressed {
-            print("[HotkeyManager] Shift pressed")
-            onShiftPressed?()
-        }
-        
-        wasShiftPressed = isShiftPressed
     }
     
     private func handleMouseEvent(_ event: CGEvent, type: CGEventType) {
