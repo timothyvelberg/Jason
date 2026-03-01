@@ -119,7 +119,7 @@ class CircularUIInstanceManager: ObservableObject {
             return
         }
         
-        print("🗑️ [InstanceManager] Removing instance for config ID: \(configId)")
+        print("[InstanceManager] Removing instance for config ID: \(configId)")
         
         // Hide UI if visible
         // Tear down all resources
@@ -128,18 +128,18 @@ class CircularUIInstanceManager: ObservableObject {
         // Clear active instance tracking if this was the active instance
         if activeInstanceId == configId {
             activeInstanceId = nil
-            print("   ⚠️ Removed active instance, cleared activeInstanceId")
+            print("   Removed active instance, cleared activeInstanceId")
         }
         
         // Remove from dictionary
         instances.removeValue(forKey: configId)
         
-        print("   ✅ Instance removed, \(instances.count) remaining")
+        print("   Instance removed, \(instances.count) remaining")
     }
     
     /// Remove all instances
     func removeAllInstances() {
-        print("🗑️ [InstanceManager] Removing all \(instances.count) instance(s)")
+        print("[InstanceManager] Removing all \(instances.count) instance(s)")
         
         // Tear down all instances
         for (_, instance) in instances {
@@ -152,7 +152,7 @@ class CircularUIInstanceManager: ObservableObject {
         // Clear active instance tracking
         activeInstanceId = nil
         
-        print("   ✅ All instances removed")
+        print("   All instances removed")
     }
     
     // MARK: - Configuration Change Handling
@@ -160,7 +160,7 @@ class CircularUIInstanceManager: ObservableObject {
     /// Handle configuration updates by recreating affected instances
     /// - Parameter updatedConfig: The updated configuration
     func handleConfigurationUpdate(_ updatedConfig: StoredRingConfiguration) {
-        print("🔄 [InstanceManager] Handling update for config: '\(updatedConfig.name)'")
+        print("[InstanceManager] Handling update for config: '\(updatedConfig.name)'")
         
         if updatedConfig.isActive {
             // Active config - create/update instance
@@ -174,7 +174,7 @@ class CircularUIInstanceManager: ObservableObject {
     /// Sync instances with current active configurations
     /// Call this when configurations are added/removed/changed
     func syncWithConfigurations() {
-        print("🔄 [InstanceManager] Syncing instances with configurations")
+        print("[InstanceManager] Syncing instances with configurations")
         
         let activeConfigs = configurationManager.getActiveConfigurations()
         let activeConfigIds = Set(activeConfigs.map { $0.id })
@@ -191,7 +191,7 @@ class CircularUIInstanceManager: ObservableObject {
             createOrUpdateInstance(for: config)
         }
         
-        print("   ✅ Sync complete: \(instances.count) active instance(s)")
+        print("   Sync complete: \(instances.count) active instance(s)")
         registerInputTriggers()
     }
     
@@ -235,14 +235,14 @@ class CircularUIInstanceManager: ObservableObject {
         case "trackpad":
             registerTrackpadTrigger(trigger, forConfig: config)
         default:
-            print("   ⚠️ Unknown trigger type '\(trigger.triggerType)' for '\(config.name)'")
+            print("   Unknown trigger type '\(trigger.triggerType)' for '\(config.name)'")
         }
     }
     
     /// Register a keyboard trigger
     private func registerKeyboardTrigger(_ trigger: TriggerConfiguration, forConfig config: StoredRingConfiguration) {
         guard let keyCode = trigger.keyCode else {
-            print("   ⚠️ Keyboard trigger missing keyCode for '\(config.name)'")
+            print("   Keyboard trigger missing keyCode for '\(config.name)'")
             return
         }
         
@@ -255,11 +255,11 @@ class CircularUIInstanceManager: ObservableObject {
                 isHoldMode: true,
                 forConfigId: config.id,
                 onPress: { [weak self] in
-                    print("🔽 [InstanceManager] Hold key PRESSED for '\(config.name)'")
+                    print("[InstanceManager] Hold key PRESSED for '\(config.name)'")
                     self?.showInHoldMode(configId: config.id, trigger: trigger)
                 },
                 onRelease: { [weak self] in
-                    print("🔼 [InstanceManager] Hold key RELEASED for '\(config.name)'")
+                    print("[InstanceManager] Hold key RELEASED for '\(config.name)'")
                     self?.hideFromHoldMode(configId: config.id)
                 }
             )
@@ -272,7 +272,7 @@ class CircularUIInstanceManager: ObservableObject {
                 isHoldMode: false,
                 forConfigId: config.id,
                 onPress: { [weak self] in
-                    print("🎯 [InstanceManager] Keyboard triggered for '\(config.name)'")
+                    print("[InstanceManager] Keyboard triggered for '\(config.name)'")
                     self?.show(configId: config.id)
                 }
             )
@@ -282,12 +282,12 @@ class CircularUIInstanceManager: ObservableObject {
     /// Register a mouse button trigger
     private func registerMouseTrigger(_ trigger: TriggerConfiguration, forConfig config: StoredRingConfiguration) {
         guard let buttonNumber = trigger.buttonNumber else {
-            print("   ⚠️ Mouse trigger missing buttonNumber for '\(config.name)'")
+            print("   Mouse trigger missing buttonNumber for '\(config.name)'")
             return
         }
         
         if trigger.isHoldMode {
-            print("   ⚠️ Mouse button hold mode not yet implemented for '\(config.name)'")
+            print("   Mouse button hold mode not yet implemented for '\(config.name)'")
             return
         }
         
@@ -298,7 +298,7 @@ class CircularUIInstanceManager: ObservableObject {
             modifierFlags: trigger.modifierFlags,
             forConfigId: config.id
         ) { [weak self] in
-            print("🎯 [InstanceManager] Mouse button triggered for '\(config.name)'")
+            print("[InstanceManager] Mouse button triggered for '\(config.name)'")
             self?.show(configId: config.id)
         }
     }
@@ -307,12 +307,12 @@ class CircularUIInstanceManager: ObservableObject {
     private func registerTrackpadTrigger(_ trigger: TriggerConfiguration, forConfig config: StoredRingConfiguration) {
         guard let swipeDirection = trigger.swipeDirection,
               let fingerCount = trigger.fingerCount else {
-            print("   ⚠️ Trackpad trigger missing direction/fingerCount for '\(config.name)'")
+            print("   Trackpad trigger missing direction/fingerCount for '\(config.name)'")
             return
         }
         
         if trigger.isHoldMode {
-            print("   ⚠️ Trackpad hold mode not yet implemented for '\(config.name)'")
+            print("   Trackpad hold mode not yet implemented for '\(config.name)'")
             return
         }
         
@@ -328,7 +328,7 @@ class CircularUIInstanceManager: ObservableObject {
                 modifierFlags: trigger.modifierFlags,
                 forConfigId: config.id
             ) { [weak self] triggerDirection in
-                print("🎯 [InstanceManager] Circle gesture triggered for '\(config.name)'")
+                print("[InstanceManager] Circle gesture triggered for '\(config.name)'")
                 self?.show(configId: config.id, triggerDirection: triggerDirection)
             }
             return
@@ -345,7 +345,7 @@ class CircularUIInstanceManager: ObservableObject {
                 modifierFlags: trigger.modifierFlags,
                 forConfigId: config.id
             ) { [weak self] _ in
-                print("🎯 [InstanceManager] Two-finger tap triggered for '\(config.name)'")
+                print("[InstanceManager] Two-finger tap triggered for '\(config.name)'")
                 self?.show(configId: config.id)
             }
             return
@@ -360,7 +360,7 @@ class CircularUIInstanceManager: ObservableObject {
             modifierFlags: trigger.modifierFlags,
             forConfigId: config.id
         ) { [weak self] in
-            print("🎯 [InstanceManager] Trackpad gesture triggered for '\(config.name)'")
+            print("[InstanceManager] Trackpad gesture triggered for '\(config.name)'")
             self?.show(configId: config.id)
         }
     }
@@ -475,23 +475,8 @@ class CircularUIInstanceManager: ObservableObject {
     
     /// Stop monitoring for hotkeys
     func stopHotkeyMonitoring() {
-        print("🛑 [InstanceManager] Stopping hotkey monitoring...")
+        print("[InstanceManager] Stopping hotkey monitoring...")
         hotkeyManager.stopMonitoring()
-    }
-    
-    // MARK: - Debugging & Diagnostics
-    
-    /// Print current state for debuggz
-    func printDebugInfo() {
-        print("🔍 [InstanceManager] Debug Info:")
-        print("   Total instances: \(instances.count)")
-        print("   Active instance ID: \(activeInstanceId?.description ?? "none")")
-        
-        for (configId, instance) in instances.sorted(by: { $0.key < $1.key }) {
-            let visibleStatus = instance.isVisible ? "👁️ VISIBLE" : "😴 hidden"
-            let activeMarker = (configId == activeInstanceId) ? " ⭐️ ACTIVE" : ""
-            print("   - Config \(configId): \(visibleStatus)\(activeMarker)")
-        }
     }
     
     /// Check if any instance is currently visible
@@ -512,13 +497,13 @@ extension CircularUIInstanceManager {
     /// - Parameter configId: The configuration ID
     func show(configId: Int, triggerDirection: RotationDirection? = nil) {
         guard let instance = getInstance(forConfigId: configId) else {
-            print("❌ [InstanceManager] Cannot show - no instance for config \(configId)")
+            print("[InstanceManager] Cannot show - no instance for config \(configId)")
             return
         }
         
         // Toggle: if this instance is already visible, hide it
         if instance.isVisible && activeInstanceId == configId {
-            print("🔄 [InstanceManager] Toggle OFF - hiding already visible instance (config \(configId))")
+            print("[InstanceManager] Toggle OFF - hiding already visible instance (config \(configId))")
             instance.hide()
             activeInstanceId = nil
             return
@@ -526,7 +511,7 @@ extension CircularUIInstanceManager {
         
         // Hide currently active instance if different
         if let currentActiveId = activeInstanceId, currentActiveId != configId {
-            print("🔄 [InstanceManager] Hiding previous instance (config \(currentActiveId))")
+            print("[InstanceManager] Hiding previous instance (config \(currentActiveId))")
             if let previousInstance = getInstance(forConfigId: currentActiveId) {
                 previousInstance.hide()
             }
@@ -534,7 +519,7 @@ extension CircularUIInstanceManager {
         
         // Update active instance tracking
         activeInstanceId = configId
-        print("✅ [InstanceManager] Setting active instance to config \(configId)")
+        print("[InstanceManager] Setting active instance to config \(configId)")
         
         // Show the new instance
         instance.show(triggerDirection: triggerDirection)
@@ -545,7 +530,7 @@ extension CircularUIInstanceManager {
     func show(forShortcut shortcut: String) {
         // Find config with matching shortcut
         guard let config = configurationManager.getConfiguration(forShortcut: shortcut) else {
-            print("❌ [InstanceManager] Cannot show - no configuration for shortcut '\(shortcut)'")
+            print("[InstanceManager] Cannot show - no configuration for shortcut '\(shortcut)'")
             return
         }
         
@@ -555,7 +540,7 @@ extension CircularUIInstanceManager {
     
     /// Hide all visible instances
     func hideAll() {
-        print("🙈 [InstanceManager] Hiding all visible instances")
+        print("[InstanceManager] Hiding all visible instances")
         
         for instance in visibleInstances {
             instance.hide()
@@ -568,11 +553,11 @@ extension CircularUIInstanceManager {
     /// Hide the currently active instance
     func hideActive() {
         guard let activeId = activeInstanceId else {
-            print("⚠️ [InstanceManager] No active instance to hide")
+            print("[InstanceManager] No active instance to hide")
             return
         }
         
-        print("🔄 [InstanceManager] Hiding active instance (config \(activeId))")
+        print("[InstanceManager] Hiding active instance (config \(activeId))")
         
         if let activeInstance = getInstance(forConfigId: activeId) {
             activeInstance.hide()
@@ -603,7 +588,7 @@ extension CircularUIInstanceManager {
     ///   - trigger: The trigger that activated this ring (for auto-execute settings)
     private func showInHoldMode(configId: Int, trigger: TriggerConfiguration? = nil) {
         guard let instance = getInstance(forConfigId: configId) else {
-            print("❌ [InstanceManager] Cannot show in hold mode - no instance for config \(configId)")
+            print("[InstanceManager] Cannot show in hold mode - no instance for config \(configId)")
             return
         }
         
@@ -613,7 +598,7 @@ extension CircularUIInstanceManager {
         
         // Hide currently active instance if different
         if let currentActiveId = activeInstanceId, currentActiveId != configId {
-            print("🔄 [InstanceManager] Hiding previous instance (config \(currentActiveId)) for hold mode")
+            print("[InstanceManager] Hiding previous instance (config \(currentActiveId)) for hold mode")
             if let previousInstance = getInstance(forConfigId: currentActiveId) {
                 previousInstance.hide()
             }
@@ -621,7 +606,7 @@ extension CircularUIInstanceManager {
         
         // Update active instance tracking
         activeInstanceId = configId
-        print("✅ [InstanceManager] Setting active instance to config \(configId) (HOLD MODE)")
+        print("[InstanceManager] Setting active instance to config \(configId) (HOLD MODE)")
         
         // Show the new instance
         instance.show()
@@ -631,17 +616,17 @@ extension CircularUIInstanceManager {
     /// - Parameter configId: The configuration ID
     private func hideFromHoldMode(configId: Int) {
         guard let instance = getInstance(forConfigId: configId) else {
-            print("❌ [InstanceManager] Cannot hide from hold mode - no instance for config \(configId)")
+            print("[InstanceManager] Cannot hide from hold mode - no instance for config \(configId)")
             return
         }
         
         // Only hide if instance is actually in hold mode
         guard instance.isInHoldMode else {
-            print("⚠️ [InstanceManager] Instance \(configId) not in hold mode - skipping hide")
+            print("[InstanceManager] Instance \(configId) not in hold mode - skipping hide")
             return
         }
         
-        print("🔄 [InstanceManager] Hiding instance from hold mode (config \(configId))")
+        print("[InstanceManager] Hiding instance from hold mode (config \(configId))")
         
         // Hide the instance
         instance.hide()

@@ -74,20 +74,20 @@ class MouseTracker {
         isPausedUntilMovement = true
         lastMouseLocation = NSEvent.mouseLocation
         ringLevelAtPause = lastRingLevel  // Remember which ring we clicked in
-        print("⏸️ [MouseTracker] Paused tracking - clicked in ring level: \(ringLevelAtPause ?? -1)")
+        print("[MouseTracker] Paused tracking - clicked in ring level: \(ringLevelAtPause ?? -1)")
     }
     
     private var isPausedForDrag = false
 
     func pauseForDrag() {
         isPausedForDrag = true
-        print("⏸️ [MouseTracker] Paused for drag operation")
+        print("[MouseTracker] Paused for drag operation")
     }
 
     func resumeFromDrag() {
         guard isPausedForDrag else { return }
         isPausedForDrag = false
-        print("▶️ [MouseTracker] Resumed from drag")
+        print("[MouseTracker] Resumed from drag")
     }
     
     func resumeTracking() {
@@ -128,7 +128,7 @@ class MouseTracker {
                 let moved = abs(current.x - last.x) > 5 || abs(current.y - last.y) > 5  // Increased threshold
                 if moved {
                     isPausedUntilMovement = false
-                    print("▶️ [MouseTracker] Resumed tracking after mouse movement")
+                    print("[MouseTracker] Resumed tracking after mouse movement")
                     lastMouseLocation = current  // Update now that we resumed
                 } else {
                     // Still paused, don't track and DON'T update lastMouseLocation
@@ -153,7 +153,7 @@ class MouseTracker {
                     
                     // Clear selection when in close zone
                     if lastFunctionIndex != nil || lastRingLevel != nil {
-                        print("🎯 [Track] In close zone (distance: \(String(format: "%.1f", distance))) - clearing selection")
+                        print("[Track] In close zone (distance: \(String(format: "%.1f", distance))) - clearing selection")
                         lastFunctionIndex = nil
                         lastRingLevel = nil
                         onPieHover?(nil)
@@ -177,7 +177,7 @@ class MouseTracker {
         
         // Only track hover if we're inside a ring
         guard let ringLevel = ringLevel else {
-            print("⚠️ [Track] No ring level - skipping hover")
+            print("[Track] No ring level - skipping hover")
             return
         }
         
@@ -231,7 +231,6 @@ class MouseTracker {
         
         // If beyond all rings, treat as being in the active (outermost) ring
         if functionManager.rings.count > 0 {
-//            print("🎯 Beyond all rings at distance \(distance), treating as active ring \(functionManager.activeRingLevel)")
             return functionManager.activeRingLevel
         }
         
@@ -272,7 +271,7 @@ class MouseTracker {
         if activeRingOpenedByClick, let pauseLevel = ringLevelAtPause {
             if let currentRingLevel = currentRingLevel, currentRingLevel == activeRingLevel, activeRingLevel > pauseLevel {
                 // Moved forward from ring 2 into ring 3 - clear click protection
-                print("➡️ Moved forward from ring \(pauseLevel) into ring \(currentRingLevel) - enabling regular boundary rules")
+                print("Moved forward from ring \(pauseLevel) into ring \(currentRingLevel) - enabling regular boundary rules")
                 ringLevelAtPause = nil
                 // Note: Don't return, let the rest of the boundary logic handle it
             }
@@ -310,7 +309,7 @@ class MouseTracker {
                                     // Debounce: only trigger once per node
                                     if lastExecutedNodeId != node.id {
                                         if let center = trackingStartPoint {
-                                            print("📋 Beyond boundary - expanding '\(node.name)' to panel")
+                                            print("Beyond boundary - expanding '\(node.name)' to panel")
                                             onExpandToPanel?(node, Double(angle), center, activeRingOuterRadius)
                                         }
                                         lastExecutedNodeId = node.id
@@ -339,7 +338,7 @@ class MouseTracker {
                                     // Debounce: only trigger once per node
                                     if lastExecutedNodeId != node.id {
                                         if let center = trackingStartPoint {
-                                            print("📋 Beyond boundary - navigating '\(node.name)' to panel")
+                                            print("Beyond boundary - navigating '\(node.name)' to panel")
                                             onExpandToPanel?(node, Double(angle), center, activeRingOuterRadius)
                                         }
                                         lastExecutedNodeId = node.id
@@ -357,14 +356,14 @@ class MouseTracker {
                                 }
                                 
                                 // Default: navigate in ring
-                                print("📂 Beyond boundary - navigating into '\(node.name)'")
+                                print("Beyond boundary - navigating into '\(node.name)'")
                                 functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: pieIndex)
                                 lastFunctionIndex = pieIndex
                                 lastRingLevel = activeRingLevel
                                 return
                                 
                             case .launchRing(let configId):
-                                print("🎯 [BoundaryCross] Launching ring config \(configId)")
+                                print("[BoundaryCross] Launching ring config \(configId)")
                                 DispatchQueue.main.async {
                                     CircularUIInstanceManager.shared.show(configId: configId)
                                 }
@@ -372,12 +371,11 @@ class MouseTracker {
                                 
                             case .doNothing:
                                 return
-//                                print("⚠️ Beyond boundary hovering '\(node.name)' - no auto-expand (use right-click)")
 
                             case .execute(let action):
                                 // Only execute once per node (debounce)
                                 if lastExecutedNodeId != node.id {
-                                    print("🎯 Beyond boundary - executing '\(node.name)'")
+                                    print("Beyond boundary - executing '\(node.name)'")
                                     action()
                                     lastExecutedNodeId = node.id
                                     lastFunctionIndex = pieIndex
@@ -390,20 +388,20 @@ class MouseTracker {
                             case .executeKeepOpen(let action):
                                 // Only execute once per node (debounce)
                                 if lastExecutedNodeId != node.id {
-                                    print("🎯 Beyond boundary - executing '\(node.name)' (keeping UI open)")
+                                    print("Beyond boundary - executing '\(node.name)' (keeping UI open)")
                                     action()
                                     lastExecutedNodeId = node.id
                                     lastFunctionIndex = pieIndex
                                     lastRingLevel = activeRingLevel
                                 }
                             case .drag:
-                                print("⚠️ Beyond boundary hovering '\(node.name)' - draggable item (no auto-expand)")
+                                print("Beyond boundary hovering '\(node.name)' - draggable item (no auto-expand)")
                             }
                         }
                     }
                 }
             } else {
-                print("🔒 Active ring was opened by click - not auto-expanding beyond boundary")
+                print("Active ring was opened by click - not auto-expanding beyond boundary")
             }
         }
         
@@ -414,30 +412,30 @@ class MouseTracker {
                 if let pauseLevel = ringLevelAtPause {
                     if currentRingLevel < pauseLevel {
                         // Moved backward past where we clicked - collapse
-                        print("🔴 Click-opened ring - moved backward from ring \(pauseLevel) to ring \(currentRingLevel) - collapsing")
+                        print("Click-opened ring - moved backward from ring \(pauseLevel) to ring \(currentRingLevel) - collapsing")
                         functionManager.collapseToRing(level: currentRingLevel)
                         onCollapse?()
                         ringLevelAtPause = nil  // Reset
                         return
                     } else if currentRingLevel == pauseLevel {
                         // Still in the ring where we clicked - keep open
-                        print("✅ Click-opened ring - staying in ring \(currentRingLevel) (clicked at \(pauseLevel)) - keeping open")
+                        print("Click-opened ring - staying in ring \(currentRingLevel) (clicked at \(pauseLevel)) - keeping open")
                         return
                     } else {
                         // currentRingLevel > pauseLevel - shouldn't happen here but handle it
-                        print("⚠️ Unexpected: current ring \(currentRingLevel) > pause level \(pauseLevel) in inward check")
+                        print("Unexpected: current ring \(currentRingLevel) > pause level \(pauseLevel) in inward check")
                         return
                     }
                 } else {
                     // No pause level recorded - apply regular boundary rules
-                    print("🔴 Click-opened ring (no pause level) - collapsing to ring \(currentRingLevel)")
+                    print("Click-opened ring (no pause level) - collapsing to ring \(currentRingLevel)")
                     functionManager.collapseToRing(level: currentRingLevel)
                     onCollapse?()
                     return
                 }
             } else {
                 // Not click-opened - normal boundary crossing behavior
-                print("🔴 Boundary crossed inward - collapsing to ring \(currentRingLevel)")
+                print("Boundary crossed inward - collapsing to ring \(currentRingLevel)")
                 functionManager.collapseToRing(level: currentRingLevel)
                 onCollapse?()
                 return
@@ -460,17 +458,17 @@ class MouseTracker {
                         switch node.onBoundaryCross.base {
                         
                         case .expand:
-                            print("🔄 Switching to category '\(node.name)'")
+                            print("Switching to category '\(node.name)'")
                             functionManager.expandCategory(ringLevel: activeRingLevel, index: hoveredIndex)
                         
                         case .launchRing(let configId):
-                            print("🎯 [BoundaryCross-Category] Launching ring config \(configId)")
+                            print("[BoundaryCross-Category] Launching ring config \(configId)")
                             DispatchQueue.main.async {
                                 CircularUIInstanceManager.shared.show(configId: configId)
                             }
                             
                         case .navigateInto:
-                            print("📂 Switching to folder '\(node.name)'")
+                            print("Switching to folder '\(node.name)'")
                             functionManager.navigateIntoFolder(ringLevel: activeRingLevel, index: hoveredIndex)
                         case .doNothing, .execute, .executeKeepOpen, .drag:
                             // Don't switch if node doesn't want auto-expansion/navigation

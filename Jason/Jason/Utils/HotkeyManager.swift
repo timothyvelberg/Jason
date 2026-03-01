@@ -137,11 +137,7 @@ class HotkeyManager {
         let hasAccessibility = PermissionManager.shared.hasAccessibilityAccess
         
         if !hasAccessibility {
-            print("[HotkeyManager] ⚠️ No accessibility permission - advanced features disabled")
-            print("   • Keyboard event tap: DISABLED (shortcuts may not intercept other apps)")
-            print("   • Mouse buttons 3+: DISABLED")
-            print("   • Trackpad gestures: DISABLED")
-            print("   • Basic shortcuts via NSEvent: ENABLED")
+            print("[HotkeyManager] No accessibility permission - advanced features disabled")
         }
         
         // Start keyboard event tap ONLY if we have permission

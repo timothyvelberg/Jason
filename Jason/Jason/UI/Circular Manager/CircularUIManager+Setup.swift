@@ -50,22 +50,12 @@ extension CircularUIManager {
             appSwitcherManager: AppSwitcherManager.shared
         )
         
-        // Create providers from configuration
-        print("   [Setup] Loading providers from configuration")
-        print("   Configuration: \(ringConfiguration.name)")
-        print("   Providers: \(ringConfiguration.providers.count)")
-        
         let providers = factory.createProviders(from: ringConfiguration)
-        
-        print("[Setup] Available config providerTypes: \(ringConfiguration.providers.map { $0.providerType })")
 
         // Register all providers with their configurations
         for provider in providers {
             // Look up this provider's configuration by matching normalized names
             let normalizedProviderId = ProviderFactory.normalizeProviderName(provider.providerId)
-
-            
-            print("[Setup] Matching '\(provider.providerId)' → normalized: '\(normalizedProviderId)'")
 
             let providerConfig = ringConfiguration.providers.first { config in
                 let normalizedConfigType = ProviderFactory.normalizeProviderName(config.providerType)
@@ -187,22 +177,6 @@ extension CircularUIManager {
             } else {
                 panelItems = []
             }
-            
-            // In the onExpandToPanel callback, after detecting nested rings:
-            print("🔍 [Ring Geometry Debug] About to spawn panel from ring")
-            if let functionManager = self.functionManager {
-                print("   Total rings: \(functionManager.rings.count)")
-                for (index, config) in functionManager.ringConfigurations.enumerated() {
-                    print("   Ring \(index):")
-                    print("      startRadius: \(config.startRadius)")
-                    print("      thickness: \(config.thickness)")
-                    print("      outerRadius: \(config.startRadius + config.thickness)")
-                    print("      iconSize: \(config.iconSize)")
-                    print("      Icon center at: \(config.startRadius + config.thickness/2)")
-                    print("      Icon actual edge: \(config.startRadius + config.thickness/2 + config.iconSize/2)")
-                }
-            }
-            print("   Spawning from ringOuterRadius: \(ringOuterRadius)")
 
             if !panelItems.isEmpty {
                 self.listPanelManager?.show(

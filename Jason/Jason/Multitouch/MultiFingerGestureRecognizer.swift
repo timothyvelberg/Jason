@@ -155,9 +155,6 @@ class MultiFingerGestureRecognizer: GestureRecognizer {
             } else {
                 // Took too long to get fingers down - not a deliberate gesture
                 phase = .completed
-                if debugLogging {
-                    print("[MultiFingerGesture] Build-up too slow (\(String(format: "%.0f", buildUpTime * 1000))ms) - ignoring")
-                }
             }
         }
         
@@ -250,16 +247,8 @@ class MultiFingerGestureRecognizer: GestureRecognizer {
         
         let fingerCount = gestureFingerCount
         
-        if debugLogging {
-            print("[MultiFingerGesture] Analyzing: fingers=\(fingerCount), duration=\(String(format: "%.3f", duration))s, distance=\(String(format: "%.3f", distance))")
-        }
-        
         // === CHECK FOR TAP ===
         if duration <= config.maxTapDuration && distance < config.maxTapDistance {
-            if debugLogging {
-                print("✅ [MultiFingerGesture] TAP with \(fingerCount) fingers")
-            }
-            
             let event = GestureEvent.tap(fingerCount: fingerCount)
             DispatchQueue.main.async { [weak self] in
                 self?.onGesture?(event)
@@ -267,28 +256,8 @@ class MultiFingerGestureRecognizer: GestureRecognizer {
             return
         }
         
-        // === CHECK FOR SWIPE ===
-        guard duration <= config.maxSwipeDuration else {
-            if debugLogging {
-                print("🖐️ [MultiFingerGesture] Duration too long for swipe")
-            }
-            return
-        }
-        
-        guard distance >= config.minSwipeDistance else {
-            if debugLogging {
-                print("🖐️ [MultiFingerGesture] Distance too short for swipe")
-            }
-            return
-        }
-        
         let velocity = distance / Float(duration)
-        guard velocity >= config.minSwipeVelocity else {
-            if debugLogging {
-                print("🖐️ [MultiFingerGesture] Velocity too low for swipe")
-            }
-            return
-        }
+
         
         // Determine direction
         let direction: MTSwipeDirection
@@ -298,11 +267,7 @@ class MultiFingerGestureRecognizer: GestureRecognizer {
         } else {
             direction = dx > 0 ? .right : .left
         }
-        
-        if debugLogging {
-            print("✅ [MultiFingerGesture] SWIPE \(direction.rawValue.uppercased()) with \(fingerCount) fingers")
-        }
-        
+
         let event = GestureEvent.swipe(direction: direction, fingerCount: fingerCount)
         DispatchQueue.main.async { [weak self] in
             self?.onGesture?(event)

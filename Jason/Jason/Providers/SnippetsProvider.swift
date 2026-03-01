@@ -129,7 +129,6 @@ class SnippetsProvider: FunctionProvider {
     // MARK: - Actions
     
     private func pasteSnippet(_ snippet: Snippet) {
-        print("📌 [SnippetsProvider] Pasting snippet: \"\(snippet.title)\"")
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(snippet.content, forType: .string)
@@ -140,7 +139,7 @@ class SnippetsProvider: FunctionProvider {
         DatabaseManager.shared.deleteSnippet(id: id)
         loadSnippets()
         NotificationCenter.default.postProviderUpdate(providerId: providerId)
-        print("🗑️ [SnippetsProvider] Deleted snippet: \(id) (\(snippets.count) remaining)")
+        print("[SnippetsProvider] Deleted snippet: \(id) (\(snippets.count) remaining)")
     }
     
     // MARK: - Public Methods

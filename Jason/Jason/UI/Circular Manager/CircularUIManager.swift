@@ -98,7 +98,7 @@ class CircularUIManager: ObservableObject, UIManager {
     deinit {
         // Clean up notification observer
         NotificationCenter.default.removeObserver(self)
-        print("🧹 CircularUIManager deallocated - removed observers")
+        print("CircularUIManager deallocated - removed observers")
         
         if let monitor = panelMouseMonitor {
             NSEvent.removeMonitor(monitor)
@@ -106,7 +106,7 @@ class CircularUIManager: ObservableObject, UIManager {
     }
     
     func teardown() {
-        print("🧹 [CircularUIManager-\(configId)] teardown() called")
+        print("[CircularUIManager-\(configId)] teardown() called")
         
         // 1. Hide if visible
         if isVisible {
@@ -159,7 +159,7 @@ class CircularUIManager: ObservableObject, UIManager {
         combinedAppsProvider = nil
         favoriteFilesProvider = nil
         
-        print("🧹 [CircularUIManager-\(configId)] teardown complete")
+        print("[CircularUIManager-\(configId)] teardown complete")
     }
     
     // MARK: - Provider Update Handler

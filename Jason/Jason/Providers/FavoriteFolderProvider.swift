@@ -77,7 +77,6 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     // MARK: - FunctionProvider Protocol
     
     func provideFunctions() -> [FunctionNode] {
-        print("📁 [FavoriteFolderProvider] provideFunctions() called")
         
         // Get favorites from database
         let favoritesFromDB = DatabaseManager.shared.getFavoriteFolders()
@@ -139,18 +138,17 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     
     func clearCache() {
         nodeCache.removeAll()
-        print("🗑️ [FavoriteFolderProvider] Cache cleared")
+        print("[FavoriteFolderProvider] Cache cleared")
     }
     
     func invalidateCache(for url: URL) {
         let cacheKey = url.path
         nodeCache.removeValue(forKey: cacheKey)
-        print("🗑️ [FavoriteFolderProvider] Invalidated cache for: \(url.path)")
+        print("[FavoriteFolderProvider] Invalidated cache for: \(url.path)")
     }
     
     func refresh() {
-        print("🔄 [FavoriteFolderProvider] refresh() called")
-//        nodeCache.removeAll()
+        print("[FavoriteFolderProvider] refresh() called")
     }
     
     /// Synchronous cache lookup for use by ListPanelManager (skips debounce on hit)
@@ -166,11 +164,11 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     // MARK: - Dynamic Loading
     
     func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
-            print("📂 [FavoriteFolderProvider] loadChildren called for: \(node.name)")
+            print("[FavoriteFolderProvider] loadChildren called for: \(node.name)")
             
             guard let metadata = node.metadata,
                   let urlString = metadata["folderURL"] as? String else {
-                print("❌ No folderURL in metadata")
+                print("No folderURL in metadata")
                 return []
             }
             
@@ -181,7 +179,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             if var entry = nodeCache[folderPath] {
                 entry.lastAccessedAt = Date()
                 nodeCache[folderPath] = entry
-                print("⚡ [FavoriteFolderProvider] nodeCache HIT for '\(node.name)' (\(entry.nodes.count) items)")
+                print("[FavoriteFolderProvider] nodeCache HIT for '\(node.name)' (\(entry.nodes.count) items)")
                 return entry.nodes
             }
 
@@ -249,7 +247,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             // SQLite read fallback for favorite folders and promoted subfolders
             if isFavorite || visitTracker.isPromoted(folderPath) {
                 if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
-                    print("💾 [FavoriteFolderProvider] Warm from SQLite: '\(node.name)'")
+                    print("[FavoriteFolderProvider] Warm from SQLite: '\(node.name)'")
                     
                     var nodes = cachedItems.map { item in
                         item.isDirectory ? createFolderNodeFromCache(item: item) : createFileNodeFromCache(item: item)

@@ -123,7 +123,7 @@ class ClipboardManager: ObservableObject {
         if plainTextOnly {
             pasteboard.declareTypes([.string], owner: nil)
             pasteboard.setString(entry.content, forType: .string)
-            print("📋 [ClipboardManager] Pasting plain text only (⌘ held)")
+            print("[ClipboardManager] Pasting plain text only (⌘ held)")
         } else {
             // Declare types we're going to write
             var types: [NSPasteboard.PasteboardType] = [.string]
@@ -138,13 +138,13 @@ class ClipboardManager: ObservableObject {
             // Restore HTML if available
             if let htmlData = entry.htmlData {
                 pasteboard.setData(htmlData, forType: .html)
-                print("📋 [ClipboardManager] Restored HTML data (\(htmlData.count) bytes)")
+                print("[ClipboardManager] Restored HTML data (\(htmlData.count) bytes)")
             }
             
             // Restore RTF if available
             if let rtfData = entry.rtfData {
                 pasteboard.setData(rtfData, forType: .rtf)
-                print("📋 [ClipboardManager] Restored RTF data (\(rtfData.count) bytes)")
+                print("[ClipboardManager] Restored RTF data (\(rtfData.count) bytes)")
             }
             
             // Always set string representation
@@ -154,7 +154,7 @@ class ClipboardManager: ObservableObject {
         // Update our changeCount so we don't re-capture this as a new entry
         lastChangeCount = pasteboard.changeCount
         
-        print("📋 [ClipboardManager] Pasting entry: \"\(entry.content.prefix(30))...\"")
+        print("[ClipboardManager] Pasting entry: \"\(entry.content.prefix(30))...\"")
         
         // Execute Cmd+V via ShortcutExecutor
         ShortcutExecutor.execute(keyCode: 9, modifierFlags: NSEvent.ModifierFlags.command.rawValue)
@@ -184,17 +184,17 @@ class ClipboardManager: ObservableObject {
         // Read RTF data if available (optional)
         let rtfData = pasteboard.data(forType: .rtf)
         if rtfData != nil {
-            print("📋 [ClipboardManager] Captured RTF data (\(rtfData!.count) bytes)")
+            print("[ClipboardManager] Captured RTF data (\(rtfData!.count) bytes)")
         }
         
         // Read HTML data if available (optional)
         let htmlData = pasteboard.data(forType: .html)
         if htmlData != nil {
-            print("📋 [ClipboardManager] Captured HTML data (\(htmlData!.count) bytes)")
+            print("[ClipboardManager] Captured HTML data (\(htmlData!.count) bytes)")
         }
         
         if let bundleId = sourceAppBundleId {
-            print("📋 [ClipboardManager] Source app: \(bundleId)")
+            print("[ClipboardManager] Source app: \(bundleId)")
         }
         
         addEntry(content: content, rtfData: rtfData, htmlData: htmlData, sourceAppBundleId: sourceAppBundleId)
@@ -230,7 +230,7 @@ class ClipboardManager: ObservableObject {
             // Cap in-memory array
             if history.count > 200 {
                 history = Array(history.prefix(200))
-                print("🧹 [ClipboardManager] Trimmed in-memory history to 200")
+                print("[ClipboardManager] Trimmed in-memory history to 200")
             }
             
             // Prune database

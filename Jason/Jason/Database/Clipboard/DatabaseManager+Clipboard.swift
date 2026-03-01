@@ -66,10 +66,10 @@ extension DatabaseManager {
                     let rtfInfo = entry.rtfData != nil ? " RTF:\(entry.rtfData!.count)" : ""
                     let htmlInfo = entry.htmlData != nil ? " HTML:\(entry.htmlData!.count)" : ""
                     let appInfo = entry.sourceAppBundleId != nil ? " from:\(entry.sourceAppBundleId!)" : ""
-                    print("📋 [DatabaseManager] Saved clipboard entry: \"\(entry.content.prefix(30))...\"\(rtfInfo)\(htmlInfo)\(appInfo)")
+                    print("[DatabaseManager] Saved clipboard entry: \"\(entry.content.prefix(30))...\"\(rtfInfo)\(htmlInfo)\(appInfo)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to save clipboard entry: \(String(cString: error))")
+                        print("[DatabaseManager] Failed to save clipboard entry: \(String(cString: error))")
                     }
                 }
             }
@@ -82,7 +82,7 @@ extension DatabaseManager {
     func deleteClipboardEntry(id: UUID) {
         queue.sync {
             guard let db = db else {
-                print("❌ [DatabaseManager] Database not initialized")
+                print("[DatabaseManager] Database not initialized")
                 return
             }
             
@@ -96,7 +96,7 @@ extension DatabaseManager {
                     print("🗑️ [DatabaseManager] Deleted clipboard entry: \(id)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to delete clipboard entry: \(String(cString: error))")
+                        print("[DatabaseManager] Failed to delete clipboard entry: \(String(cString: error))")
                     }
                 }
             }
@@ -111,7 +111,7 @@ extension DatabaseManager {
         
         queue.sync {
             guard let db = db else {
-                print("❌ [DatabaseManager] Database not initialized")
+                print("[DatabaseManager] Database not initialized")
                 return
             }
             
@@ -173,7 +173,7 @@ extension DatabaseManager {
         
         let rtfCount = entries.filter { $0.rtfData != nil }.count
         let htmlCount = entries.filter { $0.htmlData != nil }.count
-        print("📋 [DatabaseManager] Loaded \(entries.count) clipboard entries (\(rtfCount) RTF, \(htmlCount) HTML)")
+        print("[DatabaseManager] Loaded \(entries.count) clipboard entries (\(rtfCount) RTF, \(htmlCount) HTML)")
         return entries
     }
     
@@ -181,7 +181,7 @@ extension DatabaseManager {
     func clearClipboardHistory() {
         queue.sync {
             guard let db = db else {
-                print("❌ [DatabaseManager] Database not initialized")
+                print("[DatabaseManager] Database not initialized")
                 return
             }
             
@@ -191,7 +191,7 @@ extension DatabaseManager {
                 print("🗑️ [DatabaseManager] Cleared all clipboard history")
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to clear clipboard history: \(String(cString: error))")
+                    print("[DatabaseManager] Failed to clear clipboard history: \(String(cString: error))")
                 }
             }
         }
@@ -201,7 +201,7 @@ extension DatabaseManager {
     func pruneClipboardHistory(keepCount: Int = 200) {
         queue.sync {
             guard let db = db else {
-                print("❌ [DatabaseManager] Database not initialized")
+                print("[DatabaseManager] Database not initialized")
                 return
             }
             
@@ -226,7 +226,7 @@ extension DatabaseManager {
                     }
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to prune clipboard history: \(String(cString: error))")
+                        print("[DatabaseManager] Failed to prune clipboard history: \(String(cString: error))")
                     }
                 }
             }

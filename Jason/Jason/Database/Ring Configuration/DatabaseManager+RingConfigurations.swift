@@ -55,7 +55,7 @@ extension DatabaseManager {
                 } else {
                     triggerDisplay = "Unknown"
                 }
-                print("⚠️ [DatabaseManager] Trigger '\(triggerDisplay)' is already in use by an active ring")
+                print("[DatabaseManager] Trigger '\(triggerDisplay)' is already in use by an active ring")
                 return
             }
             
@@ -128,15 +128,15 @@ extension DatabaseManager {
                     }
                     
                     let modeDisplay = isHoldMode ? "hold" : "tap"
-                    print("🔵 [DatabaseManager] Created ring configuration: '\(name)' (id: \(ringId!), trigger: \(triggerDisplay), mode: \(modeDisplay), presentation: \(presentationMode))")
+                    print("[DatabaseManager] Created ring configuration: '\(name)' (id: \(ringId!), trigger: \(triggerDisplay), mode: \(modeDisplay), presentation: \(presentationMode))")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to insert ring configuration '\(name)': \(String(cString: error))")
+                        print("[DatabaseManager] Failed to insert ring configuration '\(name)': \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare INSERT for ring configuration '\(name)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare INSERT for ring configuration '\(name)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -269,7 +269,7 @@ extension DatabaseManager {
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare SELECT for ring configurations: \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare SELECT for ring configurations: \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -402,7 +402,7 @@ extension DatabaseManager {
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare SELECT for active ring configurations: \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare SELECT for active ring configurations: \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -536,7 +536,7 @@ extension DatabaseManager {
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare SELECT for ring configuration id \(id): \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare SELECT for ring configuration id \(id): \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -583,7 +583,7 @@ extension DatabaseManager {
                     
                     if sqlite3_step(checkStatement) == SQLITE_ROW {
                         let shortcutDisplay = TriggerFormatting.formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
-                        print("⚠️ [DatabaseManager] Cannot update: shortcut '\(shortcutDisplay)' is already in use by another active ring")
+                        print("[DatabaseManager] Cannot update: shortcut '\(shortcutDisplay)' is already in use by another active ring")
                         sqlite3_finalize(checkStatement)
                         return
                     }
@@ -611,7 +611,7 @@ extension DatabaseManager {
             if presentationMode != nil { updates.append("presentation_mode = ?") }
             
             guard !updates.isEmpty else {
-                print("⚠️ [DatabaseManager] No fields to update for ring configuration id \(id)")
+                print("[DatabaseManager] No fields to update for ring configuration id \(id)")
                 return
             }
             
@@ -691,15 +691,15 @@ extension DatabaseManager {
                 sqlite3_bind_int(statement, paramIndex, Int32(id))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("📊 [DatabaseManager] Updated ring configuration id \(id)")
+                    print("[DatabaseManager] Updated ring configuration id \(id)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to update ring configuration id \(id): \(String(cString: error))")
+                        print("[DatabaseManager] Failed to update ring configuration id \(id): \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare UPDATE for ring configuration id \(id): \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare UPDATE for ring configuration id \(id): \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -719,15 +719,15 @@ extension DatabaseManager {
                 sqlite3_bind_int(statement, 2, Int32(id))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("📊 [DatabaseManager] Set ring configuration id \(id) active status to \(isActive)")
+                    print("[DatabaseManager] Set ring configuration id \(id) active status to \(isActive)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to update active status for ring configuration id \(id): \(String(cString: error))")
+                        print("[DatabaseManager] Failed to update active status for ring configuration id \(id): \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare UPDATE for active status (id \(id)): \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare UPDATE for active status (id \(id)): \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -769,18 +769,18 @@ extension DatabaseManager {
                 if sqlite3_step(statement) == SQLITE_DONE {
                     let changes = sqlite3_changes(db)
                     if changes > 0 {
-                        print("🗑️ [DatabaseManager] Deleted ring configuration id \(id) (and associated providers)")
+                        print("[DatabaseManager] Deleted ring configuration id \(id) (and associated providers)")
                     } else {
-                        print("⚠️ [DatabaseManager] Ring configuration id \(id) not found")
+                        print("[DatabaseManager] Ring configuration id \(id) not found")
                     }
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to delete ring configuration id \(id): \(String(cString: error))")
+                        print("[DatabaseManager] Failed to delete ring configuration id \(id): \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare DELETE for ring configuration id \(id): \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare DELETE for ring configuration id \(id): \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -799,15 +799,15 @@ extension DatabaseManager {
                 sqlite3_bind_int(statement, 2, Int32(id))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("📊 [DatabaseManager] Updated ring configuration id \(id) presentation_mode to '\(presentationMode)'")
+                    print("[DatabaseManager] Updated ring configuration id \(id) presentation_mode to '\(presentationMode)'")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to update presentation_mode for id \(id): \(String(cString: error))")
+                        print("[DatabaseManager] Failed to update presentation_mode for id \(id): \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare UPDATE for presentation_mode (id \(id)): \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare UPDATE for presentation_mode (id \(id)): \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)

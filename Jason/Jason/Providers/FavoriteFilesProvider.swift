@@ -66,12 +66,12 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         
         // If no favorites at all, add defaults and reload once
         if staticFiles.isEmpty && dynamicFiles.isEmpty {
-            print("📋 [FavoriteFiles] No favorites found - showing placeholder")
+            print("[FavoriteFiles] No favorites found - showing placeholder")
             fileEntries = []
             return
         }
         
-        print("📋 [FavoriteFiles] Loaded \(staticFiles.count) static favorite files")
+        print("[FavoriteFiles] Loaded \(staticFiles.count) static favorite files")
         
         for file in staticFiles {
             let fileURL = URL(fileURLWithPath: file.path)
@@ -111,7 +111,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             ))
         }
         
-        print("📋 [FavoriteFiles] Loaded \(dynamicFiles.count) dynamic favorite files")
+        print("[FavoriteFiles] Loaded \(dynamicFiles.count) dynamic favorite files")
         
         for dynamic in dynamicFiles {
             let resolvedPaths = resolveDynamicFile(dynamic)
@@ -255,7 +255,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             
             guard !existingPaths.isEmpty else { return nil }
             
-            print("💥 [FavoriteFiles] Cache burst: \(existingPaths.count) files for '\(dynamic.displayName)'")
+            print("[FavoriteFiles] Cache burst: \(existingPaths.count) files for '\(dynamic.displayName)'")
             return existingPaths
         } else {
             // Non-temporal sort — just the top item
@@ -334,7 +334,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             }
             
             let burstPaths = detectBurst(from: itemsWithDates)
-            print("💥 [FavoriteFiles] Filesystem burst: \(burstPaths.count) files for '\(dynamic.displayName)'")
+            print("[FavoriteFiles] Filesystem burst: \(burstPaths.count) files for '\(dynamic.displayName)'")
             return burstPaths
         } else {
             return sortedItems.prefix(1).map { $0.path }

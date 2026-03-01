@@ -482,27 +482,11 @@ class ListPanelManager: ObservableObject {
             mainRing: mainRing
         )
         
-        print("📊 [Panel Estimation Debug]")
-        for (index, item) in items.prefix(config.maxVisibleItems).enumerated() {
-            let estimated = estimateItemHeight(for: item, config: config)
-            print("   Item \(index): '\(item.name)' type=\(item.type) → \(estimated)px")
-        }
-        print("   Total estimated: \(estimatedPanelHeight(items: items, config: config))px")
-        
         // Use estimated height for boundary check (measurements come later)
         let panelHeight = estimatedPanelHeight(items: items, config: config)
 
         // Constrain to screen boundaries (left, top, bottom only)
         let constrainedPosition = constrainToScreenBounds(position: position, panelWidth: config.panelWidth, panelHeight: panelHeight)
-//        let constrainedPosition = position
-        
-        print("[ListPanelManager] Showing panel at angle \(angle)°")
-        print("   Items: \(items.count)")
-        print("   Panel center: \(position)")
-        print("   Config: width=\(config.panelWidth), maxVisible=\(config.maxVisibleItems), lineLimit=\(config.lineLimit)")
-        if mainRing != nil {
-            print("   Main ring geometry provided - accounting for nested rings")
-        }
         
         // Clear any existing panels and push new one
         panelStack = [
@@ -704,7 +688,7 @@ class ListPanelManager: ObservableObject {
                 
                 if panelStack[childIndex].isOverlapping != shouldOverlap {
                     panelStack[childIndex].isOverlapping = shouldOverlap
-                    print("📋 [Slide] Panel level \(panelStack[childIndex].level) isOverlapping: \(shouldOverlap)")
+                    print("[Slide] Panel level \(panelStack[childIndex].level) isOverlapping: \(shouldOverlap)")
                     
                     if shouldOverlap {
                         activePanelLevel = panelStack[childIndex].level

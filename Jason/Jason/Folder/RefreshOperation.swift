@@ -22,18 +22,18 @@ class RefreshOperation: Operation, @unchecked Sendable {
     
     override func main() {
         guard !isCancelled else {
-            print("⚠️ Refresh cancelled for \(folderName)")
+            print("Refresh cancelled for \(folderName)")
             return
         }
         
         let start = Date()
-        print("📥 Starting refresh for \(folderName)")
+        print("Starting refresh for \(folderName)")
         
         // Perform the actual refresh
         performRefresh()
         
         let duration = Date().timeIntervalSince1970 - start.timeIntervalSince1970
-        print("✅ Completed refresh for \(folderName) in \(String(format: "%.2f", duration))s")
+        print("Completed refresh for \(folderName) in \(String(format: "%.2f", duration))s")
     }
     
     private func performRefresh() {
@@ -43,7 +43,7 @@ class RefreshOperation: Operation, @unchecked Sendable {
         let items = loadFolderContents(at: path)
         
         guard !isCancelled else {
-            print("⚠️ Refresh cancelled during load for \(folderName)")
+            print("Refresh cancelled during load for \(folderName)")
             return
         }
         
@@ -69,29 +69,29 @@ class RefreshOperation: Operation, @unchecked Sendable {
         let fileManager = FileManager.default
         let folderURL = URL(fileURLWithPath: path)
         
-        // 🎯 Get folder settings - check favorite folders first, then dynamic files
+        // Get folder settings - check favorite folders first, then dynamic files
         let (maxItems, sortOrder) = getFolderSettings(for: path)
         
-        print("📊 Refresh settings: max=\(maxItems), sort=\(sortOrder.displayName)")
+        print("Refresh settings: max=\(maxItems), sort=\(sortOrder.displayName)")
         
         guard let itemURLs = try? fileManager.contentsOfDirectory(
             at: folderURL,
             includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey, .creationDateKey],
             options: [.skipsHiddenFiles]
         ) else {
-            print("❌ Failed to read contents of \(folderName)")
+            print("Failed to read contents of \(folderName)")
             return []
         }
         
-        print("📂 Found \(itemURLs.count) total items")
+        print("Found \(itemURLs.count) total items")
         
-        // 🎯 Sort URLs FIRST (so we get the RIGHT items before limiting)
+        // Sort URLs FIRST (so we get the RIGHT items before limiting)
         let sortedURLs = FolderSortingUtility.sortURLs(itemURLs, by: sortOrder)
         
-        // 🎯 Apply limit BEFORE converting to EnhancedFolderItems
+        // Apply limit BEFORE converting to EnhancedFolderItems
         let limitedURLs = Array(sortedURLs.prefix(maxItems))
         
-        print("📊 Processing \(limitedURLs.count) items (after limit)")
+        print("Processing \(limitedURLs.count) items (after limit)")
         
         // Convert to EnhancedFolderItems
         var items: [EnhancedFolderItem] = []
@@ -142,7 +142,7 @@ class RefreshOperation: Operation, @unchecked Sendable {
             items.append(item)
         }
         
-        print("✅ Cached \(items.count) items")
+        print("Cached \(items.count) items")
         
         // Items are already sorted (we sorted the URLs before converting)
         return items

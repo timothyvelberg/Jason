@@ -163,10 +163,10 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
                 onMiddleClick: ModifierAwareInteraction(base: .expand),         // Middle-click expands
                 onBoundaryCross: ModifierAwareInteraction(base: .expand),       // Auto-expand on boundary cross
                 onHover: {
-                    print("⭐ Hovering over Favorites category")
+                    print("Hovering over Favorites category")
                 },
                 onHoverExit: {
-                    print("⭐ Left Favorites category")
+                    print("Left Favorites category")
                 }
             )
         ]
@@ -174,14 +174,14 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
     
     func refresh() {
         // Reload favorite apps from database
-        print("🔄 [FavoriteAppsProvider] Refreshing favorite apps")
+        print("[FavoriteAppsProvider] Refreshing favorite apps")
         loadFavoriteApps()
     }
     
     // MARK: - App Actions
     
     private func launchApp(_ appInfo: AppInfo) {
-        print("🚀 Launching favorite app: \(appInfo.name)")
+        print("Launching favorite app: \(appInfo.name)")
         
         // Track app launch in database
         DatabaseManager.shared.updateAppAccess(bundleIdentifier: appInfo.bundleIdentifier)
@@ -192,13 +192,13 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         
         NSWorkspace.shared.openApplication(at: appInfo.url, configuration: configuration) { app, error in
             if let error = error {
-                print("❌ Failed to launch \(appInfo.name): \(error.localizedDescription)")
+                print("Failed to launch \(appInfo.name): \(error.localizedDescription)")
             } else if let app = app {
-                print("✅ Successfully launched \(appInfo.name)")
+                print("Successfully launched \(appInfo.name)")
                 
-                // 🆕 Update MRU tracking so the app appears at the top of the list
+                // Update MRU tracking so the app appears at the top of the list
                 self.appSwitcherManager?.recordAppUsage(app)
-                print("📊 Updated MRU tracking for \(appInfo.name)")
+                print("Updated MRU tracking for \(appInfo.name)")
             }
         }
     }
@@ -209,12 +209,12 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
     func addFavorite(bundleIdentifier: String, displayName: String? = nil, iconOverride: String? = nil) -> Bool {
         // Try to find the app first to get its name
         guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
-            print("⚠️ [FavoriteAppsProvider] Could not find app: \(bundleIdentifier)")
+            print("[FavoriteAppsProvider] Could not find app: \(bundleIdentifier)")
             return false
         }
         
         guard let bundle = Bundle(url: appURL) else {
-            print("⚠️ [FavoriteAppsProvider] Could not load bundle: \(bundleIdentifier)")
+            print("[FavoriteAppsProvider] Could not load bundle: \(bundleIdentifier)")
             return false
         }
         
@@ -233,11 +233,11 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         )
         
         if success {
-            print("➕ [FavoriteAppsProvider] Added to favorites: \(appName)")
+            print("[FavoriteAppsProvider] Added to favorites: \(appName)")
             // Reload apps to reflect changes
             loadFavoriteApps()
         } else {
-            print("⚠️ [FavoriteAppsProvider] Failed to add favorite (may already exist)")
+            print("[FavoriteAppsProvider] Failed to add favorite (may already exist)")
         }
         
         return success
@@ -248,7 +248,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         let success = DatabaseManager.shared.removeFavoriteApp(bundleIdentifier: bundleIdentifier)
         
         if success {
-            print("➖ [FavoriteAppsProvider] Removed from favorites: \(bundleIdentifier)")
+            print("[FavoriteAppsProvider] Removed from favorites: \(bundleIdentifier)")
             // Reload apps to reflect changes
             loadFavoriteApps()
         }
@@ -265,7 +265,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         )
         
         if success {
-            print("✏️ [FavoriteAppsProvider] Updated favorite: \(displayName)")
+            print("[FavoriteAppsProvider] Updated favorite: \(displayName)")
             // Reload apps to reflect changes
             loadFavoriteApps()
         }
@@ -299,7 +299,7 @@ class FavoriteAppsProvider: ObservableObject, FunctionProvider {
         }
         
         if success {
-            print("🔄 [FavoriteAppsProvider] Reordered favorites")
+            print("[FavoriteAppsProvider] Reordered favorites")
             // Reload apps to reflect changes
             loadFavoriteApps()
         }

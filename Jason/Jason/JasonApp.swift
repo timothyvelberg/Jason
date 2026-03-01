@@ -88,8 +88,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             button.action = #selector(toggleContentWindow)
             button.target = self
         }
-        
-        print("Menu bar item created")
     }
     
     func setupSparkle() {
@@ -98,7 +96,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
-        print("✨ Sparkle updater initialized")
+        print("Sparkle updater initialized")
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             print("Current version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "unknown")")

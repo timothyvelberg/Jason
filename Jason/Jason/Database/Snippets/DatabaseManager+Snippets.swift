@@ -69,10 +69,10 @@ extension DatabaseManager {
                 sqlite3_bind_text(statement, 4, id, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("✅ [DatabaseManager] Updated snippet: \"\(title)\"")
+                    print("[DatabaseManager] Updated snippet: \"\(title)\"")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to update snippet: \(String(cString: error))")
+                        print("[DatabaseManager] Failed to update snippet: \(String(cString: error))")
                     }
                 }
             }
@@ -85,7 +85,7 @@ extension DatabaseManager {
     func deleteSnippet(id: String) {
         queue.sync {
             guard let db = db else {
-                print("❌ [DatabaseManager] Database not initialized")
+                print("[DatabaseManager] Database not initialized")
                 return
             }
             
@@ -96,10 +96,10 @@ extension DatabaseManager {
                 sqlite3_bind_text(statement, 1, id, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("🗑️ [DatabaseManager] Deleted snippet: \(id)")
+                    print("[DatabaseManager] Deleted snippet: \(id)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to delete snippet: \(String(cString: error))")
+                        print("[DatabaseManager] Failed to delete snippet: \(String(cString: error))")
                     }
                 }
             }
@@ -114,7 +114,7 @@ extension DatabaseManager {
         
         queue.sync {
             guard let db = db else {
-                print("❌ [DatabaseManager] Database not initialized")
+                print("[DatabaseManager] Database not initialized")
                 return
             }
             
@@ -150,7 +150,7 @@ extension DatabaseManager {
             sqlite3_finalize(statement)
         }
         
-        print("📌 [DatabaseManager] Loaded \(items.count) snippets")
+        print("[DatabaseManager] Loaded \(items.count) snippets")
         return items
     }
     
@@ -158,7 +158,7 @@ extension DatabaseManager {
     func reorderSnippet(id: String, newSortOrder: Int) {
         queue.sync {
             guard let db = db else {
-                print("❌ [DatabaseManager] Database not initialized")
+                print("[DatabaseManager] Database not initialized")
                 return
             }
             
@@ -170,10 +170,10 @@ extension DatabaseManager {
                 sqlite3_bind_text(statement, 2, id, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("✅ [DatabaseManager] Reordered snippet \(id) to position \(newSortOrder)")
+                    print("[DatabaseManager] Reordered snippet \(id) to position \(newSortOrder)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to reorder snippet: \(String(cString: error))")
+                        print("[DatabaseManager] Failed to reorder snippet: \(String(cString: error))")
                     }
                 }
             }

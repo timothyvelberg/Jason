@@ -326,11 +326,9 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         }
         
         let timeInterval = midnight.timeIntervalSinceNow
-        print("📅 [CalendarProvider] Midnight refresh scheduled in \(String(format: "%.0f", timeInterval))s")
         
         DispatchQueue.main.asyncAfter(deadline: .now() + timeInterval) { [weak self] in
             guard let self = self else { return }
-            print("[CalendarProvider] Midnight rollover — refreshing for new day")
             self.refresh()
             NotificationCenter.default.post(name: .providerContentUpdated, object: nil)
             

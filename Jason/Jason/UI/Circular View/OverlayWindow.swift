@@ -57,12 +57,8 @@ class OverlayWindow: NSWindow {
         self.acceptsMouseMovedEvents = true
         self.ignoresMouseEvents = false
         
-//        print("🪟 [OverlayWindow] Created fullscreen overlay: \(screenFrame.size)")
-        
         // Initially hidden
         self.orderOut(nil)
-        
-//        print("🪟 Overlay window created")
     }
     
     func showOverlay(at mouseLocation: NSPoint) {
@@ -73,7 +69,7 @@ class OverlayWindow: NSWindow {
         } ?? NSScreen.main
         
         guard let screen = targetScreen else {
-            print("❌ No screen found for mouse location")
+            print("No screen found for mouse location")
             return
         }
         
@@ -94,7 +90,7 @@ class OverlayWindow: NSWindow {
     }
     
     func hideOverlay() {
-        print("🙈 Hiding overlay window")
+        print("Hiding overlay window")
         self.orderOut(nil)
     }
     
@@ -110,23 +106,23 @@ class OverlayWindow: NSWindow {
     // Lower window level (so QuickLook can appear on top)
     func lowerWindowLevel() {
         self.level = .normal
-        print("🔽 [OverlayWindow] Lowered window level to .normal")
+        print("[OverlayWindow] Lowered window level to .normal")
     }
     
     //Restore window level to normal overlay level
     func restoreWindowLevel() {
         self.level = normalLevel
-        print("🔼 [OverlayWindow] Restored window level to \(normalLevel)")
+        print("[OverlayWindow] Restored window level to \(normalLevel)")
     }
     
     // Temporarily ignore focus changes (for app quit/launch operations)
     func ignoreFocusChangesTemporarily(duration: TimeInterval = 0.5) {
         shouldIgnoreFocusChanges = true
-        print("🔇 [OverlayWindow] Ignoring focus changes for \(duration)s")
+        print("[OverlayWindow] Ignoring focus changes for \(duration)s")
         
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
             self?.shouldIgnoreFocusChanges = false
-            print("🔊 [OverlayWindow] Resumed listening to focus changes")
+            print("[OverlayWindow] Resumed listening to focus changes")
         }
     }
     
@@ -150,10 +146,9 @@ class OverlayWindow: NSWindow {
         }
         // Scroll up (negative deltaY) = could be used for something else
         else if event.deltaY < -scrollThreshold {
-            print("🔼 Scroll UP (\(deviceName)) - (not implemented)")
+            print("Scroll UP (\(deviceName)) - (not implemented)")
             // Could be used to re-expand collapsed rings or other features
         }
-        
         // Don't call super to prevent any default scroll behavior
     }
     

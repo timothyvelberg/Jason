@@ -25,7 +25,7 @@ extension FunctionManager {
     func removeProvider(withId id: String) {
         providers.removeAll { $0.providerId == id }
         providerConfigurations.removeValue(forKey: id)
-        print("🗑️ Removed provider: \(id)")
+        print("Removed provider: \(id)")
     }
     
     // MARK: - Data Loading
@@ -55,7 +55,7 @@ extension FunctionManager {
                     // Insert spacer between previous direct-mode provider and this one
                     let spacer = FunctionNode.spacer(afterProvider: lastProviderId)
                     allNodes.append(spacer)
-                    print("➕ [Spacer] Inserted between '\(lastProviderId)' and '\(provider.providerId)'")
+                    print("[Spacer] Inserted between '\(lastProviderId)' and '\(provider.providerId)'")
                 }
                 
                 // Track first direct-mode provider for wrap-around spacer
@@ -78,7 +78,7 @@ extension FunctionManager {
            firstId != lastId {
             let spacer = FunctionNode.spacer(afterProvider: lastId)
             allNodes.append(spacer)
-            print("➕ [Spacer] Inserted after '\(lastId)' (wrap-around to '\(firstId)')")
+            print("[Spacer] Inserted after '\(lastId)' (wrap-around to '\(firstId)')")
         }
         
         rootNodes = allNodes
@@ -93,7 +93,7 @@ extension FunctionManager {
         providerId: String
     ) -> [FunctionNode] {
         
-        print("🔍 [DisplayMode] Called for providerId: \(providerId), hasConfig: \(providerConfigurations[providerId] != nil)")
+        print("[DisplayMode] Called for providerId: \(providerId), hasConfig: \(providerConfigurations[providerId] != nil)")
 
         
         guard let providerConfig = providerConfigurations[providerId] else {
@@ -113,7 +113,7 @@ extension FunctionManager {
             }
             
             if let children = node.children, !children.isEmpty {
-                print("🔄 [DisplayMode] Extracting \(children.count) children from category '\(node.name)' (provider: \(providerId))")
+                print("[DisplayMode] Extracting \(children.count) children from category '\(node.name)' (provider: \(providerId))")
                 
                 return children.map { child in
                     if child.providerId != providerId {
@@ -122,7 +122,7 @@ extension FunctionManager {
                     return child
                 }
             } else {
-                print("⚠️ [DisplayMode] Category '\(node.name)' has no children in direct mode (provider: \(providerId))")
+                print("[DisplayMode] Category '\(node.name)' has no children in direct mode (provider: \(providerId))")
                 return [node]
             }
         }
@@ -134,10 +134,10 @@ extension FunctionManager {
     
     /// Update a specific ring with fresh data from its provider
     func updateRing(providerId: String, contentIdentifier: String? = nil) {
-        print("🔄 [updateRing] Looking for ring with providerId: \(providerId), contentId: \(contentIdentifier ?? "nil")")
+        print("[updateRing] Looking for ring with providerId: \(providerId), contentId: \(contentIdentifier ?? "nil")")
         
         guard let provider = providers.first(where: { $0.providerId == providerId }) else {
-            print("❌ Provider '\(providerId)' not found")
+            print("Provider '\(providerId)' not found")
             return
         }
         
@@ -156,10 +156,10 @@ extension FunctionManager {
             let contentMatches = contentIdentifier == nil || ring.contentIdentifier == contentIdentifier
             
             if providerMatches && contentMatches {
-                print("✅ Found matching ring at level \(level)")
+                print("Found matching ring at level \(level)")
                 
                 if level + 1 < rings.count {
-                    print("🗑️ Closing \(rings.count - level - 1) child ring(s) before update")
+                    print("Closing \(rings.count - level - 1) child ring(s) before update")
                     collapseToRing(level: level)
                 }
                 
@@ -175,7 +175,7 @@ extension FunctionManager {
             }
         }
         
-        print("⚠️ No matching ring found for providerId: \(providerId), contentId: \(contentIdentifier ?? "nil")")
+        print("No matching ring found for providerId: \(providerId), contentId: \(contentIdentifier ?? "nil")")
     }
     
     // MARK: - Private Update Helpers
@@ -198,7 +198,7 @@ extension FunctionManager {
                     $0.providerId == orderedProviderId && $0.type != .spacer
                 }
                 newRing0Nodes.append(contentsOf: existingNodes)
-                print("   🔍 Provider '\(orderedProviderId)': found \(existingNodes.count) existing nodes")
+                print("   Provider '\(orderedProviderId)': found \(existingNodes.count) existing nodes")
             }
         }
         
@@ -215,7 +215,7 @@ extension FunctionManager {
                 if let lastProviderId = lastDirectModeProviderId {
                     let spacer = FunctionNode.spacer(afterProvider: lastProviderId)
                     nodesWithSpacers.append(spacer)
-                    print("   ➕ [Spacer] Re-inserted between '\(lastProviderId)' and '\(orderedProviderId)'")
+                    print("   [Spacer] Re-inserted between '\(lastProviderId)' and '\(orderedProviderId)'")
                 }
                 
                 if firstDirectModeProviderId == nil {
@@ -235,7 +235,7 @@ extension FunctionManager {
            firstId != lastId {
             let spacer = FunctionNode.spacer(afterProvider: lastId)
             nodesWithSpacers.append(spacer)
-            print("   ➕ [Spacer] Re-inserted after '\(lastId)' (wrap-around to '\(firstId)')")
+            print("   [Spacer] Re-inserted after '\(lastId)' (wrap-around to '\(firstId)')")
         }
         
         let processedNodes = applyRing0OverflowIfNeeded(nodesWithSpacers)
@@ -244,19 +244,19 @@ extension FunctionManager {
         rings[0].hoveredIndex = nil
         rings[0].selectedIndex = nil
         
-        print("✅ Updated Ring 0: replaced nodes from provider '\(providerId)'")
+        print("Updated Ring 0: replaced nodes from provider '\(providerId)'")
     }
     
     private func updateChildRing(level: Int, provider: FunctionProvider, providerId: String, contentIdentifier: String?) {
         guard level > 0, level - 1 < rings.count else {
-            print("❌ Cannot find parent ring for level \(level)")
+            print("Cannot find parent ring for level \(level)")
             return
         }
         
         let parentRing = rings[level - 1]
         guard let selectedIndex = parentRing.selectedIndex,
               selectedIndex < parentRing.nodes.count else {
-            print("❌ No selected node in parent ring")
+            print("No selected node in parent ring")
             return
         }
         
@@ -266,7 +266,7 @@ extension FunctionManager {
             let freshParentNode = freshRootNodes[0]
             
             if let parentIndex = rings[0].nodes.firstIndex(where: { $0.providerId == providerId }) {
-                print("🔄 Updating Ring 0's '\(freshParentNode.name)' node with fresh children")
+                print("Updating Ring 0's '\(freshParentNode.name)' node with fresh children")
                 rings[0].nodes[parentIndex] = freshParentNode
             }
             
@@ -277,37 +277,37 @@ extension FunctionManager {
                     guard level < self.rings.count,
                           self.rings[level].providerId == providerId,
                           self.rings[level].contentIdentifier == contentIdentifier else {
-                        print("⚠️ Ring changed during async load - ignoring update")
+                        print("Ring changed during async load - ignoring update")
                         return
                     }
                     
                     let truncatedNodes = Array(loadedNodes.prefix(self.maxItems))
                     if loadedNodes.count > self.maxItems {
-                        print("   ✂️ Truncated Ring \(level) from \(loadedNodes.count) to \(truncatedNodes.count) items")
+                        print("   Truncated Ring \(level) from \(loadedNodes.count) to \(truncatedNodes.count) items")
                     }
                     
                     self.rings[level].nodes = truncatedNodes
                     self.rings[level].hoveredIndex = nil
                     self.rings[level].selectedIndex = nil
                     
-                    print("✅ Updated Ring \(level) with \(truncatedNodes.count) dynamically loaded nodes")
+                    print("Updated Ring \(level) with \(truncatedNodes.count) dynamically loaded nodes")
                 }
             } else {
                 let freshNodes = freshParentNode.displayedChildren
                 
                 let truncatedNodes = Array(freshNodes.prefix(maxItems))
                 if freshNodes.count > maxItems {
-                    print("   ✂️ Truncated Ring \(level) from \(freshNodes.count) to \(truncatedNodes.count) items")
+                    print("   Truncated Ring \(level) from \(freshNodes.count) to \(truncatedNodes.count) items")
                 }
                 
                 rings[level].nodes = truncatedNodes
                 rings[level].hoveredIndex = nil
                 rings[level].selectedIndex = nil
                 
-                print("✅ Updated Ring \(level) with \(truncatedNodes.count) nodes")
+                print("Updated Ring \(level) with \(truncatedNodes.count) nodes")
             }
         } else {
-            print("⚠️ Cannot get fresh parent node for Ring \(level)")
+            print("Cannot get fresh parent node for Ring \(level)")
         }
     }
 }

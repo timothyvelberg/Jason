@@ -101,7 +101,6 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
     }
     
     func refresh() {
-        print("📋 [ClipboardHistoryProvider] Refresh called")
         objectWillChange.send()
     }
     
@@ -157,7 +156,7 @@ class ClipboardHistoryProvider: ObservableObject, FunctionProvider {
     }
     
     private func pasteEntry(_ entry: ClipboardEntry) {
-        print("📋 [ClipboardHistoryProvider] Pasting entry: \"\(entry.content.prefix(30))...\"")
+        print("[ClipboardHistoryProvider] Pasting entry: \"\(entry.content.prefix(30))...\"")
         clipboardManager.paste(entry: entry)
     }
     

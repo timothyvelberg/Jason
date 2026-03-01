@@ -79,23 +79,17 @@ extension FunctionManager {
     // MARK: - Category Expansion
     
     func expandCategory(ringLevel: Int, index: Int, openedByClick: Bool = false) {
-        print("⭐ expandCategory called: ringLevel=\(ringLevel), index=\(index), openedByClick=\(openedByClick)")
         
         guard rings.indices.contains(ringLevel) else {
-            print("❌ Invalid ring level: \(ringLevel)")
+            print("Invalid ring level: \(ringLevel)")
             return
         }
         guard rings[ringLevel].nodes.indices.contains(index) else {
-            print("❌ Invalid node index: \(index) for ring level: \(ringLevel)")
+            print("Invalid node index: \(index) for ring level: \(ringLevel)")
             return
         }
         
         let node = rings[ringLevel].nodes[index]
-        
-        print("⭐ Expanding node: '\(node.name)'")
-        print("   - isBranch: \(node.isBranch)")
-        print("   - children count: \(node.children?.count ?? 0)")
-        print("   - contextActions count: \(node.contextActions?.count ?? 0)")
         
         // Use displayedChildren which respects maxDisplayedChildren limit
         let displayedChildren = node.displayedChildren
@@ -103,13 +97,13 @@ extension FunctionManager {
         // Truncate to maxItems to prevent ghost items in child rings
         let truncatedChildren = Array(displayedChildren.prefix(maxItems))
         if displayedChildren.count > maxItems {
-            print("   ✂️ Truncated children from \(displayedChildren.count) to \(truncatedChildren.count) items")
+            print("   Truncated children from \(displayedChildren.count) to \(truncatedChildren.count) items")
         }
         
         print("   - displayedChildren count: \(truncatedChildren.count)")
         
         guard !truncatedChildren.isEmpty else {
-            print("❌ Cannot expand non-category or empty category: \(node.name)")
+            print("Cannot expand non-category or empty category: \(node.name)")
             return
         }
         
@@ -136,24 +130,24 @@ extension FunctionManager {
         ))
         activeRingLevel = ringLevel + 1
         
-        print("✅ Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(truncatedChildren.count) nodes (providerId: \(providerId ?? "nil"), contentId: \(contentIdentifier ?? "nil"))")
+        print("Expanded category '\(node.name)' at ring \(ringLevel), created ring \(ringLevel + 1) with \(truncatedChildren.count) nodes (providerId: \(providerId ?? "nil"), contentId: \(contentIdentifier ?? "nil"))")
     }
     
     func loadAndExpandToCategory(providerId: String) {
-        print("🎯 [FunctionManager] Loading and expanding to category: \(providerId)")
+        print("[FunctionManager] Loading and expanding to category: \(providerId)")
         
         // First, load all functions normally
         loadFunctions()
         
         // Verify we have a Ring 0
         guard !rings.isEmpty, !rings[0].nodes.isEmpty else {
-            print("❌ No Ring 0 available after loading")
+            print("No Ring 0 available after loading")
             return
         }
         
         // Find the node with matching ID in Ring 0
         guard let index = rings[0].nodes.firstIndex(where: { $0.id == providerId }) else {
-            print("❌ Provider '\(providerId)' not found in Ring 0")
+            print("Provider '\(providerId)' not found in Ring 0")
             print("   Available providers: \(rings[0].nodes.map { $0.id }.joined(separator: ", "))")
             return
         }
@@ -162,35 +156,35 @@ extension FunctionManager {
         
         // Verify it's expandable
         guard node.isBranch, !node.displayedChildren.isEmpty else {
-            print("❌ Provider '\(providerId)' is not expandable or has no children")
+            print("Provider '\(providerId)' is not expandable or has no children")
             return
         }
         
-        print("✅ Found provider '\(node.name)' at index \(index) with \(node.displayedChildren.count) children")
+        print("Found provider '\(node.name)' at index \(index) with \(node.displayedChildren.count) children")
         
         // Expand this category with openedByClick: true
         // This makes it behave like a right-click context menu - stable until boundary cross
         expandCategory(ringLevel: 0, index: index, openedByClick: true)
         
-        print("✅ Successfully expanded to '\(node.name)' - now at Ring \(activeRingLevel)")
+        print("Successfully expanded to '\(node.name)' - now at Ring \(activeRingLevel)")
     }
     
     // MARK: - Folder Navigation
     
     func navigateIntoFolder(ringLevel: Int, index: Int) {
-        print("📂 navigateIntoFolder called: ringLevel=\(ringLevel), index=\(index)")
+        print("navigateIntoFolder called: ringLevel=\(ringLevel), index=\(index)")
         
         if isLoadingFolder {
-            print("⏸️ Already loading a folder - ignoring navigation request")
+            print("Already loading a folder - ignoring navigation request")
             return
         }
         
         guard rings.indices.contains(ringLevel) else {
-            print("❌ Invalid ring level: \(ringLevel)")
+            print("Invalid ring level: \(ringLevel)")
             return
         }
         guard rings[ringLevel].nodes.indices.contains(index) else {
-            print("❌ Invalid node index: \(index) for ring level: \(ringLevel)")
+            print("Invalid node index: \(index) for ring level: \(ringLevel)")
             return
         }
         
@@ -202,23 +196,23 @@ extension FunctionManager {
             let childrenToDisplay: [FunctionNode]
             
             if node.needsDynamicLoading {
-                print("🔄 Node '\(node.name)' needs dynamic loading")
+                print("Node '\(node.name)' needs dynamic loading")
                 
                 guard let providerId = node.providerId else {
-                    print("❌ Node '\(node.name)' needs dynamic loading but has no providerId")
+                    print("Node '\(node.name)' needs dynamic loading but has no providerId")
                     isLoadingFolder = false
                     return
                 }
                 
                 guard let provider = providers.first(where: { $0.providerId == providerId }) else {
-                    print("❌ Provider '\(providerId)' not found")
+                    print("Provider '\(providerId)' not found")
                     isLoadingFolder = false
                     return
                 }
                 
-                print("📂 Loading children from provider '\(provider.providerName)'")
+                print("Loading children from provider '\(provider.providerName)'")
                 childrenToDisplay = await provider.loadChildren(for: node)
-                print("✅ Loaded \(childrenToDisplay.count) children dynamically")
+                print("Loaded \(childrenToDisplay.count) children dynamically")
                 
             } else {
                 childrenToDisplay = node.displayedChildren
@@ -233,13 +227,13 @@ extension FunctionManager {
             // Truncate to maxItems to prevent ghost items
             let truncatedChildren = Array(childrenToDisplay.prefix(maxItems))
             if childrenToDisplay.count > maxItems {
-                print("   ✂️ Truncated folder children from \(childrenToDisplay.count) to \(truncatedChildren.count) items")
+                print("   Truncated folder children from \(childrenToDisplay.count) to \(truncatedChildren.count) items")
             }
             
             // Bounds check after async work
             guard rings.indices.contains(ringLevel),
                   rings[ringLevel].nodes.indices.contains(index) else {
-                print("❌ Ring or index out of bounds after async load - rings may have changed")
+                print("Ring or index out of bounds after async load - rings may have changed")
                 isLoadingFolder = false
                 return
             }
@@ -250,14 +244,14 @@ extension FunctionManager {
             // Mark current ring as collapsed (if it's not Ring 0)
             if ringLevel > 0 {
                 rings[ringLevel].isCollapsed = true
-                print("📦 Collapsed ring \(ringLevel)")
+                print("Collapsed ring \(ringLevel)")
             }
             
             // Remove any rings beyond this level
             if ringLevel + 1 < rings.count {
                 let removed = rings.count - (ringLevel + 1)
                 rings.removeSubrange((ringLevel + 1)...)
-                print("🗑️ Removed \(removed) ring(s) beyond level \(ringLevel)")
+                print("Removed \(removed) ring(s) beyond level \(ringLevel)")
             }
             
             // Add new ring with children
@@ -273,10 +267,6 @@ extension FunctionManager {
             
             activeRingLevel = ringLevel + 1
             isLoadingFolder = false
-            
-            print("✅ Navigated into folder '\(node.name)' at ring \(ringLevel)")
-            print("   Created ring \(ringLevel + 1) with \(truncatedChildren.count) nodes")
-            print("   Active ring is now: \(activeRingLevel)")
         }
     }
     
@@ -286,7 +276,7 @@ extension FunctionManager {
         // Uncollapse the target ring (we're returning to it)
         if level > 0 {
             rings[level].isCollapsed = false
-            print("📦 Uncollapsed ring \(level) - returning to normal size")
+            print("Uncollapsed ring \(level) - returning to normal size")
         }
         
         // Remove all rings after the specified level

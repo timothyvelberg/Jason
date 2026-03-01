@@ -122,7 +122,6 @@ extension RingView {
                 rotationOffset = 0
             }
             iconRotationOffsets[node.id] = rotationOffset
-            print("   🔄 [CenterOut] Node \(index): rotationOffset=\(rotationOffset), isCounterClockwise=\(isCounterClockwise)")
 
         }
         
@@ -240,20 +239,9 @@ extension RingView {
         let addedIds = newIds.subtracting(oldIds)
         let removedIds = oldIds.subtracting(newIds)
         let persistingIds = oldIds.intersection(newIds)
-        
-        print("      🔍 Surgical Animation Analysis:")
-        print("         Old nodes: \(oldNodes.count), New nodes: \(newNodes.count)")
-        print("         Added: \(addedIds.count), Removed: \(removedIds.count), Persisting: \(persistingIds.count)")
-        if !addedIds.isEmpty {
-            print("         ➕ Added IDs: \(Array(addedIds).joined(separator: ", "))")
-        }
-        if !removedIds.isEmpty {
-            print("         ➖ Removed IDs: \(Array(removedIds).joined(separator: ", "))")
-        }
 
         // Guard against empty old nodes (shouldn't happen, but just in case)
         if oldNodes.isEmpty && newNodes.count > 0 {
-            print("      ⚠️ Old nodes empty - treating as first appearance, calling full animation")
             animateIconsIn()
             return
         }
@@ -316,7 +304,6 @@ extension RingView {
         
         // 3. ADDED ICONS: Fade in
         for id in addedIds {
-            print("      ➕ Fading in new icon: \(id)")
             
             // Start invisible
             iconOpacities[id] = 0
@@ -362,7 +349,6 @@ extension RingView {
         var safetyNetTriggered = false
         for node in newNodes {
             if iconOpacities[node.id] == nil {
-                print("      ⚠️ SAFETY NET: Initializing missing animation state for: \(node.id)")
                 safetyNetTriggered = true
                 iconOpacities[node.id] = 0
                 iconScales[node.id] = animationStartScale
@@ -395,7 +381,7 @@ extension RingView {
         }
         
         if !safetyNetTriggered {
-            print("      ✅ All \(newNodes.count) nodes have animation states")
+            print("      All \(newNodes.count) nodes have animation states")
         }
     }
 }

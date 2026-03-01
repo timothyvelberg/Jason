@@ -12,19 +12,16 @@ import SwiftUI
 extension RingView {
     
     func updateSlice(for index: Int, totalCount: Int) {
-        print("🔧 [updateSlice] Called with index=\(index), totalCount=\(totalCount)")
-        print("   Previous state: previousIndex=\(previousIndex?.description ?? "nil"), rotationIndex=\(rotationIndex), previousTotalCount=\(previousTotalCount)")
-        
         guard totalCount > 0 else {
             angleOffset = 0
             startAngle = .degrees(0)
             endAngle = .degrees(0)
-            print("   ⚠️ totalCount is 0, resetting angles")
+            print("   totalCount is 0, resetting angles")
             return
         }
         
         let itemAngle = angleForItem(at: index)
-        print("   📏 itemAngle for index \(index): \(itemAngle)°")
+        print("   itemAngle for index \(index): \(itemAngle)°")
         
         if previousIndex == nil {
             // First selection - calculate center angle for this item
@@ -32,11 +29,6 @@ extension RingView {
             angleOffset = centerAngle
             startAngle = Angle(degrees: centerAngle - itemAngle / 2 - 90)
             endAngle = Angle(degrees: centerAngle + itemAngle / 2 - 90)
-            
-            print("   🆕 FIRST SELECTION:")
-            print("      centerAngle=\(centerAngle)°")
-            print("      angleOffset=\(angleOffset)°")
-            print("      startAngle=\(startAngle.degrees)°, endAngle=\(endAngle.degrees)°")
             
             previousIndex = index
             previousTotalCount = totalCount
@@ -66,10 +58,8 @@ extension RingView {
             
             if forwardSteps <= backwardSteps {
                 newRotationIndex = rotationIndex + forwardSteps
-                print("      Moving FORWARD: \(forwardSteps) steps, newRotationIndex=\(newRotationIndex)")
             } else {
                 newRotationIndex = rotationIndex - backwardSteps
-                print("      Moving BACKWARD: \(backwardSteps) steps, newRotationIndex=\(newRotationIndex)")
             }
         } else {
             newRotationIndex = index
@@ -81,11 +71,9 @@ extension RingView {
         if sliceConfig.direction == .counterClockwise {
             let baseAngle = sliceConfig.endAngle
             newAngleOffset = cumulativeAngleAtRotationIndex(newRotationIndex, baseAngle: baseAngle, clockwise: false)
-            print("      CCW: baseAngle=\(baseAngle)°, newAngleOffset=\(newAngleOffset)°")
         } else {
             let baseAngle = sliceConfig.startAngle
             newAngleOffset = cumulativeAngleAtRotationIndex(newRotationIndex, baseAngle: baseAngle, clockwise: true)
-            print("      CW: baseAngle=\(baseAngle)°, newAngleOffset=\(newAngleOffset)°")
         }
         
         let newStartAngle = newAngleOffset - itemAngle / 2 - 90

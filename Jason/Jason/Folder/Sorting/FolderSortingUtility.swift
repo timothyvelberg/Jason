@@ -15,7 +15,7 @@ class FolderSortingUtility {
     
     /// Sort URLs based on folder sort preference
     static func sortURLs(_ urls: [URL], by sortOrder: FolderSortOrder) -> [URL] {
-        print("🔄 [SortingUtility] Sorting \(urls.count) URLs by: \(sortOrder.displayName)")
+        print("[SortingUtility] Sorting \(urls.count) URLs by: \(sortOrder.displayName)")
         
         switch sortOrder {
         case .alphabeticalAsc:
@@ -90,7 +90,7 @@ class FolderSortingUtility {
     
     /// Sort FunctionNodes by extracting their URLs and reordering based on sort preference
     static func sortNodes(_ nodes: [FunctionNode], by sortOrder: FolderSortOrder) -> [FunctionNode] {
-        print("🔄 [SortingUtility] Sorting \(nodes.count) nodes by: \(sortOrder.displayName)")
+        print("[SortingUtility] Sorting \(nodes.count) nodes by: \(sortOrder.displayName)")
         
         // Extract URLs from nodes for sorting
         var urlNodePairs: [(URL, FunctionNode)] = []
@@ -136,7 +136,7 @@ class FolderSortingUtility {
                 options: [.skipsHiddenFiles, .skipsPackageDescendants]
             )
         } catch {
-            print("❌ [SortingUtility] Failed to read folder: \(error)")
+            print("[SortingUtility] Failed to read folder: \(error)")
             return []
         }
     }
@@ -145,7 +145,7 @@ class FolderSortingUtility {
     
     /// Sort EnhancedFolderItems (for cache refresh)
     static func sortEnhancedItems(_ items: [EnhancedFolderItem], by sortOrder: FolderSortOrder) -> [EnhancedFolderItem] {
-        print("🔄 [SortingUtility] Sorting \(items.count) enhanced items by: \(sortOrder.displayName)")
+        print("[SortingUtility] Sorting \(items.count) enhanced items by: \(sortOrder.displayName)")
         
         switch sortOrder {
         case .alphabeticalAsc:

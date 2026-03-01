@@ -50,7 +50,7 @@ extension DatabaseManager {
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare SELECT for favorite files: \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare SELECT for favorite files: \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -78,13 +78,13 @@ extension DatabaseManager {
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare CHECK for file '\(path)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare CHECK for file '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(checkStatement)
             
             if alreadyExists {
-                print("⚠️ [DatabaseManager] File '\(path)' already in favorites")
+                print("[DatabaseManager] File '\(path)' already in favorites")
                 return
             }
             
@@ -97,7 +97,7 @@ extension DatabaseManager {
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare COUNT for favorite files: \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare COUNT for favorite files: \(String(cString: error))")
                 }
             }
             sqlite3_finalize(countStatement)
@@ -127,16 +127,16 @@ extension DatabaseManager {
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     let fileName = URL(fileURLWithPath: path).lastPathComponent
-                    print("⭐ [DatabaseManager] Added favorite file: \(displayName ?? fileName)")
+                    print("[DatabaseManager] Added favorite file: \(displayName ?? fileName)")
                     success = true
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to insert favorite file '\(path)': \(String(cString: error))")
+                        print("[DatabaseManager] Failed to insert favorite file '\(path)': \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare INSERT for favorite file '\(path)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare INSERT for favorite file '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -159,16 +159,16 @@ extension DatabaseManager {
                 sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("🗑️ [DatabaseManager] Removed favorite file: \(path)")
+                    print("[DatabaseManager] Removed favorite file: \(path)")
                     success = true
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to delete favorite file '\(path)': \(String(cString: error))")
+                        print("[DatabaseManager] Failed to delete favorite file '\(path)': \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare DELETE for favorite file '\(path)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare DELETE for favorite file '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -196,15 +196,15 @@ extension DatabaseManager {
                 sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("📊 [DatabaseManager] Updated access for file: \(path)")
+                    print("[DatabaseManager] Updated access for file: \(path)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to update access for file '\(path)': \(String(cString: error))")
+                        print("[DatabaseManager] Failed to update access for file '\(path)': \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare UPDATE for file access '\(path)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare UPDATE for file access '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -251,7 +251,7 @@ extension DatabaseManager {
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare SELECT for file '\(path)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare SELECT for file '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -292,16 +292,16 @@ extension DatabaseManager {
                 sqlite3_bind_text(statement, 3, (path as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("✏️ [DatabaseManager] Updated favorite file: \(path)")
+                    print("[DatabaseManager] Updated favorite file: \(path)")
                     success = true
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to update favorite file '\(path)': \(String(cString: error))")
+                        print("[DatabaseManager] Failed to update favorite file '\(path)': \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare UPDATE for favorite file '\(path)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare UPDATE for favorite file '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -325,16 +325,16 @@ extension DatabaseManager {
                 sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("🔄 [DatabaseManager] Reordered file: \(path) to position \(newSortOrder)")
+                    print("[DatabaseManager] Reordered file: \(path) to position \(newSortOrder)")
                     success = true
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to reorder file '\(path)': \(String(cString: error))")
+                        print("[DatabaseManager] Failed to reorder file '\(path)': \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare UPDATE for reordering file '\(path)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare UPDATE for reordering file '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)

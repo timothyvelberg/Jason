@@ -348,7 +348,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     }
     
     func refresh() {
-        print("🔄 [CombinedApps] Refreshing apps")
+        print("[CombinedApps] Refreshing apps")
         loadApps()
     }
     
@@ -357,7 +357,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     private func launchOrSwitchToApp(_ entry: AppEntry) {
         if entry.isRunning, let runningApp = entry.runningApp {
             // App is already running - switch to it
-            print("🔄 Switching to running app: \(entry.name)")
+            print("Switching to running app: \(entry.name)")
             
             // Route through AppSwitcherManager so unminimizing, MRU recording,
             // and UI hiding all happen in one place
@@ -365,7 +365,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             
         } else {
             // App is not running - launch it
-            print("🚀 Launching app: \(entry.name)")
+            print("Launching app: \(entry.name)")
             
             // Track app launch in database if it's a favorite
             if entry.isFavorite {
@@ -380,9 +380,9 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             
             NSWorkspace.shared.openApplication(at: entry.url, configuration: configuration) { app, error in
                 if let error = error {
-                    print("❌ Failed to launch \(entry.name): \(error.localizedDescription)")
+                    print("Failed to launch \(entry.name): \(error.localizedDescription)")
                 } else if let app = app {
-                    print("✅ Successfully launched \(entry.name)")
+                    print("Successfully launched \(entry.name)")
                     
                 
                     //using shared instance
@@ -407,14 +407,14 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             type: .action,
             icon: NSImage(named: "context_actions_favorited") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
-                print("⭐ Adding \(name) to favorites")
+                print("Adding \(name) to favorites")
                 let success = DatabaseManager.shared.addFavoriteApp(
                     bundleIdentifier: bundleIdentifier,
                     displayName: name,
                     iconOverride: nil
                 )
                 if success {
-                    print("✅ Added \(name) to favorites")
+                    print("Added \(name) to favorites")
                     self?.refresh()
                     NotificationCenter.default.postProviderUpdate(providerId: self?.providerId ?? "combined-apps")
                 }
@@ -432,10 +432,10 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             type: .action,
             icon: NSImage(named: "context_actions_unfavorited") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
-                print("⭐ Removing \(name) from favorites")
+                print("Removing \(name) from favorites")
                 let success = DatabaseManager.shared.removeFavoriteApp(bundleIdentifier: bundleIdentifier)
                 if success {
-                    print("✅ Removed \(name) from favorites")
+                    print("Removed \(name) from favorites")
                     self?.refresh()
                     NotificationCenter.default.postProviderUpdate(providerId: self?.providerId ?? "combined-apps")
                 }

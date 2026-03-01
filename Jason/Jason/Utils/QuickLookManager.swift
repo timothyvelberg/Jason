@@ -56,11 +56,11 @@ class QuickLookManager: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelega
         
         if panel.isVisible {
             panel.orderOut(nil)
-            print("🙈 [QuickLook] Preview panel hidden")
+            print("[QuickLook] Preview panel hidden")
         } else {
             
             
-            print("🙈 [QuickLook] Preview panel already hidden")
+            print("[QuickLook] Preview panel already hidden")
         }
         
         previewURLs = []
@@ -110,7 +110,7 @@ class QuickLookManager: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelega
     // NEW: Delegate method called when panel is about to close
     func previewPanelWillClose(_ panel: QLPreviewPanel!) {
         isShowing = false
-        onVisibilityChanged?(false)  // 👈 Notify that QuickLook is closing
-        print("🙈 [QuickLook] Preview panel will close")
+        onVisibilityChanged?(false)
+        print("[QuickLook] Preview panel will close")
     }
 }

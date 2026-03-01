@@ -15,7 +15,7 @@ extension DatabaseManager {
     /// Remove a folder from heavy_folders table
     func removeHeavyFolder(path: String) {
         guard let db = db else {
-            print("❌ [DatabaseManager] Database not initialized")
+            print("DatabaseManager] Database not initialized")
             return
         }
         
@@ -26,14 +26,14 @@ extension DatabaseManager {
             sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
             
             if sqlite3_step(statement) == SQLITE_DONE {
-                print("[DatabaseManager] 🗑️ Removed from heavy folders: \(path)")
+                print("[DatabaseManager] Removed from heavy folders: \(path)")
             } else {
                 let error = String(cString: sqlite3_errmsg(db))
-                print("[DatabaseManager] ⚠️ Failed to remove heavy folder: \(error)")
+                print("[DatabaseManager] Failed to remove heavy folder: \(error)")
             }
         } else {
             let error = String(cString: sqlite3_errmsg(db))
-            print("[DatabaseManager] ⚠️ Failed to prepare remove statement: \(error)")
+            print("[DatabaseManager] Failed to prepare remove statement: \(error)")
         }
         
         sqlite3_finalize(statement)
@@ -73,10 +73,10 @@ extension DatabaseManager {
             sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, nil)
             
             if sqlite3_step(statement) == SQLITE_DONE {
-                print("[DatabaseManager] 📊 Updated item count for: \(path) to \(itemCount)")
+                print("[DatabaseManager] Updated item count for: \(path) to \(itemCount)")
             } else {
                 let error = String(cString: sqlite3_errmsg(db))
-                print("[DatabaseManager] ⚠️ Failed to update item count: \(error)")
+                print("[DatabaseManager] Failed to update item count: \(error)")
             }
         }
         

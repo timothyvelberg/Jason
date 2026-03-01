@@ -147,14 +147,8 @@ class AppSwitcherManager: ObservableObject {
         // Only log when UI is visible (when user is actively using it)
         let isUIVisible = activeCircularUIManager?.isVisible ?? false
         
-        if isUIVisible {
-            // Verbose logging when UI is open - user can see changes happening
-            print("[AppSwitcher] Checking apps: current=\(runningApps.count), new=\(deduplicatedApps.count)")
-        }
-        
         // Only sort and update if there's an actual change
         if oldAppBundleIDs != newAppBundleIDs {
-            print("[AppSwitcher] CHANGE DETECTED!")
             
             // NOW do the expensive MRU sorting
             let sortedApps = sortAppsByMRU(deduplicatedApps)
@@ -168,7 +162,6 @@ class AppSwitcherManager: ObservableObject {
                     guard let bundleId = app.bundleIdentifier else { return false }
                     return added.contains(bundleId)
                 }
-                print("   Added: \(addedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: ", "))")
                 
                 // Add new apps to the end of usage history
                 for app in addedApps {
@@ -181,7 +174,6 @@ class AppSwitcherManager: ObservableObject {
                     guard let bundleId = app.bundleIdentifier else { return false }
                     return removed.contains(bundleId)
                 }
-                print("   Removed: \(removedApps.map { $0.localizedName ?? "Unknown" }.joined(separator: ", "))")
                 
                 // Remove apps from usage history
                 for app in removedApps {
@@ -211,7 +203,7 @@ class AppSwitcherManager: ObservableObject {
         
         print("[AppSwitcherManager] App launched: \(app.localizedName ?? "Unknown")")
         
-        // 🆕 Refresh badge cache (new app might have badges)
+        // Refresh badge cache (new app might have badges)
         DockBadgeReader.shared.forceRefresh()
         
         // Trigger immediate refresh instead of waiting for timer
@@ -225,7 +217,7 @@ class AppSwitcherManager: ObservableObject {
         
         print("[AppSwitcherManager] App terminated: \(app.localizedName ?? "Unknown")")
         
-        // 🆕 Refresh badge cache (removes terminated app's badge)
+        // Refresh badge cache (removes terminated app's badge)
         DockBadgeReader.shared.forceRefresh()
         
         // Trigger immediate refresh instead of waiting for timer

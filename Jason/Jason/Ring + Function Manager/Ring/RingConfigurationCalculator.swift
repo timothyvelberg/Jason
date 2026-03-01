@@ -82,23 +82,13 @@ class RingConfigurationCalculator {
         baseThickness: CGFloat
     ) -> (centerRadius: CGFloat, thickness: CGFloat) {
         
-        print("📏 [Ring 0 Auto-Size] CALLED with:")
-        print("   Item count: \(itemCount)")
-        print("   Base center radius: \(baseRadius)")
-        print("   Base thickness: \(baseThickness)")
-        
         let anglePerItem = 360.0 / Double(itemCount)
         
-        print("   Calculated angle per item: \(String(format: "%.2f°", anglePerItem))")
-        print("   minimumComfortableAngle threshold: \(minimumComfortableAngle)°")
-        
         guard anglePerItem < minimumComfortableAngle else {
-            print("   ✅ Angle is comfortable - NO RESIZE NEEDED")
-            print("   Returning: centerRadius=\(baseRadius), thickness=\(baseThickness)")
             return (baseRadius, baseThickness)
         }
         
-        print("   ⚠️ Angle TOO SMALL - TRIGGERING AUTO-RESIZE")
+        print("   Angle TOO SMALL - TRIGGERING AUTO-RESIZE")
         
         // Calculate based on middle radius (where items sit)
         let baseMiddleRadius = baseRadius + baseThickness / 2
@@ -106,22 +96,10 @@ class RingConfigurationCalculator {
         let desiredArcLength = baseMiddleRadius * (optimalAnglePerItem * .pi / 180.0)
         let scaleFactor = desiredArcLength / currentArcLength
         
-        print("   Arc calculations:")
-        print("      Base middle radius: \(String(format: "%.2f", baseMiddleRadius))")
-        print("      Current arc length: \(String(format: "%.2f", currentArcLength))")
-        print("      Desired arc length: \(String(format: "%.2f", desiredArcLength))")
-        print("      Scale factor: \(String(format: "%.2f", scaleFactor))")
-        
         // Scale only the middle radius, keep thickness constant
         let adjustedMiddleRadius = baseMiddleRadius * scaleFactor
         let adjustedThickness = baseThickness  // Keep tight around items
         let adjustedRadius = adjustedMiddleRadius - adjustedThickness / 2
-        
-        print("   🎯 RESIZING:")
-        print("      Angle: \(String(format: "%.1f°", anglePerItem)) → target: \(String(format: "%.1f°", optimalAnglePerItem))")
-        print("      Middle radius: \(String(format: "%.0f", baseMiddleRadius)) → \(String(format: "%.0f", adjustedMiddleRadius)) (+\(String(format: "%.0f", adjustedMiddleRadius - baseMiddleRadius))px)")
-        print("      Center radius: \(String(format: "%.0f", baseRadius)) → \(String(format: "%.0f", adjustedRadius)) (+\(String(format: "%.0f", adjustedRadius - baseRadius))px)")
-        print("      Thickness: \(String(format: "%.0f", baseThickness)) → \(String(format: "%.0f", adjustedThickness)) (unchanged)")
         
         return (adjustedRadius, adjustedThickness)
     }
@@ -137,11 +115,9 @@ class RingConfigurationCalculator {
         var currentRadius = centerHoleRadius
         
         for (index, ringState) in rings.enumerated() {
-            print("🔧 [Ring \(index)] Processing ring with \(ringState.nodes.count) node(s), collapsed: \(ringState.isCollapsed)")
-            
             let nodes = Array(ringState.nodes.prefix(maxItems))
             if ringState.nodes.count > maxItems {
-                print("✂️ [Ring \(index)] Truncated from \(ringState.nodes.count) to \(nodes.count) items (hard cap)")
+                print("[Ring \(index)] Truncated from \(ringState.nodes.count) to \(nodes.count) items (hard cap)")
             }
             
             let sliceConfig: PieSliceConfig
@@ -151,7 +127,6 @@ class RingConfigurationCalculator {
             if ringState.isCollapsed {
                 thisRingThickness = collapsedRingThickness
                 thisIconSize = collapsedIconSize
-                print("Ring \(index) is COLLAPSED: thickness=\(thisRingThickness), iconSize=\(thisIconSize)")
                 
                 if let existingSliceConfig = ringState.sliceConfig,
                    existingSliceConfig.itemCount == nodes.count {
@@ -159,9 +134,9 @@ class RingConfigurationCalculator {
                     sliceConfig = existingSliceConfig
                 } else {
                     if let existingSliceConfig = ringState.sliceConfig {
-                        print("   🔄 Collapsed Ring \(index) item count changed (\(existingSliceConfig.itemCount) → \(nodes.count)) - recalculating...")
+                        print("   Collapsed Ring \(index) item count changed (\(existingSliceConfig.itemCount) → \(nodes.count)) - recalculating...")
                     } else {
-                        print("   🆕 Collapsed Ring \(index) needs new sliceConfig - calculating...")
+                        print("   Collapsed Ring \(index) needs new sliceConfig - calculating...")
                     }
                     sliceConfig = calculateCollapsedRingSliceConfig(
                         index: index,
@@ -179,29 +154,15 @@ class RingConfigurationCalculator {
             } else if index == 0 {
                 let itemCount = nodes.count
                 
-                print("🔵 [calculateRingConfigurations] Processing Ring 0:")
-                print("   Item count: \(itemCount)")
-                print("   Base centerHoleRadius: \(centerHoleRadius)")
-                print("   Base ringThickness: \(ringThickness)")
-                
                 let (adjustedCenterRadius, adjustedThickness) = calculateOptimalRing0Size(
                     itemCount: itemCount,
                     baseRadius: centerHoleRadius,
                     baseThickness: ringThickness
                 )
                 
-                print("   Returned from auto-size:")
-                print("      adjustedCenterRadius: \(adjustedCenterRadius)")
-                print("      adjustedThickness: \(adjustedThickness)")
-                
                 thisRingThickness = adjustedThickness
                 thisIconSize = iconSize
                 currentRadius = adjustedCenterRadius
-                
-                print("   Final Ring 0 config:")
-                print("      currentRadius (startRadius): \(currentRadius)")
-                print("      thisRingThickness: \(thisRingThickness)")
-                print("      thisIconSize: \(thisIconSize)")
                 
                 let perItemAngles = calculateRing0Angles(for: nodes)
                 let firstItemAngle = perItemAngles.first ?? (360.0 / Double(itemCount))
@@ -240,7 +201,6 @@ class RingConfigurationCalculator {
                 
                 if let existingSliceConfig = ringState.sliceConfig,
                    existingSliceConfig.itemCount == nodes.count {
-                    print("   Ring \(index) has existing sliceConfig - preserving it (isFullCircle: \(existingSliceConfig.isFullCircle))")
                     sliceConfig = existingSliceConfig
                 } else {
                     if let existingSliceConfig = ringState.sliceConfig {
@@ -289,7 +249,7 @@ class RingConfigurationCalculator {
         }
         
         guard let parentInfo = getParentInfo(for: index, rings: rings, configs: configs) else {
-            print("❌ [Ring \(index)] No parent info - using defaults and CONTINUING")
+            print("[Ring \(index)] No parent info - using defaults and CONTINUING")
             let itemCount = nodes.count
             let itemAngle = 360.0 / Double(itemCount)
             return .fullCircle(itemCount: itemCount, anglePerItem: itemAngle)
@@ -309,9 +269,9 @@ class RingConfigurationCalculator {
         let averageAngle = totalAngle / Double(itemCount)
         
         if shouldConvertToFull {
-            print("📐 Ring \(index): Total angle \(String(format: "%.1f", totalAngle))° ≥ 360° → Converting to Full Circle")
+            print("Ring \(index): Total angle \(String(format: "%.1f", totalAngle))° ≥ 360° → Converting to Full Circle")
         } else {
-            print("📐 Ring \(index): Partial slice with \(String(format: "%.1f", totalAngle))° total")
+            print("Ring \(index): Partial slice with \(String(format: "%.1f", totalAngle))° total")
         }
         
         let positioning = parentInfo.node.slicePositioning ?? .startClockwise
@@ -361,10 +321,10 @@ class RingConfigurationCalculator {
             let total = Double(itemCount) * customAngle
             if total >= 360.0 {
                 let distributed = 360.0 / Double(itemCount)
-                print("📐 Custom Override: \(itemCount) items × \(customAngle)° = \(total)° → Full Circle at \(distributed)° each")
+                print("Custom Override: \(itemCount) items × \(customAngle)° = \(total)° → Full Circle at \(distributed)° each")
                 (shouldConvertToFull, anglePerItem, _) = (true, distributed, 360.0)
             } else {
-                print("📐 Custom Override: \(itemCount) items × \(customAngle)° = \(total)°")
+                print("Custom Override: \(itemCount) items × \(customAngle)° = \(total)°")
                 (shouldConvertToFull, anglePerItem, _) = (false, customAngle, total)
             }
         } else {
@@ -519,7 +479,7 @@ class RingConfigurationCalculator {
         }
         
         if totalCustomAngle > 360 {
-            print("⚠️ [Ring 0 Angles] Custom sizes total \(totalCustomAngle)° exceeds 360°. Falling back to equal distribution.")
+            print("[Ring 0 Angles] Custom sizes total \(totalCustomAngle)° exceeds 360°. Falling back to equal distribution.")
             let uniformAngle = 360.0 / Double(nodes.count)
             return Array(repeating: uniformAngle, count: nodes.count)
         }
@@ -529,7 +489,7 @@ class RingConfigurationCalculator {
         let autoAngle = autoSizedCount > 0 ? remainingAngle / CGFloat(autoSizedCount) : 0
         
         if autoAngle > 0 && autoAngle < 15 {
-            print("⚠️ [Ring 0 Angles] Auto-sized items are only \(autoAngle)° each. May be hard to select.")
+            print("[Ring 0 Angles] Auto-sized items are only \(autoAngle)° each. May be hard to select.")
         }
         
         var angles: [Double] = []
@@ -541,7 +501,7 @@ class RingConfigurationCalculator {
             }
         }
         
-        print("📐 [Ring 0 Angles] Calculated: \(angles.map { String(format: "%.1f°", $0) }.joined(separator: ", "))")
+        print("[Ring 0 Angles] Calculated: \(angles.map { String(format: "%.1f°", $0) }.joined(separator: ", "))")
         
         return angles
     }
@@ -575,7 +535,7 @@ class RingConfigurationCalculator {
         }
         
         if totalCustomAngle > 360 {
-            print("⚠️ [Ring \(ringIndex) Angles] Custom sizes total \(totalCustomAngle)° exceeds 360°. Falling back to equal distribution.")
+            print("[Ring \(ringIndex) Angles] Custom sizes total \(totalCustomAngle)° exceeds 360°. Falling back to equal distribution.")
             let uniformAngle = 360.0 / Double(nodes.count)
             return Array(repeating: uniformAngle, count: nodes.count)
         }
@@ -585,7 +545,7 @@ class RingConfigurationCalculator {
         let autoAngle = autoSizedCount > 0 ? remainingAngle / Double(autoSizedCount) : 0
         
         if autoAngle > 0 && autoAngle < 15 {
-            print("⚠️ [Ring \(ringIndex) Angles] Auto-sized items are only \(String(format: "%.1f", autoAngle))° each. May be hard to select.")
+            print("[Ring \(ringIndex) Angles] Auto-sized items are only \(String(format: "%.1f", autoAngle))° each. May be hard to select.")
         }
         
         var angles: [Double] = []
@@ -599,7 +559,7 @@ class RingConfigurationCalculator {
             }
         }
         
-        print("📐 [Ring \(ringIndex) Angles] Calculated: \(angles.map { String(format: "%.1f°", $0) }.joined(separator: ", "))")
+        print("[Ring \(ringIndex) Angles] Calculated: \(angles.map { String(format: "%.1f°", $0) }.joined(separator: ", "))")
         
         return angles
     }

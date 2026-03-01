@@ -16,7 +16,7 @@ class FunctionManager: ObservableObject {
     @Published var rings: [RingState] = [] {
         didSet {
             if structuralChangeDetected(from: oldValue, to: rings) {
-                print("🔄 [Cache] Structural change detected - invalidating cache")
+                print("[Cache] Structural change detected - invalidating cache")
                 lastRingsHash = 0
                 cachedConfigurations = []
             }
@@ -121,7 +121,7 @@ class FunctionManager: ObservableObject {
         let distance = RingGeometry.calculateDistance(from: centerPoint, to: position)
         
         guard let ringLevel = getRingLevel(at: distance) else {
-            print("📍 Position at distance \(distance) is not in any ring")
+            print("Position at distance \(distance) is not in any ring")
             return nil
         }
         
@@ -135,7 +135,7 @@ class FunctionManager: ObservableObject {
         
         if !sliceConfig.isFullCircle {
             if !RingGeometry.isAngleInSlice(angle, sliceConfig: sliceConfig) {
-                print("📍 Angle \(angle)° is outside the slice")
+                print("Angle \(angle)° is outside the slice")
                 return nil
             }
         }
@@ -143,13 +143,13 @@ class FunctionManager: ObservableObject {
         let itemIndex = RingGeometry.getItemIndex(for: angle, sliceConfig: sliceConfig, itemCount: nodes.count)
         
         guard itemIndex >= 0, itemIndex < nodes.count else {
-            print("📍 Invalid item index: \(itemIndex)")
+            print("Invalid item index: \(itemIndex)")
             return nil
         }
         
         let node = nodes[itemIndex]
         
-        print("📍 Found item at position: ring=\(ringLevel), index=\(itemIndex), name='\(node.name)'")
+        print("Found item at position: ring=\(ringLevel), index=\(itemIndex), name='\(node.name)'")
 
         return (ringLevel, itemIndex, node)
     }
@@ -174,7 +174,7 @@ class FunctionManager: ObservableObject {
         }
         
         if rings.count > 0 && distance > 0 {
-            print("📍 Distance \(distance) is beyond all rings, treating as active ring \(activeRingLevel)")
+            print("Distance \(distance) is beyond all rings, treating as active ring \(activeRingLevel)")
             return activeRingLevel
         }
         
@@ -261,6 +261,6 @@ class FunctionManager: ObservableObject {
     func loadTestNodes(_ nodes: [FunctionNode]) {
         rootNodes = nodes
         rebuildRings()
-        print("🧪 [FunctionManager] Loaded \(nodes.count) test nodes")
+        print("[FunctionManager] Loaded \(nodes.count) test nodes")
     }
 }

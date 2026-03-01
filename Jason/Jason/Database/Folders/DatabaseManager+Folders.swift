@@ -42,7 +42,7 @@ extension DatabaseManager {
             }
         } else {
             if let error = sqlite3_errmsg(db) {
-                print("❌ [DatabaseManager] Failed to prepare SELECT for folder '\(path)': \(String(cString: error))")
+                print("[DatabaseManager] Failed to prepare SELECT for folder '\(path)': \(String(cString: error))")
             }
         }
         sqlite3_finalize(selectStatement)
@@ -68,12 +68,12 @@ extension DatabaseManager {
                     print("📁 [DatabaseManager] Created folder entry: \(folderName) (id: \(folderId!))")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to insert folder '\(folderName)': \(String(cString: error))")
+                        print("[DatabaseManager] Failed to insert folder '\(folderName)': \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare INSERT for folder '\(folderName)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare INSERT for folder '\(folderName)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(insertStatement)
@@ -101,15 +101,15 @@ extension DatabaseManager {
                 sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("📊 [DatabaseManager] Updated access for: \(path)")
+                    print("[DatabaseManager] Updated access for: \(path)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to update access for '\(path)': \(String(cString: error))")
+                        print("[DatabaseManager] Failed to update access for '\(path)': \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare UPDATE for folder access '\(path)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare UPDATE for folder access '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -124,7 +124,7 @@ extension DatabaseManager {
             // First ensure the folder exists
             let folderId = self._getOrCreateFolderUnsafe(path: path, title: nil)
             guard folderId != nil else {
-                print("❌ [DatabaseManager] Failed to get/create folder for icon update: \(path)")
+                print("[DatabaseManager] Failed to get/create folder for icon update: \(path)")
                 return
             }
             
@@ -154,15 +154,15 @@ extension DatabaseManager {
                 sqlite3_bind_text(statement, 6, (path as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("🎨 [DatabaseManager] Set custom icon for folder: \(path)")
+                    print("[DatabaseManager] Set custom icon for folder: \(path)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to set icon for folder '\(path)': \(String(cString: error))")
+                        print("[DatabaseManager] Failed to set icon for folder '\(path)': \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare UPDATE for folder icon '\(path)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare UPDATE for folder icon '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -185,15 +185,15 @@ extension DatabaseManager {
                 sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("🗑️ [DatabaseManager] Removed custom icon for folder: \(path)")
+                    print("[DatabaseManager] Removed custom icon for folder: \(path)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to remove icon for folder '\(path)': \(String(cString: error))")
+                        print("[DatabaseManager] Failed to remove icon for folder '\(path)': \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare UPDATE for removing icon '\(path)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare UPDATE for removing icon '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -249,7 +249,7 @@ extension DatabaseManager {
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare SELECT for custom icons: \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare SELECT for custom icons: \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -307,7 +307,7 @@ extension DatabaseManager {
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare SELECT for folder '\(path)': \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare SELECT for folder '\(path)': \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
