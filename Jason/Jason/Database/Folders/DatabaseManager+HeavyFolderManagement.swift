@@ -19,7 +19,7 @@ extension DatabaseManager {
             return
         }
         
-        let sql = "DELETE FROM heavy_folders WHERE folder_path = ?;"
+        let sql = "DELETE FROM heavy_folders WHERE path = ?;"
         var statement: OpaquePointer?
         
         if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
@@ -39,38 +39,11 @@ extension DatabaseManager {
         sqlite3_finalize(statement)
     }
     
-    /// Get all heavy folder paths
-    func getAllHeavyFolders() -> [String] {
-        guard let db = db else {
-            print("❌ [DatabaseManager] Database not initialized")
-            return []
-        }
-        
-        let sql = "SELECT folder_path FROM heavy_folders ORDER BY last_accessed DESC;"
-        var statement: OpaquePointer?
-        
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
-            let error = String(cString: sqlite3_errmsg(db))
-            print("[DatabaseManager] ⚠️ Failed to prepare query: \(error)")
-            return []
-        }
-        
-        var paths: [String] = []
-        
-        while sqlite3_step(statement) == SQLITE_ROW {
-            let path = String(cString: sqlite3_column_text(statement, 0))
-            paths.append(path)
-        }
-        
-        sqlite3_finalize(statement)
-        return paths
-    }
-    
     /// Get heavy folder item count
     func getHeavyFolderItemCount(path: String) -> Int? {
         guard let db = db else { return nil }
         
-        let sql = "SELECT item_count FROM heavy_folders WHERE folder_path = ?;"
+        let sql = "SELECT item_count FROM heavy_folders WHERE path = ?;"
         var statement: OpaquePointer?
         
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {

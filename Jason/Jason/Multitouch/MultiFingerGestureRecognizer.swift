@@ -251,7 +251,7 @@ class MultiFingerGestureRecognizer: GestureRecognizer {
         let fingerCount = gestureFingerCount
         
         if debugLogging {
-            print("🖐️ [MultiFingerGesture] Analyzing: fingers=\(fingerCount), duration=\(String(format: "%.3f", duration))s, distance=\(String(format: "%.3f", distance))")
+            print("[MultiFingerGesture] Analyzing: fingers=\(fingerCount), duration=\(String(format: "%.3f", duration))s, distance=\(String(format: "%.3f", distance))")
         }
         
         // === CHECK FOR TAP ===

@@ -48,9 +48,12 @@ class RefreshOperation: Operation, @unchecked Sendable {
         }
         
         // Cache to database using enhanced cache
+        let cacheType = DatabaseManager.shared.getCacheType(for: path) ?? "heavy"
+
         DatabaseManager.shared.saveEnhancedFolderContents(
             folderPath: path,
-            items: items
+            items: items,
+            cacheType: cacheType
         )
         
         // Notify UI so nodeCache gets invalidated and any visible panel refreshes

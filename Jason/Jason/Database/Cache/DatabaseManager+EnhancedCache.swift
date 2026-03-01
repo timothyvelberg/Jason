@@ -84,9 +84,9 @@ extension DatabaseManager {
             modification_date INTEGER NOT NULL,
             creation_date INTEGER NOT NULL DEFAULT 0,
             date_added INTEGER NOT NULL DEFAULT 0,
+            cache_type TEXT NOT NULL DEFAULT 'heavy',
 
 
-            
             -- Enhanced fields
             file_extension TEXT,
             file_size INTEGER,
@@ -127,7 +127,7 @@ extension DatabaseManager {
     // MARK: - Save Enhanced Cache
     
     /// Save folder contents with thumbnails to enhanced cache
-    func saveEnhancedFolderContents(folderPath: String, items: [EnhancedFolderItem]) {
+    func saveEnhancedFolderContents(folderPath: String, items: [EnhancedFolderItem], cacheType: String = "heavy") {
         guard let db = db else {
             print("[EnhancedCache] Database not initialized")
             return
@@ -158,8 +158,8 @@ extension DatabaseManager {
                 folder_path, item_name, item_path, is_directory, modification_date,
                 creation_date, date_added,
                 file_extension, file_size, has_custom_icon, is_image_file,
-                thumbnail_data, folder_config_json, cached_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                thumbnail_data, folder_config_json, cached_at, cache_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """
             
             var insertStmt: OpaquePointer?
@@ -209,6 +209,7 @@ extension DatabaseManager {
                 }
 
                 sqlite3_bind_int64(insertStmt, 14, Int64(now))
+                sqlite3_bind_text(insertStmt, 15, (cacheType as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(insertStmt) == SQLITE_DONE {
                     savedCount += 1
@@ -237,6 +238,54 @@ extension DatabaseManager {
             }
         }
     }
+    
+    func clearPromotedSubfolderCache() {
+        guard let db = db else { return }
+        
+        queue.sync {
+            let sql = "DELETE FROM folder_contents_enhanced WHERE cache_type = 'promoted';"
+            var statement: OpaquePointer?
+            
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                if sqlite3_step(statement) == SQLITE_DONE {
+                    let deleted = sqlite3_changes(db)
+                    if deleted > 0 {
+                        print("[EnhancedCache] Cleared \(deleted) promoted subfolder cache entries")
+                    }
+                } else {
+                    let error = String(cString: sqlite3_errmsg(db))
+                    print("[EnhancedCache] Failed to clear promoted cache: \(error)")
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+    }
+    
+    func getCacheType(for folderPath: String) -> String? {
+        guard let db = db else { return nil }
+        
+        return queue.sync {
+            let sql = "SELECT DISTINCT cache_type FROM folder_contents_enhanced WHERE folder_path = ? LIMIT 1;"
+            var statement: OpaquePointer?
+            
+            guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+                return nil
+            }
+            
+            sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
+            
+            var cacheType: String?
+            if sqlite3_step(statement) == SQLITE_ROW {
+                if let text = sqlite3_column_text(statement, 0) {
+                    cacheType = String(cString: text)
+                }
+            }
+            
+            sqlite3_finalize(statement)
+            return cacheType
+        }
+    }
+    
     // MARK: - Load Enhanced Cache
     
     /// Get cached folder contents with thumbnails
@@ -539,7 +588,7 @@ extension DatabaseManager {
                 return
             }
             
-            let deleteSQL = "DELETE FROM folder_contents_enhanced WHERE folder_path = ?;"
+            let deleteSQL = "DELETE FROM folder_contents_enhanced WHERE folder_path = ? AND cache_type != 'promoted';"
             var deleteStmt: OpaquePointer?
             
             if sqlite3_prepare_v2(db, deleteSQL, -1, &deleteStmt, nil) == SQLITE_OK {

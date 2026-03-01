@@ -61,11 +61,7 @@ class FolderWatcherManager: LiveDataStream {
         // Build list of folders to watch (also check heavy status on main thread)
         var foldersToWatch: [(path: String, name: String)] = []
         for (folder, _) in favoriteFolders {
-            
-            let isHeavy = DatabaseManager.shared.isHeavyFolder(path: folder.path)
-            if isHeavy {
-                foldersToWatch.append((path: folder.path, name: folder.title))
-            }
+            foldersToWatch.append((path: folder.path, name: folder.title))
         }
         
         // Now dispatch to background thread with the data we already fetched
@@ -189,6 +185,19 @@ class FolderWatcherManager: LiveDataStream {
                 print("[FolderWatcher] Stopped watching: \(path)")
             }
         }
+    }
+    
+    func startWatchingPromotedSubfolder(_ path: String) {
+        let name = URL(fileURLWithPath: path).lastPathComponent
+        startWatching(path: path, itemName: name)
+        print("[FolderWatcher] Started watching promoted subfolder: \(name)")
+    }
+
+    func stopWatchingPromotedSubfolders(_ paths: Set<String>) {
+        for path in paths {
+            stopWatching(path: path)
+        }
+        print("[FolderWatcher] Stopped watching \(paths.count) promoted subfolder(s)")
     }
     
     /// Stop watching all folders

@@ -19,32 +19,60 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     }
     
     private let maxItemsPerFolder: Int = 40
-    private var nodeCache: [String: [FunctionNode]] = [:]
+    
+    private enum CacheTier {
+        case favorite
+        case promoted
+        case regular
+        
+        var evictionInterval: TimeInterval {
+            switch self {
+            case .favorite: return 120
+            case .promoted: return 600
+            case .regular:  return 120
+            }
+        }
+    }
+
+    private struct NodeCacheEntry {
+        let nodes: [FunctionNode]
+        var lastAccessedAt: Date
+        let tier: CacheTier
+    }
+
+    private var nodeCache: [String: NodeCacheEntry] = [:]
+    private var evictionTimer: Timer?
+    private let visitTracker = FolderVisitTracker()
     
     // MARK: - Initialization
         
-        init() {
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(handleProviderUpdate(_:)),
-                name: .providerContentUpdated,
-                object: nil
-            )
-        }
+    init() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleProviderUpdate(_:)),
+            name: .providerContentUpdated,
+            object: nil
+        )
         
-        deinit {
-            NotificationCenter.default.removeObserver(self)
-        }
+        DatabaseManager.shared.clearPromotedSubfolderCache()
+        startEvictionTimer()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        evictionTimer?.invalidate()
+        FolderWatcherManager.shared.stopWatchingPromotedSubfolders(visitTracker.promotedPaths)
+    }
+    
+    @objc private func handleProviderUpdate(_ notification: Notification) {
+        guard let updateInfo = ProviderUpdateInfo.from(notification),
+              updateInfo.providerId == self.providerId,
+              let folderPath = updateInfo.folderPath else { return }
         
-        @objc private func handleProviderUpdate(_ notification: Notification) {
-            guard let updateInfo = ProviderUpdateInfo.from(notification),
-                  updateInfo.providerId == self.providerId,
-                  let folderPath = updateInfo.folderPath else { return }
-            
-            if nodeCache.removeValue(forKey: folderPath) != nil {
-                print("🗑️ [FavoriteFolderProvider] nodeCache invalidated for: \(URL(fileURLWithPath: folderPath).lastPathComponent)")
-            }
+        if nodeCache.removeValue(forKey: folderPath) != nil {
+            print("🗑️ [FavoriteFolderProvider] nodeCache invalidated for: \(URL(fileURLWithPath: folderPath).lastPathComponent)")
         }
+    }
     
     // MARK: - FunctionProvider Protocol
     
@@ -127,158 +155,246 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     
     /// Synchronous cache lookup for use by ListPanelManager (skips debounce on hit)
     func cachedChildren(forPath path: String) -> [FunctionNode]? {
-        return nodeCache[path]
+        if var entry = nodeCache[path] {
+            entry.lastAccessedAt = Date()
+            nodeCache[path] = entry
+            return entry.nodes
+        }
+        return nil
     }
     
     // MARK: - Dynamic Loading
     
     func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
-        print("📂 [FavoriteFolderProvider] loadChildren called for: \(node.name)")
-        
-        guard let metadata = node.metadata,
-              let urlString = metadata["folderURL"] as? String else {
-            print("❌ No folderURL in metadata")
-            return []
-        }
-        
-        let folderURL = URL(fileURLWithPath: urlString)
-        let folderPath = folderURL.path
-        let db = DatabaseManager.shared
-
-        // Check in-memory cache first (instant, no filesystem or DB work)
-        if let cachedNodes = nodeCache[folderPath] {
-            print("⚡ [FavoriteFolderProvider] nodeCache HIT for '\(node.name)' (\(cachedNodes.count) items)")
-            return cachedNodes
-        }
-
-        // Single DB fetch — reused throughout this function
-        let favorites = db.getFavoriteFolders()
-
-
-        // Get sort order using pre-fetched favorites
-          let requestedSortOrder = getSortOrderForFolder(path: folderPath, favorites: favorites)
-        print("[SORT] Folder: \(node.name) - Sort: \(requestedSortOrder.displayName)")
-        
-        // Early cancellation check — bail before any filesystem work
-        try? Task.checkCancellation()
-        if Task.isCancelled { return [] }
-        
-        // Record folder access
-        db.recordFolderAccess(folderPath: folderPath)
-        
-        // Cancellation check — before heavy work
-        try? Task.checkCancellation()
-        if Task.isCancelled { return [] }
-        
-        // Check if this is a HEAVY folder and try ENHANCED CACHE
-        if db.isHeavyFolder(path: folderPath) {
-            print("[FavoriteFolderProvider] Heavy folder detected: \(node.name)")
+            print("📂 [FavoriteFolderProvider] loadChildren called for: \(node.name)")
             
-            if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
-                print("[EnhancedCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
-                
-                var nodes = cachedItems.map { item in
-                    if item.isDirectory {
-                        return createFolderNodeFromCache(item: item)
-                    } else {
-                        return createFileNodeFromCache(item: item)
-                    }
-                }
-                
-                nodes = sortNodes(nodes, by: requestedSortOrder)
-                
-                // We don't know the true total count here without a disk read,
-                // so check against cached item count as proxy
-                var resultNodes = nodes
-                if cachedItems.count >= maxItemsPerFolder {
-                    resultNodes.append(createOpenInFinderNode(for: folderURL))
-                }
-
-                nodeCache[folderPath] = resultNodes
-                print("[FavoriteFolderProvider] nodeCache stored \(resultNodes.count) nodes for '\(node.name)'")
-
-                return resultNodes
-            } else {
-                print("[EnhancedCache] Cache miss for heavy folder - will reload and cache")
-            }
-        }
-        
-        // CACHE MISS OR NOT HEAVY - Load from disk
-        print("[START] Loading from disk: \(folderURL.path)")
-        let startTime = Date()
-        
-        // Cancellation check — before expensive disk + thumbnail work
-        try? Task.checkCancellation()
-        if Task.isCancelled {
-            print("[FavoriteFolderProvider] Cancelled before disk load: \(node.name)")
-            return []
-        }
-        
-        let (nodes, actualItemCount): ([FunctionNode], Int) = await Task.detached(priority: .userInitiated) { [weak self] () -> ([FunctionNode], Int) in
-            guard let self = self else {
-                print("[FavoriteFolderProvider] Self deallocated during load")
-                return ([], 0)
-            }
-            
-            if Task.isCancelled {
-                print("[FavoriteFolderProvider] Cancelled at start of background load")
-                return ([], 0)
-            }
-            
-            print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
-            
-            let result = self.getFolderContents(at: folderURL, sortOrder: requestedSortOrder)
-            
-            if Task.isCancelled {
-                print("[FavoriteFolderProvider] Cancelled after disk load: \(folderURL.lastPathComponent)")
-                return ([], 0)
-            }
-            
-            print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.nodes.count) items")
-            return (result.nodes, result.totalCount)
-        }.value
-        
-        // Cancellation check — before caching work
-        if Task.isCancelled {
-            print("[FavoriteFolderProvider] Cancelled before caching: \(node.name)")
-            return []
-        }
-        
-        let elapsed = Date().timeIntervalSince(startTime)
-        print("[END] Loaded \(nodes.count) nodes in \(String(format: "%.2f", elapsed))s")
-        
-        let folderExceedsLimit = actualItemCount > maxItemsPerFolder
-        
-        // Handle folder watching status dynamically
-        handleFolderWatchingStatus(folderPath: folderPath, itemCount: actualItemCount, folderName: node.name, favorites: favorites)
-        
-        // Cache heavy folders to enhanced cache
-        if actualItemCount > 100 {
-            if Task.isCancelled {
-                print("[FavoriteFolderProvider] Cancelled before enhanced cache write: \(node.name)")
+            guard let metadata = node.metadata,
+                  let urlString = metadata["folderURL"] as? String else {
+                print("❌ No folderURL in metadata")
                 return []
             }
             
-            print("[EnhancedCache] Folder has \(actualItemCount) items - caching with thumbnails")
+            let folderURL = URL(fileURLWithPath: urlString)
+            let folderPath = folderURL.path
+            let db = DatabaseManager.shared
+
+            if var entry = nodeCache[folderPath] {
+                entry.lastAccessedAt = Date()
+                nodeCache[folderPath] = entry
+                print("⚡ [FavoriteFolderProvider] nodeCache HIT for '\(node.name)' (\(entry.nodes.count) items)")
+                return entry.nodes
+            }
+
+            // Single DB fetch — reused throughout this function
+            let favorites = db.getFavoriteFolders()
             
-            let enhancedItems = convertToEnhancedFolderItems(nodes: nodes, folderURL: folderURL)
-            db.saveEnhancedFolderContents(folderPath: folderPath, items: enhancedItems)
-            print("[EnhancedCache] Cached \(nodes.count) items for future instant loads!")
-        } else {
-            print("ℹ️ [EnhancedCache] Folder has only \(actualItemCount) items - not caching (threshold: 100)")
+            let favoritePaths = Set(favorites.map { $0.folder.path })
+            let isFavorite = favoritePaths.contains(folderPath)
+
+            if !isFavorite {
+                let justPromoted = visitTracker.recordVisit(for: folderPath)
+                if justPromoted {
+                    handlePromotion(for: folderPath)
+                }
+            }
+
+            // Get sort order using pre-fetched favorites
+            let requestedSortOrder = getSortOrderForFolder(path: folderPath, favorites: favorites)
+            print("[SORT] Folder: \(node.name) - Sort: \(requestedSortOrder.displayName)")
+            
+            // Early cancellation check — bail before any filesystem work
+            try? Task.checkCancellation()
+            if Task.isCancelled { return [] }
+            
+            // Record folder access
+            db.recordFolderAccess(folderPath: folderPath)
+            
+            // Cancellation check — before heavy work
+            try? Task.checkCancellation()
+            if Task.isCancelled { return [] }
+            
+            // Check if this is a HEAVY folder and try ENHANCED CACHE
+            if db.isHeavyFolder(path: folderPath) {
+                print("[FavoriteFolderProvider] Heavy folder detected: \(node.name)")
+                
+                if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
+                    print("[EnhancedCache] CACHE HIT! Loaded \(cachedItems.count) items instantly")
+                    
+                    var nodes = cachedItems.map { item in
+                        if item.isDirectory {
+                            return createFolderNodeFromCache(item: item)
+                        } else {
+                            return createFileNodeFromCache(item: item)
+                        }
+                    }
+                    
+                    nodes = sortNodes(nodes, by: requestedSortOrder)
+                    
+                    var resultNodes = nodes
+                    if cachedItems.count >= maxItemsPerFolder {
+                        resultNodes.append(createOpenInFinderNode(for: folderURL))
+                    }
+
+                    let tier = determineTier(for: folderPath, favoritePaths: favoritePaths)
+                    nodeCache[folderPath] = NodeCacheEntry(nodes: resultNodes, lastAccessedAt: Date(), tier: tier)
+                    print("[FavoriteFolderProvider] nodeCache stored \(resultNodes.count) nodes for '\(node.name)'")
+
+                    return resultNodes
+                    
+                } else {
+                    print("[EnhancedCache] Cache miss for heavy folder - will reload and cache")
+                }
+            }
+            
+            // SQLite read fallback for favorite folders and promoted subfolders
+            if isFavorite || visitTracker.isPromoted(folderPath) {
+                if let cachedItems = db.getEnhancedCachedFolderContents(folderPath: folderPath) {
+                    print("💾 [FavoriteFolderProvider] Warm from SQLite: '\(node.name)'")
+                    
+                    var nodes = cachedItems.map { item in
+                        item.isDirectory ? createFolderNodeFromCache(item: item) : createFileNodeFromCache(item: item)
+                    }
+                    nodes = sortNodes(nodes, by: requestedSortOrder)
+                    
+                    var resultNodes = nodes
+                    if cachedItems.count >= maxItemsPerFolder {
+                        resultNodes.append(createOpenInFinderNode(for: folderURL))
+                    }
+                    
+                    let tier = determineTier(for: folderPath, favoritePaths: favoritePaths)
+                    nodeCache[folderPath] = NodeCacheEntry(nodes: resultNodes, lastAccessedAt: Date(), tier: tier)
+                    return resultNodes
+                }
+            }
+            
+            // CACHE MISS OR NOT HEAVY - Load from disk
+            print("[START] Loading from disk: \(folderURL.path)")
+            let startTime = Date()
+            
+            // Cancellation check — before expensive disk + thumbnail work
+            try? Task.checkCancellation()
+            if Task.isCancelled {
+                print("[FavoriteFolderProvider] Cancelled before disk load: \(node.name)")
+                return []
+            }
+            
+            let (nodes, actualItemCount): ([FunctionNode], Int) = await Task.detached(priority: .userInitiated) { [weak self] () -> ([FunctionNode], Int) in
+                guard let self = self else {
+                    print("[FavoriteFolderProvider] Self deallocated during load")
+                    return ([], 0)
+                }
+                
+                if Task.isCancelled {
+                    print("[FavoriteFolderProvider] Cancelled at start of background load")
+                    return ([], 0)
+                }
+                
+                print("🧵 [BACKGROUND] Started loading: \(folderURL.path)")
+                
+                let result = self.getFolderContents(at: folderURL, sortOrder: requestedSortOrder)
+                
+                if Task.isCancelled {
+                    print("[FavoriteFolderProvider] Cancelled after disk load: \(folderURL.lastPathComponent)")
+                    return ([], 0)
+                }
+                
+                print("🧵 [BACKGROUND] Finished loading: \(folderURL.path) - \(result.nodes.count) items")
+                return (result.nodes, result.totalCount)
+            }.value
+            
+            // Cancellation check — before caching work
+            if Task.isCancelled {
+                print("[FavoriteFolderProvider] Cancelled before caching: \(node.name)")
+                return []
+            }
+            
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("[END] Loaded \(nodes.count) nodes in \(String(format: "%.2f", elapsed))s")
+            
+            let folderExceedsLimit = actualItemCount > maxItemsPerFolder
+            
+            // Handle folder watching status dynamically
+            handleFolderWatchingStatus(folderPath: folderPath, itemCount: actualItemCount, folderName: node.name, favorites: favorites)
+            
+            if actualItemCount > 100 {
+                if Task.isCancelled {
+                    print("[FavoriteFolderProvider] Cancelled before enhanced cache write: \(node.name)")
+                    return []
+                }
+                
+                print("[EnhancedCache] Folder has \(actualItemCount) items - caching with thumbnails")
+                
+                let enhancedItems = convertToEnhancedFolderItems(nodes: nodes, folderURL: folderURL)
+                db.saveEnhancedFolderContents(folderPath: folderPath, items: enhancedItems, cacheType: "heavy")
+                print("[EnhancedCache] Cached \(nodes.count) items for future instant loads!")
+            } else if isFavorite {
+                let enhancedItems = convertToEnhancedFolderItems(nodes: nodes, folderURL: folderURL)
+                db.saveEnhancedFolderContents(folderPath: folderPath, items: enhancedItems, cacheType: "favorite")
+                print("💾 [FavoriteFolderProvider] Cached light favorite folder to SQLite: '\(node.name)'")
+            } else {
+                print("ℹ️ [EnhancedCache] Folder has only \(actualItemCount) items - not caching (threshold: 100)")
+            }
+            
+            // Add "Open in Finder" if folder exceeds display limit
+            var resultNodes = nodes
+            if folderExceedsLimit {
+                resultNodes.append(createOpenInFinderNode(for: folderURL))
+            }
+            
+            let tier = determineTier(for: folderPath, favoritePaths: favoritePaths)
+            nodeCache[folderPath] = NodeCacheEntry(nodes: resultNodes, lastAccessedAt: Date(), tier: tier)
+            print("💾 [FavoriteFolderProvider] nodeCache stored \(resultNodes.count) nodes for '\(node.name)'")
+            
+            return resultNodes
+        }
+    
+    private func determineTier(for path: String, favoritePaths: Set<String>) -> CacheTier {
+        if favoritePaths.contains(path) { return .favorite }
+        if visitTracker.isPromoted(path) { return .promoted }
+        return .regular
+    }
+
+    private func startEvictionTimer() {
+        evictionTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            self?.evictStaleNodeCacheEntries()
+        }
+    }
+
+    private func evictStaleNodeCacheEntries() {
+        let now = Date()
+        let toEvict = nodeCache.filter { _, entry in
+            now.timeIntervalSince(entry.lastAccessedAt) > entry.tier.evictionInterval
+        }.map { $0.key }
+        
+        for path in toEvict {
+            nodeCache.removeValue(forKey: path)
+            print("⏱️ [FavoriteFolderProvider] Evicted nodeCache: '\(URL(fileURLWithPath: path).lastPathComponent)'")
         }
         
-        // Add "Open in Finder" if folder exceeds display limit
-        var resultNodes = nodes
-        if folderExceedsLimit {
-            resultNodes.append(createOpenInFinderNode(for: folderURL))
+        if !toEvict.isEmpty {
+            print("⏱️ [FavoriteFolderProvider] Evicted \(toEvict.count) stale cache entries")
         }
+    }
+
+    private func handlePromotion(for folderPath: String) {
+        print("⬆️ [FavoriteFolderProvider] Promoting subfolder: '\(URL(fileURLWithPath: folderPath).lastPathComponent)'")
         
-        // cache result so subsequent hovers are instant
-        nodeCache[folderPath] = resultNodes
-        print("💾 [FavoriteFolderProvider] nodeCache stored \(resultNodes.count) nodes for '\(node.name)'")
+        FolderWatcherManager.shared.startWatchingPromotedSubfolder(folderPath)
         
-        return resultNodes
+        if var entry = nodeCache[folderPath] {
+            let folderURL = URL(fileURLWithPath: folderPath)
+            let enhancedItems = convertToEnhancedFolderItems(nodes: entry.nodes, folderURL: folderURL)
+            DatabaseManager.shared.saveEnhancedFolderContents(
+                folderPath: folderPath,
+                items: enhancedItems,
+                cacheType: "promoted"
+            )
+            
+            entry = NodeCacheEntry(nodes: entry.nodes, lastAccessedAt: entry.lastAccessedAt, tier: .promoted)
+            nodeCache[folderPath] = entry
+            
+            print("⬆️ [FavoriteFolderProvider] NodeCache tier upgraded to .promoted for '\(URL(fileURLWithPath: folderPath).lastPathComponent)'")
+        }
     }
     
     // MARK: - Sorting
