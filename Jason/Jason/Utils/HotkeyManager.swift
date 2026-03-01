@@ -17,7 +17,7 @@ class HotkeyManager {
     var onHide: (() -> Void)?
     
     /// Called when Space is pressed (for preview toggle)
-    var onSpacePressed: (() -> Void)?
+    var onTildePressed: (() -> Void)?
     
     /// Called when Ctrl is released in app switcher mode
     var onCtrlReleasedInAppSwitcher: (() -> Void)?
@@ -802,9 +802,9 @@ class HotkeyManager {
                 print("[HotkeyManager] Enter pressed")
                 onEnter?()
                 return true
-            case 49:  // Space
-                print("[HotkeyManager] Space pressed")
-                onSpacePressed?()
+            case 50:  // Tilde/Grave `
+                print("[HotkeyManager] Tilde pressed")
+                onTildePressed?()
                 return true
             case 51:  // Backspace
                 if eventModifiers.contains(.command) {

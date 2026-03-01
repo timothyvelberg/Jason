@@ -425,7 +425,7 @@ class CircularUIInstanceManager: ObservableObject {
             panelManager.executeSelectedItem()
         }
         
-        hotkeyManager.onSpacePressed = { [weak self] in
+        hotkeyManager.onTildePressed = { [weak self] in
             guard let instance = self?.getActiveInstance(),
                   let panelManager = instance.listPanelManager,
                   panelManager.isVisible else { return }
