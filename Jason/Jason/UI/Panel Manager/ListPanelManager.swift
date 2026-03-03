@@ -966,6 +966,20 @@ class ListPanelManager: ObservableObject {
 
     func currentBounds(for panel: PanelState) -> NSRect {
         let currentPos = currentPosition(for: panel)
+        
+        // Preview panels have no items, so panelHeight would be near-zero.
+        // Use the configured preview dimensions directly.
+        if panel.previewContent != nil {
+            let w = panel.config.previewPanelWidth
+            let h = panel.config.previewPanelMaxHeight
+            return NSRect(
+                x: currentPos.x - w / 2,
+                y: currentPos.y - h / 2,
+                width: w,
+                height: h
+            )
+        }
+        
         var centerY = currentPos.y
         
         // Adjust for top-anchored search resizing

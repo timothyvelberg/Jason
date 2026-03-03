@@ -234,7 +234,6 @@ class FolderWatcherManager: LiveDataStream {
         let heavyFavoritePaths = Set(
             DatabaseManager.shared.getFavoriteFolders()
                 .map { $0.folder.path }
-                .filter { DatabaseManager.shared.isHeavyFolder(path: $0) }
         )
         
         let dynamicFileFolderPaths = Set(

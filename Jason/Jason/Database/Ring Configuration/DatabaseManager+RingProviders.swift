@@ -26,7 +26,7 @@ extension DatabaseManager {
         queue.sync {
             // Validate provider order is unique within the ring
             if _isProviderOrderInUse(ringId: ringId, providerOrder: providerOrder) {
-                print("⚠️ [DatabaseManager] Provider order \(providerOrder) is already in use in ring id \(ringId)")
+                print("[DatabaseManager] Provider order \(providerOrder) is already in use in ring id \(ringId)")
                 return
             }
             
@@ -170,7 +170,7 @@ extension DatabaseManager {
                         sqlite3_bind_int(checkStatement, 3, Int32(id))
                         
                         if sqlite3_step(checkStatement) == SQLITE_ROW {
-                            print("⚠️ [DatabaseManager] Cannot update: provider order \(newOrder) is already in use in ring id \(ringId)")
+                            print("[DatabaseManager] Cannot update: provider order \(newOrder) is already in use in ring id \(ringId)")
                             sqlite3_finalize(checkStatement)
                             return
                         }
@@ -188,7 +188,7 @@ extension DatabaseManager {
             else if providerConfig != nil { updates.append("provider_config = ?") }
             
             guard !updates.isEmpty else {
-                print("⚠️ [DatabaseManager] No fields to update for provider id \(id)")
+                print("[DatabaseManager] No fields to update for provider id \(id)")
                 return
             }
             
@@ -215,15 +215,15 @@ extension DatabaseManager {
                 sqlite3_bind_int(statement, paramIndex, Int32(id))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("📊 [DatabaseManager] Updated provider id \(id)")
+                    print("[DatabaseManager] Updated provider id \(id)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to update provider id \(id): \(String(cString: error))")
+                        print("[DatabaseManager] Failed to update provider id \(id): \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare UPDATE for provider id \(id): \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare UPDATE for provider id \(id): \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -242,15 +242,15 @@ extension DatabaseManager {
                 sqlite3_bind_int(statement, 1, Int32(id))
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("🗑️ [DatabaseManager] Removed provider id \(id)")
+                    print("[DatabaseManager] Removed provider id \(id)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to remove provider id \(id): \(String(cString: error))")
+                        print("[DatabaseManager] Failed to remove provider id \(id): \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare DELETE for provider id \(id): \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare DELETE for provider id \(id): \(String(cString: error))")
                 }
             }
             sqlite3_finalize(statement)
@@ -296,13 +296,13 @@ extension DatabaseManager {
                         }
                     }
                 } else {
-                    print("⚠️ [DatabaseManager] Provider '\(providerType)' not found in ring \(ringId)")
+                    print("[DatabaseManager] Provider '\(providerType)' not found in ring \(ringId)")
                     sqlite3_finalize(selectStatement)
                     return
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare SELECT for provider config: \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare SELECT for provider config: \(String(cString: error))")
                 }
                 sqlite3_finalize(selectStatement)
                 return
@@ -315,7 +315,7 @@ extension DatabaseManager {
             // Step 3: Serialize back to JSON string
             guard let jsonData = try? JSONSerialization.data(withJSONObject: currentConfig),
                   let jsonString = String(data: jsonData, encoding: .utf8) else {
-                print("❌ [DatabaseManager] Failed to serialize provider config JSON")
+                print("[DatabaseManager] Failed to serialize provider config JSON")
                 return
             }
             
@@ -329,16 +329,16 @@ extension DatabaseManager {
                 sqlite3_bind_text(updateStatement, 3, (providerType as NSString).utf8String, -1, nil)
                 
                 if sqlite3_step(updateStatement) == SQLITE_DONE {
-                    print("✅ [DatabaseManager] Updated display mode for provider '\(providerType)' in ring \(ringId) to '\(displayMode)'")
+                    print("[DatabaseManager] Updated display mode for provider '\(providerType)' in ring \(ringId) to '\(displayMode)'")
                     success = true
                 } else {
                     if let error = sqlite3_errmsg(db) {
-                        print("❌ [DatabaseManager] Failed to update provider display mode: \(String(cString: error))")
+                        print("[DatabaseManager] Failed to update provider display mode: \(String(cString: error))")
                     }
                 }
             } else {
                 if let error = sqlite3_errmsg(db) {
-                    print("❌ [DatabaseManager] Failed to prepare UPDATE for provider display mode: \(String(cString: error))")
+                    print("[DatabaseManager] Failed to prepare UPDATE for provider display mode: \(String(cString: error))")
                 }
             }
             sqlite3_finalize(updateStatement)
@@ -360,7 +360,7 @@ extension DatabaseManager {
         queue.sync {
             // Begin transaction - all or nothing
             if sqlite3_exec(db, "BEGIN TRANSACTION;", nil, nil, nil) != SQLITE_OK {
-                print("❌ [DatabaseManager] Failed to begin transaction for reorder")
+                print("[DatabaseManager] Failed to begin transaction for reorder")
                 return
             }
             
@@ -377,7 +377,7 @@ extension DatabaseManager {
                     
                     if sqlite3_step(statement) != SQLITE_DONE {
                         if let error = sqlite3_errmsg(db) {
-                            print("❌ [DatabaseManager] Failed to set temp order for provider \(providerId): \(String(cString: error))")
+                            print("[DatabaseManager] Failed to set temp order for provider \(providerId): \(String(cString: error))")
                         }
                         sqlite3_finalize(statement)
                         sqlite3_exec(db, "ROLLBACK;", nil, nil, nil)
@@ -399,7 +399,7 @@ extension DatabaseManager {
                     
                     if sqlite3_step(statement) != SQLITE_DONE {
                         if let error = sqlite3_errmsg(db) {
-                            print("❌ [DatabaseManager] Failed to set final order for provider \(providerId): \(String(cString: error))")
+                            print("[DatabaseManager] Failed to set final order for provider \(providerId): \(String(cString: error))")
                         }
                         sqlite3_finalize(statement)
                         sqlite3_exec(db, "ROLLBACK;", nil, nil, nil)
@@ -411,10 +411,10 @@ extension DatabaseManager {
             
             // Commit transaction
             if sqlite3_exec(db, "COMMIT;", nil, nil, nil) == SQLITE_OK {
-                print("✅ [DatabaseManager] Reordered \(providerIds.count) providers in ring \(ringId)")
+                print("[DatabaseManager] Reordered \(providerIds.count) providers in ring \(ringId)")
                 success = true
             } else {
-                print("❌ [DatabaseManager] Failed to commit reorder transaction")
+                print("[DatabaseManager] Failed to commit reorder transaction")
                 sqlite3_exec(db, "ROLLBACK;", nil, nil, nil)
             }
         }
