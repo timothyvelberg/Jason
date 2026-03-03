@@ -55,14 +55,6 @@ class RefreshOperation: Operation, @unchecked Sendable {
             items: items,
             cacheType: cacheType
         )
-        
-        // Notify UI so nodeCache gets invalidated and any visible panel refreshes
-        DispatchQueue.main.async {
-            NotificationCenter.default.postProviderUpdate(
-                providerId: "favorite-folder",
-                folderPath: self.path
-            )
-        }
     }
     
     private func loadFolderContents(at path: String) -> [EnhancedFolderItem] {

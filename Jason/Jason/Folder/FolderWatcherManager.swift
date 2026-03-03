@@ -289,27 +289,27 @@ class FolderWatcherManager: LiveDataStream {
     }
     
     private func handleFolderChange(path: String, name: String) {
-        // Cancel any pending refresh for this folder
-        pendingRefreshes[path]?.cancel()
-        
-        // Create new debounced refresh
-        let workItem = DispatchWorkItem { [weak self] in
+        watcherQueue.async { [weak self] in
             guard let self = self else { return }
             
-            print("[FolderWatcher] Change detected in: \(name)")
-            print("[FolderWatcher] Queueing cache refresh...")
+            // Cancel any pending refresh for this folder
+            self.pendingRefreshes[path]?.cancel()
             
-            //Add to operation queue
-            self.queueRefresh(for: path, name: name)
+            // Create new debounced refresh
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self = self else { return }
+                
+                print("[FolderWatcher] Change detected in: \(name)")
+                print("[FolderWatcher] Queueing cache refresh...")
+                
+                self.queueRefresh(for: path, name: name)
+                self.pendingRefreshes.removeValue(forKey: path)
+            }
             
-            // Remove from pending
-            self.pendingRefreshes.removeValue(forKey: path)
+            self.pendingRefreshes[path] = workItem
+            
+            self.watcherQueue.asyncAfter(deadline: .now() + self.debounceInterval, execute: workItem)
         }
-        
-        pendingRefreshes[path] = workItem
-        
-        // Execute after debounce interval
-        watcherQueue.asyncAfter(deadline: .now() + debounceInterval, execute: workItem)
     }
     
     // MARK: - 🆕 Queued Refresh System

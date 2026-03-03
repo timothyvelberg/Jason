@@ -20,10 +20,6 @@ extension CircularUIManager {
         )
         print("   FunctionManager initialized with config values")
         
-        // Create ListPanelManager
-        self.listPanelManager = ListPanelManager()
-        print("   ListPanelManager initialized")
-        
         self.listPanelManager = ListPanelManager()
         listPanelManager?.findProvider = { [weak self] providerId in
             self?.functionManager?.providers.first { $0.providerId == providerId }

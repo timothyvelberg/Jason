@@ -218,20 +218,12 @@ extension DatabaseManager {
                     print("[EnhancedCache] Failed to insert item '\(item.name)': \(error)")
                 }
             }
-            
-            DispatchQueue.main.async {
-                NotificationCenter.default.postProviderUpdate(
-                    providerId: "finder-logic",
-                    folderPath: folderPath
-                )
-            }
-            
             sqlite3_finalize(insertStmt)
-            
+
             print("[EnhancedCache] Cached \(savedCount) items (\(thumbnailCount) with thumbnails) for: \(folderPath)")
             DispatchQueue.main.async {
                 NotificationCenter.default.postProviderUpdate(
-                    providerId: "finder-logic",
+                    providerId: "favorite-folder",
                     folderPath: folderPath
                 )
                 print("Posted update notification for folder: \(folderPath)")

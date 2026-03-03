@@ -12,9 +12,13 @@ class IconProvider {
     // MARK: - Singleton
     
     static let shared = IconProvider()
-    
     private init() {}
+    private var imageCache: [String: NSImage] = [:]
     
+    private func clearImageCache() {
+        imageCache.removeAll()
+    }
+
     // MARK: - Icon Configuration Structures
     
     private struct FileIconConfig {
@@ -187,13 +191,13 @@ class IconProvider {
     /// Set a custom color for a specific folder path using layered rendering
     func setFolderColor(_ color: NSColor, forPath path: String) {
         pathBasedFolderIcons[path] = FolderConfig(type: .layered(color: color))
-        print("🎨 [IconProvider] Set layered folder color for path: \(path)")
+        clearImageCache()
     }
     
     /// Set a custom asset icon for a specific folder path
     func setCustomFolderAsset(_ assetName: String, forPath path: String) {
         pathBasedFolderIcons[path] = FolderConfig(type: .customAsset(assetName))
-        print("🎨 [IconProvider] Set custom asset '\(assetName)' for folder path: \(path)")
+        clearImageCache()
     }
     
     /// Set a composite icon for a specific folder path
@@ -214,13 +218,13 @@ class IconProvider {
                 symbolOffset: symbolOffset
             )
         )
-        print("🎨 [IconProvider] Set composite icon for folder path: \(path)")
+        clearImageCache()
     }
     
     /// Remove custom styling for a specific folder path
     func removeFolderCustomization(forPath path: String) {
         pathBasedFolderIcons.removeValue(forKey: path)
-        print("🗑️ [IconProvider] Removed customization for folder path: \(path)")
+        clearImageCache()
     }
     
     /// Check if a folder has custom styling
@@ -242,6 +246,9 @@ class IconProvider {
     ///   - cornerRadius: Corner radius for clipping (optional)
     /// - Returns: Composited folder icon
     func createLayeredFolderIcon(color: NSColor, size: CGFloat = 64, cornerRadius: CGFloat = 0) -> NSImage {
+        let key = "layered-\(color.hexString)-\(size)-\(cornerRadius)"
+        if let cached = imageCache[key] { return cached }
+        
         let compositeImage = NSImage(size: NSSize(width: size, height: size))
         
         // Derive back folder color (HSL lightness - 20)
@@ -279,6 +286,7 @@ class IconProvider {
         
         compositeImage.unlockFocus()
         
+        imageCache[key] = compositeImage
         return compositeImage
     }
     
@@ -301,6 +309,9 @@ class IconProvider {
         cornerRadius: CGFloat = 0,
         symbolOffset: CGFloat = -4
     ) -> NSImage {
+        let key = "layered-\(color.hexString)-\(symbolName)-\(symbolColor.hexString)-\(size)-\(symbolSize)-\(cornerRadius)-\(symbolOffset)"
+        if let cached = imageCache[key] { return cached }
+        
         let compositeImage = NSImage(size: NSSize(width: size, height: size))
         
         compositeImage.lockFocus()
@@ -368,6 +379,7 @@ class IconProvider {
         
         compositeImage.unlockFocus()
         
+        imageCache[key] = compositeImage
         return compositeImage
     }
     
@@ -410,10 +422,13 @@ class IconProvider {
         symbolName: String,
         symbolColor: NSColor,
         size: CGFloat,
-        symbolSize: CGFloat = 24,  // ABSOLUTE SIZE (not ratio)
+        symbolSize: CGFloat = 24,
         cornerRadius: CGFloat = 8,
         symbolOffset: CGFloat = -8
     ) -> NSImage {
+        let key = "composite-\(baseAssetName)-\(symbolName)-\(symbolColor.hexString)-\(size)-\(symbolSize)-\(cornerRadius)-\(symbolOffset)"
+        if let cached = imageCache[key] { return cached }
+        
         let compositeImage = NSImage(size: NSSize(width: size, height: size))
         
         compositeImage.lockFocus()
@@ -499,6 +514,7 @@ class IconProvider {
         
         compositeImage.unlockFocus()
         
+        imageCache[key] = compositeImage
         return compositeImage
     }
     

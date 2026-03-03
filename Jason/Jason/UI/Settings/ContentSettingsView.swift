@@ -108,6 +108,7 @@ struct ContentSettingsView: View {
     // MARK: - Application Setup
 
     private func setupApplication() {
+        guard !isSetupComplete else { return }
         print("[ContentSettingsView] Application setup starting...")
         FirstLaunchConfiguration.ensureDefaultConfiguration()
         let configManager = RingConfigurationManager.shared
@@ -117,9 +118,6 @@ struct ContentSettingsView: View {
         instanceManager.createInstances(for: activeConfigs)
         CircularUIInstanceManager.shared.registerInputTriggers()
         CircularUIInstanceManager.shared.startHotkeyMonitoring()
-        for (_, instance) in instanceManager.instances {
-            instance.setup()
-        }
         print("   Setup complete - \(instanceManager.instances.count) instance(s) ready")
         isSetupComplete = true
     }
