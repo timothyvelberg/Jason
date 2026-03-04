@@ -38,7 +38,7 @@ class DraggableOverlayView: NSView {
     // MARK: - Drag Initiation
     func startDragSession(at point: CGPoint, provider: DragProvider) {
         guard !provider.fileURLs.isEmpty else {
-            print("⚠️ No files to drag")
+            print("No files to drag")
             return
         }
         
@@ -82,11 +82,11 @@ class DraggableOverlayView: NSView {
         )
         
         guard let event = event else {
-            print("⚠️ Failed to create drag event")
+            print("Failed to create drag event")
             return
         }
         
-        print("🎯 Starting drag session with \(provider.fileURLs.count) file(s)")
+        print("Starting drag session with \(provider.fileURLs.count) file(s)")
         
         // Begin dragging session
         beginDraggingSession(with: draggingItems, event: event, source: self)
@@ -195,16 +195,16 @@ extension DraggableOverlayView: NSDraggingSource {
     }
     
     func draggingSession(_ session: NSDraggingSession, willBeginAt screenPoint: NSPoint) {
-        print("🎯 Drag session beginning at \(screenPoint)")
+        print("Drag session beginning at \(screenPoint)")
         
         dragProvider?.onDragSessionBegan?()
         
         // Log the initial operation
         let currentModifiers = NSEvent.modifierFlags
         if currentModifiers.contains(.option) {
-            print("   → Starting with: COPY (Option held)")
+            print("   Starting with: COPY (Option held)")
         } else {
-            print("   → Starting with: MOVE (no modifiers)")
+            print("   Starting with: MOVE (no modifiers)")
         }
     }
     
@@ -236,8 +236,8 @@ extension DraggableOverlayView: NSDraggingSource {
             operationType = "cancelled"
         }
         
-        print("🎯 Drag session ended at \(screenPoint)")
-        print("   → Success: \(success), Final Operation: \(operationType)")
+        print("Drag session ended at \(screenPoint)")
+        print("   Success: \(success), Final Operation: \(operationType)")
         
         // Call completion callback
         dragProvider?.onDragCompleted?(success)

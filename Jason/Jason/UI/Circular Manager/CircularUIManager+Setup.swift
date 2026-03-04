@@ -279,6 +279,10 @@ extension CircularUIManager {
             print("[CircularUIManager] Keyboard exit to ring level \(functionManager.activeRingLevel)")
         }
         
+        listPanelManager?.onPreviewPanelPushed = { [weak self] in
+            self?.mouseTracker?.pauseUntilMovement()
+        }
+        
         // Wire mouse movement for panel sliding
         panelMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
             guard let self = self else { return event }

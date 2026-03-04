@@ -147,5 +147,6 @@ extension ListPanelManager {
 
         panelStack.append(previewPanel)
         print("[Preview] Pushed preview panel at level \(level + 1)")
+        onPreviewPanelPushed?()
     }
 }

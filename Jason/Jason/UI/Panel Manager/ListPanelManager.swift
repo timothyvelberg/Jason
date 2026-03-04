@@ -84,6 +84,9 @@ class ListPanelManager: ObservableObject {
     /// Callback when user submits text in input mode (e.g., add todo)
     var onAddItem: ((String, NSEvent.ModifierFlags) -> Void)?
     
+    /// Called when a preview panel is pushed — lets the owner re-pause mouse tracking
+    var onPreviewPanelPushed: (() -> Void)?
+    
     // MARK: - Dynamic Load State
     
     /// Current in-flight dynamic load task (cancelled when hover changes)
@@ -753,6 +756,7 @@ class ListPanelManager: ObservableObject {
     }
 
     /// Internal: actually push the panel (called after arming check passes)
+    /// Internal: actually push the panel (called after arming check passes)
     private func actuallyPushPanel(
         title: String,
         items: [FunctionNode],
@@ -775,26 +779,27 @@ class ListPanelManager: ObservableObject {
         // Child panels inherit the source panel's config
         let config = sourcePanel.config
         
-        // Calculate position: to the right of source panel
-        // Use currentBounds (not sourcePanel.bounds) to account for search-induced
-        // top-anchored repositioning when the panel shrinks during filtering.
+        // Use currentBounds for Y calculations (row positions, scroll offset etc.)
+        // but use the stored position for X to avoid double-applying the parent shift.
+        // currentPosition() applies the overlap shift on top of the stored position,
+        // and the stored position was already calculated using the parent's shifted bounds.
+        // Using currentBounds.maxX here would bake in the shift a second time.
         let sourceBounds = currentBounds(for: sourcePanel)
         let gap: CGFloat = 8
         
         let newPanelWidth = config.panelWidth
         let newPanelHeight = estimatedPanelHeight(items: items, config: config)
         
-        // New panel's left edge aligns with source panel's right edge + gap
-        let newX = sourceBounds.maxX + gap + (newPanelWidth / 2)
+        // X: use stored position's right edge to avoid double-shifting
+        let sourceStoredRightEdge = sourcePanel.position.x + (sourcePanel.config.panelWidth / 2)
+        let newX = sourceStoredRightEdge + gap + (newPanelWidth / 2)
         
-        // Calculate Y position based on source row's VISUAL position
+        // Y: calculate from currentBounds (Y is unaffected by horizontal overlap shift)
         let newY: CGFloat
         if let rowIndex = sourceRowIndex {
-            // Calculate the visual Y of the source row using accumulated heights
             let rowTopOffset = sourcePanel.yOffsetForRow(rowIndex)
             let rowHeight = sourcePanel.heightForRow(rowIndex)
             
-            // How far this row is scrolled: its logical top minus scroll offset
             let visualOffset = rowTopOffset - sourcePanel.scrollOffset
             let visibleContentHeight = sourcePanel.visibleContentHeight
             
@@ -804,20 +809,14 @@ class ListPanelManager: ObservableObject {
                 print("[Push] Row \(rowIndex) out of visible range")
             }
             
-            // Clamp to visible area
             let clampedOffset = max(0, min(visualOffset, visibleContentHeight - rowHeight))
-            
-            // Calculate Y: row center in screen coordinates
             let rowCenterY = sourceBounds.maxY - PanelConfig.contentTopInset - clampedOffset - (rowHeight / 2)
-            
-            // Align new panel top with source row
             newY = rowCenterY - (newPanelHeight / 2) + (rowHeight / 2) + PanelConfig.contentTopInset - config.estimatedRowHeight
         } else {
             newY = sourceBounds.midY
         }
         
         let newPosition = CGPoint(x: newX, y: newY)
-        // Constrain to screen boundaries (left, top, bottom only)
         let constrainedPosition = constrainToScreenBounds(position: newPosition, panelWidth: newPanelWidth, panelHeight: newPanelHeight)
         let inheritedTypingMode = sourcePanel.typingMode
         

@@ -398,7 +398,7 @@ class AppSwitcherManager: ObservableObject {
     /// Called before activating the app so windows surface at the same time as activation.
     private func unminimizeAllWindows(for app: NSRunningApplication) {
         guard hasAccessibilityPermission else {
-            print("⚠️ [AppSwitcher] No accessibility permission - cannot unminimize windows for \(app.localizedName ?? "Unknown")")
+            print("[AppSwitcher] No accessibility permission - cannot unminimize windows for \(app.localizedName ?? "Unknown")")
             return
         }
         
@@ -407,7 +407,7 @@ class AppSwitcherManager: ObservableObject {
         var windowsRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
               let windows = windowsRef as? [AXUIElement] else {
-            print("🪟 [AppSwitcher] Could not retrieve windows for \(app.localizedName ?? "Unknown")")
+            print("[AppSwitcher] Could not retrieve windows for \(app.localizedName ?? "Unknown")")
             return
         }
         
@@ -424,7 +424,7 @@ class AppSwitcherManager: ObservableObject {
             if result == .success {
                 restoredCount += 1
             } else {
-                print("⚠️ [AppSwitcher] Failed to unminimize a window for \(app.localizedName ?? "Unknown") (AXError: \(result.rawValue))")
+                print("[AppSwitcher] Failed to unminimize a window for \(app.localizedName ?? "Unknown") (AXError: \(result.rawValue))")
             }
         }
         
