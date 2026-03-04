@@ -20,12 +20,12 @@ class QuickLookManager: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelega
     
     /// Show Quick Look preview for a single file
     func showPreview(for url: URL) {
-        print("👁️ [QuickLook] Showing preview for: \(url.lastPathComponent)")
+        print("[QuickLook] Showing preview for: \(url.lastPathComponent)")
         
         previewURLs = [url]
         
         guard let panel = QLPreviewPanel.shared() else {
-            print("❌ [QuickLook] Failed to get QLPreviewPanel")
+            print("[QuickLook] Failed to get QLPreviewPanel")
             return
         }
         
@@ -41,10 +41,10 @@ class QuickLookManager: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelega
             isShowing = true
             onVisibilityChanged?(true)
             panel.makeKeyAndOrderFront(nil)
-            print("✅ [QuickLook] Preview panel shown")
+            print("[QuickLook] Preview panel shown")
         } else {
             // Already showing according to our state
-            print("🔄 [QuickLook] Preview panel refreshed (already visible)")
+            print("[QuickLook] Preview panel refreshed (already visible)")
         }
     }
     func hidePreview() {

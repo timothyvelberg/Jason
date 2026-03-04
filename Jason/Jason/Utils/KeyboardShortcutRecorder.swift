@@ -91,7 +91,7 @@ struct KeyboardShortcutRecorder: View {
             
             // Block Escape key from being recorded (it's reserved for hiding UI)
             guard capturedKeyCode != 53 else {
-                print("⚠️ [ShortcutRecorder] Escape key cannot be used as a shortcut (reserved for hiding UI)")
+                print("[ShortcutRecorder] Escape key cannot be used as a shortcut (reserved for hiding UI)")
                 return nil // Consume event but don't save
             }
             
@@ -110,7 +110,7 @@ struct KeyboardShortcutRecorder: View {
             return nil // Consume the event
         }
         
-        print("🎹 [ShortcutRecorder] Recording started")
+        print("[ShortcutRecorder] Recording started")
     }
     
     private func stopRecording() {
@@ -119,14 +119,14 @@ struct KeyboardShortcutRecorder: View {
             localMonitor = nil
         }
         isRecording = false
-        print("🎹 [ShortcutRecorder] Recording stopped")
+        print("[ShortcutRecorder] Recording stopped")
     }
     
     private func clearShortcut() {
         keyCode = nil
         modifierFlags = nil
         showConflictWarning = false
-        print("🎹 [ShortcutRecorder] Shortcut cleared")
+        print("[ShortcutRecorder] Shortcut cleared")
     }
     
     // MARK: - Conflict Detection

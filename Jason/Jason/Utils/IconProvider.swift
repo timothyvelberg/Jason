@@ -671,7 +671,7 @@ class IconProvider {
     
     private func createCustomAssetIcon(assetName: String, size: CGFloat, cornerRadius: CGFloat) -> NSImage {
         guard let assetImage = NSImage(named: assetName) else {
-            print("⚠️ [IconProvider] Asset '\(assetName)' not found - using system icon")
+            print("[IconProvider] Asset '\(assetName)' not found - using system icon")
             return NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage()
         }
         
@@ -730,7 +730,7 @@ class IconProvider {
         for entry in entries {
             setFolderColor(entry.color, forPath: entry.path)
         }
-        print("📦 [IconProvider] Loaded \(entries.count) custom folder colors")
+        print("[IconProvider] Loaded \(entries.count) custom folder colors")
     }
     
     /// Export current folder customizations for database storage
@@ -765,7 +765,7 @@ class IconProvider {
             )
         }
         
-        print("📦 [IconProvider] Loaded \(customFolders.count) custom folder icons from database")
+        print("[IconProvider] Loaded \(customFolders.count) custom folder icons from database")
     }
     
     /// Save a folder icon customization to the database

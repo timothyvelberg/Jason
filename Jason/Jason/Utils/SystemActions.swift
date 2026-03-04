@@ -13,7 +13,7 @@ class SystemActions {
     
     /// Trigger Mission Control
     static func showMissionControl() {
-        print("🚀 [SystemActions] Triggering Mission Control")
+        print("[SystemActions] Triggering Mission Control")
         
         let task = Process()
         task.launchPath = "/usr/bin/open"
@@ -21,9 +21,9 @@ class SystemActions {
         
         do {
             try task.run()
-            print("✅ [SystemActions] Launched Mission Control")
+            print("[SystemActions] Launched Mission Control")
         } catch {
-            print("❌ [SystemActions] Failed to launch Mission Control: \(error)")
+            print("[SystemActions] Failed to launch Mission Control: \(error)")
         }
     }
     

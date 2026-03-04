@@ -104,13 +104,13 @@ struct StandardContextActions {
             type: .action,
             icon: NSImage(named: "context_actions_delete") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .executeKeepOpen {
-                print("🗑️ Moving to trash: \(fileName)")
+                print("Moving to trash: \(fileName)")
                 NSWorkspace.shared.recycle([url]) { trashedURLs, error in
                     if let error = error {
-                        print("❌ Failed to delete file: \(error.localizedDescription)")
+                        print("Failed to delete file: \(error.localizedDescription)")
                         onComplete(false)
                     } else {
-                        print("✅ File moved to trash: \(fileName)")
+                        print("File moved to trash: \(fileName)")
                         onComplete(true)
                     }
                 }
@@ -119,10 +119,10 @@ struct StandardContextActions {
                 print("🗑️ Moving to trash (UI stays open): \(fileName)")
                 NSWorkspace.shared.recycle([url]) { trashedURLs, error in
                     if let error = error {
-                        print("❌ Failed to delete file: \(error.localizedDescription)")
+                        print("Failed to delete file: \(error.localizedDescription)")
                         onComplete(false)
                     } else {
-                        print("✅ File moved to trash: \(fileName)")
+                        print("File moved to trash: \(fileName)")
                         onComplete(true)
                     }
                 }
@@ -139,18 +139,18 @@ struct StandardContextActions {
             type: .action,
             icon: NSImage(named: "context_actions_copy") ?? NSImage(),
             onLeftClick: ModifierAwareInteraction(base: .execute {
-                print("📋 Copying to clipboard: \(fileName)")
+                print("Copying to clipboard: \(fileName)")
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.writeObjects([url as NSURL])
-                print("✅ File copied to clipboard: \(fileName)")
+                print("File copied to clipboard: \(fileName)")
             }),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
-                print("📋 Copying to clipboard (UI stays open): \(fileName)")
+                print("Copying to clipboard (UI stays open): \(fileName)")
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.writeObjects([url as NSURL])
-                print("✅ File copied to clipboard: \(fileName)")
+                print("File copied to clipboard: \(fileName)")
             })
         )
     }
@@ -164,7 +164,7 @@ extension NSWorkspace {
         
         self.open(url, configuration: configuration) { app, error in
             if let error = error {
-                print("❌ Failed to open \(url.lastPathComponent): \(error.localizedDescription)")
+                print("Failed to open \(url.lastPathComponent): \(error.localizedDescription)")
             }
         }
     }

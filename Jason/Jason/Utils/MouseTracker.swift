@@ -93,7 +93,7 @@ class MouseTracker {
     func resumeTracking() {
         isPausedUntilMovement = false
         lastMouseLocation = NSEvent.mouseLocation
-        print("▶️ [MouseTracker] Resumed tracking")
+        print("[MouseTracker] Resumed tracking")
     }
 
     private func trackMousePosition(distance: CGFloat) {

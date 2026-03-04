@@ -127,9 +127,9 @@ class PermissionManager {
         if #available(macOS 14.0, *) {
             eventStore.requestFullAccessToEvents { [weak self] granted, error in
                 if let error = error {
-                    print("❌ [PermissionManager] Calendar access error: \(error.localizedDescription)")
+                    print("[PermissionManager] Calendar access error: \(error.localizedDescription)")
                 }
-                print("📅 [PermissionManager] Calendar access: \(granted)")
+                print("[PermissionManager] Calendar access: \(granted)")
                 DispatchQueue.main.async {
                     completion(granted)
                     if granted {
@@ -140,9 +140,9 @@ class PermissionManager {
         } else {
             eventStore.requestAccess(to: .event) { [weak self] granted, error in
                 if let error = error {
-                    print("❌ [PermissionManager] Calendar access error: \(error.localizedDescription)")
+                    print("[PermissionManager] Calendar access error: \(error.localizedDescription)")
                 }
-                print("📅 [PermissionManager] Calendar access: \(granted)")
+                print("[PermissionManager] Calendar access: \(granted)")
                 DispatchQueue.main.async {
                     completion(granted)
                     if granted {
@@ -159,9 +159,9 @@ class PermissionManager {
         if #available(macOS 14.0, *) {
             eventStore.requestFullAccessToReminders { [weak self] granted, error in
                 if let error = error {
-                    print("❌ [PermissionManager] Reminders access error: \(error.localizedDescription)")
+                    print("[PermissionManager] Reminders access error: \(error.localizedDescription)")
                 }
-                print("✅ [PermissionManager] Reminders access: \(granted)")
+                print("[PermissionManager] Reminders access: \(granted)")
                 DispatchQueue.main.async {
                     completion(granted)
                     if granted {
@@ -172,9 +172,9 @@ class PermissionManager {
         } else {
             eventStore.requestAccess(to: .reminder) { [weak self] granted, error in
                 if let error = error {
-                    print("❌ [PermissionManager] Reminders access error: \(error.localizedDescription)")
+                    print("[PermissionManager] Reminders access error: \(error.localizedDescription)")
                 }
-                print("✅ [PermissionManager] Reminders access: \(granted)")
+                print("[PermissionManager] Reminders access: \(granted)")
                 DispatchQueue.main.async {
                     completion(granted)
                     if granted {
@@ -242,7 +242,7 @@ class PermissionManager {
     
     /// Call this early at app launch, before any UI
     func requestAccessToFavoriteFolders() {
-        print("🔐 [Permissions] Checking folder access...")
+        print("[Permissions] Checking folder access...")
         
         // Get favorite folders from database
         let favoriteFolders = DatabaseManager.shared.getFavoriteFolders()
@@ -264,13 +264,13 @@ class PermissionManager {
         // Remove duplicates
         let uniquePaths = Array(Set(allPaths))
         
-        print("🔐 [Permissions] Requesting access to \(uniquePaths.count) folders")
+        print("[Permissions] Requesting access to \(uniquePaths.count) folders")
         
         for path in uniquePaths {
             requestAccess(to: path)
         }
         
-        print("🔐 [Permissions] Folder access check complete")
+        print("[Permissions] Folder access check complete")
     }
     
     private func requestAccess(to path: String) {
@@ -283,9 +283,9 @@ class PermissionManager {
                 includingPropertiesForKeys: nil,
                 options: [.skipsHiddenFiles]
             )
-            print("   ✅ Access granted: \(url.lastPathComponent)")
+            print("   Access granted: \(url.lastPathComponent)")
         } catch {
-            print("   ❌ Access denied or error: \(url.lastPathComponent) - \(error.localizedDescription)")
+            print("   Access denied or error: \(url.lastPathComponent) - \(error.localizedDescription)")
         }
     }
 

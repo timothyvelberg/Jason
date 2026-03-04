@@ -175,26 +175,6 @@ class HotkeyManager {
             self?.handleSwipeEvent(event)
         }
         
-        // DIAGNOSTIC: Also try listening for other gesture-related events
-        let _ = NSEvent.addGlobalMonitorForEvents(matching: [.gesture]) { event in
-            print("📍 [DIAGNOSTIC] .gesture event: type=\(event.type.rawValue)")
-        }
-        let _ = NSEvent.addGlobalMonitorForEvents(matching: [.beginGesture]) { event in
-            print("📍 [DIAGNOSTIC] .beginGesture event")
-        }
-        let _ = NSEvent.addGlobalMonitorForEvents(matching: [.endGesture]) { event in
-            print("📍 [DIAGNOSTIC] .endGesture event")
-        }
-        let _ = NSEvent.addGlobalMonitorForEvents(matching: [.magnify]) { event in
-            print("📍 [DIAGNOSTIC] .magnify event: magnification=\(event.magnification)")
-        }
-        let _ = NSEvent.addGlobalMonitorForEvents(matching: [.rotate]) { event in
-            print("📍 [DIAGNOSTIC] .rotate event: rotation=\(event.rotation)")
-        }
-        let _ = NSEvent.addGlobalMonitorForEvents(matching: [.smartMagnify]) { event in
-            print("📍 [DIAGNOSTIC] .smartMagnify event")
-        }
-        
         // Log all registered shortcuts with details
         if !registeredShortcuts.isEmpty {
             print("   Registered shortcuts:")
@@ -217,7 +197,7 @@ class HotkeyManager {
             if mouseEventTap == nil && hasAccessibility {
                 startMouseMonitoring()
             } else if !hasAccessibility {
-                print("   ⚠️ Cannot monitor mouse buttons - no accessibility permission")
+                print("   Cannot monitor mouse buttons - no accessibility permission")
             }
         }
         
@@ -369,10 +349,6 @@ class HotkeyManager {
         for (existingId, existing) in registeredMouseButtons {
             if existing.buttonNumber == buttonNumber && existing.modifierFlags == modifierFlags {
                 let existingDisplay = formatMouseButton(buttonNumber: existing.buttonNumber, modifiers: existing.modifierFlags)
-                print("   [HotkeyManager] Mouse button conflict!")
-                print("   Existing: Config \(existingId) with \(existingDisplay)")
-                print("   New: Config \(configId) with \(buttonDisplay)")
-                print("   Unregistering old mouse button...")
                 unregisterMouseButton(forConfigId: existingId)
                 break
             }
@@ -434,10 +410,6 @@ class HotkeyManager {
                existing.fingerCount == fingerCount &&
                existing.modifierFlags == modifierFlags {
                 let existingDisplay = formatTrackpadGesture(direction: existing.direction, fingerCount: existing.fingerCount, modifiers: existing.modifierFlags)
-                print("   [HotkeyManager] Trackpad gesture conflict!")
-                print("   Existing: Config \(existingId) with \(existingDisplay)")
-                print("   New: Config \(configId) with \(swipeDisplay)")
-                print("   Unregistering old gesture...")
                 unregisterSwipe(forConfigId: existingId)
                 break
             }
@@ -529,11 +501,6 @@ class HotkeyManager {
         
         // Load saved circle calibration
         if let saved = DatabaseManager.shared.loadCircleCalibration() {
-            print("[HotkeyManager] Found saved calibration in database:")
-            print("   Calibrated: \(saved.calibratedAt.formatted())")
-            print("   maxRadiusVariance: \(String(format: "%.4f", saved.maxRadiusVariance))")
-            print("   minCircles: \(String(format: "%.2f", saved.minCircles))")
-            print("   minRadius: \(String(format: "%.3f", saved.minRadius))")
             
             if let circleRec = coordinator.recognizer(identifier: "circle") as? CircleRecognizer {
                 circleRec.config.maxRadiusVariance = saved.maxRadiusVariance
@@ -958,7 +925,7 @@ class HotkeyManager {
         if cgFlags.contains(.maskAlternate) { eventModifiers |= NSEvent.ModifierFlags.option.rawValue }
         if cgFlags.contains(.maskShift) { eventModifiers |= NSEvent.ModifierFlags.shift.rawValue }
         
-        print("🖱️  [HotkeyManager] Mouse button \(buttonNumber) pressed, modifiers=\(eventModifiers)")
+        print("[HotkeyManager] Mouse button \(buttonNumber) pressed, modifiers=\(eventModifiers)")
         
         // Check registered mouse buttons
         for (configId, registration) in registeredMouseButtons {
@@ -1009,10 +976,6 @@ class HotkeyManager {
     
     
     private func handleSwipeEvent(_ event: NSEvent) {
-        print("[HotkeyManager] handleSwipeEvent CALLED!")
-        print("   Event type: \(event.type.rawValue)")
-        print("   Event subtype: \(event.subtype.rawValue)")
-        print("   deltaX: \(event.deltaX), deltaY: \(event.deltaY)")
         
         let isUIVisible = isUIVisible?() ?? false
         print("   isUIVisible: \(isUIVisible)")
@@ -1325,8 +1288,6 @@ class HotkeyManager {
         multitouchCoordinator?.isCalibrating ?? false
     }
 }
-
-// MARK: - Hotkey Configuration
 
 // MARK: - Hotkey Configuration
 
