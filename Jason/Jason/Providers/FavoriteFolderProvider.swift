@@ -351,22 +351,22 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         if favoritePaths.contains(path) { tier = .favorite }
         else if visitTracker.isPromoted(path) { tier = .promoted }
         else { tier = .regular }
-        print("⏱️ [Eviction] Tier assigned for '\(URL(fileURLWithPath: path).lastPathComponent)': \(tier)")
+        print("[Eviction] Tier assigned for '\(URL(fileURLWithPath: path).lastPathComponent)': \(tier)")
         return tier
     }
     private func startEvictionTimer() {
         let isMainThread = Thread.isMainThread
-        print("⏱️ [Eviction] Timer created on \(isMainThread ? "main thread ✅" : "background thread ⚠️ — timer may not fire")")
+        print("[Eviction] Timer created on \(isMainThread ? "main thread" : "background thread — timer may not fire")")
         evictionTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.evictStaleNodeCacheEntries()
         }
-        print("⏱️ [Eviction] Timer scheduled: \(evictionTimer != nil ? "success ✅" : "failed ❌")")
+        print("[Eviction] Timer scheduled: \(evictionTimer != nil ? "success" : "failed")")
     }
 
     private func evictStaleNodeCacheEntries() {
         let now = Date()
         let beforeCount = nodeCache.count
-        print("⏱️ [Eviction] Timer fired at \(now). nodeCache has \(beforeCount) entries:")
+        print("[Eviction] Timer fired at \(now). nodeCache has \(beforeCount) entries:")
 
         let toEvict = nodeCache.filter { path, entry in
             let age = now.timeIntervalSince(entry.lastAccessedAt)
@@ -380,11 +380,11 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
         }
 
         let afterCount = nodeCache.count
-        print("⏱️ [Eviction] Evicted \(toEvict.count) entries. Before: \(beforeCount), After: \(afterCount)")
+        print("[Eviction] Evicted \(toEvict.count) entries. Before: \(beforeCount), After: \(afterCount)")
     }
 
     private func handlePromotion(for folderPath: String) {
-        print("⬆️ [FavoriteFolderProvider] Promoting subfolder: '\(URL(fileURLWithPath: folderPath).lastPathComponent)'")
+        print("[FavoriteFolderProvider] Promoting subfolder: '\(URL(fileURLWithPath: folderPath).lastPathComponent)'")
         
         FolderWatcherManager.shared.startWatchingPromotedSubfolder(folderPath)
         
@@ -400,7 +400,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             entry = NodeCacheEntry(nodes: entry.nodes, lastAccessedAt: entry.lastAccessedAt, tier: .promoted)
             nodeCache[folderPath] = entry
             
-            print("⬆️ [FavoriteFolderProvider] NodeCache tier upgraded to .promoted for '\(URL(fileURLWithPath: folderPath).lastPathComponent)'")
+            print("[FavoriteFolderProvider] NodeCache tier upgraded to .promoted for '\(URL(fileURLWithPath: folderPath).lastPathComponent)'")
         }
     }
     
@@ -768,7 +768,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             ))),
             onRightClick: ModifierAwareInteraction(base: .expand),
             onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen {
-                print("📂 Middle-click opening folder: \(folderName)")
+                print("Middle-click opening folder: \(folderName)")
                 NSWorkspace.shared.openAndActivate(url)
             }),
             onBoundaryCross: ModifierAwareInteraction(base: .navigateInto)

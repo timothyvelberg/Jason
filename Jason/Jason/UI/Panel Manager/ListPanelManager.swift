@@ -5,8 +5,6 @@
 //  Manages state and logic for the list panel UI.
 //  Supports stack-based cascading panels (column view).
 //
-//  MODIFIED: Updated panel height estimation to use actual item types
-//  instead of assuming uniform baseRowHeight for all items.
 //
 
 import Foundation
@@ -778,7 +776,9 @@ class ListPanelManager: ObservableObject {
         let config = sourcePanel.config
         
         // Calculate position: to the right of source panel
-        let sourceBounds = sourcePanel.bounds
+        // Use currentBounds (not sourcePanel.bounds) to account for search-induced
+        // top-anchored repositioning when the panel shrinks during filtering.
+        let sourceBounds = currentBounds(for: sourcePanel)
         let gap: CGFloat = 8
         
         let newPanelWidth = config.panelWidth

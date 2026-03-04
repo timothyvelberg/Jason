@@ -37,12 +37,21 @@ struct ContentSettingsView: View {
                         .tag(tab)
                     }
                 } header: {
+                    #if DEBUG
+                    Image("core_logo_dev")
+                        .resizable()
+                        .frame(width: 48, height: 48)
+                        .padding(.top, 48)
+                        .padding(.bottom, 16)
+                        .frame(maxWidth: .infinity)
+                    #else
                     Image("core_logo")
                         .resizable()
                         .frame(width: 48, height: 48)
                         .padding(.top, 48)
                         .padding(.bottom, 16)
                         .frame(maxWidth: .infinity)
+                    #endif
                 }
             }
             .listStyle(.sidebar)
