@@ -44,15 +44,14 @@ extension ListPanelManager {
     /// Extract preview content from a node
     func loadPreviewContent(for node: FunctionNode) -> PreviewContent {
         print("[Preview] node: '\(node.name)' previewURL: \(node.previewURL?.path ?? "nil") metadata keys: \(node.metadata?.keys.map { $0 } ?? [])")
+
         // Case 1: Has a previewURL — file from FavoriteFolderProvider
         if let url = node.previewURL {
             let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
-            let unsupportedExtensions = ["nzb", "zip", "dmg", "mkv", "mp4", "mov", "avi", "mp3", "pdf", "exe", "pkg"]
+            let textExtensions  = ["txt", "md", "swift", "json", "js", "ts", "py", "rb", "sh",
+                                   "yaml", "yml", "toml", "xml", "html", "css", "c", "cpp",
+                                   "h", "m", "mm", "rs", "go", "java", "kt", "log", "csv"]
             let ext = url.pathExtension.lowercased()
-
-            if unsupportedExtensions.contains(ext) {
-                return .unsupported
-            }
 
             if imageExtensions.contains(ext) {
                 let options: [CFString: Any] = [
@@ -65,20 +64,21 @@ extension ListPanelManager {
                     let image = NSImage(cgImage: cgImage, size: .zero)
                     return .image(image)
                 }
-            }else {
-                // Check file size before reading
-                let fileSizeLimit: Int = 512 * 1024  // 512KB
-                if let fileSize = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-                   fileSize > fileSizeLimit {
+            }
+
+            if textExtensions.contains(ext) {
+                let fileSizeLimit: Int = 512 * 1024
+                guard let fileSize = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                      fileSize <= fileSizeLimit else {
                     return .unsupported
                 }
-
                 if let text = try? String(contentsOf: url, encoding: .utf8) {
                     return .text(text)
                 } else if let text = try? String(contentsOf: url, encoding: .isoLatin1) {
                     return .text(text)
                 }
             }
+
             return .unsupported
         }
 

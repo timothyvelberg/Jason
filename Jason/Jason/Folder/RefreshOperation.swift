@@ -38,26 +38,29 @@ class RefreshOperation: Operation, @unchecked Sendable {
     
     private func performRefresh() {
         guard !isCancelled else { return }
-        
-        // Load folder contents (respecting maxItems limit)
-        let items = loadFolderContents(at: path)
-        
+
+        let db = DatabaseManager.shared
+        let existingThumbnails = db.getExistingThumbnails(for: path)
+        let lastCacheTimestamp = db.getEnhancedCacheTimestamp(folderPath: path)
+
+        let items = loadFolderContents(at: path,
+                                       existingThumbnails: existingThumbnails,
+                                       lastCacheTimestamp: lastCacheTimestamp)
+
         guard !isCancelled else {
             print("Refresh cancelled during load for \(folderName)")
             return
         }
-        
-        // Cache to database using enhanced cache
-        let cacheType = DatabaseManager.shared.getCacheType(for: path) ?? "heavy"
 
-        DatabaseManager.shared.saveEnhancedFolderContents(
+        let cacheType = db.getCacheType(for: path) ?? "heavy"
+
+        db.saveEnhancedFolderContents(
             folderPath: path,
             items: items,
             cacheType: cacheType
         )
     }
-    
-    private func loadFolderContents(at path: String) -> [EnhancedFolderItem] {
+    private func loadFolderContents(at path: String, existingThumbnails: [String: Data], lastCacheTimestamp: Date?) -> [EnhancedFolderItem] {
         let fileManager = FileManager.default
         let folderURL = URL(fileURLWithPath: path)
         
@@ -113,9 +116,29 @@ class RefreshOperation: Operation, @unchecked Sendable {
             let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
             let isImageFile = imageExtensions.contains(fileExtension)
             
-            // TODO: Add thumbnail generation here later with QLThumbnailGenerator
-            // For now, skip thumbnails to keep it simple
-            
+            var thumbnailData: Data? = nil
+
+            if isImageFile {
+                if let existing = existingThumbnails[itemURL.path],
+                   let timestamp = lastCacheTimestamp,
+                   modificationDate <= timestamp {
+                    // File unchanged since last cache — reuse existing thumbnail
+                    thumbnailData = existing
+                } else {
+                    // File is new or modified — generate fresh thumbnail
+                    let options: [CFString: Any] = [
+                        kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+                        kCGImageSourceCreateThumbnailWithTransform: true,
+                        kCGImageSourceThumbnailMaxPixelSize: 40
+                    ]
+                    if let source = CGImageSourceCreateWithURL(itemURL as CFURL, nil),
+                       let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) {
+                        let rep = NSBitmapImageRep(cgImage: cgImage)
+                        thumbnailData = rep.representation(using: .png, properties: [:])
+                    }
+                }
+            }
+
             let item = EnhancedFolderItem(
                 name: itemURL.lastPathComponent,
                 path: itemURL.path,
@@ -127,7 +150,7 @@ class RefreshOperation: Operation, @unchecked Sendable {
                 fileSize: fileSize,
                 hasCustomIcon: false,
                 isImageFile: isImageFile,
-                thumbnailData: nil,  // Will add thumbnails later
+                thumbnailData: thumbnailData,
                 folderConfigJSON: nil
             )
             

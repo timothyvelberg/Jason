@@ -415,6 +415,40 @@ extension DatabaseManager {
         }
     }
     
+    /// Fetch existing thumbnail blobs for a folder, keyed by item path.
+    /// Used by RefreshOperation to preserve thumbnails for unchanged files.
+    func getExistingThumbnails(for folderPath: String) -> [String: Data] {
+        guard let db = db else { return [:] }
+
+        return queue.sync {
+            let sql = """
+            SELECT item_path, thumbnail_data
+            FROM folder_contents_enhanced
+            WHERE folder_path = ? AND thumbnail_data IS NOT NULL;
+            """
+
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+                return [:]
+            }
+
+            sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
+
+            var result: [String: Data] = [:]
+
+            while sqlite3_step(statement) == SQLITE_ROW {
+                guard let pathCStr = sqlite3_column_text(statement, 0),
+                      let blob = sqlite3_column_blob(statement, 1) else { continue }
+                let itemPath = String(cString: pathCStr)
+                let blobSize = sqlite3_column_bytes(statement, 1)
+                result[itemPath] = Data(bytes: blob, count: Int(blobSize))
+            }
+
+            sqlite3_finalize(statement)
+            return result
+        }
+    }
+    
     /// Invalidate enhanced cache for a specific folder
     func invalidateEnhancedCache(for folderPath: String) {
         guard let db = db else { return }
