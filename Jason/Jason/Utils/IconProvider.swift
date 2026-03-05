@@ -167,6 +167,41 @@ class IconProvider {
         return fileIcons[fileExtension.lowercased()] != nil
     }
     
+    /// Get a thumbnail for a file URL. For image files, generates a pixel-accurate
+    /// thumbnail. Falls back to getFileIcon for all other file types.
+    func getThumbnail(for url: URL, size: CGFloat = 40, cornerRadius: CGFloat = 8) -> NSImage {
+        let ext = url.pathExtension.lowercased()
+        let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
+
+        guard imageExtensions.contains(ext) else {
+            return getFileIcon(for: url, size: size, cornerRadius: cornerRadius)
+        }
+
+        let key = "thumbnail-\(url.path)-\(size)-\(cornerRadius)"
+        if let cached = imageCache[key] { return cached }
+
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: size
+        ]
+
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return getFileIcon(for: url, size: size, cornerRadius: cornerRadius)
+        }
+
+        let thumbnail = NSImage(size: NSSize(width: size, height: size))
+        thumbnail.lockFocus()
+        let rect = NSRect(origin: .zero, size: NSSize(width: size, height: size))
+        NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius).addClip()
+        NSGraphicsContext.current?.cgContext.draw(cgImage, in: rect)
+        thumbnail.unlockFocus()
+
+        imageCache[key] = thumbnail
+        return thumbnail
+    }
+    
     // MARK: - Public API - Folders
     
     /// Get icon for a folder URL with optional custom styling

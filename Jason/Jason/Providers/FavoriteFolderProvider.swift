@@ -544,15 +544,9 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     
     private func createFileNode(for url: URL) -> FunctionNode {
         let fileName = url.lastPathComponent
-        let thumbnail = createThumbnail(for: url)
-        let dragImage = thumbnail.image
+        let dragImage = IconProvider.shared.getThumbnail(for: url, size: 40, cornerRadius: 8)
         let folderPath = url.deletingLastPathComponent().path
         let providerId = self.providerId
-        
-        var metadata: [String: Any] = [:]
-        if let data = thumbnail.data {
-            metadata["thumbnailData"] = data
-        }
         
         return FunctionNode(
             id: "file-\(url.path)",
@@ -576,7 +570,6 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             previewURL: url,
             showLabel: true,
             slicePositioning: .center,
-            metadata: metadata,
             onLeftClick: ModifierAwareInteraction(base: .drag(DragProvider(
                 fileURLs: [url],
                 dragImage: dragImage,

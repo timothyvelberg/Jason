@@ -93,7 +93,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             } else if treatAsDirectory {
                 icon = IconProvider.shared.getFolderIcon(for: fileURL, size: 64, cornerRadius: 8)
             } else {
-                icon = NSWorkspace.shared.icon(forFile: file.path)
+                icon = IconProvider.shared.getThumbnail(for: fileURL, size: 40, cornerRadius: 8)
             }
             
             entries.append(FileEntry(
@@ -147,7 +147,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                     } else if treatAsDirectory {
                         icon = IconProvider.shared.getFolderIcon(for: resolvedURL, size: 64, cornerRadius: 8)
                     } else {
-                        icon = NSWorkspace.shared.icon(forFile: resolvedPath)
+                        icon = IconProvider.shared.getThumbnail(for: resolvedURL, size: 40, cornerRadius: 8)
                     }
                     
                     entries.append(FileEntry(
