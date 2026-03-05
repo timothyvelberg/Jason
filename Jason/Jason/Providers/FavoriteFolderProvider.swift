@@ -70,7 +70,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
               let folderPath = updateInfo.folderPath else { return }
         
         if nodeCache.removeValue(forKey: folderPath) != nil {
-            print("🗑️ [FavoriteFolderProvider] nodeCache invalidated for: \(URL(fileURLWithPath: folderPath).lastPathComponent)")
+            print("[FavoriteFolderProvider] nodeCache invalidated for: \(URL(fileURLWithPath: folderPath).lastPathComponent)")
         }
     }
     
@@ -149,6 +149,25 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     
     func refresh() {
         print("[FavoriteFolderProvider] refresh() called")
+    }
+    
+    func teardown() {
+        print("[FavoriteFolderProvider] teardown()")
+        
+        // Stop the eviction timer immediately
+        evictionTimer?.invalidate()
+        evictionTimer = nil
+        
+        // Remove notification observer
+        NotificationCenter.default.removeObserver(self)
+        
+        // Stop all promoted subfolder watchers
+        FolderWatcherManager.shared.stopWatchingPromotedSubfolders(visitTracker.promotedPaths)
+        
+        // Clear all cached data
+        nodeCache.removeAll()
+        
+        print("[FavoriteFolderProvider] teardown complete")
     }
     
     /// Synchronous cache lookup for use by ListPanelManager (skips debounce on hit)
@@ -482,7 +501,6 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                 includingPropertiesForKeys: [.isDirectoryKey, .nameKey, .contentModificationDateKey, .creationDateKey, .fileSizeKey],
                 options: [.skipsHiddenFiles, .skipsPackageDescendants]
             )
-            
             let totalCount = contents.count
             let sortedContents = FolderSortingUtility.sortURLs(contents, by: sortOrder)
             let limitedContents = Array(sortedContents.prefix(maxItemsPerFolder))
@@ -494,9 +512,8 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
                     return createFileNode(for: contentURL)
                 }
             }
-            
             return (nodes: nodes, totalCount: totalCount)
-            
+
         } catch {
             print("[FavoriteFolderProvider] Failed to get folder contents: \(error)")
             return (nodes: [], totalCount: 0)

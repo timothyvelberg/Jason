@@ -439,6 +439,14 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
         fetchReminders()
     }
     
+    func teardown() {
+        print("[RemindersProvider] teardown()")
+        NotificationCenter.default.removeObserver(self)
+        reminders.removeAll()
+        onItemsChanged = nil
+        print("[RemindersProvider] teardown complete")
+    }
+    
     func clearCache() {
         reminders.removeAll()
         print("[RemindersProvider] Cache cleared")

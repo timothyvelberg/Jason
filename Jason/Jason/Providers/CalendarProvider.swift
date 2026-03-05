@@ -72,6 +72,14 @@ class CalendarProvider: ObservableObject, FunctionProvider {
         lastFetchDate = nil
     }
     
+    func teardown() {
+        print("[CalendarProvider] teardown()")
+        NotificationCenter.default.removeObserver(self)
+        cachedNodes = nil
+        lastFetchDate = nil
+        print("[CalendarProvider] teardown complete")
+    }
+    
     func clearCache() {
         cachedNodes = nil
         lastFetchDate = nil

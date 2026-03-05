@@ -690,6 +690,12 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         loadFiles()
     }
     
+    func teardown() {
+        print("[FavoriteFilesProvider] teardown()")
+        fileEntries.removeAll()
+        print("[FavoriteFilesProvider] teardown complete")
+    }
+    
     // MARK: - Dynamic Children Loading (for folders)
     
     func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
