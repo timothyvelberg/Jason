@@ -262,6 +262,15 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         )
     }
     
+    func teardown() {
+        print("[CombinedAppsProvider] teardown()")
+        appEntries.removeAll()
+        displayedBundleIds.removeAll()
+        lastFavoritesOrder.removeAll()
+        appSwitcherManager = nil
+        circularUIManager = nil
+    }
+    
     // MARK: - FunctionProvider Protocol
     
     func provideFunctions() -> [FunctionNode] {

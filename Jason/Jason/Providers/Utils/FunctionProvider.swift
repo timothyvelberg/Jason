@@ -42,6 +42,8 @@ protocol FunctionProvider {
     /// Clean up any cached data held by this provider.
     /// Called during instance teardown.
     func clearCache()
+    
+    func teardown()
 }
 
 
@@ -72,6 +74,10 @@ extension FunctionProvider {
     
     // Default clearCache does nothing - providers override if they have caches
     func clearCache() {
+        // No-op by default
+    }
+    
+    func teardown() {
         // No-op by default
     }
     

@@ -119,7 +119,7 @@ struct ContentSettingsView: View {
     private func setupApplication() {
         guard !isSetupComplete else { return }
         print("[ContentSettingsView] Application setup starting...")
-        FirstLaunchConfiguration.ensureDefaultConfiguration()
+//        FirstLaunchConfiguration.ensureDefaultConfiguration()
         let configManager = RingConfigurationManager.shared
         configManager.loadActiveConfigurations()
         let activeConfigs = configManager.getActiveConfigurations()

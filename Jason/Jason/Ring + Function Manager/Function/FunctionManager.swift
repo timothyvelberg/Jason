@@ -37,8 +37,6 @@ class FunctionManager: ObservableObject {
     var maxItems: Int { configCalculator.maxItems }
     
     // MARK: - Private State
-    
-    private(set) var favoriteAppsProvider: FavoriteAppsProvider?
     private let configCalculator: RingConfigurationCalculator
     
     // MARK: - Close Zone Configuration
@@ -67,8 +65,6 @@ class FunctionManager: ObservableObject {
         )
         
         self.providers = []
-        let appsProvider = FavoriteAppsProvider()
-        self.favoriteAppsProvider = appsProvider
     }
     
     // MARK: - Computed Properties for UI

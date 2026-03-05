@@ -27,7 +27,7 @@ protocol UIManager: AnyObject {
     var listPanelManager: ListPanelManager? { get }
     
     /// Setup the manager (create windows, wire callbacks)
-    func setup()
+    func setup(injectedProviders: [any FunctionProvider]?)
     
     /// Show the UI
     func show(triggerDirection: RotationDirection?)
@@ -50,5 +50,9 @@ extension UIManager {
     
     func teardown() {
         // Default no-op for managers that don't need cleanup
+    }
+    
+    func setup() {
+        setup(injectedProviders: nil)
     }
 }

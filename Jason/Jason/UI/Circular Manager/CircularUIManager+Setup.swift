@@ -10,7 +10,7 @@ import SwiftUI
 
 extension CircularUIManager {
     
-    func setup() {
+    func setup(injectedProviders: [any FunctionProvider]? = nil) {
         // Create FunctionManager with configuration values
         self.functionManager = FunctionManager(
             ringThickness: CGFloat(ringConfiguration.ringRadius),
@@ -40,13 +40,16 @@ extension CircularUIManager {
         }
         print("   PanelActionHandler initialized")
         
-        // Create provider factory
-        let factory = ProviderFactory(
-            circularUIManager: self,
-            appSwitcherManager: AppSwitcherManager.shared
-        )
-        
-        let providers = factory.createProviders(from: ringConfiguration)
+        let providers: [any FunctionProvider]
+        if let injected = injectedProviders {
+            providers = injected
+        } else {
+            let factory = ProviderFactory(
+                circularUIManager: self,
+                appSwitcherManager: AppSwitcherManager.shared
+            )
+            providers = factory.createProviders(from: ringConfiguration)
+        }
 
         // Register all providers with their configurations
         for provider in providers {

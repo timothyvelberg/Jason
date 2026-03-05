@@ -25,6 +25,9 @@ class CircularUIInstanceManager: ObservableObject {
     /// Track which instance is currently visible (nil if none are visible)
     private(set) var activeInstanceId: Int? = nil
     
+    /// Tracks which provider types each instance is currently holding
+    private var instanceProviderTypes: [Int: [String]] = [:]
+    
     // MARK: - Dependencies
     
     private let configurationManager = RingConfigurationManager.shared
@@ -50,20 +53,15 @@ class CircularUIInstanceManager: ObservableObject {
         print("[InstanceManager] Now managing \(instances.count) instance(s)")
     }
     
-    /// Create or update a single CircularUIManager instance
-    /// - Parameter config: The configuration to instantiate/update
     func createOrUpdateInstance(for config: StoredRingConfiguration) {
         let action = instances[config.id] != nil ? "Updating" : "Creating"
         print("[InstanceManager] \(action) instance for '\(config.name)' (ID: \(config.id))")
         
-        // Remove old instance if it exists (to ensure clean state)
         if instances[config.id] != nil {
             removeInstance(forConfigId: config.id)
         }
         
-        // Create new instance with configuration
         let instance: any UIManager
-
         switch config.presentationMode {
         case .ring:
             instance = CircularUIManager(configuration: config)
@@ -73,8 +71,28 @@ class CircularUIInstanceManager: ObservableObject {
         
         instances[config.id] = instance
         
-        // Setup the instance so it's ready to use immediately
-        instance.setup()
+        // Resolve providers via registry
+        let circularManager = instance as? CircularUIManager
+        let factory = ProviderFactory(
+            circularUIManager: circularManager,
+            appSwitcherManager: AppSwitcherManager.shared
+        )
+        
+        var resolvedProviders: [any FunctionProvider] = []
+        let providerTypes = config.sortedProviders.map { $0.providerType }
+        
+        for providerConfig in config.sortedProviders {
+            if let provider = ProviderRegistry.shared.acquire(
+                providerType: providerConfig.providerType,
+                factory: { factory.createProvider(from: providerConfig) }
+            ) {
+                resolvedProviders.append(provider)
+            }
+        }
+        
+        instanceProviderTypes[config.id] = providerTypes
+        
+        instance.setup(injectedProviders: resolvedProviders)
         print("   Instance created and setup complete")
     }
     
@@ -124,6 +142,12 @@ class CircularUIInstanceManager: ObservableObject {
         // Hide UI if visible
         // Tear down all resources
         instance.teardown()
+        
+        if let providerTypes = instanceProviderTypes[configId] {
+            ProviderRegistry.shared.releaseAll(providerTypes: providerTypes)
+            instanceProviderTypes.removeValue(forKey: configId)
+        }
+
         
         // Clear active instance tracking if this was the active instance
         if activeInstanceId == configId {

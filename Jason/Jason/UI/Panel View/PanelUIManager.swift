@@ -107,7 +107,7 @@ class PanelUIManager: ObservableObject, UIManager {
     
     // MARK: - UIManager Protocol Methods
     
-    func setup() {
+    func setup(injectedProviders: [any FunctionProvider]? = nil) {
         print("[PanelUIManager-\(configId)] Setting up...")
         
         // Create ListPanelManager
