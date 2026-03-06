@@ -91,11 +91,9 @@ extension FunctionManager {
         
         let node = rings[ringLevel].nodes[index]
         
-        // Use displayedChildren which respects maxDisplayedChildren limit
         let displayedChildren = node.displayedChildren
         
-        // Truncate to maxItems to prevent ghost items in child rings
-        let truncatedChildren = Array(displayedChildren.prefix(maxItems))
+        let truncatedChildren = Array(displayedChildren.filter { !$0.type.isSectionHeader }.prefix(maxItems))
         if displayedChildren.count > maxItems {
             print("   Truncated children from \(displayedChildren.count) to \(truncatedChildren.count) items")
         }
@@ -107,20 +105,16 @@ extension FunctionManager {
             return
         }
         
-        // Select the node at this level
         rings[ringLevel].selectedIndex = index
         rings[ringLevel].hoveredIndex = index
         
-        // Remove any rings beyond this level
         if ringLevel + 1 < rings.count {
             rings.removeSubrange((ringLevel + 1)...)
         }
         
-        // Get context from the node
         let providerId = node.providerId
         let contentIdentifier = node.metadata?["folderURL"] as? String
         
-        // Add new ring with displayed children and context tracking
         rings.append(RingState(
             nodes: truncatedChildren,
             isCollapsed: false,
@@ -224,13 +218,11 @@ extension FunctionManager {
                 return
             }
             
-            // Truncate to maxItems to prevent ghost items
-            let truncatedChildren = Array(childrenToDisplay.prefix(maxItems))
+            let truncatedChildren = Array(childrenToDisplay.filter { !$0.type.isSectionHeader }.prefix(maxItems))
             if childrenToDisplay.count > maxItems {
                 print("   Truncated folder children from \(childrenToDisplay.count) to \(truncatedChildren.count) items")
             }
             
-            // Bounds check after async work
             guard rings.indices.contains(ringLevel),
                   rings[ringLevel].nodes.indices.contains(index) else {
                 print("Ring or index out of bounds after async load - rings may have changed")
@@ -241,20 +233,17 @@ extension FunctionManager {
             rings[ringLevel].selectedIndex = index
             rings[ringLevel].hoveredIndex = index
             
-            // Mark current ring as collapsed (if it's not Ring 0)
             if ringLevel > 0 {
                 rings[ringLevel].isCollapsed = true
                 print("Collapsed ring \(ringLevel)")
             }
             
-            // Remove any rings beyond this level
             if ringLevel + 1 < rings.count {
                 let removed = rings.count - (ringLevel + 1)
                 rings.removeSubrange((ringLevel + 1)...)
                 print("Removed \(removed) ring(s) beyond level \(ringLevel)")
             }
             
-            // Add new ring with children
             let providerId = node.providerId
             let contentIdentifier = node.metadata?["folderURL"] as? String
             rings.append(RingState(

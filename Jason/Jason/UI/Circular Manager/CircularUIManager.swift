@@ -29,8 +29,6 @@ class CircularUIManager: ObservableObject, UIManager {
     var hasLeftCloseZone: Bool = false
     
     var overlayWindow: OverlayWindow?
-    var combinedAppsProvider: CombinedAppsProvider?
-    var favoriteFilesProvider: FavoriteFilesProvider?
     var functionManager: FunctionManager?
     var mouseTracker: MouseTracker?
     var gestureManager: GestureManager?
@@ -156,8 +154,6 @@ class CircularUIManager: ObservableObject, UIManager {
         listPanelManager = nil
         panelActionHandler = nil
         overlayWindow = nil
-        combinedAppsProvider = nil
-        favoriteFilesProvider = nil
         
         print("[CircularUIManager-\(configId)] teardown complete")
     }

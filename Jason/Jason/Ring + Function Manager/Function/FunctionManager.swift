@@ -213,7 +213,7 @@ class FunctionManager: ObservableObject {
                 let contentIdentifier = selectedNode.metadata?["folderURL"] as? String
                 
                 rings.append(RingState(
-                    nodes: children,
+                    nodes: children.filter { !$0.type.isSectionHeader },
                     providerId: providerId,
                     contentIdentifier: contentIdentifier
                 ))

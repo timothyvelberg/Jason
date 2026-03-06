@@ -59,9 +59,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
     }
     
     deinit {
-        NotificationCenter.default.removeObserver(self)
-        evictionTimer?.invalidate()
-        FolderWatcherManager.shared.stopWatchingPromotedSubfolders(visitTracker.promotedPaths)
+        print("[FavoriteFolderProvider] deinit")
     }
     
     @objc private func handleProviderUpdate(_ notification: Notification) {
@@ -912,7 +910,7 @@ class FavoriteFolderProvider: ObservableObject, FunctionProvider {
             
             guard let itemPath = path else { return nil }
             
-            let hasCustomIcon = !fileExtension.isEmpty && IconProvider.shared.hasCustomFileIcon(for: fileExtension)
+            let hasCustomIcon = false
             
             let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
             let isImageFile = imageExtensions.contains(fileExtension)

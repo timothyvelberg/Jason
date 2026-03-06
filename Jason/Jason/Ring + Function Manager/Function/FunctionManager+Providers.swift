@@ -95,7 +95,6 @@ extension FunctionManager {
         
         print("[DisplayMode] Called for providerId: \(providerId), hasConfig: \(providerConfigurations[providerId] != nil)")
 
-        
         guard let providerConfig = providerConfigurations[providerId] else {
             return nodes
         }
@@ -106,7 +105,6 @@ extension FunctionManager {
             return nodes
         }
         
-        // Direct mode: Extract children from category nodes
         let transformedNodes = nodes.flatMap { node -> [FunctionNode] in
             guard node.type == .category else {
                 return [node]
@@ -115,7 +113,7 @@ extension FunctionManager {
             if let children = node.children, !children.isEmpty {
                 print("[DisplayMode] Extracting \(children.count) children from category '\(node.name)' (provider: \(providerId))")
                 
-                return children.map { child in
+                return children.filter { !$0.type.isSectionHeader }.map { child in
                     if child.providerId != providerId {
                         return child.withProviderId(providerId)
                     }
@@ -281,7 +279,7 @@ extension FunctionManager {
                         return
                     }
                     
-                    let truncatedNodes = Array(loadedNodes.prefix(self.maxItems))
+                    let truncatedNodes = Array(loadedNodes.filter { !$0.type.isSectionHeader }.prefix(self.maxItems))
                     if loadedNodes.count > self.maxItems {
                         print("   Truncated Ring \(level) from \(loadedNodes.count) to \(truncatedNodes.count) items")
                     }
@@ -295,7 +293,7 @@ extension FunctionManager {
             } else {
                 let freshNodes = freshParentNode.displayedChildren
                 
-                let truncatedNodes = Array(freshNodes.prefix(maxItems))
+                let truncatedNodes = Array(freshNodes.filter { !$0.type.isSectionHeader }.prefix(maxItems))
                 if freshNodes.count > maxItems {
                     print("   Truncated Ring \(level) from \(freshNodes.count) to \(truncatedNodes.count) items")
                 }

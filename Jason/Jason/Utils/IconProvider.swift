@@ -13,160 +13,48 @@ class IconProvider {
     
     static let shared = IconProvider()
     private init() {}
-    private var imageCache: [String: NSImage] = [:]
-    
+
+    private var thumbnailCache: [String: NSImage] = [:]
+    private var thumbnailAccessOrder: [String] = []
+    private let thumbnailCacheLimit = 200
+
+    private var iconCache: [String: NSImage] = [:]
+
     private func clearImageCache() {
-        imageCache.removeAll()
+        iconCache.removeAll()
     }
 
     // MARK: - Icon Configuration Structures
-    
-    private struct FileIconConfig {
-        let symbolName: String
-        let backgroundColor: NSColor
-        let foregroundColor: NSColor
-        
-        // Convenience initializer with color names
-        init(symbolName: String, symbolColor: FileIconColor) {
-            self.symbolName = symbolName
-            self.backgroundColor = .white
-            self.foregroundColor = symbolColor.nsColor
-        }
-    }
-    
+
     private enum FolderIconType {
-        case systemWithColor(NSColor)     // System folder icon with custom color tint
-        case customAsset(String)           // Custom icon from Asset Catalog
+        case systemWithColor(NSColor)
+        case customAsset(String)
         case composite(baseAsset: String, symbol: String, symbolColor: NSColor, symbolSize: CGFloat, symbolOffset: CGFloat)
-        case layered(color: NSColor)       // New: Layered SVG folder with custom color
+        case layered(color: NSColor)
     }
-    
+
     private struct FolderConfig {
         let type: FolderIconType
     }
-    
-    // Simple color enum
-    private enum FileIconColor {
-        case red
-        case blue
-        case green
-        case orange
-        case purple
-        case yellow
-        case pink
-        case teal
-        case gray
-        case brown
-        
-        var nsColor: NSColor {
-            switch self {
-            case .red: return NSColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 1.0)
-            case .blue: return NSColor(red: 0.2, green: 0.4, blue: 0.8, alpha: 1.0)
-            case .green: return NSColor(red: 0.2, green: 0.7, blue: 0.3, alpha: 1.0)
-            case .orange: return NSColor(red: 1.0, green: 0.6, blue: 0.2, alpha: 1.0)
-            case .purple: return NSColor(red: 0.6, green: 0.3, blue: 0.8, alpha: 1.0)
-            case .yellow: return NSColor(red: 0.9, green: 0.8, blue: 0.2, alpha: 1.0)
-            case .pink: return NSColor(red: 0.9, green: 0.4, blue: 0.6, alpha: 1.0)
-            case .teal: return NSColor(red: 0.2, green: 0.7, blue: 0.7, alpha: 1.0)
-            case .gray: return NSColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1.0)
-            case .brown: return NSColor(red: 0.6, green: 0.4, blue: 0.2, alpha: 1.0)
-            }
-        }
-    }
-    
-    // Custom icon mappings by file extension
-    private let fileIcons: [String: FileIconConfig] = [
-        // Documents
-        "pdf": FileIconConfig(symbolName: "doc.fill", symbolColor: .red),
-        "doc": FileIconConfig(symbolName: "doc.text.fill", symbolColor: .blue),
-        "docx": FileIconConfig(symbolName: "doc.text.fill", symbolColor: .blue),
-        "txt": FileIconConfig(symbolName: "doc.plaintext.fill", symbolColor: .gray),
-        "rtf": FileIconConfig(symbolName: "doc.richtext.fill", symbolColor: .gray),
-        
-        // Spreadsheets
-        "xls": FileIconConfig(symbolName: "tablecells.fill", symbolColor: .green),
-        "xlsx": FileIconConfig(symbolName: "tablecells.fill", symbolColor: .green),
-        "csv": FileIconConfig(symbolName: "tablecells.fill", symbolColor: .teal),
-        
-        // Presentations
-        "ppt": FileIconConfig(symbolName: "rectangle.on.rectangle.fill", symbolColor: .orange),
-        "pptx": FileIconConfig(symbolName: "rectangle.on.rectangle.fill", symbolColor: .orange),
-        
-        // Code
-        "swift": FileIconConfig(symbolName: "swift", symbolColor: .orange),
-        "py": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", symbolColor: .blue),
-        "js": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", symbolColor: .yellow),
-        "ts": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", symbolColor: .blue),
-        "html": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", symbolColor: .red),
-        "css": FileIconConfig(symbolName: "paintbrush.fill", symbolColor: .blue),
-        "json": FileIconConfig(symbolName: "curlybraces", symbolColor: .gray),
-        "xml": FileIconConfig(symbolName: "chevron.left.forwardslash.chevron.right", symbolColor: .brown),
-        
-        // Archives
-        "zip": FileIconConfig(symbolName: "doc.zipper", symbolColor: .purple),
-        "rar": FileIconConfig(symbolName: "doc.zipper", symbolColor: .purple),
-        "7z": FileIconConfig(symbolName: "doc.zipper", symbolColor: .purple),
-        "tar": FileIconConfig(symbolName: "doc.zipper", symbolColor: .brown),
-        "gz": FileIconConfig(symbolName: "doc.zipper", symbolColor: .brown),
-        
-        // Audio
-        "mp3": FileIconConfig(symbolName: "music.note", symbolColor: .pink),
-        "wav": FileIconConfig(symbolName: "waveform", symbolColor: .pink),
-        "m4a": FileIconConfig(symbolName: "music.note", symbolColor: .pink),
-        "flac": FileIconConfig(symbolName: "waveform", symbolColor: .purple),
-        
-        // Video
-        "mp4": FileIconConfig(symbolName: "video.fill", symbolColor: .blue),
-        "mov": FileIconConfig(symbolName: "video.fill", symbolColor: .blue),
-        "avi": FileIconConfig(symbolName: "video.fill", symbolColor: .purple),
-        "mkv": FileIconConfig(symbolName: "video.fill", symbolColor: .teal),
-        
-        // Images (for non-thumbnail cases)
-        "svg": FileIconConfig(symbolName: "photo.fill", symbolColor: .orange),
-        "psd": FileIconConfig(symbolName: "photo.fill", symbolColor: .blue),
-        
-        // Fonts
-        "ttf": FileIconConfig(symbolName: "textformat", symbolColor: .gray),
-        "otf": FileIconConfig(symbolName: "textformat", symbolColor: .gray),
-        
-        // Misc
-        "dmg": FileIconConfig(symbolName: "internaldrive.fill", symbolColor: .gray),
-        "pkg": FileIconConfig(symbolName: "shippingbox.fill", symbolColor: .brown),
-    ]
-    
+
     // MARK: - Folder Mappings
-    
-    // Map specific folder paths to custom icons
+
     private var pathBasedFolderIcons: [String: FolderConfig] = [:]
-    
-    // Map folder names to custom icons (applies to any folder with that name)
+
     private let nameBasedFolderIcons: [String: FolderConfig] = [
         "Documents": FolderConfig(type: .systemWithColor(NSColor(red: 0.3, green: 0.5, blue: 0.8, alpha: 1.0))),
         "Music": FolderConfig(type: .systemWithColor(NSColor(red: 0.9, green: 0.3, blue: 0.4, alpha: 1.0))),
         "Pictures": FolderConfig(type: .systemWithColor(NSColor(red: 0.8, green: 0.2, blue: 0.6, alpha: 1.0))),
         "Movies": FolderConfig(type: .systemWithColor(NSColor(red: 0.6, green: 0.3, blue: 0.8, alpha: 1.0))),
     ]
-    
+
     // MARK: - Public API - Files
-    
-    /// Get icon for a file URL with optional custom styling
+
+    /// Get icon for a file URL
     func getFileIcon(for url: URL, size: CGFloat = 64, cornerRadius: CGFloat = 8) -> NSImage {
-        let fileExtension = url.pathExtension.lowercased()
-        
-        // Check if we have a custom icon for this file type
-        if let config = fileIcons[fileExtension] {
-            return createRoundedIcon(config: config, size: size, cornerRadius: cornerRadius)
-        }
-        
-        // Fallback to system icon with rounded corners
         return createRoundedSystemIcon(for: url, size: size, cornerRadius: cornerRadius)
     }
-    
-    /// Check if a file extension has a custom icon
-    func hasCustomFileIcon(for fileExtension: String) -> Bool {
-        return fileIcons[fileExtension.lowercased()] != nil
-    }
-    
+
     /// Get a thumbnail for a file URL. For image files, generates a pixel-accurate
     /// thumbnail. Falls back to getFileIcon for all other file types.
     func getThumbnail(for url: URL, size: CGFloat = 40, cornerRadius: CGFloat = 8) -> NSImage {
@@ -178,7 +66,11 @@ class IconProvider {
         }
 
         let key = "thumbnail-\(url.path)-\(size)-\(cornerRadius)"
-        if let cached = imageCache[key] { return cached }
+        if let cached = thumbnailCache[key] {
+            thumbnailAccessOrder.removeAll { $0 == key }
+            thumbnailAccessOrder.append(key)
+            return cached
+        }
 
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
@@ -198,44 +90,44 @@ class IconProvider {
         NSGraphicsContext.current?.cgContext.draw(cgImage, in: rect)
         thumbnail.unlockFocus()
 
-        imageCache[key] = thumbnail
+        thumbnailCache[key] = thumbnail
+        thumbnailAccessOrder.append(key)
+        if thumbnailCache.count > thumbnailCacheLimit {
+            let evicted = thumbnailAccessOrder.removeFirst()
+            thumbnailCache.removeValue(forKey: evicted)
+        }
+
         return thumbnail
     }
-    
+
     // MARK: - Public API - Folders
-    
+
     /// Get icon for a folder URL with optional custom styling
     func getFolderIcon(for url: URL, size: CGFloat = 64, cornerRadius: CGFloat = 8) -> NSImage {
         let folderName = url.lastPathComponent
         let folderPath = url.path
-        
-        // Priority 1: Check path-based customization (most specific)
+
         if let config = pathBasedFolderIcons[folderPath] {
             return createFolderIcon(config: config, url: url, size: size, cornerRadius: cornerRadius)
         }
-        
-        // Priority 2: Check name-based customization
+
         if let config = nameBasedFolderIcons[folderName] {
             return createFolderIcon(config: config, url: url, size: size, cornerRadius: cornerRadius)
         }
-        
-        // Priority 3: Fallback to default layered folder icon (blue)
+
         return createLayeredFolderIcon(color: NSColor(hex: "#55C2EE") ?? .systemBlue, size: size, cornerRadius: cornerRadius)
     }
-    
-    /// Set a custom color for a specific folder path using layered rendering
+
     func setFolderColor(_ color: NSColor, forPath path: String) {
         pathBasedFolderIcons[path] = FolderConfig(type: .layered(color: color))
         clearImageCache()
     }
-    
-    /// Set a custom asset icon for a specific folder path
+
     func setCustomFolderAsset(_ assetName: String, forPath path: String) {
         pathBasedFolderIcons[path] = FolderConfig(type: .customAsset(assetName))
         clearImageCache()
     }
-    
-    /// Set a composite icon for a specific folder path
+
     func setCompositeFolderIcon(
         baseAsset: String,
         symbol: String,
@@ -255,86 +147,60 @@ class IconProvider {
         )
         clearImageCache()
     }
-    
-    /// Remove custom styling for a specific folder path
+
     func removeFolderCustomization(forPath path: String) {
         pathBasedFolderIcons.removeValue(forKey: path)
         clearImageCache()
     }
-    
-    /// Check if a folder has custom styling
+
     func hasCustomFolderIcon(forPath path: String) -> Bool {
         return pathBasedFolderIcons[path] != nil
     }
-    
-    /// Get all folder paths with custom icons
+
     func getCustomizedFolderPaths() -> [String] {
         return Array(pathBasedFolderIcons.keys)
     }
-    
+
     // MARK: - Layered Folder Icon
-    
-    /// Create a folder icon by compositing 4 SVG layers with customizable color
-    /// - Parameters:
-    ///   - color: The primary folder color (front folder)
-    ///   - size: The icon size
-    ///   - cornerRadius: Corner radius for clipping (optional)
-    /// - Returns: Composited folder icon
+
     func createLayeredFolderIcon(color: NSColor, size: CGFloat = 64, cornerRadius: CGFloat = 0) -> NSImage {
         let key = "layered-\(color.hexString)-\(size)-\(cornerRadius)"
-        if let cached = imageCache[key] { return cached }
-        
+        if let cached = iconCache[key] { return cached }
+
         let compositeImage = NSImage(size: NSSize(width: size, height: size))
-        
-        // Derive back folder color (HSL lightness - 20)
         let backColor = color.adjustingLightness(by: -20)
-        
+
         compositeImage.lockFocus()
-        
+
         let rect = NSRect(origin: .zero, size: NSSize(width: size, height: size))
-        
-        // Optional corner radius clipping
+
         if cornerRadius > 0 {
             let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
             path.addClip()
         }
-        
-        // Layer 1 (bottom): Back folder - derived darker color
+
         if let backLayer = NSImage(named: "folder-blue-04") {
             drawTintedLayer(backLayer, in: rect, tintColor: backColor)
         }
-        
-        // Layer 2: Highlight - draw as-is (white + alpha)
+
         if let highlight1 = NSImage(named: "folder-blue-03") {
             highlight1.draw(in: rect, from: NSRect(origin: .zero, size: highlight1.size), operation: .sourceOver, fraction: 1.0)
         }
-        
-        // Layer 3: Front folder - user's chosen color
+
         if let frontLayer = NSImage(named: "folder-blue-02") {
             drawTintedLayer(frontLayer, in: rect, tintColor: color)
         }
-        
-        // Layer 4 (top): Highlight - draw as-is (white + alpha)
+
         if let highlight2 = NSImage(named: "folder-blue-01") {
             highlight2.draw(in: rect, from: NSRect(origin: .zero, size: highlight2.size), operation: .sourceOver, fraction: 1.0)
         }
-        
+
         compositeImage.unlockFocus()
-        
-        imageCache[key] = compositeImage
+
+        iconCache[key] = compositeImage
         return compositeImage
     }
-    
-    /// Create a layered folder icon with an SF Symbol overlay
-    /// - Parameters:
-    ///   - color: The primary folder color
-    ///   - symbolName: SF Symbol to overlay
-    ///   - symbolColor: Color of the SF Symbol
-    ///   - size: The icon size
-    ///   - symbolSize: Absolute point size for the symbol
-    ///   - cornerRadius: Corner radius for clipping
-    ///   - symbolOffset: Vertical offset for the symbol
-    /// - Returns: Composited folder icon with symbol
+
     func createLayeredFolderIconWithSymbol(
         color: NSColor,
         symbolName: String,
@@ -345,113 +211,92 @@ class IconProvider {
         symbolOffset: CGFloat = -4
     ) -> NSImage {
         let key = "layered-\(color.hexString)-\(symbolName)-\(symbolColor.hexString)-\(size)-\(symbolSize)-\(cornerRadius)-\(symbolOffset)"
-        if let cached = imageCache[key] { return cached }
-        
+        if let cached = iconCache[key] { return cached }
+
         let compositeImage = NSImage(size: NSSize(width: size, height: size))
-        
+
         compositeImage.lockFocus()
-        
-        // Draw base layered folder
+
         let baseFolder = createLayeredFolderIcon(color: color, size: size, cornerRadius: cornerRadius)
         baseFolder.draw(in: NSRect(origin: .zero, size: NSSize(width: size, height: size)))
-        
-        // Draw SF Symbol overlay
+
         if let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
             let symbolConfig = NSImage.SymbolConfiguration(pointSize: symbolSize, weight: .medium)
             if let configuredSymbol = symbol.withSymbolConfiguration(symbolConfig) {
-                
+
                 let symbolActualSize = configuredSymbol.size
-                
-                // Create colored version with shadow baked in
                 let shadowOffset: CGFloat = 1
                 let shadowBlur: CGFloat = 1
                 let imageSize = NSSize(
                     width: symbolActualSize.width + shadowBlur * 2,
                     height: symbolActualSize.height + shadowBlur * 2 + shadowOffset
                 )
-                
+
                 let coloredSymbol = NSImage(size: imageSize)
                 coloredSymbol.lockFocus()
-                
-                // Set up shadow
+
                 let shadow = NSShadow()
                 shadow.shadowColor = NSColor.black.withAlphaComponent(0.3)
                 shadow.shadowOffset = NSSize(width: 0, height: -shadowOffset)
                 shadow.shadowBlurRadius = shadowBlur
                 shadow.set()
-                
-                // Draw symbol with padding for shadow
+
                 let drawRect = NSRect(
                     x: shadowBlur,
                     y: shadowBlur + shadowOffset,
                     width: symbolActualSize.width,
                     height: symbolActualSize.height
                 )
-                
+
                 configuredSymbol.draw(
                     in: drawRect,
                     from: NSRect(origin: .zero, size: symbolActualSize),
                     operation: .sourceOver,
                     fraction: 1.0
                 )
-                
+
                 symbolColor.setFill()
                 drawRect.fill(using: .sourceAtop)
-                
+
                 coloredSymbol.unlockFocus()
-                
-                // Draw colored symbol centered on composite
+
                 let symbolRect = NSRect(
                     x: (size - imageSize.width) / 2,
                     y: (size - imageSize.height) / 2 + symbolOffset,
                     width: imageSize.width,
                     height: imageSize.height
                 )
-                
+
                 coloredSymbol.draw(in: symbolRect)
             }
         }
-        
+
         compositeImage.unlockFocus()
-        
-        imageCache[key] = compositeImage
+
+        iconCache[key] = compositeImage
         return compositeImage
     }
-    
+
     private func drawTintedLayer(_ image: NSImage, in rect: NSRect, tintColor: NSColor) {
-        // Create a temporary image for tinting
         let tintedImage = NSImage(size: rect.size)
-        
+
         tintedImage.lockFocus()
-        
-        // Draw the original image
+
         image.draw(in: NSRect(origin: .zero, size: rect.size),
                    from: NSRect(origin: .zero, size: image.size),
                    operation: .sourceOver,
                    fraction: 1.0)
-        
-        // Apply tint - replaces color while preserving alpha
+
         tintColor.setFill()
         NSRect(origin: .zero, size: rect.size).fill(using: .sourceAtop)
-        
+
         tintedImage.unlockFocus()
-        
-        // Draw the tinted result
+
         tintedImage.draw(in: rect)
     }
-    
-    // MARK: - Public API - Composite Icons
-    
-    /// Create a composite icon with a base asset and SF Symbol overlay using ABSOLUTE symbol size
-    /// - Parameters:
-    ///   - baseAssetName: Name of the base icon asset (e.g., "_folder-blue_")
-    ///   - symbolName: SF Symbol to overlay on top
-    ///   - symbolColor: Color of the SF Symbol
-    ///   - size: Final icon size
-    ///   - symbolSize: ABSOLUTE point size for the symbol (e.g., 24, 32)
-    ///   - cornerRadius: Corner radius for the final icon (unused if base asset has its own shape)
-    ///   - symbolOffset: Vertical offset for the symbol (negative moves up, positive moves down)
-    /// - Returns: Composite NSImage
+
+    // MARK: - Composite Icons
+
     func createCompositeIcon(
         baseAssetName: String,
         symbolName: String,
@@ -462,26 +307,25 @@ class IconProvider {
         symbolOffset: CGFloat = -8
     ) -> NSImage {
         let key = "composite-\(baseAssetName)-\(symbolName)-\(symbolColor.hexString)-\(size)-\(symbolSize)-\(cornerRadius)-\(symbolOffset)"
-        if let cached = imageCache[key] { return cached }
-        
+        if let cached = iconCache[key] { return cached }
+
         let compositeImage = NSImage(size: NSSize(width: size, height: size))
-        
+
         compositeImage.lockFocus()
-        
-        // Draw base icon (e.g., your custom folder "_folder-blue_")
+
         if let baseImage = NSImage(named: baseAssetName) {
             let imageSize = baseImage.size
             let scale = min(size / imageSize.width, size / imageSize.height)
             let scaledWidth = imageSize.width * scale
             let scaledHeight = imageSize.height * scale
-            
+
             let drawRect = NSRect(
                 x: (size - scaledWidth) / 2,
                 y: (size - scaledHeight) / 2,
                 width: scaledWidth,
                 height: scaledHeight
             )
-            
+
             baseImage.draw(
                 in: drawRect,
                 from: NSRect(origin: .zero, size: baseImage.size),
@@ -489,73 +333,66 @@ class IconProvider {
                 fraction: 1.0
             )
         }
-        
-        // Create colored SF Symbol with preserved aspect ratio
+
         if let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
-            let symbolConfig = NSImage.SymbolConfiguration(pointSize: symbolSize, weight: .medium)  // USE ABSOLUTE SIZE
+            let symbolConfig = NSImage.SymbolConfiguration(pointSize: symbolSize, weight: .medium)
             if let configuredSymbol = symbol.withSymbolConfiguration(symbolConfig) {
-                
+
                 let symbolActualSize = configuredSymbol.size
-                
-                // Create colored version with shadow baked in
                 let shadowOffset: CGFloat = 1
                 let shadowBlur: CGFloat = 1
                 let imageSize = NSSize(
                     width: symbolActualSize.width + shadowBlur * 2,
                     height: symbolActualSize.height + shadowBlur * 2 + shadowOffset
                 )
-                
+
                 let coloredSymbol = NSImage(size: imageSize)
                 coloredSymbol.lockFocus()
-                
-                // Set up shadow
+
                 let shadow = NSShadow()
                 shadow.shadowColor = NSColor.black.withAlphaComponent(0.3)
                 shadow.shadowOffset = NSSize(width: 0, height: -shadowOffset)
                 shadow.shadowBlurRadius = shadowBlur
                 shadow.set()
-                
-                // Draw symbol with padding for shadow
+
                 let drawRect = NSRect(
                     x: shadowBlur,
                     y: shadowBlur + shadowOffset,
                     width: symbolActualSize.width,
                     height: symbolActualSize.height
                 )
-                
+
                 configuredSymbol.draw(
                     in: drawRect,
                     from: NSRect(origin: .zero, size: symbolActualSize),
                     operation: .sourceOver,
                     fraction: 1.0
                 )
-                
+
                 symbolColor.setFill()
                 drawRect.fill(using: .sourceAtop)
-                
+
                 coloredSymbol.unlockFocus()
-                
-                // Draw colored symbol (with baked-in shadow) centered on composite
+
                 let symbolRect = NSRect(
                     x: (size - imageSize.width) / 2,
                     y: (size - imageSize.height) / 2 + symbolOffset,
                     width: imageSize.width,
                     height: imageSize.height
                 )
-                
+
                 coloredSymbol.draw(in: symbolRect)
             }
         }
-        
+
         compositeImage.unlockFocus()
-        
-        imageCache[key] = compositeImage
+
+        iconCache[key] = compositeImage
         return compositeImage
     }
-    
+
     // MARK: - Batch Operations
-    
-    /// Get icons for multiple file URLs (useful for batch loading)
+
     func getFileIcons(for urls: [URL], size: CGFloat = 64, cornerRadius: CGFloat = 8) -> [URL: NSImage] {
         var icons: [URL: NSImage] = [:]
         for url in urls {
@@ -563,8 +400,7 @@ class IconProvider {
         }
         return icons
     }
-    
-    /// Get icons for multiple folder URLs (useful for batch loading)
+
     func getFolderIcons(for urls: [URL], size: CGFloat = 64, cornerRadius: CGFloat = 8) -> [URL: NSImage] {
         var icons: [URL: NSImage] = [:]
         for url in urls {
@@ -572,88 +408,33 @@ class IconProvider {
         }
         return icons
     }
-    
+
     // MARK: - Icon Creation - Files
-    
-    private func createRoundedIcon(config: FileIconConfig, size: CGFloat, cornerRadius: CGFloat) -> NSImage {
-        let image = NSImage(size: NSSize(width: size, height: size))
-        
-        image.lockFocus()
-        
-        let rect = NSRect(origin: .zero, size: NSSize(width: size, height: size))
-        let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-        
-        // Draw background
-        config.backgroundColor.setFill()
-        path.fill()
-        
-        // Draw SF Symbol with preserved aspect ratio
-        if let symbol = NSImage(systemSymbolName: config.symbolName, accessibilityDescription: nil) {
-            let symbolConfig = NSImage.SymbolConfiguration(pointSize: size * 0.4, weight: .regular)
-            if let configuredSymbol = symbol.withSymbolConfiguration(symbolConfig) {
-                
-                let symbolSize = configuredSymbol.size
-                
-                // Create colored version in its own context
-                let coloredSymbol = NSImage(size: symbolSize)
-                coloredSymbol.lockFocus()
-                
-                configuredSymbol.draw(
-                    in: NSRect(origin: .zero, size: symbolSize),
-                    from: NSRect(origin: .zero, size: symbolSize),
-                    operation: .sourceOver,
-                    fraction: 1.0
-                )
-                
-                config.foregroundColor.setFill()
-                NSRect(origin: .zero, size: symbolSize).fill(using: .sourceAtop)
-                
-                coloredSymbol.unlockFocus()
-                
-                // Draw colored symbol centered
-                let symbolRect = NSRect(
-                    x: (size - symbolSize.width) / 2,
-                    y: (size - symbolSize.height) / 2,
-                    width: symbolSize.width,
-                    height: symbolSize.height
-                )
-                
-                coloredSymbol.draw(in: symbolRect)
-            }
-        }
-        
-        image.unlockFocus()
-        
-        return image
-    }
-    
+
     private func createRoundedSystemIcon(for url: URL, size: CGFloat, cornerRadius: CGFloat) -> NSImage {
         let systemIcon = NSWorkspace.shared.icon(forFile: url.path)
         let roundedIcon = NSImage(size: NSSize(width: size, height: size))
-        
+
         roundedIcon.lockFocus()
-        
+
         let rect = NSRect(origin: .zero, size: NSSize(width: size, height: size))
         let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-        
-        // Clip to rounded rect
         path.addClip()
-        
-        // Draw system icon
+
         systemIcon.draw(
             in: rect,
             from: NSRect(origin: .zero, size: systemIcon.size),
             operation: .sourceOver,
             fraction: 1.0
         )
-        
+
         roundedIcon.unlockFocus()
-        
+
         return roundedIcon
     }
-    
+
     // MARK: - Icon Creation - Folders
-    
+
     private func createFolderIcon(config: FolderConfig, url: URL, size: CGFloat, cornerRadius: CGFloat) -> NSImage {
         switch config.type {
         case .systemWithColor(let color):
@@ -674,101 +455,89 @@ class IconProvider {
             return createLayeredFolderIcon(color: color, size: size, cornerRadius: cornerRadius)
         }
     }
-    
+
     private func createColoredFolderIcon(for url: URL, color: NSColor, size: CGFloat, cornerRadius: CGFloat) -> NSImage {
         let systemIcon = NSWorkspace.shared.icon(forFile: url.path)
         let coloredIcon = NSImage(size: NSSize(width: size, height: size))
-        
+
         coloredIcon.lockFocus()
-        
+
         let rect = NSRect(origin: .zero, size: NSSize(width: size, height: size))
         let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-        
-        // Clip to rounded rect
         path.addClip()
-        
-        // Draw the system folder icon
+
         systemIcon.draw(
             in: rect,
             from: NSRect(origin: .zero, size: systemIcon.size),
             operation: .sourceOver,
             fraction: 1.0
         )
-        
-        // Apply color tint overlay
+
         color.setFill()
         rect.fill(using: .sourceAtop)
-        
+
         coloredIcon.unlockFocus()
-        
+
         return coloredIcon
     }
-    
+
     private func createCustomAssetIcon(assetName: String, size: CGFloat, cornerRadius: CGFloat) -> NSImage {
         guard let assetImage = NSImage(named: assetName) else {
             print("[IconProvider] Asset '\(assetName)' not found - using system icon")
             return NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil) ?? NSImage()
         }
-        
+
         let roundedIcon = NSImage(size: NSSize(width: size, height: size))
-        
+
         roundedIcon.lockFocus()
-        
+
         let rect = NSRect(origin: .zero, size: NSSize(width: size, height: size))
         let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-        
-        // Clip to rounded rect
         path.addClip()
-        
-        // Draw asset image
+
         assetImage.draw(
             in: rect,
             from: NSRect(origin: .zero, size: assetImage.size),
             operation: .sourceOver,
             fraction: 1.0
         )
-        
+
         roundedIcon.unlockFocus()
-        
+
         return roundedIcon
     }
-    
+
     private func createSystemFolderIcon(for url: URL, size: CGFloat, cornerRadius: CGFloat) -> NSImage {
         let folderIcon = NSImage(named: "folder-blue") ?? NSWorkspace.shared.icon(forFile: url.path)
         let roundedIcon = NSImage(size: NSSize(width: size, height: size))
-        
+
         roundedIcon.lockFocus()
-        
+
         let rect = NSRect(origin: .zero, size: NSSize(width: size, height: size))
         let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-        
-        // Clip to rounded rect
         path.addClip()
-        
-        // Draw system icon
+
         folderIcon.draw(
             in: rect,
             from: NSRect(origin: .zero, size: folderIcon.size),
             operation: .sourceOver,
             fraction: 1.0
         )
-        
+
         roundedIcon.unlockFocus()
-        
+
         return roundedIcon
     }
-    
-    // MARK: - Persistence Support (for future database integration)
-    
-    /// Load custom folder colors from database
+
+    // MARK: - Persistence Support
+
     func loadFolderCustomizations(from entries: [(path: String, color: NSColor)]) {
         for entry in entries {
             setFolderColor(entry.color, forPath: entry.path)
         }
         print("[IconProvider] Loaded \(entries.count) custom folder colors")
     }
-    
-    /// Export current folder customizations for database storage
+
     func exportFolderCustomizations() -> [(path: String, colorHex: String)] {
         return pathBasedFolderIcons.compactMap { path, config in
             if case .systemWithColor(let color) = config.type {
@@ -777,19 +546,18 @@ class IconProvider {
             return nil
         }
     }
-    
+
     // MARK: - Database Integration
-    
-    /// Load all folder icon customizations from the database
+
     func loadFolderCustomizationsFromDatabase() {
         let customFolders = DatabaseManager.shared.getFoldersWithCustomIcons()
-        
+
         for folder in customFolders {
             guard let iconName = folder.iconName,
                   let iconColor = folder.iconColor else {
                 continue
             }
-            
+
             setCompositeFolderIcon(
                 baseAsset: folder.baseAsset,
                 symbol: iconName,
@@ -799,11 +567,10 @@ class IconProvider {
                 forPath: folder.path
             )
         }
-        
+
         print("[IconProvider] Loaded \(customFolders.count) custom folder icons from database")
     }
-    
-    /// Save a folder icon customization to the database
+
     func saveFolderIconToDatabase(
         path: String,
         iconName: String?,
@@ -812,7 +579,6 @@ class IconProvider {
         symbolSize: CGFloat = 24.0,
         symbolOffset: CGFloat = -8.0
     ) {
-        // Save to database
         DatabaseManager.shared.setFolderIcon(
             path: path,
             iconName: iconName,
@@ -821,8 +587,7 @@ class IconProvider {
             symbolSize: symbolSize,
             symbolOffset: symbolOffset
         )
-        
-        // Also update in-memory cache
+
         if let iconName = iconName, let iconColor = iconColor {
             setCompositeFolderIcon(
                 baseAsset: baseAsset,
@@ -836,26 +601,19 @@ class IconProvider {
             removeFolderCustomization(forPath: path)
         }
     }
-    
-    /// Remove a folder icon customization from both database and memory
+
     func removeFolderIconFromDatabase(path: String) {
-        // Remove from database
         DatabaseManager.shared.removeFolderIcon(path: path)
-        
-        // Remove from in-memory cache
         removeFolderCustomization(forPath: path)
     }
-    
-    /// Get folder icon from database or generate default
+
     func getFolderIconFromDatabase(for url: URL, size: CGFloat = 64, cornerRadius: CGFloat = 8) -> NSImage {
         let path = url.path
-        
-        // Check if folder has custom icon in database
+
         if let folderEntry = DatabaseManager.shared.getFolder(path: path),
            let iconName = folderEntry.iconName,
            let iconColor = folderEntry.iconColor {
-            
-            // Generate composite icon with database settings
+
             return createCompositeIcon(
                 baseAssetName: folderEntry.baseAsset,
                 symbolName: iconName,
@@ -866,8 +624,7 @@ class IconProvider {
                 symbolOffset: folderEntry.symbolOffset
             )
         }
-        
-        // Fall back to standard folder icon
+
         return getFolderIcon(for: url, size: size, cornerRadius: cornerRadius)
     }
 }
@@ -875,34 +632,32 @@ class IconProvider {
 // MARK: - NSColor Extension for Hex Conversion
 
 extension NSColor {
-    /// Convert NSColor to hex string for database storage
     var hexString: String {
         guard let rgbColor = usingColorSpace(.deviceRGB) else {
             return "#000000"
         }
-        
+
         let r = Int(rgbColor.redComponent * 255)
         let g = Int(rgbColor.greenComponent * 255)
         let b = Int(rgbColor.blueComponent * 255)
-        
+
         return String(format: "#%02X%02X%02X", r, g, b)
     }
-    
-    /// Create NSColor from hex string
+
     convenience init?(hex: String) {
         var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
-        
+
         var rgb: UInt64 = 0
-        
+
         guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else {
             return nil
         }
-        
+
         let r = CGFloat((rgb & 0xFF0000) >> 16) / 255.0
         let g = CGFloat((rgb & 0x00FF00) >> 8) / 255.0
         let b = CGFloat(rgb & 0x0000FF) / 255.0
-        
+
         self.init(red: r, green: g, blue: b, alpha: 1.0)
     }
 }
@@ -910,28 +665,24 @@ extension NSColor {
 // MARK: - NSColor Extension for HSL Adjustment
 
 extension NSColor {
-    /// Adjust the lightness component in HSL color space
-    /// - Parameter delta: Amount to add/subtract from lightness (0-100 scale)
-    /// - Returns: New color with adjusted lightness
     func adjustingLightness(by delta: CGFloat) -> NSColor {
         guard let rgbColor = usingColorSpace(.deviceRGB) else { return self }
-        
+
         let r = rgbColor.redComponent
         let g = rgbColor.greenComponent
         let b = rgbColor.blueComponent
-        
-        // Convert RGB to HSL
+
         let maxC = max(r, g, b)
         let minC = min(r, g, b)
         let l = (maxC + minC) / 2
-        
+
         var h: CGFloat = 0
         var s: CGFloat = 0
-        
+
         if maxC != minC {
             let d = maxC - minC
             s = l > 0.5 ? d / (2 - maxC - minC) : d / (maxC + minC)
-            
+
             switch maxC {
             case r:
                 h = (g - b) / d + (g < b ? 6 : 0)
@@ -944,26 +695,23 @@ extension NSColor {
             }
             h /= 6
         }
-        
-        // Adjust lightness (delta is on 0-100 scale, convert to 0-1)
+
         let newL = max(0, min(1, l + (delta / 100)))
-        
-        // Convert HSL back to RGB
+
         return Self.fromHSL(hue: h, saturation: s, lightness: newL)
     }
-    
-    /// Create color from HSL values (hue: 0-1, saturation: 0-1, lightness: 0-1)
+
     static func fromHSL(hue h: CGFloat, saturation s: CGFloat, lightness l: CGFloat, alpha: CGFloat = 1.0) -> NSColor {
         let c = (1 - abs(2 * l - 1)) * s
         let x = c * (1 - abs((h * 6).truncatingRemainder(dividingBy: 2) - 1))
         let m = l - c / 2
-        
+
         var r: CGFloat = 0
         var g: CGFloat = 0
         var b: CGFloat = 0
-        
+
         let segment = Int(h * 6) % 6
-        
+
         switch segment {
         case 0: r = c; g = x; b = 0
         case 1: r = x; g = c; b = 0
@@ -973,7 +721,7 @@ extension NSColor {
         case 5: r = c; g = 0; b = x
         default: break
         }
-        
+
         return NSColor(red: r + m, green: g + m, blue: b + m, alpha: alpha)
     }
 }

@@ -70,14 +70,6 @@ extension CircularUIManager {
                 print("      Registered '\(provider.providerName)' (providerId: \(provider.providerId)) WITHOUT config")
                 print("      Available configs: \(ringConfiguration.providers.map { $0.providerType }.joined(separator: ", "))")
             }
-            
-            // Store references for specific provider types
-            if let combinedApps = provider as? CombinedAppsProvider {
-                self.combinedAppsProvider = combinedApps
-            }
-            if let favoriteFiles = provider as? FavoriteFilesProvider {
-                self.favoriteFilesProvider = favoriteFiles
-            }
         }
         
         print("   Registered \(providers.count) provider(s)")

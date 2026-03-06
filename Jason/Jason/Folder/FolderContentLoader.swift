@@ -413,8 +413,7 @@ class FolderContentLoader {
             
             guard let itemPath = path else { return nil }
             
-            let hasCustomIcon = !fileExtension.isEmpty &&
-                IconProvider.shared.hasCustomFileIcon(for: fileExtension)
+            let hasCustomIcon = false
             
             let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "heic", "webp"]
             let isImageFile = imageExtensions.contains(fileExtension)
