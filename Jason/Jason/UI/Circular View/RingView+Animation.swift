@@ -25,12 +25,17 @@ extension RingView {
     
     func animateIconsInLinear() {
         // Reset all opacities to 0, scales to starting value, and rotation offsets
+        // Badge opacities are set immediately based on presence — no fade on re-show
         for node in nodes {
             iconOpacities[node.id] = 0
             iconScales[node.id] = animationStartScale
             iconRotationOffsets[node.id] = effectiveRotationOffset
             runningIndicatorOpacities[node.id] = 0
-            badgeOpacities[node.id] = 0
+
+            // Badge: set immediately based on presence, no fade
+            let badge = node.metadata?["badge"] as? String
+            let hasBadge = badge != nil && !badge!.isEmpty
+            badgeOpacities[node.id] = hasBadge ? 1.0 : 0
         }
         
         // Reverse stagger order for counter-clockwise triggers (full circle only)
@@ -65,17 +70,6 @@ extension RingView {
                     }
                 }
             }
-        
-            // Animate badge if present
-            if let metadata = node.metadata,
-               let badge = metadata["badge"] as? String,
-               !badge.isEmpty {
-                DispatchQueue.main.asyncAfter(deadline: .now() + indicatorDelay) {
-                    withAnimation(.easeIn(duration: 0.3)) {
-                        self.badgeOpacities[node.id] = 1.0
-                    }
-                }
-            }
         }
     }
     
@@ -96,33 +90,30 @@ extension RingView {
         }
         
         // Reset all opacities to 0, scales to starting value, and rotation offsets
-        // Apply symmetric rotation: left of center = +10°, right of center = -10°
+        // Badge opacities are set immediately based on presence — no fade on re-show
         for (index, node) in nodes.enumerated() {
             iconOpacities[node.id] = 0
             iconScales[node.id] = animationStartScale
             runningIndicatorOpacities[node.id] = 0
-            badgeOpacities[node.id] = 0
+
+            // Badge: set immediately based on presence, no fade
+            let badge = node.metadata?["badge"] as? String
+            let hasBadge = badge != nil && !badge!.isEmpty
+            badgeOpacities[node.id] = hasBadge ? 1.0 : 0
             
             // Determine rotation offset based on position relative to center
-            // For clockwise trigger: left=+, right=- (converging inward)
-            // For counter-clockwise trigger: left=-, right=+ (diverging outward)
             let rotationOffset: Double
             let baseOffset = abs(effectiveRotationOffset)
             let isCounterClockwise = triggerDirection == .counterClockwise && sliceConfig.isFullCircle
 
-
             if Double(index) < centerPoint {
-                // Left of center
                 rotationOffset = isCounterClockwise ? -baseOffset : baseOffset
             } else if Double(index) > centerPoint {
-                // Right of center
                 rotationOffset = isCounterClockwise ? baseOffset : -baseOffset
             } else {
-                // Exactly at center (odd count only): no rotation
                 rotationOffset = 0
             }
             iconRotationOffsets[node.id] = rotationOffset
-
         }
         
         // Build animation groups: items at same distance from center animate together
@@ -131,12 +122,10 @@ extension RingView {
         
         // Start with center item(s)
         if totalCount % 2 == 1 {
-            // Odd count: one center item
             let centerIndex = totalCount / 2
             animationGroups.append([centerIndex])
             processed.insert(centerIndex)
         } else {
-            // Even count: two center items
             let centerLeft = (totalCount / 2) - 1
             let centerRight = totalCount / 2
             animationGroups.append([centerLeft, centerRight])
@@ -150,7 +139,6 @@ extension RingView {
             var group: [Int] = []
             
             if totalCount % 2 == 1 {
-                // Odd count: expand from single center
                 let centerIndex = totalCount / 2
                 let leftIndex = centerIndex - distance
                 let rightIndex = centerIndex + distance
@@ -164,7 +152,6 @@ extension RingView {
                     processed.insert(rightIndex)
                 }
             } else {
-                // Even count: expand from the gap between center items
                 let centerLeft = (totalCount / 2) - 1
                 let leftIndex = centerLeft - distance
                 let rightIndex = centerLeft + 1 + distance
@@ -203,27 +190,18 @@ extension RingView {
             }
         }
         
-        // Animate running indicators and badges after all icons are done
+        // Animate running indicators after all icons are done
         let lastGroupDelay = animationInitialDelay + (Double(animationGroups.count - 1) * effectiveStaggerDelay)
         let indicatorDelay = lastGroupDelay + animationDuration
         
         for node in nodes {
             guard let metadata = node.metadata else { continue }
             
-            // Check if this node is a running app
+            // Running indicator
             if let isRunning = metadata["isRunning"] as? Bool, isRunning {
                 DispatchQueue.main.asyncAfter(deadline: .now() + indicatorDelay) {
                     withAnimation(.easeIn(duration: 0.3)) {
                         self.runningIndicatorOpacities[node.id] = 1.0
-                    }
-                }
-            }
-            
-            // Animate badge if present
-            if let badge = metadata["badge"] as? String, !badge.isEmpty {
-                DispatchQueue.main.asyncAfter(deadline: .now() + indicatorDelay) {
-                    withAnimation(.easeIn(duration: 0.3)) {
-                        self.badgeOpacities[node.id] = 1.0
                     }
                 }
             }
@@ -267,14 +245,12 @@ extension RingView {
         
         // 2. PERSISTING ICONS: Ensure visible, no animation
         for id in persistingIds {
-            // Just make sure they're visible (in case they weren't before)
             if iconOpacities[id] != 1.0 {
                 iconOpacities[id] = 1.0
                 iconScales[id] = 1.0
                 iconRotationOffsets[id] = 0
             }
             
-            // Update running indicator and badge if metadata changed
             if let node = newNodes.first(where: { $0.id == id }),
                let metadata = node.metadata {
                 
@@ -304,22 +280,18 @@ extension RingView {
         
         // 3. ADDED ICONS: Fade in
         for id in addedIds {
-            
-            // Start invisible
             iconOpacities[id] = 0
             iconScales[id] = animationStartScale
             iconRotationOffsets[id] = 0
             runningIndicatorOpacities[id] = 0
             badgeOpacities[id] = 0
             
-            // Fade in with slight delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 withAnimation(.easeOut(duration: 0.25)) {
                     self.iconOpacities[id] = 1.0
                     self.iconScales[id] = 1.0
                 }
                 
-                // Check if should show running indicator and badge
                 if let node = newNodes.first(where: { $0.id == id }),
                    let metadata = node.metadata {
                     
@@ -345,7 +317,6 @@ extension RingView {
         }
         
         // 4. SAFETY NET: Ensure ALL current nodes have animation states
-        // This catches any nodes that might have been missed (e.g., due to truncation edge cases)
         var safetyNetTriggered = false
         for node in newNodes {
             if iconOpacities[node.id] == nil {
@@ -354,27 +325,23 @@ extension RingView {
                 iconScales[node.id] = animationStartScale
                 iconRotationOffsets[node.id] = 0
                 runningIndicatorOpacities[node.id] = 0
-                badgeOpacities[node.id] = 0
+
+                // Badge: set immediately based on presence
+                if badgeOpacities[node.id] == nil {
+                    let badge = node.metadata?["badge"] as? String
+                    badgeOpacities[node.id] = (badge != nil && !badge!.isEmpty) ? 1.0 : 0
+                }
                 
-                // Immediately fade in (this shouldn't normally happen)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
                     withAnimation(.easeOut(duration: 0.2)) {
                         self.iconOpacities[node.id] = 1.0
                         self.iconScales[node.id] = 1.0
                     }
                     
-                    // Running indicator if needed
-                    if let metadata = node.metadata,
-                       let isRunning = metadata["isRunning"] as? Bool,
-                       isRunning {
-                        self.runningIndicatorOpacities[node.id] = 1.0
-                    }
-                    
-                    // Badge if needed
-                    if let metadata = node.metadata,
-                       let badge = metadata["badge"] as? String,
-                       !badge.isEmpty {
-                        self.badgeOpacities[node.id] = 1.0
+                    if let metadata = node.metadata {
+                        if let isRunning = metadata["isRunning"] as? Bool, isRunning {
+                            self.runningIndicatorOpacities[node.id] = 1.0
+                        }
                     }
                 }
             }
