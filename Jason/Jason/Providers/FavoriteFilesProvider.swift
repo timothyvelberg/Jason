@@ -578,7 +578,6 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 type: .folder,
                 icon: entry.icon,
                 children: nil,  // Will be loaded dynamically
-//                childDisplayMode: .panel,
                 contextActions: contextActions,
                 preferredLayout: .partialSlice,
                 previewURL: entry.filePath.isEmpty ? nil : folderURL,
@@ -592,13 +591,13 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                     allowedOperations: [.move, .copy],
                     clickBehavior: .navigate,
                     onDragStarted: {
-                        print("📦 Started dragging folder: \(entry.displayName)")
+                        print("Started dragging folder: \(entry.displayName)")
                     },
                     onDragCompleted: { success in
                         if success {
-                            print("✅ Successfully dragged folder: \(entry.displayName)")
+                            print("Successfully dragged folder: \(entry.displayName)")
                         } else {
-                            print("❌ Drag cancelled: \(entry.displayName)")
+                            print("Drag cancelled: \(entry.displayName)")
                         }
                     }
                 ))),
@@ -619,6 +618,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 preferredLayout: .partialSlice,
                 previewURL: entry.filePath.isEmpty ? nil : URL(fileURLWithPath: entry.filePath),
                 showLabel: true,
+                slicePositioning: .center,
                 metadata: metadata,
                 onLeftClick: ModifierAwareInteraction(base: entry.filePath.isEmpty ? .doNothing : .drag(DragProvider(
                     fileURLs: [URL(fileURLWithPath: entry.filePath)],

@@ -212,11 +212,7 @@ class CircularUIInstanceManager: ObservableObject {
         
         // Only create instances for configs that don't already have one
         for config in activeConfigs {
-            if instances[config.id] == nil {
-                createOrUpdateInstance(for: config)
-            } else {
-                print("[InstanceManager] Instance for '\(config.name)' already exists — skipping")
-            }
+            createOrUpdateInstance(for: config)
         }
         
         print("   Sync complete: \(instances.count) active instance(s)")
