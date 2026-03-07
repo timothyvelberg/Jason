@@ -14,6 +14,7 @@ struct RingView: View {
     let nodes: [FunctionNode]
     let selectedIndex: Int?
     let shouldDimOpacity: Bool
+    let isLabelActive: Bool
     let sliceConfig: PieSliceConfig
     let iconSize: CGFloat
     let triggerDirection: RotationDirection?
@@ -251,7 +252,7 @@ struct RingView: View {
         .overlay(
             Group {
                 if let selectedIndex = selectedIndex,
-                   !shouldDimOpacity {
+                   !shouldDimOpacity && isLabelActive {
                     let node = nodes[selectedIndex]
                     if node.showLabel {
                         TitleTextView(

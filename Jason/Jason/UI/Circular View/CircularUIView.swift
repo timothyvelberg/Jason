@@ -66,6 +66,7 @@ struct CircularUIView: View {
                             nodes: ring.nodes,
                             selectedIndex: ring.selectedIndex,
                             shouldDimOpacity: shouldDimRing(ring.level),
+                            isLabelActive: !listPanelManager.isVisible,
                             sliceConfig: ring.sliceConfig,
                             iconSize: ring.iconSize,
                             triggerDirection: circularUI.triggerDirection
