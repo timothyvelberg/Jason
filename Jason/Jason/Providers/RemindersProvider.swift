@@ -17,7 +17,6 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
     var providerIcon: NSImage { NSImage(systemSymbolName: "checklist", accessibilityDescription: "Todo List") ?? NSImage() }
     var defaultTypingMode: TypingMode { .input }
     var panelConfig: PanelConfig { PanelConfig(lineLimit: 3, panelWidth: 320) }
-    var onItemsChanged: (() -> Void)?
     
     // MARK: - Data
     
@@ -67,7 +66,7 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
             print("[RemindersProvider] No reminder lists enabled")
             DispatchQueue.main.async {
                 self.reminders = []
-                self.onItemsChanged?()
+                NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
             }
             return
         }
@@ -105,7 +104,8 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
                 DispatchQueue.main.async {
                     self.reminders = combined
                     print("[RemindersProvider] Loaded \(combined.count) incomplete reminders")
-                    self.onItemsChanged?()
+                    NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
+
                 }
             }
         }
@@ -306,7 +306,7 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
             try eventStore.save(reminder, commit: true)
             reminders.insert(reminder, at: 0)
             print("[RemindersProvider] Added: '\(cleanTitle)' to list '\(reminder.calendar.title)'")
-            onItemsChanged?()
+            NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
         } catch {
             print("[RemindersProvider] Failed to save reminder: \(error.localizedDescription)")
         }
@@ -387,7 +387,8 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
                 reminders.removeAll { $0.calendarItemIdentifier == id }
             }
             
-            onItemsChanged?()
+            NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
+
         } catch {
             reminder.isCompleted.toggle()
             print("[RemindersProvider] ❌ Failed to toggle: \(error.localizedDescription)")
@@ -405,7 +406,7 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
             try eventStore.remove(reminder, commit: true)
             reminders.remove(at: index)
             print("[RemindersProvider] Deleted: '\(title)' (\(reminders.count) remaining)")
-            onItemsChanged?()
+            NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
         } catch {
             print("[RemindersProvider] Failed to delete: \(error.localizedDescription)")
         }
@@ -443,7 +444,6 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
         print("[RemindersProvider] teardown()")
         NotificationCenter.default.removeObserver(self)
         reminders.removeAll()
-        onItemsChanged = nil
         print("[RemindersProvider] teardown complete")
     }
     

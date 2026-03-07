@@ -54,8 +54,8 @@ protocol FunctionProvider {
 /// Allows generic wiring of onAddItem/onItemsChanged without provider-specific code.
 protocol MutableListProvider: FunctionProvider {
     func addItem(title: String)
-    var onItemsChanged: (() -> Void)? { get set }
 }
+
 
 // MARK: - Default Implementations
 

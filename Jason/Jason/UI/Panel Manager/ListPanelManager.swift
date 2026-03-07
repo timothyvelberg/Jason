@@ -283,19 +283,9 @@ class ListPanelManager: ObservableObject {
                    let provider = self.findProvider?(providerId) as? any MutableListProvider else { return }
              
              provider.addItem(title: text)
-             self.refreshPanelItems(at: 0)
              
              if !modifiers.contains(.command) {
                  handler?.hideUI?()
-             }
-         }
-         
-         // Wire items changed notifications for all mutable providers
-         for provider in providers {
-             if var mutableProvider = provider as? any MutableListProvider {
-                 mutableProvider.onItemsChanged = { [weak self] in
-                     self?.refreshPanelItems(at: 0)
-                 }
              }
          }
     }
