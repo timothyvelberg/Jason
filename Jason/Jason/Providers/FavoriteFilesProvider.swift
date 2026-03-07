@@ -396,13 +396,13 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         
         // Build flat list with section headers
         var fileNodes: [FunctionNode] = []
-        for group in groupedEntries {
+        for (index, group) in groupedEntries.enumerated() {
             // Only add header if there's more than one group
             if groupedEntries.count > 1 {
                 fileNodes.append(FunctionNode(
                     id: "section-\(group.directory)",
-                    name: group.directory,
-                    type: .sectionHeader(style: .default),
+                    name: URL(fileURLWithPath: group.directory).lastPathComponent,
+                    type: .sectionHeader(style: .subtle.withTopLine(index > 0)),
                     icon: NSImage(),
                     providerId: providerId
                 ))

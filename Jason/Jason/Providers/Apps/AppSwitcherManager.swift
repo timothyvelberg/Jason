@@ -440,10 +440,20 @@ extension AppSwitcherManager {
     
     /// Quit an application
     func quitApp(_ app: NSRunningApplication) {
-        // Ignore focus changes for 500ms to prevent UI from hiding when app window closes
-        activeCircularUIManager?.ignoreFocusChangesTemporarily(duration: 0.5)
+        activeCircularUIManager?.ignoreFocusChangesTemporarily(duration: 0.3)
+        
+        let uiManager = activeCircularUIManager
         
         app.terminate()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard !app.isTerminated else {
+                print("[quitApp] App terminated cleanly: \(app.localizedName ?? "Unknown")")
+                return
+            }
+            print("[quitApp] App still alive — blocked on save dialog, activating: \(app.localizedName ?? "Unknown")")
+            uiManager?.hideAndSwitchTo(app: app)
+        }
     }
     
     /// Hide an application
