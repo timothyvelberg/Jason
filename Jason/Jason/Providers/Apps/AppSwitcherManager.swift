@@ -83,7 +83,7 @@ class AppSwitcherManager: ObservableObject {
         // Find the currently active app and put it at the top of MRU history
         if let activeApp = NSWorkspace.shared.frontmostApplication,
            activeApp.bundleIdentifier != Bundle.main.bundleIdentifier {
-            print("🎯 Initializing MRU with active app: \(activeApp.localizedName ?? "Unknown")")
+            print("Initializing MRU with active app: \(activeApp.localizedName ?? "Unknown")")
             recordAppUsage(activeApp)
         }
     }

@@ -93,7 +93,7 @@ class MouseTracker {
     func resumeTracking() {
         isPausedUntilMovement = false
         lastMouseLocation = NSEvent.mouseLocation
-        print("[MouseTracker] Resumed tracking")
+        print("▶️ [MouseTracker] Resumed tracking")
     }
 
     private func trackMousePosition(distance: CGFloat) {
@@ -327,6 +327,7 @@ class MouseTracker {
                                 }
                                 
                                 // Default: expand as ring
+                                onReturnedInsideBoundary?()
                                 functionManager.expandCategory(ringLevel: activeRingLevel, index: pieIndex)
                                 lastFunctionIndex = pieIndex
                                 lastRingLevel = activeRingLevel
