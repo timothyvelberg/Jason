@@ -161,8 +161,6 @@ extension FunctionManager {
                     collapseToRing(level: level)
                 }
                 
-                provider.refresh()
-                
                 if level == 0 {
                     updateRing0(provider: provider, providerId: providerId)
                 } else {
