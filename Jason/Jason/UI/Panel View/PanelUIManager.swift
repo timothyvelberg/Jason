@@ -161,6 +161,9 @@ class PanelUIManager: ObservableObject, UIManager {
             print("   Saved previous app: \(prevApp.localizedName ?? "Unknown")")
         }
         
+        AppSwitcherManager.shared.activeUIManager = self
+        print("[PanelUIManager-\(configId)] Registered as active UIManager")
+        
         // Load items from providers
         let items = loadProviderItems()
         
@@ -255,6 +258,10 @@ class PanelUIManager: ObservableObject, UIManager {
             print("   Skipping restore - intentionally switching")
         }
         
+        if AppSwitcherManager.shared.activeUIManager === self {
+            AppSwitcherManager.shared.activeUIManager = nil
+        }
+        
         // Reset state
         inputCoordinator?.reset()
         previousApp = nil
@@ -265,6 +272,20 @@ class PanelUIManager: ObservableObject, UIManager {
     
     func ignoreFocusChangesTemporarily(duration: TimeInterval) {
         overlayWindow?.ignoreFocusChangesTemporarily(duration: duration)
+    }
+    
+    func hideAndSwitchTo(app: NSRunningApplication) {
+        isIntentionallySwitching = true
+        
+        stopPanelMouseMonitor()
+        gestureManager?.stopMonitoring()
+        
+        isVisible = false
+        overlayWindow?.hideOverlay()
+        listPanelManager?.hide()
+        
+        print("[PanelUIManager-\(configId)] Switching to: \(app.localizedName ?? "Unknown")")
+        app.activate()
     }
     
     // MARK: - Provider Setup

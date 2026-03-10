@@ -218,8 +218,7 @@ struct EditRingView: View {
     @State private var centerHoleRadius: String = "56"
     @State private var iconSize: String = "32"
     @State private var startAngle: Double = 0.0
-    @State private var isActive: Bool = true
-    @State private var useAsPanel: Bool = false
+    @State private var panelProviderType: String? = nil
     
     // Provider selection - ordered array
     @State private var providers: [ProviderConfig] = []
@@ -271,13 +270,6 @@ struct EditRingView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             TextField("Ring Name", text: $name)
                                 .textFieldStyle(.roundedBorder)
-                            
-                            Toggle("Active on Launch", isOn: $isActive)
-                                .help("New rings are active by default.")
-                                .disabled(true)
-                            
-                            Toggle("Use as Panel", isOn: $useAsPanel)
-                                .help("Present as a standalone panel instead of a circular ring.")
                         }
                         .padding(12)
                     }
@@ -354,7 +346,10 @@ struct EditRingView: View {
                                 .foregroundColor(.secondary.opacity(0.8))   
                             List {
                                 ForEach(providers.indices, id: \.self) { index in
-                                    ProviderRowReorderable(provider: $providers[index])
+                                    ProviderRowReorderable(
+                                        provider: $providers[index],
+                                        panelProviderType: $panelProviderType
+                                    )
                                 }
                                 .onMove(perform: moveProvider)
                             }
@@ -432,8 +427,6 @@ struct EditRingView: View {
             centerHoleRadius = String(Int(config.centerHoleRadius))
             iconSize = String(Int(config.iconSize))
             startAngle = config.startAngle
-            isActive = config.isActive
-            useAsPanel = config.presentationMode == .panel
             
             // Load triggers from array
             triggers = config.triggers.map { TriggerFormConfig(from: $0) }
@@ -464,10 +457,16 @@ struct EditRingView: View {
             enabledProviders.sort { $0.1 < $1.1 }
             providers = enabledProviders.map { $0.0 } + disabledProviders
             
+            // Set panel provider if this ring is in panel mode
+            if config.presentationMode == .panel {
+                panelProviderType = providers.first(where: { $0.isEnabled })?.type
+            }
+            
         } else {
             // New ring - use defaults
             providers = Self.defaultProviders
-            triggers = []  // Start with no triggers
+            triggers = []
+            panelProviderType = nil
         }
     }
     
@@ -553,7 +552,7 @@ struct EditRingView: View {
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
                     startAngle: startAngle,
-                    presentationMode: useAsPanel ? .panel : .ring,
+                    presentationMode: panelProviderType != nil ? .panel : .ring,
                     triggers: triggerData,
                     providers: providerData
                     
@@ -576,7 +575,7 @@ struct EditRingView: View {
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
                     startAngle: startAngle,
-                    presentationMode: useAsPanel ? .panel : .ring
+                    presentationMode: panelProviderType != nil ? .panel : .ring
                 )
                 
                 // Step 2: Remove all existing triggers
@@ -637,26 +636,33 @@ struct EditRingView: View {
 
 struct ProviderRowReorderable: View {
     @Binding var provider: ProviderConfig
+    @Binding var panelProviderType: String?
+    
+    private var isPanel: Bool {
+        panelProviderType == provider.type
+    }
+    
+    private var isLocked: Bool {
+        panelProviderType != nil && panelProviderType != provider.type
+    }
     
     var body: some View {
         HStack(spacing: 12) {
-            // Drag indicator
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 14))
                 .foregroundColor(.secondary.opacity(0.5))
                 .help("Drag to reorder")
             
-            // Enable toggle
             Toggle("", isOn: $provider.isEnabled)
                 .labelsHidden()
                 .toggleStyle(.checkbox)
+                .disabled(isLocked || isPanel)
             
-            // Provider info
             VStack(alignment: .leading, spacing: 2) {
                 Text(provider.name)
                     .font(.body)
                     .fontWeight(.medium)
-                    .foregroundColor(provider.isEnabled ? .primary : .secondary)
+                    .foregroundColor((provider.isEnabled && !isLocked) ? .primary : .secondary)
                 
                 Text(provider.description)
                     .font(.caption)
@@ -665,8 +671,30 @@ struct ProviderRowReorderable: View {
             
             Spacer()
             
-            // Display mode picker (only when enabled)
-            if provider.isEnabled {
+            if provider.isEnabled && !isLocked {
+                Button(action: {
+                    if isPanel {
+                        panelProviderType = nil
+                    } else {
+                        panelProviderType = provider.type
+                    }
+                }) {
+                    Text("Use as Panel")
+                        .font(.caption)
+                        .fontWeight(isPanel ? .semibold : .regular)
+                        .foregroundColor(isPanel ? .white : .secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(isPanel ? Color.blue : Color.gray.opacity(0.15))
+                        )
+                }
+                .buttonStyle(.plain)
+                .help(isPanel ? "Tap to remove panel mode" : "Use this provider as a standalone panel")
+            }
+            
+            if provider.isEnabled && !isLocked && !isPanel {
                 Picker("", selection: $provider.displayMode) {
                     ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
                         Text(mode.displayName).tag(mode)
@@ -680,8 +708,13 @@ struct ProviderRowReorderable: View {
         .padding(.horizontal, 8)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(provider.isEnabled ? Color.blue.opacity(0.05) : Color.clear)
+                .fill(
+                    isPanel ? Color.blue.opacity(0.08) :
+                    isLocked ? Color.clear :
+                    provider.isEnabled ? Color.blue.opacity(0.05) : Color.clear
+                )
         )
+        .opacity(isLocked ? 0.4 : 1.0)
     }
 }
 

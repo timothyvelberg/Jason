@@ -36,6 +36,7 @@ extension CircularUIManager {
         // Register as the active CircularUIManager
         print("[CircularUIManager-\(configId)] Registering as active instance with AppSwitcherManager")
         AppSwitcherManager.shared.activeCircularUIManager = self
+        AppSwitcherManager.shared.activeUIManager = self
         
         // Save the currently active app BEFORE we show our UI
         previousApp = NSWorkspace.shared.frontmostApplication
@@ -102,6 +103,11 @@ extension CircularUIManager {
             AppSwitcherManager.shared.activeCircularUIManager = nil
         }
         
+        // Unregister as the active UIManager
+        if AppSwitcherManager.shared.activeUIManager === self {
+            AppSwitcherManager.shared.activeUIManager = nil
+        }
+        
         // Only restore previous app if we're NOT intentionally switching
         if !isIntentionallySwitching {
             if let prevApp = previousApp, prevApp.isTerminated == false {
@@ -154,13 +160,11 @@ extension CircularUIManager {
     
     /// Execute the hovered item when releasing hold mode (if auto-execute is enabled)
     func executeHoveredItemIfInHoldMode() {
-        // Only execute in hold mode AND if auto-execute is enabled
         guard isInHoldMode else {
             print("[HoldMode] Not in hold mode - skipping auto-execute")
             return
         }
         
-        // Check if auto-execute is enabled for the active trigger
         let autoExecuteEnabled = activeTrigger?.autoExecuteOnRelease ?? true
         guard autoExecuteEnabled else {
             print("[HoldMode] Auto-execute disabled for this trigger - skipping")
@@ -172,7 +176,6 @@ extension CircularUIManager {
             return
         }
         
-        // Get the active ring
         let activeRingLevel = functionManager.activeRingLevel
         guard activeRingLevel < functionManager.rings.count else {
             print("[HoldMode] Invalid ring level: \(activeRingLevel)")
@@ -181,7 +184,6 @@ extension CircularUIManager {
         
         let ring = functionManager.rings[activeRingLevel]
         
-        // Check if there's a hovered item
         guard let hoveredIndex = ring.hoveredIndex else {
             print("[HoldMode] No item currently hovered - skipping auto-execute")
             return
@@ -196,16 +198,13 @@ extension CircularUIManager {
         
         print("[HoldMode] Hold released - auto-executing: \(selectedNode.name)")
         
-        // Execute the item's left click action (resolve with no modifiers since key/button was just released)
         let behavior = selectedNode.onLeftClick.resolve(with: [])
         
         switch behavior {
         case .execute(let action):
             action()
-            // Note: hide() will be called after this method returns
         case .executeKeepOpen(let action):
             action()
-            // Note: hide() will be called after this method returns (we don't honor keepOpen in hold mode)
         default:
             print("[HoldMode] Selected node doesn't have execute action")
         }
@@ -216,7 +215,6 @@ extension CircularUIManager {
     func handlePreviewRequest() {
         guard let functionManager = functionManager else { return }
         
-        // If QuickLook is already showing, just close it
         if QuickLookManager.shared.isShowing {
             print("[Preview] QuickLook is already open - closing it")
             QuickLookManager.shared.hidePreview()
@@ -241,7 +239,6 @@ extension CircularUIManager {
         
         let node = functionManager.rings[activeRingLevel].nodes[hoveredIndex]
         
-        // Check if node is previewable
         guard node.isPreviewable, let previewURL = node.previewURL else {
             print("Node '\(node.name)' is not previewable")
             return

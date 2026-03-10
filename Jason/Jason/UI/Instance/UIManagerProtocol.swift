@@ -39,6 +39,8 @@ protocol UIManager: AnyObject {
     func ignoreFocusChangesTemporarily(duration: TimeInterval)
     /// Clean up all resources before removal
     func teardown()
+    
+    func hideAndSwitchTo(app: NSRunningApplication)
 }
 
 // MARK: - Default Implementations
@@ -55,4 +57,5 @@ extension UIManager {
     func setup() {
         setup(injectedProviders: nil)
     }
+    
 }

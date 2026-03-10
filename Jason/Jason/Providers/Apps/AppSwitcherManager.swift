@@ -30,6 +30,8 @@ class AppSwitcherManager: ObservableObject {
     /// This gets set when a CircularUIManager shows, and unset when it hides
     weak var activeCircularUIManager: CircularUIManager?
     
+    weak var activeUIManager: (any UIManager)?
+    
     private var refreshTimer: Timer?
     internal var isCtrlPressed: Bool = false
     
@@ -384,7 +386,7 @@ class AppSwitcherManager: ObservableObject {
         
         // Hide the circular UI and activate the selected app
         // This uses the special hideAndSwitchTo which doesn't restore previous app
-        activeCircularUIManager?.hideAndSwitchTo(app: app)
+        activeUIManager?.hideAndSwitchTo(app: app)
         
         print("Successfully switched to \(app.localizedName ?? "Unknown")")
         
