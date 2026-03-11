@@ -26,6 +26,16 @@ protocol FunctionProvider {
     /// Panel layout configuration (dimensions, line limit, etc.)
     var panelConfig: PanelConfig { get }
     
+    /// Protocol — default returns [] so existing providers need no changes
+    var providerSettings: [ProviderSettingDefinition] { get }
+
+    /// Computed helper — UI uses this to decide whether to show the gear icon
+    var hasProviderSettings: Bool { get }
+
+    /// Reading helper — providers call this in their load methods
+    /// Falls back to defaultValue if no DB row exists yet
+    func currentSettingValue(for key: String) -> String
+    
     /// Generate the function tree for this provider
     /// Returns an array of root-level FunctionNodes
     func provideFunctions() -> [FunctionNode]
@@ -46,6 +56,17 @@ protocol FunctionProvider {
     func teardown()
 }
 
+enum ProviderSettingType {
+    case boolean
+    case options([String])  // e.g. ["1","2","3","4","5"]
+}
+
+struct ProviderSettingDefinition {
+    let key: String          // e.g. "favorites_only"
+    let label: String        // e.g. "Show only favorited apps"
+    let type: ProviderSettingType
+    let defaultValue: String // e.g. "false" or "1"
+}
 
 
 // MARK: - Mutable List Provider Protocol
@@ -71,6 +92,20 @@ extension FunctionProvider {
         return []
     }
     
+    // Default: no settings — existing providers need no changes
+    var providerSettings: [ProviderSettingDefinition] { [] }
+
+    // Derived from providerSettings — no override needed
+    var hasProviderSettings: Bool { !providerSettings.isEmpty }
+
+    // Looks up persisted value, falls back to the definition's default
+    func currentSettingValue(for key: String) -> String {
+        guard let definition = providerSettings.first(where: { $0.key == key }) else {
+            return ""
+        }
+        return DatabaseManager.shared.loadProviderSetting(providerId: providerId, key: key)
+            ?? definition.defaultValue
+    }
     
     // Default clearCache does nothing - providers override if they have caches
     func clearCache() {

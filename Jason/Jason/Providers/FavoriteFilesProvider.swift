@@ -26,6 +26,17 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         return NSImage(named: "parent-files") ?? NSImage()
     }
     
+    var providerSettings: [ProviderSettingDefinition] {
+        [
+            ProviderSettingDefinition(
+                key: "dynamic_file_count",
+                label: "Files per dynamic rule",
+                type: .options(["1", "2", "3", "4", "5"]),
+                defaultValue: "1"
+            )
+        ]
+    }
+    
     // MARK: - Properties
     
     weak var circularUIManager: CircularUIManager?
@@ -175,6 +186,10 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         print("[FavoriteFiles] Total files: \(fileEntries.count)")
     }
     
+    private var resolvedDynamicFileCount: Int {
+        Int(currentSettingValue(for: "dynamic_file_count")) ?? 1
+    }
+    
     // MARK: - Dynamic File Resolution
     
     private func resolveDynamicFile(_ dynamic: FavoriteDynamicFileEntry) -> [String] {
@@ -244,7 +259,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         
         // Apply burst detection for time-based sorts
         let timeInfo = temporalInfo(for: dynamic.sortOrder)
-
+        
         if timeInfo.isTemporal, let keyPath = timeInfo.dateKeyPath {
             let itemsWithDates: [(path: String, date: Date)] = items.map { item in
                 (path: item.path, date: item[keyPath: keyPath])
@@ -256,14 +271,17 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             guard !existingPaths.isEmpty else { return nil }
             
             print("[FavoriteFiles] Cache burst: \(existingPaths.count) files for '\(dynamic.displayName)'")
-            return existingPaths
+            return Array(existingPaths.prefix(resolvedDynamicFileCount))
         } else {
             // Non-temporal sort — just the top item
             guard let first = items.first, FileManager.default.fileExists(atPath: first.path) else {
                 return nil
             }
-            return [first.path]
-        }    }
+            return Array(items.prefix(resolvedDynamicFileCount).compactMap {
+                FileManager.default.fileExists(atPath: $0.path) ? $0.path : nil
+            })
+        }
+    }
     
     /// Resolve dynamic file by scanning filesystem (fallback)
     private func resolveDynamicFileFromFilesystem(_ dynamic: FavoriteDynamicFileEntry) -> [String] {
@@ -335,9 +353,9 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             
             let burstPaths = detectBurst(from: itemsWithDates)
             print("[FavoriteFiles] Filesystem burst: \(burstPaths.count) files for '\(dynamic.displayName)'")
-            return burstPaths
+            return Array(burstPaths.prefix(resolvedDynamicFileCount))
         } else {
-            return sortedItems.prefix(1).map { $0.path }
+            return sortedItems.prefix(resolvedDynamicFileCount).map { $0.path }
         }
     }
     

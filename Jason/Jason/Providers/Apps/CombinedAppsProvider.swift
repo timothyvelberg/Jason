@@ -25,6 +25,17 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         return NSImage(named: "parent-apps") ?? NSImage()
     }
     
+    var providerSettings: [ProviderSettingDefinition] {
+        [
+            ProviderSettingDefinition(
+                key: "favorites_only",
+                label: "Show only favorited apps",
+                type: .boolean,
+                defaultValue: "false"
+            )
+        ]
+    }
+    
     // MARK: - Stable Display Order
     
     /// Tracks the stable display order of apps by bundle ID
@@ -92,23 +103,25 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         let runningBundleIds = Set(runningAppsMap.keys)
         
         // 3. Calculate valid bundle IDs (should be displayed)
-        // Valid = is favorite OR is running
-        let validBundleIds = favoriteBundleIds.union(runningBundleIds)
+        let favoritesOnly = currentSettingValue(for: "favorites_only") == "true"
+        let validBundleIds = favoritesOnly ? favoriteBundleIds : favoriteBundleIds.union(runningBundleIds)
         
         // 4. Update display order
         if displayedBundleIds.isEmpty {
             // First load: favorites first (in db order), then running non-favorites (alphabetically)
             displayedBundleIds = currentFavoritesOrder
             
-            let nonFavoriteRunning = runningApps
-                .filter { app in
-                    guard let bundleId = app.bundleIdentifier else { return false }
-                    return !favoriteBundleIds.contains(bundleId)
-                }
-                .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }
-                .compactMap { $0.bundleIdentifier }
-            
-            displayedBundleIds.append(contentsOf: nonFavoriteRunning)
+            if !favoritesOnly {
+                let nonFavoriteRunning = runningApps
+                    .filter { app in
+                        guard let bundleId = app.bundleIdentifier else { return false }
+                        return !favoriteBundleIds.contains(bundleId)
+                    }
+                    .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }
+                    .compactMap { $0.bundleIdentifier }
+
+                displayedBundleIds.append(contentsOf: nonFavoriteRunning)
+            }
         } else {
             // Subsequent load: maintain order, remove invalid, append new
             
@@ -274,6 +287,38 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     // MARK: - FunctionProvider Protocol
     
     func provideFunctions() -> [FunctionNode] {
+        if appEntries.isEmpty {
+            return [
+                FunctionNode(
+                    id: providerId,
+                    name: providerName,
+                    type: .category,
+                    icon: providerIcon,
+                    children: [
+                        FunctionNode(
+                            id: "combined-apps-empty",
+                            name: "No Apps",
+                            type: .action,
+                            icon: NSImage(systemSymbolName: "app.dashed", accessibilityDescription: nil) ?? NSImage(),
+                            preferredLayout: .partialSlice,
+                            showLabel: true,
+                            slicePositioning: .center,
+                            providerId: providerId,
+                            onLeftClick: ModifierAwareInteraction(base: .doNothing),
+                            onRightClick: ModifierAwareInteraction(base: .doNothing),
+                            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+                        )
+                    ],
+                    preferredLayout: .partialSlice,
+                    slicePositioning: .center,
+                    providerId: providerId,
+                    onLeftClick: ModifierAwareInteraction(base: .expand),
+                    onRightClick: ModifierAwareInteraction(base: .doNothing),
+                    onMiddleClick: ModifierAwareInteraction(base: .expand),
+                    onBoundaryCross: ModifierAwareInteraction(base: .expand)
+                )
+            ]
+        }
         // Create nodes for each app
         let appNodes: [FunctionNode] = appEntries.map { entry in
             // Get AppSwitcherManager for context actions

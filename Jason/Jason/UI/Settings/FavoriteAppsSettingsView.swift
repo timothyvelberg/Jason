@@ -12,6 +12,7 @@ struct FavoriteAppsSettingsView: View {
     @State private var favoriteApps: [FavoriteAppEntry] = []
     @State private var showingAppPicker = false
     @State private var editingApp: FavoriteAppEntry?
+    @State private var showingProviderSettings = false
     
     var body: some View {
         SettingsListShell(
@@ -20,10 +21,13 @@ struct FavoriteAppsSettingsView: View {
             emptyTitle: "No favourite apps yet",
             emptySubtitle: "Click the + button below to add your first favourite app",
             primaryLabel: "Add App",
+            primaryIcon: "plus.circle.fill",
             primaryAction: { showingAppPicker = true },
             secondaryLabel: nil,
             secondaryAction: nil,
-            isEmpty: favoriteApps.isEmpty
+            permission: nil,
+            isEmpty: favoriteApps.isEmpty,
+            onProviderSettings: { showingProviderSettings = true }
         ) {
             ForEach(favoriteApps) { app in
                 AppRow(app: app) {
@@ -52,6 +56,37 @@ struct FavoriteAppsSettingsView: View {
                 onCancel: { editingApp = nil }
             )
         }
+        .sheet(isPresented: $showingProviderSettings) {
+            let provider = ProviderRegistry.shared.peek(providerType: "combined-apps") as? CombinedAppsProvider
+            let definitions = provider?.providerSettings ?? CombinedAppsProvider().providerSettings
+            let currentValues = Dictionary(
+                uniqueKeysWithValues: definitions.map { definition in
+                    let value = DatabaseManager.shared.loadProviderSetting(
+                        providerId: "combined-apps",
+                        key: definition.key
+                    ) ?? definition.defaultValue
+                    return (definition.key, value)
+                }
+            )
+
+            ProviderSettingsSheet(
+                definitions: definitions,
+                currentValues: currentValues,
+                onSave: { updatedValues in
+                    for (key, value) in updatedValues {
+                        DatabaseManager.shared.saveProviderSetting(
+                            providerId: "combined-apps",
+                            key: key,
+                            value: value
+                        )
+                    }
+                    provider?.refresh()
+                    NotificationCenter.default.postProviderUpdate(providerId: "combined-apps")
+                },
+                onDismiss: { showingProviderSettings = false }
+            )
+        }
+        
     }
     
     // MARK: - Actions

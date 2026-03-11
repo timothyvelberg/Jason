@@ -79,4 +79,9 @@ class ProviderRegistry {
     func logState() {
         print("[ProviderRegistry] State: \(refCounts.map { "\($0.key): \($0.value)" }.joined(separator: ", "))")
     }
+    
+    /// Look up a live provider instance by type string without affecting the ref count.
+    func peek(providerType: String) -> (any FunctionProvider)? {
+        return providers[providerType]
+    }
 }

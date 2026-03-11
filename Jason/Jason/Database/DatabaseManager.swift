@@ -273,6 +273,15 @@ class DatabaseManager {
         );
         """
         
+        let providerSettingsSQL = """
+        CREATE TABLE IF NOT EXISTS provider_settings (
+            provider_id TEXT NOT NULL,
+            setting_key TEXT NOT NULL,
+            setting_value TEXT NOT NULL,
+            PRIMARY KEY (provider_id, setting_key)
+        );
+        """
+        
         let tables = [
             foldersSQL,
             favoriteFoldersSQL,
@@ -288,7 +297,8 @@ class DatabaseManager {
             ringTriggersSQL,
             clipboardHistorySQL,
             todosSQL,
-            snippetsSQL
+            snippetsSQL,
+            providerSettingsSQL
         ]
         
         for sql in tables {

@@ -362,7 +362,7 @@ class FunctionNode: Identifiable, ObservableObject {
         case .category:
             assert((children?.count ?? 0) > 0 || (contextActions?.count ?? 0) > 0,
                    "[.category] nodes must have children or contextActions (node: \(name))")
-        case .spacer, .sectionHeader:
+        case .spacer, .sectionHeader:1
             // Spacers and section headers are pure visual elements - no children or contextActions
             assert((children?.count ?? 0) == 0 && (contextActions?.count ?? 0) == 0,
                 "[spacer/sectionHeader] nodes cannot have children or contextActions (node: \(name))")

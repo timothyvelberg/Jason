@@ -360,16 +360,14 @@ struct EditRingView: View {
                                 .frame(width: 140)
                                 .onChange(of: isPanelMode) { _, newValue in
                                     if newValue {
+                                        // Switching to Panel: just set panelProviderType, don't touch isEnabled
                                         panelProviderType = providers.first(where: { $0.isEnabled })?.type
-                                        for i in providers.indices {
-                                            if providers[i].type != panelProviderType {
-                                                providers[i].isEnabled = false
-                                            } else {
-                                                providers[i].isEnabled = true  // ← add this
-                                            }
-                                        }
+                                    } else {
+                                        // Switching to Ring: just clear panelProviderType
+                                        panelProviderType = nil
                                     }
                                 }
+                                
                             }
                             .padding(.vertical, 6)
                             
@@ -382,9 +380,6 @@ struct EditRingView: View {
                                         panelProviderType: $panelProviderType,
                                         isPanelMode: isPanelMode,
                                         onTap: {
-                                            for i in providers.indices {
-                                                providers[i].isEnabled = providers[i].type == providers[index].type
-                                            }
                                             panelProviderType = providers[index].type
                                         }
                                     )
@@ -566,7 +561,12 @@ struct EditRingView: View {
         var providerData: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
         var order = 1
         
-        for provider in providers where provider.isEnabled {
+        for provider in providers {
+            if isPanelMode {
+                guard provider.type == panelProviderType else { continue }
+            } else {
+                guard provider.isEnabled else { continue }
+            }
             providerData.append((provider.type, order, provider.displayMode.rawValue, nil))
             order += 1
         }
@@ -576,7 +576,6 @@ struct EditRingView: View {
         
         do {
             if isCreating {
-                // Create new configuration
                 let newConfig = try configManager.createConfiguration(
                     name: name.trimmingCharacters(in: .whitespaces),
                     shortcut: shortcutDisplay,
@@ -584,15 +583,13 @@ struct EditRingView: View {
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
                     startAngle: startAngle,
-                    presentationMode: panelProviderType != nil ? .panel : .ring,
+                    presentationMode: isPanelMode ? .panel : .ring,
                     triggers: triggerData,
                     providers: providerData
-                    
                 )
                 
                 print("✅ [EditRing] Created new ring: '\(newConfig.name)' with \(newConfig.triggers.count) trigger(s)")
             } else {
-                // Update existing configuration
                 guard let config = configuration else {
                     errorMessage = "Configuration not found"
                     return
@@ -607,7 +604,7 @@ struct EditRingView: View {
                     centerHoleRadius: holeValue,
                     iconSize: iconValue,
                     startAngle: startAngle,
-                    presentationMode: panelProviderType != nil ? .panel : .ring
+                    presentationMode: isPanelMode ? .panel : .ring
                 )
                 
                 // Step 2: Remove all existing triggers
@@ -740,9 +737,7 @@ struct ProviderRowReorderable: View {
         .opacity(isPanelMode ? 1.0 : (isLocked ? 0.4 : 1.0))
         .contentShape(Rectangle())
         .onTapGesture {
-            if isPanelMode {
-                onTap?()
-            }
+            if isPanelMode { onTap?() }
         }
     }
 }

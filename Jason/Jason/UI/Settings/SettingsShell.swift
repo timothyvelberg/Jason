@@ -54,6 +54,7 @@ struct SettingsListShell<RowContent: View>: View {
     let primaryAction: () -> Void
     let secondaryLabel: String?
     let secondaryAction: (() -> Void)?
+    let onProviderSettings: (() -> Void)?
 
     // Optional permission gating
     let permission: SettingsPermissionConfig?
@@ -75,6 +76,8 @@ struct SettingsListShell<RowContent: View>: View {
         secondaryAction: (() -> Void)? = nil,
         permission: SettingsPermissionConfig? = nil,
         isEmpty: Bool,
+        onProviderSettings: (() -> Void)? = nil,
+
         @ViewBuilder rows: @escaping () -> RowContent
     ) {
         self.title = title
@@ -89,6 +92,7 @@ struct SettingsListShell<RowContent: View>: View {
         self.permission = permission
         self.isEmpty = isEmpty
         self.rows = rows
+        self.onProviderSettings = onProviderSettings
     }
 
     var body: some View {
@@ -98,6 +102,17 @@ struct SettingsListShell<RowContent: View>: View {
                 Text(title)
                     .font(.title2)
                     .fontWeight(.semibold)
+                
+                if let onProviderSettings {
+                    Button(action: onProviderSettings) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Provider Settings")
+                }
+
                 Spacer()
             }
             .padding(.horizontal)
