@@ -219,6 +219,7 @@ struct EditRingView: View {
     @State private var iconSize: String = "32"
     @State private var startAngle: Double = 0.0
     @State private var panelProviderType: String? = nil
+    @State private var isPanelMode: Bool = false
     
     // Provider selection - ordered array
     @State private var providers: [ProviderConfig] = []
@@ -273,7 +274,7 @@ struct EditRingView: View {
                         }
                         .padding(12)
                     }
-
+                    
                     // Triggers Section (NEW)
                     GroupBox(label: Label("Triggers", systemImage: "bolt.fill")) {
                         VStack(alignment: .leading, spacing: 12) {
@@ -333,38 +334,67 @@ struct EditRingView: View {
                             }
                         }
                     }
-                                    
+                    
                     // Providers
                     GroupBox(label: Label("Content Providers", systemImage: "square.stack.3d.up.fill")) {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Select and reorder content sources for this ring:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
                             
-                            Text("Drag to reorder • Enabled providers appear in ring order")
-                                .font(.caption2)
-                                .foregroundColor(.secondary.opacity(0.8))   
+                            // MARK: - Ring / Panel Mode Selector
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Ring or Panel")
+                                        .font(.body)
+                                        .fontWeight(.medium)
+                                    Text("Set up multiple providers as a Ring, or a single provider as a Panel.")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Picker("", selection: $isPanelMode) {
+                                    Text("Ring").tag(false)
+                                    Text("Panel").tag(true)
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 140)
+                                .onChange(of: isPanelMode) { _, newValue in
+                                    if newValue {
+                                        panelProviderType = providers.first(where: { $0.isEnabled })?.type
+                                        for i in providers.indices {
+                                            if providers[i].type != panelProviderType {
+                                                providers[i].isEnabled = false
+                                            } else {
+                                                providers[i].isEnabled = true  // ← add this
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 6)
+                            
+                            Divider()
+                            
                             List {
                                 ForEach(providers.indices, id: \.self) { index in
                                     ProviderRowReorderable(
                                         provider: $providers[index],
-                                        panelProviderType: $panelProviderType
+                                        panelProviderType: $panelProviderType,
+                                        isPanelMode: isPanelMode,
+                                        onTap: {
+                                            for i in providers.indices {
+                                                providers[i].isEnabled = providers[i].type == providers[index].type
+                                            }
+                                            panelProviderType = providers[index].type
+                                        }
                                     )
                                 }
-                                .onMove(perform: moveProvider)
+                                .onMove(perform: isPanelMode ? nil : moveProvider)
                             }
                             .listStyle(.inset)
                             .frame(minHeight: 300)
                         }
                         .padding(12)
-                    }
-                    
-                    // Error message
-                    if let error = errorMessage {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundColor(.red)
-                            .padding(.horizontal, 12)
                     }
                 }
                 .padding()
@@ -405,12 +435,9 @@ struct EditRingView: View {
     
     private var isFormValid: Bool {
         return !name.trimmingCharacters(in: .whitespaces).isEmpty &&
-               !ringRadius.isEmpty &&
-               !centerHoleRadius.isEmpty &&
-               !iconSize.isEmpty &&
-               !triggers.isEmpty &&  // Must have at least one trigger
+               !triggers.isEmpty &&
                triggers.allSatisfy { $0.isValid } &&
-               hasAtLeastOneProvider
+               (isPanelMode ? panelProviderType != nil : hasAtLeastOneProvider)
     }
     
     private var hasAtLeastOneProvider: Bool {
@@ -457,15 +484,20 @@ struct EditRingView: View {
             enabledProviders.sort { $0.1 < $1.1 }
             providers = enabledProviders.map { $0.0 } + disabledProviders
             
-            // Set panel provider if this ring is in panel mode
+            // Set panel/ring mode
             if config.presentationMode == .panel {
+                isPanelMode = true
                 panelProviderType = providers.first(where: { $0.isEnabled })?.type
+            } else {
+                isPanelMode = false
+                panelProviderType = nil
             }
             
         } else {
             // New ring - use defaults
             providers = Self.defaultProviders
             triggers = []
+            isPanelMode = false
             panelProviderType = nil
         }
     }
@@ -637,6 +669,9 @@ struct EditRingView: View {
 struct ProviderRowReorderable: View {
     @Binding var provider: ProviderConfig
     @Binding var panelProviderType: String?
+    var isPanelMode: Bool
+    var onTap: (() -> Void)?
+
     
     private var isPanel: Bool {
         panelProviderType == provider.type
@@ -648,21 +683,28 @@ struct ProviderRowReorderable: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 14))
-                .foregroundColor(.secondary.opacity(0.5))
-                .help("Drag to reorder")
+            // Drag handle — hidden in Panel mode
+            if !isPanelMode {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary.opacity(0.5))
+                    .help("Drag to reorder")
+            }
             
-            Toggle("", isOn: $provider.isEnabled)
-                .labelsHidden()
-                .toggleStyle(.checkbox)
-                .disabled(isLocked || isPanel)
+            // Checkbox — hidden in Panel mode
+            if !isPanelMode {
+                Toggle("", isOn: $provider.isEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.checkbox)
+                    .disabled(isLocked)
+            }
             
+            // Provider info
             VStack(alignment: .leading, spacing: 2) {
                 Text(provider.name)
                     .font(.body)
                     .fontWeight(.medium)
-                    .foregroundColor((provider.isEnabled && !isLocked) ? .primary : .secondary)
+                    .foregroundColor(isPanelMode ? (isPanel ? .primary : .secondary) : (provider.isEnabled && !isLocked ? .primary : .secondary))
                 
                 Text(provider.description)
                     .font(.caption)
@@ -671,30 +713,8 @@ struct ProviderRowReorderable: View {
             
             Spacer()
             
-            if provider.isEnabled && !isLocked {
-                Button(action: {
-                    if isPanel {
-                        panelProviderType = nil
-                    } else {
-                        panelProviderType = provider.type
-                    }
-                }) {
-                    Text("Use as Panel")
-                        .font(.caption)
-                        .fontWeight(isPanel ? .semibold : .regular)
-                        .foregroundColor(isPanel ? .white : .secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5)
-                                .fill(isPanel ? Color.blue : Color.gray.opacity(0.15))
-                        )
-                }
-                .buttonStyle(.plain)
-                .help(isPanel ? "Tap to remove panel mode" : "Use this provider as a standalone panel")
-            }
-            
-            if provider.isEnabled && !isLocked && !isPanel {
+            // Parent/Direct picker — Ring mode only, enabled providers only
+            if !isPanelMode && provider.isEnabled && !isLocked {
                 Picker("", selection: $provider.displayMode) {
                     ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
                         Text(mode.displayName).tag(mode)
@@ -709,12 +729,21 @@ struct ProviderRowReorderable: View {
         .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(
-                    isPanel ? Color.blue.opacity(0.08) :
-                    isLocked ? Color.clear :
-                    provider.isEnabled ? Color.blue.opacity(0.05) : Color.clear
+                    isPanelMode && isPanel ? Color.blue.opacity(0.08) :
+                    !isPanelMode && provider.isEnabled ? Color.blue.opacity(0.05) : Color.clear
                 )
         )
-        .opacity(isLocked ? 0.4 : 1.0)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(isPanelMode && isPanel ? Color.blue.opacity(0.4) : Color.clear, lineWidth: 1)
+        )
+        .opacity(isPanelMode ? 1.0 : (isLocked ? 0.4 : 1.0))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isPanelMode {
+                onTap?()
+            }
+        }
     }
 }
 
