@@ -377,7 +377,6 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                     self?.launchOrSwitchToApp(entry)
                 }),
                 onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
-
             )
         }
         

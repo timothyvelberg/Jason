@@ -34,7 +34,7 @@ extension LiveDataStream {
     
     /// Default restart implementation
     func restartMonitoring() {
-        print("🔄 [\(streamId)] Restarting monitoring...")
+        print("[\(streamId)] Restarting monitoring...")
         stopMonitoring()
         startMonitoring()
     }

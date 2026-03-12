@@ -66,7 +66,7 @@ extension CircularUIManager {
         isVisible = true
         overlayWindow?.showOverlay(at: mousePosition)
         
-        mouseTracker?.startTrackingMouse()
+        mouseTracker?.startTrackingMouse(from: centerPoint)
         gestureManager?.startMonitoring()
         resumeMouseMonitor()
         
