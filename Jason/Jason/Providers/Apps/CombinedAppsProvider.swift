@@ -367,7 +367,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                         command: .executeKeepOpen { [weak self] in
                             // Cmd+Click = Quit the app (if running)
                             if let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: entry.bundleIdentifier).first {
-                                print("🚪 [Cmd+Click] Quitting app: \(entry.name)")
+                                print("[Cmd+Click] Quitting app: \(entry.name)")
                                 self?.appSwitcherManager?.quitApp(runningApp)
                             }
                         }

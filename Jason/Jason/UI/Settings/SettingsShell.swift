@@ -219,19 +219,6 @@ struct SettingsListShell<RowContent: View>: View {
     }
 }
 
-// MARK: - View Helpers
-
-extension View {
-    @ViewBuilder
-    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
-        if condition {
-            transform(self)
-        } else {
-            self
-        }
-    }
-}
-
 // MARK: - Shared Models
 
 /// Shared model used by EditRingView and settings views to represent a content provider.

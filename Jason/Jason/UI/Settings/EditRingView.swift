@@ -735,9 +735,10 @@ struct ProviderRowReorderable: View {
                 .stroke(isPanelMode && isPanel ? Color.blue.opacity(0.4) : Color.clear, lineWidth: 1)
         )
         .opacity(isPanelMode ? 1.0 : (isLocked ? 0.4 : 1.0))
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if isPanelMode { onTap?() }
+        .if(isPanelMode) { view in
+            view
+                .contentShape(Rectangle())
+                .onTapGesture { onTap?() }
         }
     }
 }
@@ -1211,7 +1212,7 @@ class MouseButtonRecorderHandler {
         if cgFlags.contains(.maskAlternate) { mods |= NSEvent.ModifierFlags.option.rawValue }
         if cgFlags.contains(.maskShift) { mods |= NSEvent.ModifierFlags.shift.rawValue }
         
-        print("🖱️ [MouseRecorder] Captured button \(btn), modifiers: \(mods)")
+        print("[MouseRecorder] Captured button \(btn), modifiers: \(mods)")
         
         // Save the captured values
         DispatchQueue.main.async { [weak self] in
@@ -1219,6 +1220,18 @@ class MouseButtonRecorderHandler {
             self?.modifierFlags.wrappedValue = mods
             self?.isRecording.wrappedValue = false
             self?.stopRecordingCallback?()
+        }
+    }
+}
+
+
+extension View {
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
         }
     }
 }
