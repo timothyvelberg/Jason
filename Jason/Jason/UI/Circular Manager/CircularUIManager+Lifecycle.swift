@@ -150,7 +150,7 @@ extension CircularUIManager {
         print("Switching to selected app: \(app.localizedName ?? "Unknown")")
         
         // Activate the app AFTER setting the flag
-        app.activate()
+        app.activate(options: .activateAllWindows)
         
         // Note: hide() will be called by onLostFocus, and it will see our flag
         print("Switching to app (hide() will clean up)")

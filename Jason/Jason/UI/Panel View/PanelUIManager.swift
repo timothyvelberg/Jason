@@ -285,7 +285,7 @@ class PanelUIManager: ObservableObject, UIManager {
         listPanelManager?.hide()
         
         print("[PanelUIManager-\(configId)] Switching to: \(app.localizedName ?? "Unknown")")
-        app.activate()
+        app.activate(options: .activateAllWindows)
     }
     
     // MARK: - Provider Setup

@@ -390,8 +390,8 @@ class AppSwitcherManager: ObservableObject {
         
         print("Successfully switched to \(app.localizedName ?? "Unknown")")
         
-        // Force a refresh to update the active state indicators and MRU order
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        // Raise windows AFTER activation so macOS doesn't override them
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             self.loadRunningApplications()
         }
     }
@@ -431,7 +431,7 @@ class AppSwitcherManager: ObservableObject {
         }
         
         if restoredCount > 0 {
-            print("🪟 [AppSwitcher] Restored \(restoredCount) minimized window(s) for \(app.localizedName ?? "Unknown")")
+            print("[AppSwitcher] Restored \(restoredCount) minimized window(s) for \(app.localizedName ?? "Unknown")")
         }
     }
 }
