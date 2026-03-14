@@ -151,80 +151,80 @@ class GestureManager {
     
     private func setupGlobalMonitors() {
         // Left mouse button - track down, drag, up for drag detection
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] event in
             self?.handleMouseDown(event, button: .left)
-        } {
+        }) {
             globalMonitors.append(monitor)
         }
         
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged]) { [weak self] event in
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged], handler: { [weak self] event in
             self?.handleMouseDragged(event, button: .left)
-        } {
+        }) {
             globalMonitors.append(monitor)
         }
         
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] event in
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp], handler: { [weak self] event in
             self?.handleMouseUp(event, button: .left)
-        } {
+        }) {
             globalMonitors.append(monitor)
         }
         
         // Right mouse button
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.rightMouseDown]) { [weak self] event in
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.rightMouseDown], handler: { [weak self] event in
             self?.handleMouseEvent(event, type: .click(.right))
-        } {
+        }) {
             globalMonitors.append(monitor)
         }
         
         // Middle mouse button
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.otherMouseDown]) { [weak self] event in
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.otherMouseDown], handler: { [weak self] event in
             if event.buttonNumber == 2 {  // Middle button
                 self?.handleMouseEvent(event, type: .click(.middle))
             }
-        } {
+        }) {
             globalMonitors.append(monitor)
         }
     }
-    
+
     private func setupLocalMonitors() {
         // Left mouse button - track down, drag, up for drag detection
-        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] event in
             self?.handleMouseDown(event, button: .left)
             return event  // Let it pass through to SwiftUI
-        } {
+        }) {
             localMonitors.append(monitor)
         }
         
-        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDragged]) { [weak self] event in
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDragged], handler: { [weak self] event in
             self?.handleMouseDragged(event, button: .left)
             return event  // Let it pass through
-        } {
+        }) {
             localMonitors.append(monitor)
         }
         
-        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] event in
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp], handler: { [weak self] event in
             self?.handleMouseUp(event, button: .left)
             return event  // Let it pass through
-        } {
+        }) {
             localMonitors.append(monitor)
         }
         
         // Right mouse button
-        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown]) { [weak self] event in
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown], handler: { [weak self] event in
             self?.handleMouseEvent(event, type: .click(.right))
             return nil  // Consume event
-        } {
+        }) {
             localMonitors.append(monitor)
         }
         
         // Middle mouse button
-        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.otherMouseDown]) { [weak self] event in
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.otherMouseDown], handler: { [weak self] event in
             if event.buttonNumber == 2 {  // Middle button
                 self?.handleMouseEvent(event, type: .click(.middle))
                 return nil  // Consume event
             }
             return event
-        } {
+        }) {
             localMonitors.append(monitor)
         }
     }
