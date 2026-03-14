@@ -271,7 +271,7 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
             guard !existingPaths.isEmpty else { return nil }
             
             print("[FavoriteFiles] Cache burst: \(existingPaths.count) files for '\(dynamic.displayName)'")
-            return Array(existingPaths.prefix(resolvedDynamicFileCount))
+            return existingPaths
         } else {
             // Non-temporal sort — just the top item
             guard let first = items.first, FileManager.default.fileExists(atPath: first.path) else {
@@ -350,10 +350,10 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
                 guard let d = date else { return nil }
                 return (path: url.path, date: d)
             }
-            
+             
             let burstPaths = detectBurst(from: itemsWithDates)
             print("[FavoriteFiles] Filesystem burst: \(burstPaths.count) files for '\(dynamic.displayName)'")
-            return Array(burstPaths.prefix(resolvedDynamicFileCount))
+            return burstPaths
         } else {
             return sortedItems.prefix(resolvedDynamicFileCount).map { $0.path }
         }
