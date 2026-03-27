@@ -28,6 +28,7 @@ extension HotkeyManager {
         registeredTwoFingerTaps[configId] = (side, modifierFlags, callback)
     }
     
+    
     func unregisterTwoFingerTap(forConfigId configId: Int) {
         if let _ = registeredTwoFingerTaps.removeValue(forKey: configId) {
             print("[HotkeyManager] Unregistered two-finger tap for config \(configId)")
@@ -40,3 +41,4 @@ extension HotkeyManager {
         print("[HotkeyManager] Unregistered all \(count) two-finger tap(s)")
     }
 }
+
