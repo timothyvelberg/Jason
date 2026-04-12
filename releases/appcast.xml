@@ -5,7 +5,22 @@
         <description>Latest Jason updates</description>
         <language>en</language>
         
-        <!-- Latest release v0.0.5 -->
+        <!-- Latest release v0.0.6 -->  
+        <item>
+            <title>Version 0.0.6</title>
+            <description>First time users experience</description>
+            <pubDate>Sun, 12 Apr 2026 11:00:00 +0000</pubDate>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>0.0.6</sparkle:shortVersionString>
+            <enclosure
+                url="https://github.com/timothyvelberg/Jason/releases/download/v0.0.6/Jason_v0.0.6.app.zip"
+                sparkle:edSignature="/8JqVrXhNzk0kHph9oR6IpgME5rExeY++WqNz8AXTV0dTilmqTnoMOjJM+3MtZdnCGC8AN1xJxd/SuqoFfRNDw=="
+                length="6385438"
+                type="application/octet-stream"
+            />
+        </item>
+
+        <!-- release v0.0.5 -->
         <item>
             <title>Version 0.0.5</title>
             <description>First time users experience</description>
