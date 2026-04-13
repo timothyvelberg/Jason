@@ -284,6 +284,34 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         circularUIManager = nil
     }
     
+    // MARK: - Window Node Builder
+
+    private func createWindowNodes(for runningApp: NSRunningApplication) -> [FunctionNode] {
+        let windows = AppSwitcherManager.shared.fetchWindows(for: runningApp)
+
+        print("🪟 [CombinedApps] Building window nodes for \(runningApp.localizedName ?? "unknown"): \(windows.count) window(s)")
+
+        return windows.map { window in
+            FunctionNode(
+                id: "window-\(window.windowID)",
+                name: window.title.isEmpty ? "Untitled Window" : window.title,
+                type: .action,
+                icon: runningApp.icon ?? NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil) ?? NSImage(),
+                preferredLayout: .partialSlice,
+                showLabel: true,
+                slicePositioning: .center,
+                providerId: providerId,
+                onLeftClick: ModifierAwareInteraction(base: .execute {
+                    AppSwitcherManager.shared.focusWindow(window)
+                }),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .execute {
+                    AppSwitcherManager.shared.focusWindow(window)
+                })
+            )
+        }
+    }
+    
     // MARK: - FunctionProvider Protocol
     
     func provideFunctions() -> [FunctionNode] {
@@ -319,6 +347,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 )
             ]
         }
+
         // Create nodes for each app
         let appNodes: [FunctionNode] = appEntries.map { entry in
             // Get AppSwitcherManager for context actions
@@ -344,12 +373,24 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                     createAddToFavoritesAction(bundleIdentifier: entry.bundleIdentifier, name: entry.name)
                 )
             }
-            
+
+            // Build window children for running apps
+            let windowNodes: [FunctionNode]
+            if entry.isRunning, let runningApp = entry.runningApp {
+                windowNodes = createWindowNodes(for: runningApp)
+            } else {
+                windowNodes = []
+            }
+
+            let hasWindows = !windowNodes.isEmpty
+
             return FunctionNode(
                 id: "combined-app-\(entry.bundleIdentifier)",
                 name: entry.name,
-                type: .app,
+                type: hasWindows ? .category : .app,
                 icon: entry.icon,
+                children: hasWindows ? windowNodes : nil,
+                childDisplayMode: hasWindows ? .panel : nil,
                 contextActions: contextActions.isEmpty ? nil : contextActions,
                 slicePositioning: .center,
                 metadata: [
@@ -358,25 +399,24 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 ],
                 providerId: providerId,
                 onLeftClick: ModifierAwareInteraction(
-                        base: .execute { [weak self] in
-                            self?.launchOrSwitchToApp(entry)
-                        },
-                        shift: .executeKeepOpen { [weak self] in
-                            self?.launchOrSwitchToApp(entry)
-                        },
-                        command: .executeKeepOpen { [weak self] in
-                            // Cmd+Click = Quit the app (if running)
-                            if let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: entry.bundleIdentifier).first {
-                                print("[Cmd+Click] Quitting app: \(entry.name)")
-                                self?.appSwitcherManager?.quitApp(runningApp)
-                            }
+                    base: .execute { [weak self] in
+                        self?.launchOrSwitchToApp(entry)
+                    },
+                    shift: .executeKeepOpen { [weak self] in
+                        self?.launchOrSwitchToApp(entry)
+                    },
+                    command: .executeKeepOpen { [weak self] in
+                        if let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: entry.bundleIdentifier).first {
+                            print("[Cmd+Click] Quitting app: \(entry.name)")
+                            self?.appSwitcherManager?.quitApp(runningApp)
                         }
-                    ),
+                    }
+                ),
                 onRightClick: ModifierAwareInteraction(base: contextActions.isEmpty ? .doNothing : .expand),
                 onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                     self?.launchOrSwitchToApp(entry)
                 }),
-                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+                onBoundaryCross: ModifierAwareInteraction(base: hasWindows ? .expand : .doNothing)
             )
         }
         
@@ -436,11 +476,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                     print("Failed to launch \(entry.name): \(error.localizedDescription)")
                 } else if let app = app {
                     print("Successfully launched \(entry.name)")
-                    
-                
-                    //using shared instance
                     self.appSwitcherManager?.recordAppUsage(app)
-            
                 }
             }
         }
