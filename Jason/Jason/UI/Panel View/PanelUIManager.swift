@@ -152,6 +152,16 @@ class PanelUIManager: ObservableObject, UIManager {
         print("[PanelUIManager-\(configId)] Setup complete")
     }
     
+    func hideSkippingRestore() {
+        isIntentionallySwitching = true
+        stopPanelMouseMonitor()
+        gestureManager?.stopMonitoring()
+        isVisible = false
+        overlayWindow?.hideOverlay()
+        listPanelManager?.hide()
+        print("[PanelUIManager-\(configId)] Hiding without activating any app")
+    }
+    
     func show(triggerDirection: RotationDirection? = nil) {
         print("[PanelUIManager-\(configId)] Showing panel...")
         

@@ -131,6 +131,15 @@ extension CircularUIManager {
         print("Hiding circular UI")
     }
     
+    func hideSkippingRestore() {
+        isIntentionallySwitching = true
+        mouseTracker?.stopTrackingMouse()
+        gestureManager?.stopMonitoring()
+        isVisible = false
+        overlayWindow?.hideOverlay()
+        print("Hiding without activating any app")
+    }
+    
     /// Temporarily ignore focus changes (used during app quit/launch to prevent unwanted UI hiding)
     func ignoreFocusChangesTemporarily(duration: TimeInterval = 0.5) {
         overlayWindow?.ignoreFocusChangesTemporarily(duration: duration)

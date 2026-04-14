@@ -41,6 +41,8 @@ protocol UIManager: AnyObject {
     func teardown()
     
     func hideAndSwitchTo(app: NSRunningApplication)
+    
+    func hideSkippingRestore()
 }
 
 // MARK: - Default Implementations

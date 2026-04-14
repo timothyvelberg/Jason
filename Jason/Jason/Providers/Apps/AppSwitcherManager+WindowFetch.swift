@@ -56,11 +56,11 @@ extension AppSwitcherManager {
     // MARK: - Window Focusing
     
     func focusWindow(_ window: WindowInfo) {
-        print("[AppSwitcherManager] Focusing window: '\(window.title)' (id: \(window.windowID))")
+        print("🪟 [AppSwitcherManager] Focusing window: '\(window.title)' (id: \(window.windowID))")
 
         let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: window.appBundleID)
         guard let app = runningApps.first else {
-            print("[AppSwitcherManager] App not found for bundle: \(window.appBundleID)")
+            print("⚠️ [AppSwitcherManager] App not found for bundle: \(window.appBundleID)")
             return
         }
 
@@ -68,7 +68,7 @@ extension AppSwitcherManager {
         var windowsRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
               let axWindows = windowsRef as? [AXUIElement] else {
-            print("[AppSwitcherManager] Could not get AX windows for \(window.appBundleID)")
+            print("⚠️ [AppSwitcherManager] Could not get AX windows for \(window.appBundleID)")
             activeUIManager?.hideAndSwitchTo(app: app)
             return
         }
@@ -77,15 +77,12 @@ extension AppSwitcherManager {
             var windowIDRef: CGWindowID = 0
             _AXUIElementGetWindow(axWindow, &windowIDRef)
             if windowIDRef == window.windowID {
-                // Hide the Jason UI without activating any app —
-                // we own the full activation sequence from here
-                
-                // Suppress focus restore, then hide and own activation ourselves
-                activeUIManager?.ignoreFocusChangesTemporarily(duration: 0.5)
-                activeUIManager?.hide()
-
                 let targetWindow = axWindow
                 let targetTitle = window.title
+
+                // Hide without activating anything — we own the full sequence
+                activeUIManager?.hideSkippingRestore()
+
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     AXUIElementPerformAction(targetWindow, kAXRaiseAction as CFString)
                     AXUIElementSetAttributeValue(targetWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
@@ -99,7 +96,7 @@ extension AppSwitcherManager {
             }
         }
 
-        print("[AppSwitcherManager] Could not match window ID \(window.windowID) — falling back")
+        print("⚠️ [AppSwitcherManager] Could not match window ID \(window.windowID) — falling back")
         activeUIManager?.hideAndSwitchTo(app: app)
     }
 }
