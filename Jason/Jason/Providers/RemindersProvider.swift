@@ -65,8 +65,10 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
         if enabledIDs.isEmpty {
             print("[RemindersProvider] No reminder lists enabled")
             DispatchQueue.main.async {
-                self.reminders = []
-                NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
+                if !self.reminders.isEmpty {  // ← only notify if something changed
+                    self.reminders = []
+                    NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
+                }
             }
             return
         }
@@ -437,6 +439,7 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
     
     func refresh() {
         print("[RemindersProvider] Manual refresh requested")
+        guard PermissionManager.shared.hasRemindersAccess else { return }
         fetchReminders()
     }
     
