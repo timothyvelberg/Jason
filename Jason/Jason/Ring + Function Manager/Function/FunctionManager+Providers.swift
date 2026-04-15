@@ -177,6 +177,8 @@ extension FunctionManager {
     // MARK: - Private Update Helpers
     
     private func updateRing0(provider: FunctionProvider, providerId: String) {
+        
+        provider.refresh()
         let providerNodes = provider.provideFunctions()
         let updatedRootNodes = applyDisplayMode(providerNodes, providerId: providerId)
         
@@ -256,6 +258,7 @@ extension FunctionManager {
             return
         }
         
+        provider.refresh()
         let freshRootNodes = provider.provideFunctions()
         
         if level == 1 && !freshRootNodes.isEmpty {
