@@ -40,7 +40,7 @@ class FocusedWindowSwitcherProvider: ObservableObject, FunctionProvider {
     // MARK: - Init / Teardown
 
     init() {
-        print("🪟 [FocusedWindowSwitcher] Initialized")
+        print("[FocusedWindowSwitcher] Initialized")
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(frontmostAppChanged),
@@ -54,20 +54,20 @@ class FocusedWindowSwitcherProvider: ObservableObject, FunctionProvider {
     }
 
     func teardown() {
-        print("🪟 [FocusedWindowSwitcher] teardown()")
+        print("[FocusedWindowSwitcher] teardown()")
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         invalidateCache()
-        print("🪟 [FocusedWindowSwitcher] teardown complete")
+        print("[FocusedWindowSwitcher] teardown complete")
     }
 
     func refresh() {
-        print("🪟 [FocusedWindowSwitcher] refresh() called")
+        print("[FocusedWindowSwitcher] refresh() called")
         invalidateCache()
     }
 
     func clearCache() {
         invalidateCache()
-        print("🪟 [FocusedWindowSwitcher] Cache cleared")
+        print("[FocusedWindowSwitcher] Cache cleared")
     }
 
     // MARK: - Cache Helpers
@@ -81,7 +81,7 @@ class FocusedWindowSwitcherProvider: ObservableObject, FunctionProvider {
     // MARK: - Observation
 
     @objc private func frontmostAppChanged() {
-        print("🪟 [FocusedWindowSwitcher] Frontmost app changed — invalidating cache")
+        print("[FocusedWindowSwitcher] Frontmost app changed — invalidating cache")
         invalidateCache()
     }
 
@@ -89,7 +89,7 @@ class FocusedWindowSwitcherProvider: ObservableObject, FunctionProvider {
 
     func provideFunctions() -> [FunctionNode] {
         if isCacheValid, let cached = cachedNodes {
-            print("🪟 [FocusedWindowSwitcher] Returning cached nodes (\(cached.count) windows)")
+            print("[FocusedWindowSwitcher] Returning cached nodes (\(cached.count) windows)")
             return cached
         }
 
@@ -98,7 +98,7 @@ class FocusedWindowSwitcherProvider: ObservableObject, FunctionProvider {
         }
 
         let windows = AppSwitcherManager.shared.fetchWindows(for: frontmost)
-        print("🪟 [FocusedWindowSwitcher] Fetched \(windows.count) window(s) for \(frontmost.localizedName ?? "unknown")")
+        print("[FocusedWindowSwitcher] Fetched \(windows.count) window(s) for \(frontmost.localizedName ?? "unknown")")
 
         if windows.isEmpty {
             return [createNoWindowsNode(message: "No windows open")]
