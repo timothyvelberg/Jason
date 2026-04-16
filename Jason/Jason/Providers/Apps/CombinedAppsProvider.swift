@@ -374,22 +374,22 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 )
             }
 
-            // Build window children for running apps
-            let windowNodes: [FunctionNode]
-            if entry.isRunning, let runningApp = entry.runningApp {
-                windowNodes = createWindowNodes(for: runningApp)
-            } else {
-                windowNodes = []
-            }
+//            // Build window children for running apps
+//            let windowNodes: [FunctionNode]
+//            if entry.isRunning, let runningApp = entry.runningApp {
+//                windowNodes = createWindowNodes(for: runningApp)
+//            } else {
+//                windowNodes = []
+//            }
 
-            let hasWindows = !windowNodes.isEmpty
+            let hasWindows = entry.isRunning && entry.runningApp != nil
 
             return FunctionNode(
                 id: "combined-app-\(entry.bundleIdentifier)",
                 name: entry.name,
                 type: hasWindows ? .category : .app,
                 icon: entry.icon,
-                children: hasWindows ? windowNodes : nil,
+                children: nil,
                 childDisplayMode: hasWindows ? .panel : nil,
                 contextActions: contextActions.isEmpty ? nil : contextActions,
                 slicePositioning: .center,
@@ -485,6 +485,23 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     private func openApplicationsFolder() {
         let applicationsURL = URL(fileURLWithPath: "/Applications")
         NSWorkspace.shared.open(applicationsURL)
+    }
+    
+    func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
+        let prefix = "combined-app-"
+        guard node.id.hasPrefix(prefix) else { return [] }
+        
+        let bundleID = String(node.id.dropFirst(prefix.count))
+        
+        guard let entry = appEntries.first(where: { $0.bundleIdentifier == bundleID }),
+              entry.isRunning,
+              let runningApp = entry.runningApp else {
+            print("🪟 [CombinedApps] loadChildren: no running app found for \(bundleID)")
+            return []
+        }
+        
+        print("🪟 [CombinedApps] loadChildren: fetching windows for \(entry.name)")
+        return createWindowNodes(for: runningApp)
     }
     
     // MARK: - Favorite Management Actions

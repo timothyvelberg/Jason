@@ -28,8 +28,7 @@ class FocusedWindowSwitcherProvider: ObservableObject, FunctionProvider {
     private var isCacheValid: Bool {
         guard let cachedForBundleID,
               let lastFetchDate,
-              let frontmost = NSWorkspace.shared.frontmostApplication,
-              let currentBundleID = frontmost.bundleIdentifier else {
+              let currentBundleID = FrontmostAppMonitor.shared.frontmostBundleID else {
             return false
         }
         let notExpired = Date().timeIntervalSince(lastFetchDate) < cacheTimeout
@@ -40,34 +39,34 @@ class FocusedWindowSwitcherProvider: ObservableObject, FunctionProvider {
     // MARK: - Init / Teardown
 
     init() {
-        print("[FocusedWindowSwitcher] Initialized")
-        NSWorkspace.shared.notificationCenter.addObserver(
+        print("🪟 [FocusedWindowSwitcher] Initialized")
+        NotificationCenter.default.addObserver(
             self,
             selector: #selector(frontmostAppChanged),
-            name: NSWorkspace.didActivateApplicationNotification,
+            name: .frontmostAppChanged,
             object: nil
         )
     }
 
     deinit {
-        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        NotificationCenter.default.removeObserver(self)
     }
 
     func teardown() {
-        print("[FocusedWindowSwitcher] teardown()")
-        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        print("🪟 [FocusedWindowSwitcher] teardown()")
+        NotificationCenter.default.removeObserver(self)
         invalidateCache()
-        print("[FocusedWindowSwitcher] teardown complete")
+        print("🪟 [FocusedWindowSwitcher] teardown complete")
     }
 
     func refresh() {
-        print("[FocusedWindowSwitcher] refresh() called")
+        print("🪟 [FocusedWindowSwitcher] refresh() called")
         invalidateCache()
     }
 
     func clearCache() {
         invalidateCache()
-        print("[FocusedWindowSwitcher] Cache cleared")
+        print("🪟 [FocusedWindowSwitcher] Cache cleared")
     }
 
     // MARK: - Cache Helpers
@@ -81,7 +80,7 @@ class FocusedWindowSwitcherProvider: ObservableObject, FunctionProvider {
     // MARK: - Observation
 
     @objc private func frontmostAppChanged() {
-        print("[FocusedWindowSwitcher] Frontmost app changed — invalidating cache")
+        print("🪟 [FocusedWindowSwitcher] Frontmost app changed — invalidating cache")
         invalidateCache()
     }
 
@@ -89,16 +88,16 @@ class FocusedWindowSwitcherProvider: ObservableObject, FunctionProvider {
 
     func provideFunctions() -> [FunctionNode] {
         if isCacheValid, let cached = cachedNodes {
-            print("[FocusedWindowSwitcher] Returning cached nodes (\(cached.count) windows)")
+            print("🪟 [FocusedWindowSwitcher] Returning cached nodes (\(cached.count) windows)")
             return cached
         }
 
-        guard let frontmost = NSWorkspace.shared.frontmostApplication else {
+        guard let frontmost = FrontmostAppMonitor.shared.frontmostApp else {
             return [createNoWindowsNode(message: "No active app")]
         }
 
         let windows = AppSwitcherManager.shared.fetchWindows(for: frontmost)
-        print("[FocusedWindowSwitcher] Fetched \(windows.count) window(s) for \(frontmost.localizedName ?? "unknown")")
+        print("🪟 [FocusedWindowSwitcher] Fetched \(windows.count) window(s) for \(frontmost.localizedName ?? "unknown")")
 
         if windows.isEmpty {
             return [createNoWindowsNode(message: "No windows open")]

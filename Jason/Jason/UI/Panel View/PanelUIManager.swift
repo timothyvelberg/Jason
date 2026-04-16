@@ -111,9 +111,7 @@ class PanelUIManager: ObservableObject, UIManager {
         print("[PanelUIManager-\(configId)] Setting up...")
         
         // Create ListPanelManager
-        self.listPanelManager = ListPanelManager()
         print("   ListPanelManager initialized")
-        
         self.listPanelManager = ListPanelManager()
         listPanelManager?.findProvider = { [weak self] providerId in
             self?.providers.first { $0.providerId == providerId }
@@ -138,7 +136,7 @@ class PanelUIManager: ObservableObject, UIManager {
         print("   PanelActionHandler initialized")
         
         // Create providers
-        setupProviders()
+        setupProviders(injectedProviders: injectedProviders)
         
         // Setup gesture manager for clicks
         setupGestureManager()
@@ -300,20 +298,23 @@ class PanelUIManager: ObservableObject, UIManager {
     
     // MARK: - Provider Setup
     
-    private func setupProviders() {
+    private func setupProviders(injectedProviders: [any FunctionProvider]? = nil) {
         print("[PanelUIManager-\(configId)] Setting up providers...")
-        
-        let factory = ProviderFactory(
-            circularUIManager: nil,
-            appSwitcherManager: AppSwitcherManager.shared
-        )
-        
-        providers = factory.createProviders(from: configuration)
-        
+
+        if let injected = injectedProviders, !injected.isEmpty {
+            providers = injected
+        } else {
+            let factory = ProviderFactory(
+                circularUIManager: nil,
+                appSwitcherManager: AppSwitcherManager.shared
+            )
+            providers = factory.createProviders(from: configuration)
+        }
+
         for provider in providers {
             print("   Registered provider: \(provider.providerName)")
         }
-        
+
         print("   Total providers: \(providers.count)")
     }
     
