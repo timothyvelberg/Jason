@@ -75,6 +75,8 @@ class ProviderFactory {
         case "CalendarProvider":
             provider = createCalendarProvider(config: config)
             
+        case "FocusedWindowSwitcherProvider":
+            provider = createFocusedWindowSwitcherProvider(config: config)
         default:
             return nil
         }
@@ -163,6 +165,11 @@ class ProviderFactory {
         return provider
     }
     
+    private func createFocusedWindowSwitcherProvider(config: ProviderConfiguration) -> FocusedWindowSwitcherProvider? {
+        let provider = FocusedWindowSwitcherProvider()
+        return provider
+    }
+    
     // MARK: - Provider Type Validation
     static func isProviderTypeSupported(_ type: String) -> Bool {
         return supportedProviderTypes().contains(type)
@@ -180,7 +187,8 @@ class ProviderFactory {
             "ShortcutExecuteProvider",
             "ClipboardHistoryProvider",
             "RemindersProvider",
-            "CalendarProvider"
+            "CalendarProvider",
+            "FocusedWindowSwitcherProvider"
         ]
     }
 }
