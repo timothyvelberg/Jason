@@ -350,47 +350,38 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
 
         // Create nodes for each app
         let appNodes: [FunctionNode] = appEntries.map { entry in
-            // Get AppSwitcherManager for context actions
             let manager = appSwitcherManager
             
             var contextActions: [FunctionNode] = []
             
-            // Add app-specific actions if running
             if entry.isRunning, let runningApp = entry.runningApp, let manager = manager {
                 contextActions = [
                     StandardContextActions.quitApp(runningApp, manager: manager),
                 ]
             }
             
-            // Add favorite management actions
             if entry.isFavorite {
                 contextActions.append(
                     createRemoveFromFavoritesAction(bundleIdentifier: entry.bundleIdentifier, name: entry.name)
                 )
             } else if entry.isRunning {
-                // Only show "Add to Favorites" for running apps
                 contextActions.append(
                     createAddToFavoritesAction(bundleIdentifier: entry.bundleIdentifier, name: entry.name)
                 )
             }
 
-//            // Build window children for running apps
-//            let windowNodes: [FunctionNode]
-//            if entry.isRunning, let runningApp = entry.runningApp {
-//                windowNodes = createWindowNodes(for: runningApp)
-//            } else {
-//                windowNodes = []
-//            }
-
-            let hasWindows = entry.isRunning && entry.runningApp != nil
+            // Window panel disabled — re-enable by changing to: entry.isRunning && entry.runningApp != nil
+            // Also restore: type: hasWindows ? .category : .app
+            //               childDisplayMode: hasWindows ? .panel : nil
+            //               onBoundaryCross: hasWindows ? .navigateInto : .doNothing
 
             return FunctionNode(
                 id: "combined-app-\(entry.bundleIdentifier)",
                 name: entry.name,
-                type: hasWindows ? .category : .app,
+                type: .app,
                 icon: entry.icon,
                 children: nil,
-                childDisplayMode: hasWindows ? .panel : nil,
+                childDisplayMode: nil,
                 contextActions: contextActions.isEmpty ? nil : contextActions,
                 slicePositioning: .center,
                 metadata: [
@@ -416,7 +407,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 onMiddleClick: ModifierAwareInteraction(base: .executeKeepOpen { [weak self] in
                     self?.launchOrSwitchToApp(entry)
                 }),
-                onBoundaryCross: ModifierAwareInteraction(base: hasWindows ? .expand : .doNothing)
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             )
         }
         
@@ -438,7 +429,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 onBoundaryCross: ModifierAwareInteraction(base: .expand)
             )
         ]
-    }
+    }r
     
     func refresh() {
         print("[CombinedApps] Refreshing apps")
