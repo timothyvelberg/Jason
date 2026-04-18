@@ -77,6 +77,10 @@ class DatabaseManager {
             throw DatabaseError.notInitialized
         }
         
+        if sqlite3_exec(db, "PRAGMA foreign_keys = ON;", nil, nil, nil) != SQLITE_OK {
+            print("❌ [DatabaseManager] Failed to enable foreign keys")
+        }
+        
         // Create folders table (all folders - registry + usage tracking)
         let foldersSQL = """
         CREATE TABLE IF NOT EXISTS folders (
@@ -282,6 +286,30 @@ class DatabaseManager {
         );
         """
         
+        let contextAppsSQL = """
+        CREATE TABLE IF NOT EXISTS context_apps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bundle_id TEXT UNIQUE NOT NULL,
+            display_name TEXT NOT NULL,
+            sort_order INTEGER NOT NULL
+        );
+        """
+        
+        let contextShortcutsSQL = """
+        CREATE TABLE IF NOT EXISTS context_shortcuts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bundle_id TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            shortcut_name TEXT NOT NULL,
+            description TEXT,
+            key_code INTEGER NOT NULL,
+            modifier_flags INTEGER NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL,
+            FOREIGN KEY (bundle_id) REFERENCES context_apps(bundle_id) ON DELETE CASCADE
+        );
+        """
+        
         let tables = [
             foldersSQL,
             favoriteFoldersSQL,
@@ -298,7 +326,9 @@ class DatabaseManager {
             clipboardHistorySQL,
             todosSQL,
             snippetsSQL,
-            providerSettingsSQL
+            providerSettingsSQL,
+            contextAppsSQL,
+            contextShortcutsSQL
         ]
         
         for sql in tables {

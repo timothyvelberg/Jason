@@ -74,7 +74,9 @@ struct ContentSettingsView: View {
                 case .snippets:   SnippetsSettingsView()
                 case .calendar:   CalendarSettingsView()
                 case .reminder:   RemindersSettingsView()
+                case .shortcuts:  ContextShortcutsSettingsView()
                 case .settings:   GeneralSettingsView()
+                
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -119,7 +121,6 @@ struct ContentSettingsView: View {
     private func setupApplication() {
         guard !isSetupComplete else { return }
         print("[ContentSettingsView] Application setup starting...")
-//        FirstLaunchConfiguration.ensureDefaultConfiguration()
         let configManager = RingConfigurationManager.shared
         configManager.loadActiveConfigurations()
         let activeConfigs = configManager.getActiveConfigurations()

@@ -14,6 +14,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case snippets = "Snippets"
     case calendar = "Calendar"
     case reminder = "Reminder"
+    case shortcuts = "Shortcuts"
     case settings = "Settings"
 
     var id: String { rawValue }
@@ -27,6 +28,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .snippets:  return "core_settings_menu_snippets"
         case .calendar:  return "core_settings_menu_calendar"
         case .reminder:  return "core_settings_menu_reminders"
+        case .shortcuts:  return "core_settings_menu_settings"
         case .settings:  return "core_settings_menu_settings"
         }
     }

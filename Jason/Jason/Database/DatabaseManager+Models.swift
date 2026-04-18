@@ -147,7 +147,7 @@ struct RingProviderEntry: Identifiable {
 struct RingTriggerEntry: Identifiable {
     let id: Int
     let ringId: Int
-    let triggerType: String            // "keyboard", "mouse", "trackpad"
+    let triggerType: String
     let keyCode: UInt16?
     let modifierFlags: UInt
     let buttonNumber: Int32?
@@ -156,6 +156,25 @@ struct RingTriggerEntry: Identifiable {
     let isHoldMode: Bool
     let autoExecuteOnRelease: Bool
     let createdAt: Int
+}
+
+struct ContextShortcut: Identifiable {
+    let id: Int64
+    var bundleId: String
+    var displayName: String
+    var shortcutName: String
+    var description: String?
+    var keyCode: UInt16
+    var modifierFlags: UInt
+    var enabled: Bool
+    var sortOrder: Int
+}
+
+struct ContextApp: Identifiable {
+    let id: Int64
+    var bundleId: String
+    var displayName: String
+    var sortOrder: Int
 }
 
 // MARK: - Errors

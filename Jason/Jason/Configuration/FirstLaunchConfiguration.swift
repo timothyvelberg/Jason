@@ -115,7 +115,7 @@ class FirstLaunchConfiguration {
             
             let appsDirectRing = try configManager.createConfiguration(
                 name: "Quick Apps (Direct)",
-                shortcut: "Ctrl+Shift+Q",  // For display
+                shortcut: "Ctrl+Shift+Q",
                 ringRadius: 80.0,
                 centerHoleRadius: 56.0,
                 iconSize: 32.0,
@@ -130,10 +130,12 @@ class FirstLaunchConfiguration {
             print("   Created '\(appsDirectRing.name)' - \(appsDirectRing.triggersSummary)")
             print("   Created default configurations")
             
+            // Seed context shortcuts
+            DatabaseManager.shared.seedContextShortcutsIfNeeded()
+            print("[FirstLaunch] Context shortcuts seeded")
+            
         } catch {
             print("   Failed to create default configuration: \(error)")
-            
-            // This is a critical error - app can't function without at least one ring
             fatalError("Failed to create default ring configuration: \(error)")
         }
     }
@@ -149,11 +151,15 @@ class FirstLaunchConfiguration {
         configManager.loadConfigurations()
         let existingConfigs = configManager.getAllConfigurations()
         
+        
+        
         // Delete all existing configurations
         for config in existingConfigs {
             do {
                 try configManager.deleteConfiguration(id: config.id)
                 print("   Deleted configuration: \(config.name)")
+                
+                
             } catch {
                 print("   Failed to delete \(config.name): \(error)")
             }

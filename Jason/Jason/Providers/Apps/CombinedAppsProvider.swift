@@ -429,7 +429,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 onBoundaryCross: ModifierAwareInteraction(base: .expand)
             )
         ]
-    }r
+    }
     
     func refresh() {
         print("[CombinedApps] Refreshing apps")
