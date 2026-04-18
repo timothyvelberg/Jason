@@ -241,7 +241,8 @@ struct EditRingView: View {
         ProviderConfig(type: "ClipboardHistoryProvider", name: "Clipboard History", description: "Access previously copied text", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "RemindersProvider", name: "Reminders", description: "Quick task list with add and complete", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "CalendarProvider", name: "Calendar", description: "Show today's calendar items", isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "FocusedWindowSwitcherProvider", name: "Window Switcher", description: "List of Windows of current focused app", isEnabled: false, displayMode: .parent)
+        ProviderConfig(type: "FocusedWindowSwitcherProvider", name: "Window Switcher", description: "List of Windows of current focused app", isEnabled: false, displayMode: .parent),
+        ProviderConfig(type: "ContextProvider", name: "Context Provider", description: "Shortcut for your individual apps", isEnabled: false, displayMode: .parent)
     ]
     
     var body: some View {

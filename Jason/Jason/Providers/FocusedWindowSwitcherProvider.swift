@@ -103,7 +103,7 @@ class FocusedWindowSwitcherProvider: ObservableObject, FunctionProvider {
             return [createNoWindowsNode(message: "No windows open")]
         }
 
-        let nodes = windows.map { window in
+        let windowNodes = windows.map { window in
             FunctionNode(
                 id: "focused-window-\(window.windowID)",
                 name: window.title.isEmpty ? "Untitled Window" : window.title,
@@ -123,11 +123,29 @@ class FocusedWindowSwitcherProvider: ObservableObject, FunctionProvider {
             )
         }
 
-        cachedNodes = nodes
+        let result = [
+            FunctionNode(
+                id: "focused-window-switcher-category",
+                name: frontmost.localizedName ?? "Windows",
+                type: .category,
+                icon: frontmost.icon ?? providerIcon,
+                children: windowNodes,
+                childDisplayMode: .panel,
+                preferredLayout: .partialSlice,
+                slicePositioning: .center,
+                providerId: providerId,
+                onLeftClick: ModifierAwareInteraction(base: .doNothing),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .expand)
+            )
+        ]
+
+        cachedNodes = result
         cachedForBundleID = frontmost.bundleIdentifier
         lastFetchDate = Date()
 
-        return nodes
+        return result
     }
 
     // MARK: - Empty State

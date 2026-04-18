@@ -77,6 +77,9 @@ class ProviderFactory {
             
         case "FocusedWindowSwitcherProvider":
             provider = createFocusedWindowSwitcherProvider(config: config)
+        case "ContextProvider":
+            provider = createContextProvider(config: config)
+            
         default:
             return nil
         }
@@ -109,6 +112,11 @@ class ProviderFactory {
         provider.circularUIManager = circularUIManager
         provider.appSwitcherManager = appSwitcherManager  //This is now the shared instance
     
+        return provider
+    }
+    
+    private func createContextProvider(config: ProviderConfiguration) -> ContextProvider? {
+        let provider = ContextProvider()
         return provider
     }
     
@@ -188,7 +196,8 @@ class ProviderFactory {
             "ClipboardHistoryProvider",
             "RemindersProvider",
             "CalendarProvider",
-            "FocusedWindowSwitcherProvider"
+            "FocusedWindowSwitcherProvider",
+            "ContextProvider"
         ]
     }
 }
