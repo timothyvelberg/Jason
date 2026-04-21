@@ -302,6 +302,7 @@ class DatabaseManager {
             display_name TEXT NOT NULL,
             shortcut_name TEXT NOT NULL,
             description TEXT,
+            icon_name TEXT,
             key_code INTEGER NOT NULL,
             modifier_flags INTEGER NOT NULL,
             enabled INTEGER NOT NULL DEFAULT 1,

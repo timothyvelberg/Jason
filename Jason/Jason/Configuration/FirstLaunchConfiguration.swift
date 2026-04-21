@@ -130,8 +130,6 @@ class FirstLaunchConfiguration {
             print("   Created '\(appsDirectRing.name)' - \(appsDirectRing.triggersSummary)")
             print("   Created default configurations")
             
-            // Seed context shortcuts
-            DatabaseManager.shared.seedContextShortcutsIfNeeded()
             print("[FirstLaunch] Context shortcuts seeded")
             
         } catch {

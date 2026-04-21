@@ -42,14 +42,14 @@ class ContextProvider: ObservableObject, FunctionProvider {
 
         let shortcuts = DatabaseManager.shared.fetchContextShortcuts(for: bundleID)
         let enabledShortcuts = shortcuts.filter { $0.enabled }
-
+        
         let children: [FunctionNode] = enabledShortcuts.isEmpty
             ? [noActionsNode()]
             : enabledShortcuts.map { shortcut in
                 makeShortcutNode(
                     id: "context-\(shortcut.id)",
                     name: shortcut.shortcutName,
-                    icon: "command",
+                    icon: shortcut.iconName ?? "command",
                     keyCode: shortcut.keyCode,
                     modifierFlags: shortcut.modifierFlags
                 )
@@ -67,10 +67,6 @@ class ContextProvider: ObservableObject, FunctionProvider {
         print("🎯 [ContextProvider] teardown()")
         NotificationCenter.default.removeObserver(self)
         print("🎯 [ContextProvider] teardown complete")
-    }
-    
-    func loadChildren(for node: FunctionNode) async -> [FunctionNode] {
-        return provideFunctions().first?.children ?? [noActionsNode()]
     }
 
     // MARK: - Node Helpers

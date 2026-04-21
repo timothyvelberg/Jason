@@ -249,7 +249,7 @@ struct EditRingView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text(isCreating ? "Create New Ring" : "Edit Ring")
+                Text(isCreating ? "Create New Instance" : "Edit Instance")
                     .font(.title2)
                     .fontWeight(.semibold)
                 

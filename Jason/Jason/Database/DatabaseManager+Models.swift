@@ -164,6 +164,7 @@ struct ContextShortcut: Identifiable {
     var displayName: String
     var shortcutName: String
     var description: String?
+    var iconName: String?
     var keyCode: UInt16
     var modifierFlags: UInt
     var enabled: Bool
