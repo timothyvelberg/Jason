@@ -23,6 +23,23 @@ struct RingProviderConfig: Identifiable, Equatable {
     }
 }
 
+struct SectionBox<Label: View, Content: View>: View {
+    let label: () -> Label
+    let content: () -> Content
+    
+    init(@ViewBuilder label: @escaping () -> Label, @ViewBuilder content: @escaping () -> Content) {
+        self.label = label
+        self.content = content
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            label()
+            content()
+        }
+    }
+}
+
 // MARK: - Trigger Config (for form state)
 
 struct TriggerFormConfig: Identifiable, Equatable {
@@ -212,8 +229,8 @@ struct EditRingView: View {
     
     // Form fields
     @State private var name: String = ""
-    @State private var triggers: [TriggerFormConfig] = []  // NEW: Array of triggers
-    @State private var showAddTriggerSheet = false          // NEW: Sheet state
+    @State private var triggers: [TriggerFormConfig] = []
+    @State private var showAddTriggerSheet = false
     @State private var ringRadius: String = "80"
     @State private var centerHoleRadius: String = "56"
     @State private var iconSize: String = "32"
@@ -270,59 +287,124 @@ struct EditRingView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     
                     // 1. Type of Instance
-                    GroupBox {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Ring or Panel")
-                                        .font(.body)
-                                        .fontWeight(.medium)
-                                    Text("Set up multiple providers as a Ring, or a single provider as a Panel.")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                Spacer()
-                                
-                                Picker("", selection: $isPanelMode) {
-                                    Text("Ring").tag(false)
-                                    Text("Panel").tag(true)
-                                }
-                                .pickerStyle(.segmented)
-                                .frame(width: 140)
-                                .onChange(of: isPanelMode) { _, newValue in
-                                    if newValue {
-                                        panelProviderType = providers.first(where: { $0.isEnabled })?.type
-                                    } else {
-                                        panelProviderType = nil
-                                    }
-                                }
-                            }
-                        }
-                        .padding(12)
-                    } label: {
+                    SectionBox {
                         Text("1. Type of Instance")
                             .font(.headline)
                             .padding(.bottom, 8)
                             .padding(.top, 8)
+                    } content: {
+                        HStack(spacing: 16) {
+                            // Ring option
+                            VStack() {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.secondary.opacity(0))
+                                    .frame(height: 120)
+                                    .overlay(
+                                        Image(systemName: "circle.grid.cross")
+                                            .font(.system(size: 40))
+                                            .foregroundColor(.secondary.opacity(0.4))
+                                    )
+                                
+                                Text("Ring")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                
+                                Text("Hosts multiple providers")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(!isPanelMode ? Color.blue.opacity(0) : Color.clear)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(!isPanelMode ? Color.blue.opacity(0.5) : Color.secondary.opacity(0.2), lineWidth: !isPanelMode ? 2 : 1)
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                isPanelMode = false
+                                panelProviderType = nil
+                            }
+                            
+                            // Panel option
+                            VStack() {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.secondary.opacity(0))
+                                    .frame(height: 120)
+                                    .overlay(
+                                        Image(systemName: "rectangle.stack")
+                                            .font(.system(size: 40))
+                                            .foregroundColor(.secondary.opacity(0.4))
+                                    )
+                                
+                                Text("Panel")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                
+                                Text("Hosts a single provider")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(isPanelMode ? Color.blue.opacity(0) : Color.clear)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(isPanelMode ? Color.blue.opacity(0.5) : Color.secondary.opacity(0.2), lineWidth: isPanelMode ? 2 : 1)
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                isPanelMode = true
+                                panelProviderType = providers.first(where: { $0.isEnabled })?.type
+                            }
+                        }
+                        .padding(12)
                     }
                     
                     // 2. Name of Instance
-                    GroupBox {
-                        VStack(alignment: .leading, spacing: 12) {
-                            TextField("Ring Name", text: $name)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                        .padding(12)
-                    } label: {
+                    SectionBox {
                         Text("2. Name of Instance")
                             .font(.headline)
                             .padding(.bottom, 8)
                             .padding(.top, 8)
+                    } content: {
+                        VStack(alignment: .leading, spacing: 12) {
+                            TextField("Ring Name", text: $name)
+                                .textFieldStyle(.roundedBorder)
+                                .onAppear {
+                                    DispatchQueue.main.async {
+                                        NSApp.keyWindow?.makeFirstResponder(nil)
+                                    }
+                                }
+                        }
+                        .padding(12)
                     }
                     
                     // 3. Triggers
-                    GroupBox {
+                    SectionBox {
+                        HStack {
+                            Text("3. Triggers")
+                                .font(.headline)
+                                .padding(.bottom, 8)
+                                .padding(.top, 8)
+                            Spacer()
+                            Button(action: { showAddTriggerSheet = true }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.blue)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Add trigger")
+                        }
+                    } content: {
                         VStack(alignment: .leading, spacing: 12) {
                             if triggers.isEmpty {
                                 HStack {
@@ -354,21 +436,6 @@ struct EditRingView: View {
                             }
                         }
                         .padding(12)
-                    } label: {
-                        HStack {
-                            Text("3. Triggers")
-                                .font(.headline)
-                                .padding(.bottom, 8)
-                                .padding(.top, 8)
-                            Spacer()
-                            Button(action: { showAddTriggerSheet = true }) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.blue)
-                            }
-                            .buttonStyle(.plain)
-                            .help("Add trigger")
-                        }
                     }
                     .sheet(isPresented: $showAddTriggerSheet) {
                         AddTriggerSheet(existingTriggers: triggers) { newTrigger in
@@ -379,7 +446,24 @@ struct EditRingView: View {
                     }
                     
                     // 4. Providers
-                    GroupBox {
+                    SectionBox {
+                        HStack {
+                            Text("4. Content Providers")
+                                .font(.headline)
+                                .padding(.bottom, 8)
+                                .padding(.top, 8)
+                            Spacer()
+                            if canAddMoreProviders {
+                                Button(action: { showAddProviderSheet = true }) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.blue)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Add provider")
+                            }
+                        }
+                    } content: {
                         VStack(alignment: .leading, spacing: 12) {
                             if savedProviderIndices.isEmpty {
                                 HStack {
@@ -423,23 +507,7 @@ struct EditRingView: View {
                                 .frame(height: max(60, CGFloat(savedProviderIndices.count) * 48))
                             }
                         }
-                    } label: {
-                        HStack {
-                            Text("4. Content Providers")
-                                .font(.headline)
-                                .padding(.bottom, 8)
-                                .padding(.top, 8)
-                            Spacer()
-                            if canAddMoreProviders {
-                                Button(action: { showAddProviderSheet = true }) {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(.blue)
-                                    }
-                                .buttonStyle(.plain)
-                                .help("Add provider")
-                            }
-                        }
+                        .padding(12)
                     }
                     .sheet(isPresented: $showAddProviderSheet) {
                         AddProviderSheet(
