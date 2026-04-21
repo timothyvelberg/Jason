@@ -220,6 +220,7 @@ struct EditRingView: View {
     @State private var startAngle: Double = 0.0
     @State private var panelProviderType: String? = nil
     @State private var isPanelMode: Bool = false
+    @State private var showAddProviderSheet = false
     
     // Provider selection - ordered array
     @State private var providers: [ProviderConfig] = []
@@ -235,14 +236,14 @@ struct EditRingView: View {
         ProviderConfig(type: "CombinedAppsProvider", name: "Apps", description: "Running and favorite applications", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "FavoriteFilesProvider", name: "Favorite Files", description: "Quick access to favorite files", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "FavoriteFolderProvider", name: "Finder Logic", description: "Browse folders and recent locations", isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "SystemActionsProvider", name: "System Actions", description: "Lock, Sleep, Logout, etc.", isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "WindowManagementProvider", name: "Window Management", description: "Resize and position windows", isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "ShortcutExecuteProvider", name: "Keyboard Shortcuts", description: "Execute keyboard shortcuts (Copy, Paste, etc.)", isEnabled: false, displayMode: .parent),
+        ProviderConfig(type: "ContextProvider", name: "Context Provider", description: "Shortcut for your individual apps", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "ClipboardHistoryProvider", name: "Clipboard History", description: "Access previously copied text", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "RemindersProvider", name: "Reminders", description: "Quick task list with add and complete", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "CalendarProvider", name: "Calendar", description: "Show today's calendar items", isEnabled: false, displayMode: .parent),
         ProviderConfig(type: "FocusedWindowSwitcherProvider", name: "Window Switcher", description: "List of Windows of current focused app", isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "ContextProvider", name: "Context Provider", description: "Shortcut for your individual apps", isEnabled: false, displayMode: .parent)
+        ProviderConfig(type: "SystemActionsProvider", name: "System Actions", description: "Lock, Sleep, Logout, etc.", isEnabled: false, displayMode: .parent),
+        ProviderConfig(type: "WindowManagementProvider", name: "Window Management", description: "Resize and position windows", isEnabled: false, displayMode: .parent),
+        ProviderConfig(type: "ShortcutExecuteProvider", name: "Keyboard Shortcuts", description: "Execute keyboard shortcuts (Copy, Paste, etc.)", isEnabled: false, displayMode: .parent)
     ]
     
     var body: some View {
@@ -268,36 +269,61 @@ struct EditRingView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     
-                    // Basic Settings
-                    GroupBox(label: Label("Basic Settings", systemImage: "gear")) {
+                    // 1. Type of Instance
+                    GroupBox {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Ring or Panel")
+                                        .font(.body)
+                                        .fontWeight(.medium)
+                                    Text("Set up multiple providers as a Ring, or a single provider as a Panel.")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Picker("", selection: $isPanelMode) {
+                                    Text("Ring").tag(false)
+                                    Text("Panel").tag(true)
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 140)
+                                .onChange(of: isPanelMode) { _, newValue in
+                                    if newValue {
+                                        panelProviderType = providers.first(where: { $0.isEnabled })?.type
+                                    } else {
+                                        panelProviderType = nil
+                                    }
+                                }
+                            }
+                        }
+                        .padding(12)
+                    } label: {
+                        Text("1. Type of Instance")
+                            .font(.headline)
+                            .padding(.bottom, 8)
+                            .padding(.top, 8)
+                    }
+                    
+                    // 2. Name of Instance
+                    GroupBox {
                         VStack(alignment: .leading, spacing: 12) {
                             TextField("Ring Name", text: $name)
                                 .textFieldStyle(.roundedBorder)
                         }
                         .padding(12)
+                    } label: {
+                        Text("2. Name of Instance")
+                            .font(.headline)
+                            .padding(.bottom, 8)
+                            .padding(.top, 8)
                     }
                     
-                    // Triggers Section (NEW)
-                    GroupBox(label: Label("Triggers", systemImage: "bolt.fill")) {
+                    // 3. Triggers
+                    GroupBox {
                         VStack(alignment: .leading, spacing: 12) {
-                            // Header with add button
-                            HStack {
-                                Text("Configure how to activate this ring")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                
-                                Spacer()
-                                
-                                Button(action: { showAddTriggerSheet = true }) {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(.blue)
-                                }
-                                .buttonStyle(.plain)
-                                .help("Add trigger")
-                            }
-                            
-                            // Triggers list
                             if triggers.isEmpty {
                                 HStack {
                                     Spacer()
@@ -328,6 +354,21 @@ struct EditRingView: View {
                             }
                         }
                         .padding(12)
+                    } label: {
+                        HStack {
+                            Text("3. Triggers")
+                                .font(.headline)
+                                .padding(.bottom, 8)
+                                .padding(.top, 8)
+                            Spacer()
+                            Button(action: { showAddTriggerSheet = true }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.blue)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Add trigger")
+                        }
                     }
                     .sheet(isPresented: $showAddTriggerSheet) {
                         AddTriggerSheet(existingTriggers: triggers) { newTrigger in
@@ -337,61 +378,78 @@ struct EditRingView: View {
                         }
                     }
                     
-                    // Providers
-                    GroupBox(label: Label("Content Providers", systemImage: "square.stack.3d.up.fill")) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            
-                            // MARK: - Ring / Panel Mode Selector
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Ring or Panel")
-                                        .font(.body)
-                                        .fontWeight(.medium)
-                                    Text("Set up multiple providers as a Ring, or a single provider as a Panel.")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                Spacer()
-                                
-                                Picker("", selection: $isPanelMode) {
-                                    Text("Ring").tag(false)
-                                    Text("Panel").tag(true)
-                                }
-                                .pickerStyle(.segmented)
-                                .frame(width: 140)
-                                .onChange(of: isPanelMode) { _, newValue in
-                                    if newValue {
-                                        // Switching to Panel: just set panelProviderType, don't touch isEnabled
-                                        panelProviderType = providers.first(where: { $0.isEnabled })?.type
-                                    } else {
-                                        // Switching to Ring: just clear panelProviderType
-                                        panelProviderType = nil
+                    // 4. Providers
+                    GroupBox {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if savedProviderIndices.isEmpty {
+                                HStack {
+                                    Spacer()
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "square.stack.3d.up")
+                                            .font(.system(size: 32))
+                                            .foregroundColor(.secondary.opacity(0.5))
+                                        Text("No providers added")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text("Add at least one provider to power this instance")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary.opacity(0.8))
                                     }
+                                    .padding(.vertical, 20)
+                                    Spacer()
                                 }
-                                
-                            }
-                            .padding(.vertical, 6)
-                            
-                            Divider()
-                            
-                            List {
-                                ForEach(providers.indices, id: \.self) { index in
-                                    ProviderRowReorderable(
-                                        provider: $providers[index],
-                                        panelProviderType: $panelProviderType,
-                                        isPanelMode: isPanelMode,
-                                        onTap: {
-                                            panelProviderType = providers[index].type
-                                        }
-                                    )
+                            } else {
+                                List {
+                                    ForEach(savedProviderIndices, id: \.self) { index in
+                                        SavedProviderRowView(
+                                            provider: providers[index],
+                                            displayMode: $providers[index].displayMode,
+                                            isPanelMode: isPanelMode,
+                                            onRemove: {
+                                                withAnimation {
+                                                    removeProvider(type: providers[index].type)
+                                                }
+                                            }
+                                        )
+                                        .listRowInsets(EdgeInsets())
+                                        .listRowBackground(Color.clear)
+                                        .listRowSeparator(.hidden)
+                                    }
+                                    .onMove(perform: isPanelMode ? nil : moveSavedProvider)
                                 }
-                                .onMove(perform: isPanelMode ? nil : moveProvider)
+                                .listStyle(.plain)
+                                .scrollContentBackground(.hidden)
+                                .scrollDisabled(true)
+                                .frame(height: max(60, CGFloat(savedProviderIndices.count) * 48))
                             }
-                            .listStyle(.inset)
-                            .frame(minHeight: 300)
                         }
-                        .padding(12)
+                    } label: {
+                        HStack {
+                            Text("4. Content Providers")
+                                .font(.headline)
+                                .padding(.bottom, 8)
+                                .padding(.top, 8)
+                            Spacer()
+                            if canAddMoreProviders {
+                                Button(action: { showAddProviderSheet = true }) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.blue)
+                                    }
+                                .buttonStyle(.plain)
+                                .help("Add provider")
+                            }
+                        }
+                    }
+                    .sheet(isPresented: $showAddProviderSheet) {
+                        AddProviderSheet(
+                            availableProviders: availableProviders,
+                            isPanelMode: isPanelMode
+                        ) { type, displayMode in
+                            withAnimation {
+                                addProvider(type: type, displayMode: displayMode)
+                            }
+                        }
                     }
                 }
                 .padding()
@@ -419,6 +477,57 @@ struct EditRingView: View {
         .frame(width: 600, height: 800)
         .onAppear {
             loadConfiguration()
+        }
+    }
+    
+    // MARK: - Provider Helpers
+
+    private var savedProviderIndices: [Int] {
+        if isPanelMode {
+            return providers.indices.filter { providers[$0].type == panelProviderType }
+        } else {
+            return providers.indices.filter { providers[$0].isEnabled }
+        }
+    }
+    
+    private func moveSavedProvider(from source: IndexSet, to destination: Int) {
+        var saved = savedProviderIndices.map { providers[$0] }
+        saved.move(fromOffsets: source, toOffset: destination)
+        let disabled = providers.filter { !$0.isEnabled }
+        providers = saved + disabled
+    }
+    
+    private var availableProviders: [ProviderConfig] {
+        if isPanelMode {
+            return providers
+        } else {
+            return providers.filter { !$0.isEnabled }
+        }
+    }
+
+    private var canAddMoreProviders: Bool {
+        if isPanelMode {
+            return panelProviderType == nil
+        }
+        return providers.contains { !$0.isEnabled }
+    }
+
+    private func addProvider(type: String, displayMode: ProviderDisplayMode) {
+        guard let index = providers.firstIndex(where: { $0.type == type }) else { return }
+        if isPanelMode {
+            panelProviderType = type
+        } else {
+            providers[index].isEnabled = true
+        }
+        providers[index].displayMode = displayMode
+    }
+
+    private func removeProvider(type: String) {
+        guard let index = providers.firstIndex(where: { $0.type == type }) else { return }
+        if isPanelMode {
+            panelProviderType = nil
+        } else {
+            providers[index].isEnabled = false
         }
     }
     
@@ -663,88 +772,6 @@ struct EditRingView: View {
     }
 }
 
-// MARK: - Provider Row (Reorderable)
-
-struct ProviderRowReorderable: View {
-    @Binding var provider: ProviderConfig
-    @Binding var panelProviderType: String?
-    var isPanelMode: Bool
-    var onTap: (() -> Void)?
-
-    
-    private var isPanel: Bool {
-        panelProviderType == provider.type
-    }
-    
-    private var isLocked: Bool {
-        panelProviderType != nil && panelProviderType != provider.type
-    }
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Drag handle — hidden in Panel mode
-            if !isPanelMode {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary.opacity(0.5))
-                    .help("Drag to reorder")
-            }
-            
-            // Checkbox — hidden in Panel mode
-            if !isPanelMode {
-                Toggle("", isOn: $provider.isEnabled)
-                    .labelsHidden()
-                    .toggleStyle(.checkbox)
-                    .disabled(isLocked)
-            }
-            
-            // Provider info
-            VStack(alignment: .leading, spacing: 2) {
-                Text(provider.name)
-                    .font(.body)
-                    .fontWeight(.medium)
-                    .foregroundColor(isPanelMode ? (isPanel ? .primary : .secondary) : (provider.isEnabled && !isLocked ? .primary : .secondary))
-                
-                Text(provider.description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            // Parent/Direct picker — Ring mode only, enabled providers only
-            if !isPanelMode && provider.isEnabled && !isLocked {
-                Picker("", selection: $provider.displayMode) {
-                    ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 140)
-            }
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(
-                    isPanelMode && isPanel ? Color.blue.opacity(0.08) :
-                    !isPanelMode && provider.isEnabled ? Color.blue.opacity(0.05) : Color.clear
-                )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(isPanelMode && isPanel ? Color.blue.opacity(0.4) : Color.clear, lineWidth: 1)
-        )
-        .opacity(isPanelMode ? 1.0 : (isLocked ? 0.4 : 1.0))
-        .if(isPanelMode) { view in
-            view
-                .contentShape(Rectangle())
-                .onTapGesture { onTap?() }
-        }
-    }
-}
-
 // MARK: - Display Mode Enum
 
 enum ProviderDisplayMode: String, CaseIterable {
@@ -837,6 +864,162 @@ extension EditRingView {
         parts.append(buttonName)
         
         return parts.joined()
+    }
+}
+
+// MARK: - Saved Provider Row
+
+struct SavedProviderRowView: View {
+    let provider: ProviderConfig
+    @Binding var displayMode: ProviderDisplayMode
+    let isPanelMode: Bool
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "list.bullet")
+                .font(.system(size: 16))
+                .foregroundColor(.white)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(provider.name)
+                    .font(.body)
+                    .fontWeight(.medium)
+
+                Text(provider.description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            if !isPanelMode {
+                Picker("", selection: $displayMode) {
+                    ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 140)
+            }
+
+            Button(action: onRemove) {
+                Image(systemName: "trash")
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .buttonStyle(.plain)
+            .help("Remove provider")
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+// MARK: - Add Provider Sheet
+
+struct AddProviderSheet: View {
+    @Environment(\.dismiss) var dismiss
+
+    let availableProviders: [ProviderConfig]
+    let isPanelMode: Bool
+    let onAdd: (String, ProviderDisplayMode) -> Void
+
+    @State private var selectedType: String? = nil
+    @State private var displayMode: ProviderDisplayMode = .parent
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Add Provider")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .buttonStyle(.bordered)
+            }
+            .padding()
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+
+                    // Provider list
+                    VStack(spacing: 4) {
+                        ForEach(availableProviders) { provider in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(provider.name)
+                                        .fontWeight(.medium)
+                                    Text(provider.description)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if selectedType == provider.type {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(selectedType == provider.type ? Color.blue.opacity(0.08) : Color.clear)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(selectedType == provider.type ? Color.blue.opacity(0.4) : Color.clear, lineWidth: 1)
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture { selectedType = provider.type }
+                        }
+                    }
+
+                    // Display mode — ring mode only, shown once a provider is selected
+                    if !isPanelMode && selectedType != nil {
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Display Mode")
+                                .font(.body)
+                                .fontWeight(.medium)
+                            Text("Parent shows this provider as a slice in the ring. Direct shows its contents immediately.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+
+                            Picker("", selection: $displayMode) {
+                                ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
+                                    Text(mode.displayName).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 200)
+                        }
+                    }
+                }
+                .padding()
+            }
+
+            Divider()
+
+            // Footer
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .buttonStyle(.bordered)
+                Button("Add") {
+                    if let type = selectedType {
+                        onAdd(type, displayMode)
+                        dismiss()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(selectedType == nil)
+            }
+            .padding()
+        }
+        .frame(width: 480, height: 500)
     }
 }
 
@@ -933,10 +1116,10 @@ struct TrackpadGesturePicker: View {
                     
                     if !availableDirections().contains(direction) {
                         let newDirection = availableDirections().first ?? .add
-                        print("   ⚠️ Resetting direction to: \(newDirection.rawValue)")
+                        print("   Resetting direction to: \(newDirection.rawValue)")
                         direction = newDirection
                     } else {
-                        print("   ✅ Direction is valid, keeping it")
+                        print("   Direction is valid, keeping it")
                     }
                 }
 
@@ -1182,7 +1365,6 @@ struct MouseButtonRecorder: View {
         return parts.joined()
     }
 }
-
 
 // MARK: - Mouse Button Recorder Handler
 

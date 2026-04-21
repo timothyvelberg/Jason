@@ -231,7 +231,7 @@ struct TriggerRowView: View {
             // Type icon
             Image(systemName: iconName)
                 .font(.system(size: 16))
-                .foregroundColor(.blue)
+                .foregroundColor(.white)
                 .frame(width: 24)
             
             // Trigger description
@@ -258,24 +258,19 @@ struct TriggerRowView: View {
             // Delete button
             Button(action: onDelete) {
                 Image(systemName: "trash")
-                    .foregroundColor(.red.opacity(0.8))
+                    .foregroundColor(.white.opacity(0.8))
             }
             .buttonStyle(.plain)
             .help("Remove trigger")
         }
         .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.blue.opacity(0.05))
-        )
     }
     
     private var iconName: String {
         switch trigger.triggerType {
         case .keyboard: return "keyboard"
         case .mouse: return "computermouse"
-        case .trackpad: return "hand.draw"
+        case .trackpad: return "rectangle.and.hand.point.up.left.filled"
         }
     }
 }
