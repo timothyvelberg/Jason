@@ -209,6 +209,7 @@ class DatabaseManager {
             swipe_direction TEXT,
             finger_count INTEGER,
             is_hold_mode INTEGER DEFAULT 0,
+            is_modifier_hold_mode INTEGER DEFAULT 0,
             auto_execute_on_release INTEGER DEFAULT 1,
             created_at INTEGER DEFAULT (strftime('%s', 'now')),
             FOREIGN KEY (ring_id) REFERENCES ring_configurations(id) ON DELETE CASCADE

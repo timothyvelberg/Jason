@@ -39,6 +39,7 @@ class CircularUIManager: ObservableObject, UIManager {
     var isIntentionallySwitching: Bool = false
     
     var isInHoldMode: Bool = false
+    var isInModifierHoldMode: Bool = false
     var inputCoordinator: InputCoordinator?
     
     var listPanelManager: ListPanelManager?

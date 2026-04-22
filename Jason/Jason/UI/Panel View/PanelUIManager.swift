@@ -22,6 +22,7 @@ class PanelUIManager: ObservableObject, UIManager {
     @Published var isVisible: Bool = false
     let configId: Int
     var isInHoldMode: Bool = false
+    var isInModifierHoldMode: Bool = false
     var activeTrigger: TriggerConfiguration?
     var listPanelManager: ListPanelManager?
     
@@ -239,9 +240,9 @@ class PanelUIManager: ObservableObject, UIManager {
         
         // Stop mouse monitor
         stopPanelMouseMonitor()
-        
-        // Execute hovered item if in hold mode
-        if isInHoldMode {
+
+        // Execute hovered item if in hold mode or modifier hold mode
+        if isInHoldMode || isInModifierHoldMode {
             executeHoveredItemIfInHoldMode()
         }
         
@@ -255,6 +256,7 @@ class PanelUIManager: ObservableObject, UIManager {
         
         // Reset hold mode
         isInHoldMode = false
+        isInModifierHoldMode = false
         
         // Restore previous app if not intentionally switching
         if !isIntentionallySwitching {
@@ -554,7 +556,7 @@ class PanelUIManager: ObservableObject, UIManager {
     // MARK: - Hold Mode
     
     private func executeHoveredItemIfInHoldMode() {
-        guard isInHoldMode else { return }
+        guard isInHoldMode || isInModifierHoldMode else { return }
         
         let autoExecuteEnabled = activeTrigger?.autoExecuteOnRelease ?? true
         guard autoExecuteEnabled else {

@@ -23,6 +23,7 @@ extension DatabaseManager {
         swipeDirection: String? = nil,
         fingerCount: Int? = nil,
         isHoldMode: Bool = false,
+        isModifierHoldMode: Bool = false,
         autoExecuteOnRelease: Bool = true
     ) -> Int? {
         guard let db = db else { return nil }
@@ -45,8 +46,8 @@ extension DatabaseManager {
             }
             
             let sql = """
-            INSERT INTO ring_triggers (ring_id, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO ring_triggers (ring_id, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, is_modifier_hold_mode, auto_execute_on_release)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """
             
             var statement: OpaquePointer?
@@ -82,7 +83,8 @@ extension DatabaseManager {
                 }
                 
                 sqlite3_bind_int(statement, 8, isHoldMode ? 1 : 0)
-                sqlite3_bind_int(statement, 9, autoExecuteOnRelease ? 1 : 0)
+                sqlite3_bind_int(statement, 9, isModifierHoldMode ? 1 : 0)
+                sqlite3_bind_int(statement, 10, autoExecuteOnRelease ? 1 : 0)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     triggerId = Int(sqlite3_last_insert_rowid(db))
@@ -113,7 +115,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, ring_id, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release, created_at
+            SELECT id, ring_id, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, is_modifier_hold_mode, auto_execute_on_release, created_at
             FROM ring_triggers
             WHERE ring_id = ?
             ORDER BY created_at;
@@ -147,7 +149,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT id, ring_id, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, auto_execute_on_release, created_at
+            SELECT id, ring_id, trigger_type, key_code, modifier_flags, button_number, swipe_direction, finger_count, is_hold_mode, is_modifier_hold_mode, auto_execute_on_release, created_at
             FROM ring_triggers
             WHERE id = ?;
             """
@@ -305,6 +307,7 @@ extension DatabaseManager {
         }()
         
         let isHoldMode = sqlite3_column_int(statement, 8) == 1
+        let isModifierHoldMode = sqlite3_column_int(statement, 9) == 1
         let autoExecuteOnRelease = sqlite3_column_int(statement, 9) == 1
         let createdAt = Int(sqlite3_column_int64(statement, 10))
         
@@ -318,6 +321,7 @@ extension DatabaseManager {
             swipeDirection: swipeDirection,
             fingerCount: fingerCount,
             isHoldMode: isHoldMode,
+            isModifierHoldMode: isModifierHoldMode,
             autoExecuteOnRelease: autoExecuteOnRelease,
             createdAt: createdAt
         )

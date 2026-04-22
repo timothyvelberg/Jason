@@ -27,6 +27,7 @@ struct AddTriggerSheet: View {
     @State private var fingerCount: Int = 3
     @State private var swipeModifierFlags: UInt = 0
     @State private var isHoldMode: Bool = false
+    @State private var isModifierHoldMode: Bool = false
     @State private var autoExecuteOnRelease: Bool = true
     
     @State private var errorMessage: String?
@@ -57,7 +58,6 @@ struct AddTriggerSheet: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Trigger Type")
                             .font(.headline)
-                        
                         Picker("", selection: $triggerType) {
                             Text("Keyboard").tag(TriggerType.keyboard)
                             Text("Mouse").tag(TriggerType.mouse)
@@ -118,9 +118,18 @@ struct AddTriggerSheet: View {
                             .font(.headline)
                         
                         Toggle("Hold to show (release to hide)", isOn: $isHoldMode)
-                            .help("When enabled, UI appears while held and disappears when released")
+                            .onChange(of: isHoldMode) {
+                                if isHoldMode { isModifierHoldMode = false }
+                            }
+                            .help("UI appears while the trigger key is held, hides on release")
                         
-                        if isHoldMode {
+                        Toggle("Modifier hold (release modifiers to hide)", isOn: $isModifierHoldMode)
+                            .onChange(of: isModifierHoldMode) {
+                                if isModifierHoldMode { isHoldMode = false }
+                            }
+                            .help("UI appears on keypress and stays until modifier keys are released")
+                        
+                        if isHoldMode || isModifierHoldMode {
                             Toggle("Auto-execute on release", isOn: $autoExecuteOnRelease)
                                 .padding(.leading, 20)
                                 .help("Execute the hovered item when releasing")
@@ -182,6 +191,7 @@ struct AddTriggerSheet: View {
             swipeDirection: swipeDirection,
             fingerCount: fingerCount,
             isHoldMode: isHoldMode,
+            isModifierHoldMode: isModifierHoldMode,
             autoExecuteOnRelease: autoExecuteOnRelease
         )
         
@@ -245,7 +255,11 @@ struct TriggerRowView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    if trigger.isHoldMode {
+                    if trigger.isModifierHoldMode {
+                        Text("• Modifier Hold")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    } else if trigger.isHoldMode {
                         Text("• Hold")
                             .font(.caption)
                             .foregroundColor(.orange)

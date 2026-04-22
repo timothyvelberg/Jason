@@ -51,6 +51,7 @@ struct TriggerFormConfig: Identifiable, Equatable {
     var swipeDirection: SwipeDirection
     var fingerCount: Int
     var isHoldMode: Bool
+    var isModifierHoldMode: Bool
     var autoExecuteOnRelease: Bool
     
     // For existing triggers loaded from DB
@@ -65,6 +66,7 @@ struct TriggerFormConfig: Identifiable, Equatable {
         swipeDirection: SwipeDirection = .up,
         fingerCount: Int = 3,
         isHoldMode: Bool = false,
+        isModifierHoldMode: Bool = false,
         autoExecuteOnRelease: Bool = true,
         databaseId: Int? = nil
     ) {
@@ -76,6 +78,7 @@ struct TriggerFormConfig: Identifiable, Equatable {
         self.swipeDirection = swipeDirection
         self.fingerCount = fingerCount
         self.isHoldMode = isHoldMode
+        self.isModifierHoldMode = isModifierHoldMode
         self.autoExecuteOnRelease = autoExecuteOnRelease
         self.databaseId = databaseId
     }
@@ -86,6 +89,7 @@ struct TriggerFormConfig: Identifiable, Equatable {
         self.databaseId = config.id
         self.modifierFlags = config.modifierFlags
         self.isHoldMode = config.isHoldMode
+        self.isModifierHoldMode = config.isModifierHoldMode
         self.autoExecuteOnRelease = config.autoExecuteOnRelease
         
         if config.triggerType == "keyboard" {
@@ -720,7 +724,7 @@ struct EditRingView: View {
         }
         
         // Build triggers array for API
-        let triggerData: [(type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, autoExecuteOnRelease: Bool)] = triggers.map { trigger in
+        let triggerData: [(type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, isModifierHoldMode: Bool, autoExecuteOnRelease: Bool)] = triggers.map { trigger in
             (
                 type: trigger.triggerType.rawValue,
                 keyCode: trigger.triggerType == .keyboard ? trigger.keyCode : nil,
@@ -729,6 +733,7 @@ struct EditRingView: View {
                 swipeDirection: trigger.triggerType == .trackpad ? trigger.swipeDirection.rawValue : nil,
                 fingerCount: trigger.triggerType == .trackpad ? trigger.fingerCount : nil,
                 isHoldMode: trigger.isHoldMode,
+                isModifierHoldMode: trigger.isModifierHoldMode,
                 autoExecuteOnRelease: trigger.autoExecuteOnRelease
             )
         }
@@ -802,6 +807,7 @@ struct EditRingView: View {
                         swipeDirection: trigger.triggerType == .trackpad ? trigger.swipeDirection.rawValue : nil,
                         fingerCount: trigger.triggerType == .trackpad ? trigger.fingerCount : nil,
                         isHoldMode: trigger.isHoldMode,
+                        isModifierHoldMode: trigger.isModifierHoldMode,
                         autoExecuteOnRelease: trigger.autoExecuteOnRelease
                     )
                 }

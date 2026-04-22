@@ -38,6 +38,7 @@ struct TriggerConfiguration: Identifiable, Equatable {
     let swipeDirection: String?
     let fingerCount: Int?
     let isHoldMode: Bool
+    let isModifierHoldMode: Bool
     let autoExecuteOnRelease: Bool
     
     // MARK: - Computed Properties
@@ -71,7 +72,9 @@ struct TriggerConfiguration: Identifiable, Equatable {
     
     /// Mode description
     var modeDescription: String {
-        return isHoldMode ? "Hold" : "Tap"
+        if isModifierHoldMode { return "Modifier Hold" }
+        if isHoldMode { return "Hold" }
+        return "Tap"
     }
     
     // MARK: - Formatting Helpers

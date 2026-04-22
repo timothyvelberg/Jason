@@ -161,7 +161,7 @@ class RingConfigurationManager: ObservableObject {
         iconSize: Double,
         startAngle: Double = 0.0,
         presentationMode: PresentationMode = .ring,
-        triggers: [(type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, autoExecuteOnRelease: Bool)] = [],
+        triggers: [(type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, isModifierHoldMode: Bool, autoExecuteOnRelease: Bool)] = [],
         providers: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
     ) throws -> StoredRingConfiguration {
         print("[RingConfigManager] Creating configuration '\(name)'")
@@ -232,6 +232,7 @@ class RingConfigurationManager: ObservableObject {
                 swipeDirection: trigger.swipeDirection,
                 fingerCount: trigger.fingerCount,
                 isHoldMode: trigger.isHoldMode,
+                isModifierHoldMode: trigger.isModifierHoldMode,
                 autoExecuteOnRelease: trigger.autoExecuteOnRelease
             ) {
                 triggerConfigs.append(TriggerConfiguration(
@@ -243,6 +244,7 @@ class RingConfigurationManager: ObservableObject {
                     swipeDirection: trigger.swipeDirection,
                     fingerCount: trigger.fingerCount,
                     isHoldMode: trigger.isHoldMode,
+                    isModifierHoldMode: trigger.isModifierHoldMode,
                     autoExecuteOnRelease: trigger.autoExecuteOnRelease
                 ))
                 print("   Added trigger: \(trigger.type)")
@@ -402,6 +404,7 @@ class RingConfigurationManager: ObservableObject {
         swipeDirection: String? = nil,
         fingerCount: Int? = nil,
         isHoldMode: Bool = false,
+        isModifierHoldMode: Bool = false,
         autoExecuteOnRelease: Bool = true
     ) throws -> Int {
         print("[RingConfigManager] Adding trigger to ring \(ringId)")
@@ -444,6 +447,7 @@ class RingConfigurationManager: ObservableObject {
             swipeDirection: swipeDirection,
             fingerCount: fingerCount,
             isHoldMode: isHoldMode,
+            isModifierHoldMode: isModifierHoldMode,
             autoExecuteOnRelease: autoExecuteOnRelease
         ) else {
             throw StoredRingConfigurationError.databaseError("Failed to create trigger")
@@ -769,6 +773,7 @@ class RingConfigurationManager: ObservableObject {
                 swipeDirection: dbTrigger.swipeDirection,
                 fingerCount: dbTrigger.fingerCount,
                 isHoldMode: dbTrigger.isHoldMode,
+                isModifierHoldMode: dbTrigger.isModifierHoldMode,
                 autoExecuteOnRelease: dbTrigger.autoExecuteOnRelease
             )
         }

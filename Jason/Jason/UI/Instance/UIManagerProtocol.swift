@@ -20,6 +20,9 @@ protocol UIManager: AnyObject {
     /// Whether the UI is in hold mode (key held down)
     var isInHoldMode: Bool { get set }
     
+    /// Whether the UI is in modifier hold mode (modifiers held down)
+    var isInModifierHoldMode: Bool { get set }
+    
     /// The trigger that activated this UI (for hold mode behavior)
     var activeTrigger: TriggerConfiguration? { get set }
     

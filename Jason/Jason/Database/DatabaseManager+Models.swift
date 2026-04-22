@@ -154,6 +154,7 @@ struct RingTriggerEntry: Identifiable {
     let swipeDirection: String?
     let fingerCount: Int?
     let isHoldMode: Bool
+    let isModifierHoldMode: Bool
     let autoExecuteOnRelease: Bool
     let createdAt: Int
 }

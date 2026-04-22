@@ -84,7 +84,7 @@ extension CircularUIManager {
         // Stop mouse monitor FIRST to prevent blocking permission dialogs
         pauseMouseMonitor()
         
-        if isInHoldMode {
+        if isInHoldMode || isInModifierHoldMode {
             executeHoveredItemIfInHoldMode()
         }
         
@@ -96,6 +96,7 @@ extension CircularUIManager {
         
         // Exit hold mode when hiding (prevents double-hide on key release)
         isInHoldMode = false
+        isInModifierHoldMode = false
         
         // Unregister as the active CircularUIManager
         if AppSwitcherManager.shared.activeCircularUIManager === self {
@@ -169,7 +170,7 @@ extension CircularUIManager {
     
     /// Execute the hovered item when releasing hold mode (if auto-execute is enabled)
     func executeHoveredItemIfInHoldMode() {
-        guard isInHoldMode else {
+        guard isInHoldMode || isInModifierHoldMode else {
             print("[HoldMode] Not in hold mode - skipping auto-execute")
             return
         }

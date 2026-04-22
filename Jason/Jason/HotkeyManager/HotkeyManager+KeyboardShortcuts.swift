@@ -14,12 +14,13 @@ extension HotkeyManager {
         keyCode: UInt16,
         modifierFlags: UInt,
         isHoldMode: Bool = false,
+        isModifierHoldMode: Bool = false,
         forConfigId configId: Int,
         onPress: @escaping () -> Void,
         onRelease: (() -> Void)? = nil
     ) {
         let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
-        let modeLabel = isHoldMode ? "HOLD" : "TAP"
+        let modeLabel = isModifierHoldMode ? "MODIFIER HOLD" : isHoldMode ? "HOLD" : "TAP"
         print("[HotkeyManager] Registering \(modeLabel) shortcut for config \(configId): \(shortcutDisplay)")
         
         for (existingId, existing) in registeredShortcuts {
@@ -34,6 +35,8 @@ extension HotkeyManager {
             keyCode: keyCode,
             modifierFlags: modifierFlags,
             isHoldMode: isHoldMode,
+            isModifierHoldMode: isModifierHoldMode,
+            sustainModifierMask: modifierFlags,
             onPress: onPress,
             onRelease: onRelease
         )
@@ -187,6 +190,27 @@ extension HotkeyManager {
     }
     
     func handleFlagsChanged(_ event: NSEvent) {
+        // Modifier hold release detection — must run regardless of UI visibility
+        if let activeConfigId = activeModifierHoldRegistration,
+           let registration = registeredShortcuts[activeConfigId] {
+            
+            let currentFlags = event.modifierFlags.rawValue & (
+                NSEvent.ModifierFlags.command.rawValue |
+                NSEvent.ModifierFlags.control.rawValue |
+                NSEvent.ModifierFlags.option.rawValue |
+                NSEvent.ModifierFlags.shift.rawValue
+            )
+            
+            let sustainStillHeld = (currentFlags & currentSustainMask) == currentSustainMask
+            
+            if !sustainStillHeld {
+                print("[HotkeyManager] Sustain modifiers released for config \(activeConfigId)")
+                activeModifierHoldRegistration = nil
+                currentSustainMask = 0
+                DispatchQueue.main.async { registration.onRelease?() }
+            }
+        }
+        
         guard isUIVisible?() ?? false else { return }
         
         let isShiftPressed = event.modifierFlags.contains(.shift)

@@ -39,6 +39,8 @@ class HotkeyManager {
     var wasCtrlPressed: Bool = false
     var requiresReleaseBeforeNextShow: Bool = false
     var activeHoldRegistration: Int? = nil
+    var activeModifierHoldRegistration: Int? = nil
+    var currentSustainMask: UInt = 0
     
     // MARK: - Event Monitors
     
@@ -76,6 +78,8 @@ class HotkeyManager {
         let keyCode: UInt16
         let modifierFlags: UInt
         let isHoldMode: Bool
+        let isModifierHoldMode: Bool
+        let sustainModifierMask: UInt
         let onPress: () -> Void
         let onRelease: (() -> Void)?
     }

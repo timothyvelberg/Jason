@@ -19,18 +19,19 @@ class FirstLaunchConfiguration {
         modifiers: NSEvent.ModifierFlags,
         isHoldMode: Bool = false,
         autoExecuteOnRelease: Bool = true
-    ) -> (type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, autoExecuteOnRelease: Bool) {
-        return (
-            type: "keyboard",
-            keyCode: keyCode,
-            modifierFlags: modifiers.rawValue,
-            buttonNumber: nil,
-            swipeDirection: nil,
-            fingerCount: nil,
-            isHoldMode: isHoldMode,
-            autoExecuteOnRelease: autoExecuteOnRelease
-        )
-    }
+    ) -> (type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, isModifierHoldMode: Bool, autoExecuteOnRelease: Bool) {
+            return (
+                type: "keyboard",
+                keyCode: keyCode,
+                modifierFlags: modifiers.rawValue,
+                buttonNumber: nil,
+                swipeDirection: nil,
+                fingerCount: nil,
+                isHoldMode: isHoldMode,
+                isModifierHoldMode: false,
+                autoExecuteOnRelease: autoExecuteOnRelease
+            )
+        }
     
     /// Helper to create a trackpad trigger tuple
     private static func trackpadTrigger(
@@ -39,18 +40,19 @@ class FirstLaunchConfiguration {
         modifiers: NSEvent.ModifierFlags = [],
         isHoldMode: Bool = false,
         autoExecuteOnRelease: Bool = true
-    ) -> (type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, autoExecuteOnRelease: Bool) {
-        return (
-            type: "trackpad",
-            keyCode: nil,
-            modifierFlags: modifiers.rawValue,
-            buttonNumber: nil,
-            swipeDirection: direction,
-            fingerCount: fingerCount,
-            isHoldMode: isHoldMode,
-            autoExecuteOnRelease: autoExecuteOnRelease
-        )
-    }
+    ) -> (type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, isModifierHoldMode: Bool, autoExecuteOnRelease: Bool) {
+            return (
+                type: "trackpad",
+                keyCode: nil,
+                modifierFlags: modifiers.rawValue,
+                buttonNumber: nil,
+                swipeDirection: direction,
+                fingerCount: fingerCount,
+                isHoldMode: isHoldMode,
+                isModifierHoldMode: false,
+                autoExecuteOnRelease: autoExecuteOnRelease
+            )
+        }
     
     /// Helper to create a mouse trigger tuple
     private static func mouseTrigger(
@@ -58,18 +60,19 @@ class FirstLaunchConfiguration {
         modifiers: NSEvent.ModifierFlags = [],
         isHoldMode: Bool = false,
         autoExecuteOnRelease: Bool = true
-    ) -> (type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, autoExecuteOnRelease: Bool) {
-        return (
-            type: "mouse",
-            keyCode: nil,
-            modifierFlags: modifiers.rawValue,
-            buttonNumber: buttonNumber,
-            swipeDirection: nil,
-            fingerCount: nil,
-            isHoldMode: isHoldMode,
-            autoExecuteOnRelease: autoExecuteOnRelease
-        )
-    }
+    ) -> (type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, isModifierHoldMode: Bool, autoExecuteOnRelease: Bool) {
+            return (
+                type: "mouse",
+                keyCode: nil,
+                modifierFlags: modifiers.rawValue,
+                buttonNumber: buttonNumber,
+                swipeDirection: nil,
+                fingerCount: nil,
+                isHoldMode: isHoldMode,
+                isModifierHoldMode: false,
+                autoExecuteOnRelease: autoExecuteOnRelease
+            )
+        }
     
     // MARK: - First Launch Setup
     

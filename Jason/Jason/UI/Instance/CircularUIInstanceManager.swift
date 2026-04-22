@@ -270,7 +270,24 @@ class CircularUIInstanceManager: ObservableObject {
             return
         }
         
-        if trigger.isHoldMode {
+        if trigger.isModifierHoldMode {
+            print("[InstanceManager] Registering keyboard MODIFIER HOLD: \(trigger.displayDescription) for '\(config.name)'")
+            
+            hotkeyManager.registerShortcut(
+                keyCode: keyCode,
+                modifierFlags: trigger.modifierFlags,
+                isModifierHoldMode: true,
+                forConfigId: config.id,
+                onPress: { [weak self] in
+                    print("[InstanceManager] Modifier hold PRESSED for '\(config.name)'")
+                    self?.showInModifierHoldMode(configId: config.id, trigger: trigger)
+                },
+                onRelease: { [weak self] in
+                    print("[InstanceManager] Modifier hold RELEASED for '\(config.name)'")
+                    self?.hideFromModifierHoldMode(configId: config.id)
+                }
+            )
+        } else if trigger.isHoldMode {
             print("[InstanceManager] Registering keyboard HOLD: \(trigger.displayDescription) for '\(config.name)'")
             
             hotkeyManager.registerShortcut(
@@ -656,6 +673,45 @@ extension CircularUIInstanceManager {
         instance.hide()
         
         // Clear active instance tracking
+        if activeInstanceId == configId {
+            activeInstanceId = nil
+        }
+    }
+    
+    private func showInModifierHoldMode(configId: Int, trigger: TriggerConfiguration? = nil) {
+        guard let instance = getInstance(forConfigId: configId) else {
+            print("[InstanceManager] Cannot show in modifier hold mode - no instance for config \(configId)")
+            return
+        }
+        
+        instance.isInModifierHoldMode = true
+        instance.activeTrigger = trigger
+        
+        if let currentActiveId = activeInstanceId, currentActiveId != configId {
+            if let previousInstance = getInstance(forConfigId: currentActiveId) {
+                previousInstance.hide()
+            }
+        }
+        
+        activeInstanceId = configId
+        print("[InstanceManager] Setting active instance to config \(configId) (MODIFIER HOLD MODE)")
+        instance.show()
+    }
+        
+    private func hideFromModifierHoldMode(configId: Int) {
+        guard let instance = getInstance(forConfigId: configId) else {
+            print("[InstanceManager] Cannot hide from modifier hold mode - no instance for config \(configId)")
+            return
+        }
+        
+        guard instance.isInModifierHoldMode else {
+            print("[InstanceManager] Instance \(configId) not in modifier hold mode - skipping hide")
+            return
+        }
+        
+        print("[InstanceManager] Hiding instance from modifier hold mode (config \(configId))")
+        instance.hide()
+        
         if activeInstanceId == configId {
             activeInstanceId = nil
         }

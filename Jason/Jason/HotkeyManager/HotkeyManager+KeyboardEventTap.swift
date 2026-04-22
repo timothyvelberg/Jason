@@ -78,11 +78,22 @@ extension HotkeyManager {
         )
         
         if type == .keyDown {
+            // Block all new triggers while a modifier hold session is active
+            if activeModifierHoldRegistration != nil {
+                return nil
+            }
+            
             for (configId, registration) in registeredShortcuts {
                 if registration.keyCode == keyCode && registration.modifierFlags == normalizedModifiers {
                     let display = formatShortcut(keyCode: keyCode, modifiers: normalizedModifiers)
                     
-                    if registration.isHoldMode {
+                    if registration.isModifierHoldMode {
+                        print("[HotkeyManager] MODIFIER HOLD mode MATCHED for config \(configId): \(display) (intercepted)")
+                        activeModifierHoldRegistration = configId
+                        currentSustainMask = registration.sustainModifierMask
+                        DispatchQueue.main.async { registration.onPress() }
+                        
+                    } else if registration.isHoldMode {
                         if activeHoldRegistration == configId { return nil }
                         if requiresReleaseBeforeNextShow && activeHoldRegistration != nil { return nil }
                         
@@ -99,6 +110,14 @@ extension HotkeyManager {
             }
             
         } else if type == .keyUp {
+            // In modifier hold mode, swallow the trigger key release — dismiss is owned by handleFlagsChanged
+            if let activeConfigId = activeModifierHoldRegistration,
+               let registration = registeredShortcuts[activeConfigId],
+               registration.keyCode == keyCode {
+                print("[HotkeyManager] Trigger key released in modifier hold mode — ignoring (sustain modifiers still own dismiss)")
+                return nil
+            }
+            
             if let activeConfigId = activeHoldRegistration,
                let registration = registeredShortcuts[activeConfigId],
                registration.keyCode == keyCode {
