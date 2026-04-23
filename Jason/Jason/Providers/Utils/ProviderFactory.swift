@@ -19,14 +19,15 @@ class ProviderFactory {
     /// Reference to AppSwitcherManager (needed by CombinedAppsProvider)
     /// Now references the shared singleton instead of a per-instance manager
     weak var appSwitcherManager: AppSwitcherManager?
+    let ringId: Int
     
     // MARK: - Initialization
     
-    init(circularUIManager: CircularUIManager? = nil, appSwitcherManager: AppSwitcherManager? = nil) {
+    init(circularUIManager: CircularUIManager? = nil, appSwitcherManager: AppSwitcherManager? = nil, ringId ringIdValue: Int = 0) {
         self.circularUIManager = circularUIManager
         self.appSwitcherManager = appSwitcherManager
-        
-        // Log which AppSwitcherManager we're using
+        self.ringId = ringIdValue
+
         if let manager = appSwitcherManager {
             print("   [ProviderFactory] Using AppSwitcherManager: \(manager === AppSwitcherManager.shared ? "SHARED" : "INSTANCE")")
         }
@@ -116,8 +117,7 @@ class ProviderFactory {
     }
     
     private func createContextProvider(config: ProviderConfiguration) -> ContextProvider? {
-        let provider = ContextProvider()
-        return provider
+        return ContextProvider(ringId: ringId)
     }
     
     private func createClipboardHistoryProvider(config: ProviderConfiguration) -> ClipboardHistoryProvider? {

@@ -11,66 +11,66 @@ import Foundation
 import AppKit
 
 class ContextProvider: ObservableObject, FunctionProvider {
-
+    
     // MARK: - FunctionProvider Protocol
-
+    
     var providerId: String { "context" }
-    var providerName: String { "Context" }
+    var providerName: String { "Context" }R
     var providerIcon: NSImage {
         NSImage(systemSymbolName: "contextualmenu.and.cursorarrow", accessibilityDescription: nil) ?? NSImage()
     }
-
+    
+    // MARK: - Properties
+    
+    private let ringId: Int     // NEW
+    
     // MARK: - Initialization
-
-    init() {
+    
+    init(ringId: Int) {         // NEW
+        self.ringId = ringId
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(frontmostAppChanged),
             name: .frontmostAppChanged,
             object: nil
         )
-        print("🎯 [ContextProvider] Initialized")
+        print("🎯 [ContextProvider] Initialized for ring \(ringId)")
     }
-
+    
     // MARK: - FunctionProvider Protocol
-
+    
     func provideFunctions() -> [FunctionNode] {
-        guard let app = FrontmostAppMonitor.shared.frontmostApp,
-              let bundleID = app.bundleIdentifier else {
-            return [categoryNode(children: [noActionsNode()])]
-        }
-
-        let shortcuts = DatabaseManager.shared.fetchContextShortcutsForApp(bundleId: bundleID)
+        let shortcuts = DatabaseManager.shared.fetchContextShortcuts(for: ringId)  // CHANGED
         let enabledShortcuts = shortcuts.filter { $0.enabled }
         
         let children: [FunctionNode] = enabledShortcuts.isEmpty
-            ? [noActionsNode()]
-            : enabledShortcuts.map { shortcut in
-                makeShortcutNode(
-                    id: "context-\(shortcut.id)",
-                    name: shortcut.shortcutName,
-                    icon: shortcut.iconName ?? "command",
-                    keyCode: shortcut.keyCode,
-                    modifierFlags: shortcut.modifierFlags
-                )
-            }
-
+        ? [noActionsNode()]
+        : enabledShortcuts.map { shortcut in
+            makeShortcutNode(
+                id: "context-\(shortcut.id)",
+                name: shortcut.shortcutName,
+                icon: shortcut.iconName ?? "command",
+                keyCode: shortcut.keyCode,
+                modifierFlags: shortcut.modifierFlags
+            )
+        }
+        
         return [categoryNode(children: children)]
     }
-
+    
     func refresh() {
         print("[ContextProvider] refresh() called")
         NotificationCenter.default.postProviderUpdate(providerId: providerId)
     }
-
+    
     func teardown() {
         print("[ContextProvider] teardown()")
         NotificationCenter.default.removeObserver(self)
         print("[ContextProvider] teardown complete")
     }
-
+    
     // MARK: - Node Helpers
-
+    
     private func makeShortcutNode(
         id: String,
         name: String,
@@ -79,7 +79,7 @@ class ContextProvider: ObservableObject, FunctionProvider {
         modifierFlags: UInt
     ) -> FunctionNode {
         let iconImage = NSImage(systemSymbolName: icon, accessibilityDescription: nil) ?? NSImage()
-
+        
         return FunctionNode(
             id: id,
             name: name,
@@ -97,7 +97,7 @@ class ContextProvider: ObservableObject, FunctionProvider {
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
     }
-
+    
     private func noActionsNode() -> FunctionNode {
         return FunctionNode(
             id: "context-no-actions",
@@ -131,17 +131,17 @@ class ContextProvider: ObservableObject, FunctionProvider {
             onBoundaryCross: ModifierAwareInteraction(base: .expand)
         )
     }
-
+    
     // MARK: - Notifications
-
+    
     @objc private func frontmostAppChanged() {
         guard let app = FrontmostAppMonitor.shared.frontmostApp,
               let bundleID = app.bundleIdentifier,
               bundleID != Bundle.main.bundleIdentifier else {
             return
         }
-        print("[ContextProvider] Frontmost app changed — refreshing")
         DispatchQueue.main.async {
             NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
         }
-    }}
+    }
+}

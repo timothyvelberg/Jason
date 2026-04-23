@@ -75,22 +75,29 @@ class CircularUIInstanceManager: ObservableObject {
         let circularManager = instance as? CircularUIManager
         let factory = ProviderFactory(
             circularUIManager: circularManager,
-            appSwitcherManager: AppSwitcherManager.shared
+            appSwitcherManager: AppSwitcherManager.shared,
+            ringId: config.id
         )
         
         var resolvedProviders: [any FunctionProvider] = []
         let providerTypes = config.sortedProviders.map { $0.providerType }
         
         for providerConfig in config.sortedProviders {
+            let registryKey = providerConfig.providerType == "ContextProvider"
+                ? "ContextProvider-\(config.id)"
+                : providerConfig.providerType
+
             if let provider = ProviderRegistry.shared.acquire(
-                providerType: providerConfig.providerType,
+                providerType: registryKey,
                 factory: { factory.createProvider(from: providerConfig) }
             ) {
                 resolvedProviders.append(provider)
             }
         }
-        
-        instanceProviderTypes[config.id] = providerTypes
+
+        instanceProviderTypes[config.id] = config.sortedProviders.map { p in
+            p.providerType == "ContextProvider" ? "ContextProvider-\(config.id)" : p.providerType
+        }
         
         instance.setup(injectedProviders: resolvedProviders)
         print("   Instance created and setup complete")
