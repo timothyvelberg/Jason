@@ -289,7 +289,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     private func createWindowNodes(for runningApp: NSRunningApplication) -> [FunctionNode] {
         let windows = AppSwitcherManager.shared.fetchWindows(for: runningApp)
 
-        print("🪟 [CombinedApps] Building window nodes for \(runningApp.localizedName ?? "unknown"): \(windows.count) window(s)")
+        print("[CombinedApps] Building window nodes for \(runningApp.localizedName ?? "unknown"): \(windows.count) window(s)")
 
         return windows.map { window in
             FunctionNode(

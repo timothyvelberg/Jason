@@ -59,14 +59,14 @@ class ContextProvider: ObservableObject, FunctionProvider {
     }
 
     func refresh() {
-        print("🎯 [ContextProvider] refresh() called")
+        print("[ContextProvider] refresh() called")
         NotificationCenter.default.postProviderUpdate(providerId: providerId)
     }
 
     func teardown() {
-        print("🎯 [ContextProvider] teardown()")
+        print("[ContextProvider] teardown()")
         NotificationCenter.default.removeObserver(self)
-        print("🎯 [ContextProvider] teardown complete")
+        print("[ContextProvider] teardown complete")
     }
 
     // MARK: - Node Helpers
@@ -94,10 +94,7 @@ class ContextProvider: ObservableObject, FunctionProvider {
             }),
             onRightClick: ModifierAwareInteraction(base: .doNothing),
             onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-            onBoundaryCross: ModifierAwareInteraction(base: .execute {
-                print("🎯 [ContextProvider] Executing via boundary: \(name)")
-                ShortcutExecutor.execute(keyCode: keyCode, modifierFlags: modifierFlags)
-            })
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
     }
 
