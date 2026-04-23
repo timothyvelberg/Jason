@@ -186,7 +186,8 @@ class DatabaseManager {
             presentation_mode TEXT NOT NULL DEFAULT 'ring',
             created_at INTEGER DEFAULT (strftime('%s', 'now')),
             is_active INTEGER DEFAULT 1,
-            display_order INTEGER DEFAULT 0
+            display_order INTEGER DEFAULT 0,
+            bundle_id TEXT DEFAULT NULL
         );
         """
 
@@ -299,8 +300,7 @@ class DatabaseManager {
         let contextShortcutsSQL = """
         CREATE TABLE IF NOT EXISTS context_shortcuts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bundle_id TEXT NOT NULL,
-            display_name TEXT NOT NULL,
+            ring_id INTEGER NOT NULL,
             shortcut_name TEXT NOT NULL,
             description TEXT,
             icon_name TEXT,
@@ -308,7 +308,7 @@ class DatabaseManager {
             modifier_flags INTEGER NOT NULL,
             enabled INTEGER NOT NULL DEFAULT 1,
             sort_order INTEGER NOT NULL,
-            FOREIGN KEY (bundle_id) REFERENCES context_apps(bundle_id) ON DELETE CASCADE
+            FOREIGN KEY (ring_id) REFERENCES ring_configurations(id) ON DELETE CASCADE
         );
         """
         
@@ -320,7 +320,6 @@ class DatabaseManager {
             favoriteDynamicFilesSQL,
             preferencesSQL,
             ringConfigurationsSQL,
-            ringConfigurationsIndexSQL,
             ringProvidersSQL,
             ringProvidersIndexSQL,
             circleCalibrationSQL,

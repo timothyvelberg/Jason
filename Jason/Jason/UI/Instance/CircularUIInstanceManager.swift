@@ -269,14 +269,15 @@ class CircularUIInstanceManager: ObservableObject {
             print("   Keyboard trigger missing keyCode for '\(config.name)'")
             return
         }
-        
+
         if trigger.isModifierHoldMode {
             print("[InstanceManager] Registering keyboard MODIFIER HOLD: \(trigger.displayDescription) for '\(config.name)'")
-            
+
             hotkeyManager.registerShortcut(
                 keyCode: keyCode,
                 modifierFlags: trigger.modifierFlags,
                 isModifierHoldMode: true,
+                bundleId: config.bundleId,
                 forConfigId: config.id,
                 onPress: { [weak self] in
                     print("[InstanceManager] Modifier hold PRESSED for '\(config.name)'")
@@ -289,11 +290,12 @@ class CircularUIInstanceManager: ObservableObject {
             )
         } else if trigger.isHoldMode {
             print("[InstanceManager] Registering keyboard HOLD: \(trigger.displayDescription) for '\(config.name)'")
-            
+
             hotkeyManager.registerShortcut(
                 keyCode: keyCode,
                 modifierFlags: trigger.modifierFlags,
                 isHoldMode: true,
+                bundleId: config.bundleId,
                 forConfigId: config.id,
                 onPress: { [weak self] in
                     print("[InstanceManager] Hold key PRESSED for '\(config.name)'")
@@ -306,11 +308,12 @@ class CircularUIInstanceManager: ObservableObject {
             )
         } else {
             print("[InstanceManager] Registering keyboard TAP: \(trigger.displayDescription) for '\(config.name)'")
-            
+
             hotkeyManager.registerShortcut(
                 keyCode: keyCode,
                 modifierFlags: trigger.modifierFlags,
                 isHoldMode: false,
+                bundleId: config.bundleId,             
                 forConfigId: config.id,
                 onPress: { [weak self] in
                     print("[InstanceManager] Keyboard triggered for '\(config.name)'")

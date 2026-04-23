@@ -149,36 +149,35 @@ extension DatabaseManager {
 
             let sql = """
             INSERT INTO context_shortcuts
-                (bundle_id, display_name, shortcut_name, description, icon_name, key_code, modifier_flags, enabled, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                (ring_id, shortcut_name, description, icon_name, key_code, modifier_flags, enabled, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
             """
 
             var statement: OpaquePointer?
 
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, shortcut.bundleId, -1, SQLITE_TRANSIENT_CS)
-                sqlite3_bind_text(statement, 2, shortcut.displayName, -1, SQLITE_TRANSIENT_CS)
-                sqlite3_bind_text(statement, 3, shortcut.shortcutName, -1, SQLITE_TRANSIENT_CS)
+                sqlite3_bind_int(statement, 1, Int32(shortcut.ringId))
+                sqlite3_bind_text(statement, 2, shortcut.shortcutName, -1, SQLITE_TRANSIENT_CS)
 
                 if let description = shortcut.description {
-                    sqlite3_bind_text(statement, 4, description, -1, SQLITE_TRANSIENT_CS)
+                    sqlite3_bind_text(statement, 3, description, -1, SQLITE_TRANSIENT_CS)
+                } else {
+                    sqlite3_bind_null(statement, 3)
+                }
+
+                if let iconName = shortcut.iconName {
+                    sqlite3_bind_text(statement, 4, iconName, -1, SQLITE_TRANSIENT_CS)
                 } else {
                     sqlite3_bind_null(statement, 4)
                 }
 
-                if let iconName = shortcut.iconName {
-                    sqlite3_bind_text(statement, 5, iconName, -1, SQLITE_TRANSIENT_CS)
-                } else {
-                    sqlite3_bind_null(statement, 5)
-                }
-
-                sqlite3_bind_int(statement, 6, Int32(shortcut.keyCode))
-                sqlite3_bind_int64(statement, 7, Int64(shortcut.modifierFlags))
-                sqlite3_bind_int(statement, 8, shortcut.enabled ? 1 : 0)
-                sqlite3_bind_int(statement, 9, Int32(shortcut.sortOrder))
+                sqlite3_bind_int(statement, 5, Int32(shortcut.keyCode))
+                sqlite3_bind_int64(statement, 6, Int64(shortcut.modifierFlags))
+                sqlite3_bind_int(statement, 7, shortcut.enabled ? 1 : 0)
+                sqlite3_bind_int(statement, 8, Int32(shortcut.sortOrder))
 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("✅ [DatabaseManager] Inserted context shortcut: '\(shortcut.shortcutName)' for \(shortcut.bundleId)")
+                    print("✅ [DatabaseManager] Inserted context shortcut: '\(shortcut.shortcutName)' for ring \(shortcut.ringId)")
                 } else {
                     if let error = sqlite3_errmsg(db) {
                         print("❌ [DatabaseManager] Failed to insert context shortcut: \(String(cString: error))")
@@ -189,19 +188,54 @@ extension DatabaseManager {
         }
     }
 
-    // MARK: - Context Shortcuts: Fetch by Bundle ID
+    // MARK: - Context Shortcuts: Fetch by Ring ID
 
-    func fetchContextShortcuts(for bundleId: String) -> [ContextShortcut] {
+    func fetchContextShortcuts(for ringId: Int) -> [ContextShortcut] {
         var results: [ContextShortcut] = []
 
         queue.sync {
             guard let db = self.db else { return }
 
             let sql = """
-            SELECT id, bundle_id, display_name, shortcut_name, description, icon_name, key_code, modifier_flags, enabled, sort_order
+            SELECT id, ring_id, shortcut_name, description, icon_name, key_code, modifier_flags, enabled, sort_order
             FROM context_shortcuts
-            WHERE bundle_id = ?
+            WHERE ring_id = ?
             ORDER BY sort_order ASC;
+            """
+
+            var statement: OpaquePointer?
+
+            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
+                sqlite3_bind_int(statement, 1, Int32(ringId))
+
+                while sqlite3_step(statement) == SQLITE_ROW {
+                    if let shortcut = contextShortcutFromStatement(statement) {
+                        results.append(shortcut)
+                    }
+                }
+            }
+            sqlite3_finalize(statement)
+        }
+
+        print("🎯 [DatabaseManager] Fetched \(results.count) context shortcut(s) for ring \(ringId)")
+        return results
+    }
+
+    // MARK: - Context Shortcuts: Fetch All for App (join)
+
+    func fetchContextShortcutsForApp(bundleId: String) -> [ContextShortcut] {
+        var results: [ContextShortcut] = []
+
+        queue.sync {
+            guard let db = self.db else { return }
+
+            let sql = """
+            SELECT cs.id, cs.ring_id, cs.shortcut_name, cs.description, cs.icon_name,
+                   cs.key_code, cs.modifier_flags, cs.enabled, cs.sort_order
+            FROM context_shortcuts cs
+            JOIN ring_configurations rc ON cs.ring_id = rc.id
+            WHERE rc.bundle_id = ?
+            ORDER BY cs.ring_id ASC, cs.sort_order ASC;
             """
 
             var statement: OpaquePointer?
@@ -218,37 +252,7 @@ extension DatabaseManager {
             sqlite3_finalize(statement)
         }
 
-        print("🎯 [DatabaseManager] Fetched \(results.count) context shortcut(s) for \(bundleId)")
-        return results
-    }
-
-    // MARK: - Context Shortcuts: Fetch All
-
-    func fetchAllContextShortcuts() -> [ContextShortcut] {
-        var results: [ContextShortcut] = []
-
-        queue.sync {
-            guard let db = self.db else { return }
-
-            let sql = """
-            SELECT id, bundle_id, display_name, shortcut_name, description, icon_name, key_code, modifier_flags, enabled, sort_order
-            FROM context_shortcuts
-            ORDER BY bundle_id ASC, sort_order ASC;
-            """
-
-            var statement: OpaquePointer?
-
-            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                while sqlite3_step(statement) == SQLITE_ROW {
-                    if let shortcut = contextShortcutFromStatement(statement) {
-                        results.append(shortcut)
-                    }
-                }
-            }
-            sqlite3_finalize(statement)
-        }
-
-        print("🎯 [DatabaseManager] Fetched \(results.count) total context shortcut(s)")
+        print("🎯 [DatabaseManager] Fetched \(results.count) context shortcut(s) for app \(bundleId)")
         return results
     }
 
@@ -367,36 +371,29 @@ extension DatabaseManager {
         guard let statement = statement else { return nil }
 
         let id = sqlite3_column_int64(statement, 0)
+        let ringId = Int(sqlite3_column_int(statement, 1))
 
-        guard let bundleIdCString = sqlite3_column_text(statement, 1),
-              let displayNameCString = sqlite3_column_text(statement, 2),
-              let shortcutNameCString = sqlite3_column_text(statement, 3) else {
-            return nil
-        }
-
-        let bundleId = String(cString: bundleIdCString)
-        let displayName = String(cString: displayNameCString)
+        guard let shortcutNameCString = sqlite3_column_text(statement, 2) else { return nil }
         let shortcutName = String(cString: shortcutNameCString)
 
         var description: String? = nil
-        if let descCString = sqlite3_column_text(statement, 4) {
+        if let descCString = sqlite3_column_text(statement, 3) {
             description = String(cString: descCString)
         }
 
         var iconName: String? = nil
-        if let iconCString = sqlite3_column_text(statement, 5) {
+        if let iconCString = sqlite3_column_text(statement, 4) {
             iconName = String(cString: iconCString)
         }
 
-        let keyCode = UInt16(sqlite3_column_int(statement, 6))
-        let modifierFlags = UInt(sqlite3_column_int64(statement, 7))
-        let enabled = sqlite3_column_int(statement, 8) != 0
-        let sortOrder = Int(sqlite3_column_int(statement, 9))
+        let keyCode = UInt16(sqlite3_column_int(statement, 5))
+        let modifierFlags = UInt(sqlite3_column_int64(statement, 6))
+        let enabled = sqlite3_column_int(statement, 7) != 0
+        let sortOrder = Int(sqlite3_column_int(statement, 8))
 
         return ContextShortcut(
             id: id,
-            bundleId: bundleId,
-            displayName: displayName,
+            ringId: ringId,
             shortcutName: shortcutName,
             description: description,
             iconName: iconName,

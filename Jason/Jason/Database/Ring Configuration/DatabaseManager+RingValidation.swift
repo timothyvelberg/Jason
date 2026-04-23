@@ -18,88 +18,70 @@ extension DatabaseManager {
         modifierFlags: UInt,
         buttonNumber: Int32?,
         swipeDirection: String?,
-        fingerCount: Int?
+        fingerCount: Int?,
+        bundleId: String? = nil         // NEW
     ) -> Bool {
         guard let db = db else { return false }
-        
-        if triggerType == "keyboard" {
-            // Check keyboard shortcut conflicts
-            guard let keyCode = keyCode else { return false }
-            
-            let sql = "SELECT id FROM ring_configurations WHERE trigger_type = 'keyboard' AND key_code = ? AND modifier_flags = ? AND is_active = 1;"
+
+        // Scope clause: only conflict within the same scope
+        // global (NULL) vs global, or same app vs same app
+        let scopeClause: String
+        if bundleId == nil {
+            scopeClause = "AND bundle_id IS NULL"
+        } else {
+            scopeClause = "AND bundle_id = ?"
+        }
+
+        func bindAndCheck(_ sql: String, _ bind: (OpaquePointer) -> Void) -> Bool {
             var statement: OpaquePointer?
             var inUse = false
-            
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_int(statement, 1, Int32(keyCode))
-                sqlite3_bind_int(statement, 2, Int32(modifierFlags))
-                if sqlite3_step(statement) == SQLITE_ROW {
-                    inUse = true
+                bind(statement!)
+                if let bid = bundleId {
+                    // bundleId goes in the last position after the other params
+                    let paramCount = sqlite3_bind_parameter_count(statement)
+                    sqlite3_bind_text(statement, paramCount, (bid as NSString).utf8String, -1, nil)
                 }
+                if sqlite3_step(statement) == SQLITE_ROW { inUse = true }
             }
             sqlite3_finalize(statement)
-            
-            return inUse
-            
-        } else if triggerType == "mouse" {
-            // Check mouse button conflicts
-            guard let buttonNumber = buttonNumber else { return false }
-            
-            let sql = "SELECT id FROM ring_configurations WHERE trigger_type = 'mouse' AND button_number = ? AND modifier_flags = ? AND is_active = 1;"
-            var statement: OpaquePointer?
-            var inUse = false
-            
-            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_int(statement, 1, buttonNumber)
-                sqlite3_bind_int(statement, 2, Int32(modifierFlags))
-                if sqlite3_step(statement) == SQLITE_ROW {
-                    inUse = true
-                }
-            }
-            sqlite3_finalize(statement)
-            
-            return inUse
-            
-        } else if triggerType == "trackpad" {
-            // Check trackpad gesture conflicts (direction + finger_count + modifiers)
-            guard let swipeDirection = swipeDirection else { return false }
-            guard let fingerCount = fingerCount else { return false }
-            
-            let sql = "SELECT id FROM ring_configurations WHERE trigger_type = 'trackpad' AND swipe_direction = ? AND finger_count = ? AND modifier_flags = ? AND is_active = 1;"
-            var statement: OpaquePointer?
-            var inUse = false
-            
-            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (swipeDirection as NSString).utf8String, -1, nil)
-                sqlite3_bind_int(statement, 2, Int32(fingerCount))
-                sqlite3_bind_int(statement, 3, Int32(modifierFlags))
-                if sqlite3_step(statement) == SQLITE_ROW {
-                    inUse = true
-                }
-            }
-            sqlite3_finalize(statement)
-            
-            return inUse
-        } else if triggerType == "swipe" {
-            // Legacy "swipe" support (treat as 3-finger trackpad gesture)
-            guard let swipeDirection = swipeDirection else { return false }
-            
-            let sql = "SELECT id FROM ring_configurations WHERE trigger_type IN ('swipe', 'trackpad') AND swipe_direction = ? AND (finger_count = 3 OR finger_count IS NULL) AND modifier_flags = ? AND is_active = 1;"
-            var statement: OpaquePointer?
-            var inUse = false
-            
-            if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (swipeDirection as NSString).utf8String, -1, nil)
-                sqlite3_bind_int(statement, 2, Int32(modifierFlags))
-                if sqlite3_step(statement) == SQLITE_ROW {
-                    inUse = true
-                }
-            }
-            sqlite3_finalize(statement)
-            
             return inUse
         }
-        
+
+        if triggerType == "keyboard" {
+            guard let keyCode = keyCode else { return false }
+            let sql = "SELECT id FROM ring_configurations WHERE trigger_type = 'keyboard' AND key_code = ? AND modifier_flags = ? AND is_active = 1 \(scopeClause);"
+            return bindAndCheck(sql) { stmt in
+                sqlite3_bind_int(stmt, 1, Int32(keyCode))
+                sqlite3_bind_int(stmt, 2, Int32(modifierFlags))
+            }
+
+        } else if triggerType == "mouse" {
+            guard let buttonNumber = buttonNumber else { return false }
+            let sql = "SELECT id FROM ring_configurations WHERE trigger_type = 'mouse' AND button_number = ? AND modifier_flags = ? AND is_active = 1 \(scopeClause);"
+            return bindAndCheck(sql) { stmt in
+                sqlite3_bind_int(stmt, 1, buttonNumber)
+                sqlite3_bind_int(stmt, 2, Int32(modifierFlags))
+            }
+
+        } else if triggerType == "trackpad" {
+            guard let swipeDirection = swipeDirection, let fingerCount = fingerCount else { return false }
+            let sql = "SELECT id FROM ring_configurations WHERE trigger_type = 'trackpad' AND swipe_direction = ? AND finger_count = ? AND modifier_flags = ? AND is_active = 1 \(scopeClause);"
+            return bindAndCheck(sql) { stmt in
+                sqlite3_bind_text(stmt, 1, (swipeDirection as NSString).utf8String, -1, nil)
+                sqlite3_bind_int(stmt, 2, Int32(fingerCount))
+                sqlite3_bind_int(stmt, 3, Int32(modifierFlags))
+            }
+
+        } else if triggerType == "swipe" {
+            guard let swipeDirection = swipeDirection else { return false }
+            let sql = "SELECT id FROM ring_configurations WHERE trigger_type IN ('swipe', 'trackpad') AND swipe_direction = ? AND (finger_count = 3 OR finger_count IS NULL) AND modifier_flags = ? AND is_active = 1 \(scopeClause);"
+            return bindAndCheck(sql) { stmt in
+                sqlite3_bind_text(stmt, 1, (swipeDirection as NSString).utf8String, -1, nil)
+                sqlite3_bind_int(stmt, 2, Int32(modifierFlags))
+            }
+        }
+
         return false
     }
     

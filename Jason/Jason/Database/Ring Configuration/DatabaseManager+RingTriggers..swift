@@ -31,6 +31,32 @@ extension DatabaseManager {
         var triggerId: Int?
         
         queue.sync {
+            // Look up the ring's bundleId for scope-aware validation
+            var ringBundleId: String? = nil
+            let bidSQL = "SELECT bundle_id FROM ring_configurations WHERE id = ?;"
+            var bidStmt: OpaquePointer?
+            if sqlite3_prepare_v2(db, bidSQL, -1, &bidStmt, nil) == SQLITE_OK {
+                sqlite3_bind_int(bidStmt, 1, Int32(ringId))
+                if sqlite3_step(bidStmt) == SQLITE_ROW && sqlite3_column_type(bidStmt, 0) != SQLITE_NULL {
+                    ringBundleId = String(cString: sqlite3_column_text(bidStmt, 0))
+                }
+            }
+            sqlite3_finalize(bidStmt)
+
+            if _isTriggerInUseForTriggers(
+                triggerType: triggerType,
+                keyCode: keyCode,
+                modifierFlags: modifierFlags,
+                buttonNumber: buttonNumber,
+                swipeDirection: swipeDirection,
+                fingerCount: fingerCount,
+                excludingTriggerId: nil,
+                bundleId: ringBundleId
+            ) {
+                print("⚠️ [DatabaseManager] Trigger already in use by another ring in same scope")
+                return
+            }
+            
             // Validate trigger is not already in use
             if _isTriggerInUseForTriggers(
                 triggerType: triggerType,
@@ -215,13 +241,23 @@ extension DatabaseManager {
         buttonNumber: Int32?,
         swipeDirection: String?,
         fingerCount: Int?,
-        excludingTriggerId: Int?
+        excludingTriggerId: Int?,
+        bundleId: String? = nil         // NEW
     ) -> Bool {
         guard let db = db else { return false }
-        
+
         var inUse = false
-        
-        // Build query based on trigger type
+
+        let excludeClause = excludingTriggerId.map { "AND t.id != \($0)" } ?? ""
+
+        // Scope clause
+        let scopeClause: String
+        if let bundleId = bundleId {
+            scopeClause = "AND r.bundle_id = '\(bundleId)'"
+        } else {
+            scopeClause = "AND r.bundle_id IS NULL"
+        }
+
         let sql: String
         switch triggerType {
         case "keyboard":
@@ -229,50 +265,51 @@ extension DatabaseManager {
             sql = """
             SELECT t.id FROM ring_triggers t
             JOIN ring_configurations r ON t.ring_id = r.id
-            WHERE t.trigger_type = 'keyboard' 
-            AND t.key_code = \(keyCode) 
+            WHERE t.trigger_type = 'keyboard'
+            AND t.key_code = \(keyCode)
             AND t.modifier_flags = \(modifierFlags)
             AND r.is_active = 1
-            \(excludingTriggerId.map { "AND t.id != \($0)" } ?? "");
+            \(scopeClause)
+            \(excludeClause);
             """
-            
+
         case "mouse":
             guard let buttonNumber = buttonNumber else { return false }
             sql = """
             SELECT t.id FROM ring_triggers t
             JOIN ring_configurations r ON t.ring_id = r.id
-            WHERE t.trigger_type = 'mouse' 
-            AND t.button_number = \(buttonNumber) 
+            WHERE t.trigger_type = 'mouse'
+            AND t.button_number = \(buttonNumber)
             AND t.modifier_flags = \(modifierFlags)
             AND r.is_active = 1
-            \(excludingTriggerId.map { "AND t.id != \($0)" } ?? "");
+            \(scopeClause)
+            \(excludeClause);
             """
-            
+
         case "trackpad":
             guard let swipeDirection = swipeDirection, let fingerCount = fingerCount else { return false }
             sql = """
             SELECT t.id FROM ring_triggers t
             JOIN ring_configurations r ON t.ring_id = r.id
-            WHERE t.trigger_type = 'trackpad' 
-            AND t.swipe_direction = '\(swipeDirection)' 
-            AND t.finger_count = \(fingerCount) 
+            WHERE t.trigger_type = 'trackpad'
+            AND t.swipe_direction = '\(swipeDirection)'
+            AND t.finger_count = \(fingerCount)
             AND t.modifier_flags = \(modifierFlags)
             AND r.is_active = 1
-            \(excludingTriggerId.map { "AND t.id != \($0)" } ?? "");
+            \(scopeClause)
+            \(excludeClause);
             """
-            
+
         default:
             return false
         }
-        
+
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-            if sqlite3_step(statement) == SQLITE_ROW {
-                inUse = true
-            }
+            if sqlite3_step(statement) == SQLITE_ROW { inUse = true }
         }
         sqlite3_finalize(statement)
-        
+
         return inUse
     }
     

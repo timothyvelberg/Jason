@@ -15,6 +15,7 @@ extension HotkeyManager {
         modifierFlags: UInt,
         isHoldMode: Bool = false,
         isModifierHoldMode: Bool = false,
+        bundleId: String? = nil,        // NEW
         forConfigId configId: Int,
         onPress: @escaping () -> Void,
         onRelease: (() -> Void)? = nil
@@ -22,21 +23,30 @@ extension HotkeyManager {
         let shortcutDisplay = formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
         let modeLabel = isModifierHoldMode ? "MODIFIER HOLD" : isHoldMode ? "HOLD" : "TAP"
         print("[HotkeyManager] Registering \(modeLabel) shortcut for config \(configId): \(shortcutDisplay)")
-        
+
+        // Conflict check: only unregister if same combo AND same scope
         for (existingId, existing) in registeredShortcuts {
-            if existing.keyCode == keyCode && existing.modifierFlags == modifierFlags {
-                print("   Conflict with config \(existingId) - unregistering old")
+            guard existing.keyCode == keyCode && existing.modifierFlags == modifierFlags else { continue }
+            let sameScope: Bool
+            switch (bundleId, existing.bundleId) {
+            case (nil, nil):          sameScope = true
+            case (let a?, let b?) where a == b: sameScope = true
+            default:                  sameScope = false
+            }
+            if sameScope {
+                print("   Conflict with config \(existingId) (same scope) - unregistering old")
                 unregisterShortcut(forConfigId: existingId)
                 break
             }
         }
-        
+
         registeredShortcuts[configId] = KeyboardRegistration(
             keyCode: keyCode,
             modifierFlags: modifierFlags,
             isHoldMode: isHoldMode,
             isModifierHoldMode: isModifierHoldMode,
             sustainModifierMask: modifierFlags,
+            bundleId: bundleId,
             onPress: onPress,
             onRelease: onRelease
         )
@@ -147,6 +157,14 @@ extension HotkeyManager {
         guard let match = bestMatch else {
             print("[HotkeyManager] No exact modifier match for keyCode \(event.keyCode)")
             return false
+        }
+        // App-scope gate
+        if let requiredBundleId = match.registration.bundleId {
+            let frontmost = FrontmostAppMonitor.shared.frontmostApp?.bundleIdentifier
+            guard frontmost == requiredBundleId else {
+                print("[HotkeyManager] Trigger skipped — frontmost app '\(frontmost ?? "nil")' != '\(requiredBundleId)'")
+                return false
+            }
         }
         
         let display = formatShortcut(keyCode: match.registration.keyCode, modifiers: match.registration.modifierFlags)

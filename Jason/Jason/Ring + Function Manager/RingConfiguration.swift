@@ -194,6 +194,9 @@ struct StoredRingConfiguration: Identifiable, Equatable {
     let presentationMode: PresentationMode
     let triggers: [TriggerConfiguration]
     let providers: [ProviderConfiguration]
+    let bundleId: String?
+    
+    var isAppScoped: Bool { bundleId != nil }
     
     // MARK: - Trigger Properties
     
@@ -323,7 +326,8 @@ struct StoredRingConfiguration: Identifiable, Equatable {
                 lhs.isActive == rhs.isActive &&
                 lhs.presentationMode == rhs.presentationMode &&
                 lhs.triggers == rhs.triggers &&
-                lhs.providers == rhs.providers
+                lhs.providers == rhs.providers &&
+                lhs.bundleId == rhs.bundleId
     }
 }
 

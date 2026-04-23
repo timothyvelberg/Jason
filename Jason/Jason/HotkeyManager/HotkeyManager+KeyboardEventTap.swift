@@ -82,21 +82,31 @@ extension HotkeyManager {
             if activeModifierHoldRegistration != nil {
                 return nil
             }
-            
+
             for (configId, registration) in registeredShortcuts {
                 if registration.keyCode == keyCode && registration.modifierFlags == normalizedModifiers {
+
+                    // App-scope gate
+                    if let requiredBundleId = registration.bundleId {
+                        let frontmost = FrontmostAppMonitor.shared.frontmostApp?.bundleIdentifier
+                        guard frontmost == requiredBundleId else {
+                            print("[HotkeyManager] Trigger skipped (tap) — frontmost '\(frontmost ?? "nil")' != '\(requiredBundleId)'")
+                            continue
+                        }
+                    }
+
                     let display = formatShortcut(keyCode: keyCode, modifiers: normalizedModifiers)
-                    
+
                     if registration.isModifierHoldMode {
                         print("[HotkeyManager] MODIFIER HOLD mode MATCHED for config \(configId): \(display) (intercepted)")
                         activeModifierHoldRegistration = configId
                         currentSustainMask = registration.sustainModifierMask
                         DispatchQueue.main.async { registration.onPress() }
-                        
+
                     } else if registration.isHoldMode {
                         if activeHoldRegistration == configId { return nil }
                         if requiresReleaseBeforeNextShow && activeHoldRegistration != nil { return nil }
-                        
+
                         print("[HotkeyManager] HOLD mode MATCHED for config \(configId): \(display) (intercepted)")
                         activeHoldRegistration = configId
                         DispatchQueue.main.async { registration.onPress() }
@@ -104,12 +114,11 @@ extension HotkeyManager {
                         print("[HotkeyManager] TAP mode MATCHED for config \(configId): \(display) (intercepted)")
                         DispatchQueue.main.async { registration.onPress() }
                     }
-                    
+
                     return nil
                 }
             }
-            
-        } else if type == .keyUp {
+        }else if type == .keyUp {
             // In modifier hold mode, swallow the trigger key release — dismiss is owned by handleFlagsChanged
             if let activeConfigId = activeModifierHoldRegistration,
                let registration = registeredShortcuts[activeConfigId],

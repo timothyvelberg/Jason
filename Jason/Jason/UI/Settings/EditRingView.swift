@@ -227,9 +227,15 @@ struct TriggerFormConfig: Identifiable, Equatable {
 struct EditRingView: View {
     @Environment(\.dismiss) var dismiss
     
-    // Configuration being edited (nil for new ring)
     let configuration: StoredRingConfiguration?
+    let bundleId: String?
     let onSave: () -> Void
+    
+    init(configuration: StoredRingConfiguration?, bundleId: String? = nil, onSave: @escaping () -> Void) {
+        self.configuration = configuration
+        self.bundleId = bundleId
+        self.onSave = onSave
+    }
     
     // Form fields
     @State private var name: String = ""
@@ -768,6 +774,7 @@ struct EditRingView: View {
                     iconSize: iconValue,
                     startAngle: startAngle,
                     presentationMode: isPanelMode ? .panel : .ring,
+                    bundleId: bundleId,
                     triggers: triggerData,
                     providers: providerData
                 )

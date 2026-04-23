@@ -40,7 +40,7 @@ class ContextProvider: ObservableObject, FunctionProvider {
             return [categoryNode(children: [noActionsNode()])]
         }
 
-        let shortcuts = DatabaseManager.shared.fetchContextShortcuts(for: bundleID)
+        let shortcuts = DatabaseManager.shared.fetchContextShortcutsForApp(bundleId: bundleID)
         let enabledShortcuts = shortcuts.filter { $0.enabled }
         
         let children: [FunctionNode] = enabledShortcuts.isEmpty

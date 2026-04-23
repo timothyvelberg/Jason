@@ -80,6 +80,7 @@ class HotkeyManager {
         let isHoldMode: Bool
         let isModifierHoldMode: Bool
         let sustainModifierMask: UInt
+        let bundleId: String?
         let onPress: () -> Void
         let onRelease: (() -> Void)?
     }

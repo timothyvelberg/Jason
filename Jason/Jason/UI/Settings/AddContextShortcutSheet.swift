@@ -11,6 +11,7 @@ struct AddContextShortcutSheet: View {
     @Environment(\.dismiss) var dismiss
 
     let app: ContextApp
+    let ringId: Int                        // NEW: ring instance this shortcut belongs to
     let existingShortcut: ContextShortcut?
     let onSave: () -> Void
 
@@ -21,8 +22,9 @@ struct AddContextShortcutSheet: View {
     @State private var recordedModifierFlags: UInt?
     @State private var errorMessage: String?
 
-    init(app: ContextApp, existingShortcut: ContextShortcut? = nil, onSave: @escaping () -> Void) {
+    init(app: ContextApp, ringId: Int, existingShortcut: ContextShortcut? = nil, onSave: @escaping () -> Void) {
         self.app = app
+        self.ringId = ringId
         self.existingShortcut = existingShortcut
         self.onSave = onSave
     }
@@ -181,11 +183,10 @@ struct AddContextShortcutSheet: View {
             (NSImage(systemSymbolName: trimmedIcon, accessibilityDescription: nil) != nil ? trimmedIcon : nil)
 
         if let existing = existingShortcut {
-            // Update
+            // Update — ring_id is immutable once created
             let updated = ContextShortcut(
                 id: existing.id,
-                bundleId: existing.bundleId,
-                displayName: existing.displayName,
+                ringId: existing.ringId,
                 shortcutName: shortcutName.trimmingCharacters(in: .whitespaces),
                 description: description.trimmingCharacters(in: .whitespaces).isEmpty ? nil : description.trimmingCharacters(in: .whitespaces),
                 iconName: validatedIcon,
@@ -197,11 +198,10 @@ struct AddContextShortcutSheet: View {
             DatabaseManager.shared.updateContextShortcut(updated)
         } else {
             // Insert
-            let existingShortcuts = DatabaseManager.shared.fetchContextShortcuts(for: app.bundleId)
+            let existingShortcuts = DatabaseManager.shared.fetchContextShortcuts(for: ringId)
             let shortcut = ContextShortcut(
                 id: 0,
-                bundleId: app.bundleId,
-                displayName: app.displayName,
+                ringId: ringId,
                 shortcutName: shortcutName.trimmingCharacters(in: .whitespaces),
                 description: description.trimmingCharacters(in: .whitespaces).isEmpty ? nil : description.trimmingCharacters(in: .whitespaces),
                 iconName: validatedIcon,

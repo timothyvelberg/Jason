@@ -161,20 +161,19 @@ class RingConfigurationManager: ObservableObject {
         iconSize: Double,
         startAngle: Double = 0.0,
         presentationMode: PresentationMode = .ring,
+        bundleId: String? = nil,        // NEW
         triggers: [(type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, isModifierHoldMode: Bool, autoExecuteOnRelease: Bool)] = [],
         providers: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
     ) throws -> StoredRingConfiguration {
         print("[RingConfigManager] Creating configuration '\(name)'")
-        
-        // Validate inputs
+
         try validateConfigurationInputs(
             name: name,
             ringRadius: ringRadius,
             centerHoleRadius: centerHoleRadius,
             iconSize: iconSize
         )
-        
-        // Validate all triggers for uniqueness
+
         for trigger in triggers {
             guard validateTrigger(
                 triggerType: trigger.type,
@@ -183,7 +182,8 @@ class RingConfigurationManager: ObservableObject {
                 buttonNumber: trigger.buttonNumber,
                 swipeDirection: trigger.swipeDirection,
                 fingerCount: trigger.fingerCount,
-                excludingTriggerId: nil
+                excludingTriggerId: nil,
+                bundleId: bundleId
             ) else {
                 let description = formatTriggerDescription(
                     triggerType: trigger.type,
@@ -196,8 +196,7 @@ class RingConfigurationManager: ObservableObject {
                 throw StoredRingConfigurationError.duplicateShortcut(description)
             }
         }
-        
-        // Create ring in database (legacy trigger fields ignored)
+
         guard let ringId = databaseManager.createRingConfiguration(
             name: name,
             shortcut: shortcut,
@@ -214,13 +213,13 @@ class RingConfigurationManager: ObservableObject {
             isHoldMode: false,
             autoExecuteOnRelease: true,
             presentationMode: presentationMode.rawValue,
+            bundleId: bundleId
         ) else {
             throw StoredRingConfigurationError.databaseError("Failed to create ring configuration")
         }
-        
+
         print("   Created ring configuration with ID: \(ringId)")
-        
-        // Add triggers
+
         var triggerConfigs: [TriggerConfiguration] = []
         for trigger in triggers {
             if let triggerId = databaseManager.createTrigger(
@@ -250,8 +249,7 @@ class RingConfigurationManager: ObservableObject {
                 print("   Added trigger: \(trigger.type)")
             }
         }
-        
-        // Add providers
+
         var providerConfigs: [ProviderConfiguration] = []
         for (index, provider) in providers.enumerated() {
             var configJSON: String? = nil
@@ -262,7 +260,7 @@ class RingConfigurationManager: ObservableObject {
                     configJSON = jsonString
                 }
             }
-            
+
             guard let providerId = databaseManager.createProvider(
                 ringId: ringId,
                 providerType: provider.type,
@@ -273,12 +271,12 @@ class RingConfigurationManager: ObservableObject {
                 print("   Failed to add provider '\(provider.type)'")
                 continue
             }
-            
+
             var configDict: [String: Any]? = nil
             if let displayMode = provider.displayMode {
                 configDict = ["displayMode": displayMode]
             }
-            
+
             providerConfigs.append(ProviderConfiguration(
                 id: providerId,
                 providerType: provider.type,
@@ -286,11 +284,10 @@ class RingConfigurationManager: ObservableObject {
                 parentItemAngle: provider.angle,
                 config: configDict
             ))
-            
+
             print("   Added provider \(index + 1)/\(providers.count): \(provider.type)")
         }
-        
-        // Create domain model
+
         let newConfig = StoredRingConfiguration(
             id: ringId,
             name: name,
@@ -302,12 +299,12 @@ class RingConfigurationManager: ObservableObject {
             isActive: true,
             presentationMode: presentationMode,
             triggers: triggerConfigs,
-            providers: providerConfigs
+            providers: providerConfigs,
+            bundleId: bundleId              // NEW
         )
-        
-        // Update in-memory cache
+
         configurations.append(newConfig)
-        
+
         print("[RingConfigManager] Created configuration successfully")
         return newConfig
     }
@@ -423,7 +420,8 @@ class RingConfigurationManager: ObservableObject {
                 buttonNumber: buttonNumber,
                 swipeDirection: swipeDirection,
                 fingerCount: fingerCount,
-                excludingTriggerId: nil
+                excludingTriggerId: nil,
+                bundleId: config.bundleId
             ) else {
                 let description = formatTriggerDescription(
                     triggerType: triggerType,
@@ -449,6 +447,7 @@ class RingConfigurationManager: ObservableObject {
             isHoldMode: isHoldMode,
             isModifierHoldMode: isModifierHoldMode,
             autoExecuteOnRelease: autoExecuteOnRelease
+            
         ) else {
             throw StoredRingConfigurationError.databaseError("Failed to create trigger")
         }
@@ -646,7 +645,8 @@ class RingConfigurationManager: ObservableObject {
                     buttonNumber: trigger.buttonNumber,
                     swipeDirection: trigger.swipeDirection,
                     fingerCount: trigger.fingerCount,
-                    excludingTriggerId: trigger.id
+                    excludingTriggerId: trigger.id,
+                    bundleId: existingConfig.bundleId
                 ) else {
                     throw StoredRingConfigurationError.duplicateShortcut(trigger.displayDescription)
                 }
@@ -673,18 +673,26 @@ class RingConfigurationManager: ObservableObject {
         buttonNumber: Int32?,
         swipeDirection: String?,
         fingerCount: Int?,
-        excludingTriggerId: Int?
+        excludingTriggerId: Int?,
+        bundleId: String? = nil
     ) -> Bool {
         let activeConfigs = getActiveConfigurations()
-        
+
         for config in activeConfigs {
+            // Scope check: only compare configs in the same scope
+            let sameScope: Bool
+            switch (bundleId, config.bundleId) {
+            case (nil, nil):                        sameScope = true   // both global
+            case (let a?, let b?) where a == b:     sameScope = true   // same app
+            default:                                sameScope = false  // different scopes — no conflict
+            }
+            guard sameScope else { continue }
+
             for trigger in config.triggers {
-                // Skip excluded trigger
                 if let excludingId = excludingTriggerId, trigger.id == excludingId {
                     continue
                 }
-                
-                // Check for match based on trigger type
+
                 if trigger.triggerType == triggerType {
                     switch triggerType {
                     case "keyboard":
@@ -710,7 +718,7 @@ class RingConfigurationManager: ObservableObject {
                 }
             }
         }
-        
+
         return true
     }
     
@@ -738,10 +746,8 @@ class RingConfigurationManager: ObservableObject {
     
     /// Transform database entry to domain model
     private func transformToDomain(_ dbConfig: RingConfigurationEntry) -> StoredRingConfiguration? {
-        // Get providers for this ring
         let dbProviders = databaseManager.getProviders(ringId: dbConfig.id)
-        
-        // Transform providers
+
         let providers = dbProviders.map { dbProvider in
             let parsedConfig: [String: Any]?
             if let configJSON = dbProvider.providerConfig {
@@ -749,7 +755,7 @@ class RingConfigurationManager: ObservableObject {
             } else {
                 parsedConfig = nil
             }
-            
+
             return ProviderConfiguration(
                 id: dbProvider.id,
                 providerType: dbProvider.providerType,
@@ -758,11 +764,9 @@ class RingConfigurationManager: ObservableObject {
                 config: parsedConfig
             )
         }
-        
-        // Get triggers for this ring
+
         let dbTriggers = databaseManager.getTriggersForRing(ringId: dbConfig.id)
-        
-        // Transform triggers
+
         let triggers = dbTriggers.map { dbTrigger in
             TriggerConfiguration(
                 id: dbTrigger.id,
@@ -777,9 +781,9 @@ class RingConfigurationManager: ObservableObject {
                 autoExecuteOnRelease: dbTrigger.autoExecuteOnRelease
             )
         }
-        
+
         let presentationMode = PresentationMode(rawValue: dbConfig.presentationMode) ?? .ring
-        
+
         return StoredRingConfiguration(
             id: dbConfig.id,
             name: dbConfig.name,
@@ -791,7 +795,8 @@ class RingConfigurationManager: ObservableObject {
             isActive: dbConfig.isActive,
             presentationMode: presentationMode,
             triggers: triggers,
-            providers: providers
+            providers: providers,
+            bundleId: dbConfig.bundleId
         )
     }
     
