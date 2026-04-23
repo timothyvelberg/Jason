@@ -14,21 +14,30 @@ extension HotkeyManager {
     func registerMouseButton(
         buttonNumber: Int32,
         modifierFlags: UInt,
+        bundleId: String? = nil,        // NEW
         forConfigId configId: Int,
         callback: @escaping () -> Void
     ) {
         let buttonDisplay = formatMouseButton(buttonNumber: buttonNumber, modifiers: modifierFlags)
         print("[HotkeyManager] Attempting to register mouse button for config \(configId): \(buttonDisplay)")
-        
+
         for (existingId, existing) in registeredMouseButtons {
             if existing.buttonNumber == buttonNumber && existing.modifierFlags == modifierFlags {
-                unregisterMouseButton(forConfigId: existingId)
-                break
+                let sameScope: Bool
+                switch (bundleId, existing.bundleId) {
+                case (nil, nil):                        sameScope = true
+                case (let a?, let b?) where a == b:     sameScope = true
+                default:                                sameScope = false
+                }
+                if sameScope {
+                    unregisterMouseButton(forConfigId: existingId)
+                    break
+                }
             }
         }
-        
-        registeredMouseButtons[configId] = (buttonNumber, modifierFlags, callback)
-        
+
+        registeredMouseButtons[configId] = (buttonNumber, modifierFlags, bundleId, callback)
+
         if registeredMouseButtons.count == 1 && mouseEventTap == nil {
             startMouseMonitoring()
         }
@@ -124,6 +133,14 @@ extension HotkeyManager {
         
         for (configId, registration) in registeredMouseButtons {
             if buttonNumber == Int64(registration.buttonNumber) && eventModifiers == registration.modifierFlags {
+                // App-scope gate
+                if let requiredBundleId = registration.bundleId {
+                    let frontmost = FrontmostAppMonitor.shared.frontmostApp?.bundleIdentifier
+                    guard frontmost == requiredBundleId else {
+                        print("[HotkeyManager] Mouse trigger skipped — frontmost '\(frontmost ?? "nil")' != '\(requiredBundleId)'")
+                        continue
+                    }
+                }
                 let display = formatMouseButton(buttonNumber: registration.buttonNumber, modifiers: registration.modifierFlags)
                 print("[HotkeyManager] Mouse button MATCHED for config \(configId): \(display)")
                 registration.callback()

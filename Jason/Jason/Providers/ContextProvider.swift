@@ -15,7 +15,7 @@ class ContextProvider: ObservableObject, FunctionProvider {
     // MARK: - FunctionProvider Protocol
     
     var providerId: String { "context" }
-    var providerName: String { "Context" }R
+    var providerName: String { "Context" }
     var providerIcon: NSImage {
         NSImage(systemSymbolName: "contextualmenu.and.cursorarrow", accessibilityDescription: nil) ?? NSImage()
     }

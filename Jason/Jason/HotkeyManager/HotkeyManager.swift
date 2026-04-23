@@ -68,11 +68,11 @@ class HotkeyManager {
     
     // MARK: - Registrations
     
-    var registeredMouseButtons: [Int: (buttonNumber: Int32, modifierFlags: UInt, callback: () -> Void)] = [:]
-    var registeredSwipes: [Int: (direction: String, fingerCount: Int, modifierFlags: UInt, callback: () -> Void)] = [:]
+    var registeredMouseButtons: [Int: (buttonNumber: Int32, modifierFlags: UInt, bundleId: String?, callback: () -> Void)] = [:]
     var registeredShortcuts: [Int: KeyboardRegistration] = [:]
-    var registeredTwoFingerTaps: [Int: (side: TapSide, modifierFlags: UInt, callback: (TapSide) -> Void)] = [:]
-    var registeredCircles: [Int: (direction: RotationDirection, fingerCount: Int, modifierFlags: UInt, callback: (RotationDirection) -> Void)] = [:]
+    var registeredSwipes: [Int: (direction: String, fingerCount: Int, modifierFlags: UInt, bundleId: String?, callback: () -> Void)] = [:]
+    var registeredTwoFingerTaps: [Int: (side: TapSide, modifierFlags: UInt, bundleId: String?, callback: (TapSide) -> Void)] = [:]
+    var registeredCircles: [Int: (direction: RotationDirection, fingerCount: Int, modifierFlags: UInt, bundleId: String?, callback: (RotationDirection) -> Void)] = [:]
 
     struct KeyboardRegistration {
         let keyCode: UInt16

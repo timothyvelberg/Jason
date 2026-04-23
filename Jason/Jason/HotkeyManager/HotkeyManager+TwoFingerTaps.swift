@@ -11,6 +11,7 @@ extension HotkeyManager {
     func registerTwoFingerTap(
         side: TapSide,
         modifierFlags: UInt,
+        bundleId: String? = nil,
         forConfigId configId: Int,
         callback: @escaping (TapSide) -> Void
     ) {
@@ -25,7 +26,7 @@ extension HotkeyManager {
             }
         }
         
-        registeredTwoFingerTaps[configId] = (side, modifierFlags, callback)
+        registeredTwoFingerTaps[configId] = (side, modifierFlags, bundleId, callback)
     }
     
     

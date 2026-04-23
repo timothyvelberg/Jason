@@ -252,10 +252,12 @@ extension DatabaseManager {
 
         // Scope clause
         let scopeClause: String
-        if let bundleId = bundleId {
-            scopeClause = "AND r.bundle_id = '\(bundleId)'"
+        if bundleId == nil {
+            // Global trigger — conflicts with other globals AND any app-scoped trigger
+            scopeClause = ""  // no scope filter — matches everything
         } else {
-            scopeClause = "AND r.bundle_id IS NULL"
+            // App-scoped trigger — conflicts with same app AND globals
+            scopeClause = "AND (r.bundle_id = '\(bundleId!)' OR r.bundle_id IS NULL)"
         }
 
         let sql: String

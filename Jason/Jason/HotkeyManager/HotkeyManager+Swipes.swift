@@ -15,6 +15,7 @@ extension HotkeyManager {
         direction: String,
         fingerCount: Int,
         modifierFlags: UInt,
+        bundleId: String? = nil,
         forConfigId configId: Int,
         callback: @escaping () -> Void
     ) {
@@ -26,7 +27,7 @@ extension HotkeyManager {
                 break
             }
         }
-        registeredSwipes[configId] = (direction, fingerCount, modifierFlags, callback)
+        registeredSwipes[configId] = (direction, fingerCount, modifierFlags, bundleId, callback)
     }
     
     func unregisterSwipe(forConfigId configId: Int) {

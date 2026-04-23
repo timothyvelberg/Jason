@@ -14,23 +14,35 @@ extension HotkeyManager {
         direction: RotationDirection,
         fingerCount: Int,
         modifierFlags: UInt,
+        bundleId: String? = nil,
         forConfigId configId: Int,
         callback: @escaping (RotationDirection) -> Void
     ) {
         let display = formatCircleGesture(direction: direction, fingerCount: fingerCount, modifiers: modifierFlags)
         print("[HotkeyManager] Registering circle gesture for config \(configId): \(display)")
         
+        // Only unregister if same combo AND same scope
         for (existingId, existing) in registeredCircles {
             if existing.direction == direction &&
                existing.fingerCount == fingerCount &&
                existing.modifierFlags == modifierFlags {
-                print("   [HotkeyManager] Circle gesture conflict with config \(existingId) - unregistering old")
-                unregisterCircle(forConfigId: existingId)
-                break
+                
+                let sameScope: Bool
+                switch (bundleId, existing.bundleId) {
+                case (nil, nil):                        sameScope = true   // both global
+                case (let a?, let b?) where a == b:     sameScope = true   // same app
+                case (nil, _), (_, nil):                sameScope = true   // global vs app-scoped — conflict
+                default:                                sameScope = false  // different apps — no conflict
+                }
+                
+                if sameScope {
+                    unregisterCircle(forConfigId: existingId)
+                    break
+                }
             }
         }
         
-        registeredCircles[configId] = (direction, fingerCount, modifierFlags, callback)
+        registeredCircles[configId] = (direction, fingerCount, modifierFlags, bundleId, callback)
     }
     
     func unregisterCircle(forConfigId configId: Int) {

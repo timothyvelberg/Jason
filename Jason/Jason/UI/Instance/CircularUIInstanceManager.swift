@@ -347,6 +347,7 @@ class CircularUIInstanceManager: ObservableObject {
         hotkeyManager.registerMouseButton(
             buttonNumber: buttonNumber,
             modifierFlags: trigger.modifierFlags,
+            bundleId: config.bundleId,          // NEW
             forConfigId: config.id
         ) { [weak self] in
             print("[InstanceManager] Mouse button triggered for '\(config.name)'")
@@ -377,6 +378,7 @@ class CircularUIInstanceManager: ObservableObject {
                 direction: direction,
                 fingerCount: fingerCount,
                 modifierFlags: trigger.modifierFlags,
+                bundleId: config.bundleId,
                 forConfigId: config.id
             ) { [weak self] triggerDirection in
                 print("[InstanceManager] Circle gesture triggered for '\(config.name)'")
@@ -394,6 +396,7 @@ class CircularUIInstanceManager: ObservableObject {
             hotkeyManager.registerTwoFingerTap(
                 side: side,
                 modifierFlags: trigger.modifierFlags,
+                bundleId: config.bundleId,
                 forConfigId: config.id
             ) { [weak self] _ in
                 print("[InstanceManager] Two-finger tap triggered for '\(config.name)'")
@@ -409,6 +412,7 @@ class CircularUIInstanceManager: ObservableObject {
             direction: swipeDirection,
             fingerCount: fingerCount,
             modifierFlags: trigger.modifierFlags,
+            bundleId: config.bundleId,
             forConfigId: config.id
         ) { [weak self] in
             print("[InstanceManager] Trackpad gesture triggered for '\(config.name)'")

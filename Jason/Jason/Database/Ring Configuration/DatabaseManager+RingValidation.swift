@@ -27,9 +27,11 @@ extension DatabaseManager {
         // global (NULL) vs global, or same app vs same app
         let scopeClause: String
         if bundleId == nil {
-            scopeClause = "AND bundle_id IS NULL"
+            // Global trigger — conflicts with other globals AND any app-scoped trigger
+            scopeClause = ""  // no scope filter — matches everything
         } else {
-            scopeClause = "AND bundle_id = ?"
+            // App-scoped trigger — conflicts with same app AND globals
+            scopeClause = "AND (bundle_id = ? OR bundle_id IS NULL)"
         }
 
         func bindAndCheck(_ sql: String, _ bind: (OpaquePointer) -> Void) -> Bool {
@@ -38,7 +40,6 @@ extension DatabaseManager {
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 bind(statement!)
                 if let bid = bundleId {
-                    // bundleId goes in the last position after the other params
                     let paramCount = sqlite3_bind_parameter_count(statement)
                     sqlite3_bind_text(statement, paramCount, (bid as NSString).utf8String, -1, nil)
                 }
@@ -47,7 +48,7 @@ extension DatabaseManager {
             sqlite3_finalize(statement)
             return inUse
         }
-
+        
         if triggerType == "keyboard" {
             guard let keyCode = keyCode else { return false }
             let sql = "SELECT id FROM ring_configurations WHERE trigger_type = 'keyboard' AND key_code = ? AND modifier_flags = ? AND is_active = 1 \(scopeClause);"

@@ -29,9 +29,10 @@ extension HotkeyManager {
             guard existing.keyCode == keyCode && existing.modifierFlags == modifierFlags else { continue }
             let sameScope: Bool
             switch (bundleId, existing.bundleId) {
-            case (nil, nil):          sameScope = true
-            case (let a?, let b?) where a == b: sameScope = true
-            default:                  sameScope = false
+            case (nil, nil):                        sameScope = true   // both global
+            case (let a?, let b?) where a == b:     sameScope = true   // same app
+            case (nil, _), (_, nil):                sameScope = true   // global vs app-scoped — conflict
+            default:                                sameScope = false  // different apps — no conflict
             }
             if sameScope {
                 print("   Conflict with config \(existingId) (same scope) - unregistering old")
