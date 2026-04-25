@@ -34,6 +34,7 @@ extension HotkeyManager {
                 case (nil, _), (_, nil):                sameScope = true   // global vs app-scoped — conflict
                 default:                                sameScope = false  // different apps — no conflict
                 }
+            
                 
                 if sameScope {
                     unregisterCircle(forConfigId: existingId)

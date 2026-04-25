@@ -550,7 +550,6 @@ class ListPanelManager: ObservableObject {
         
         // Set initial keyboard state
         activePanelLevel = 0
-        keyboardSelectedRow[0] = 0
         inputCoordinator?.switchToKeyboard()
     }
     

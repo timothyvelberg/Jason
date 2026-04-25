@@ -81,11 +81,16 @@ extension CircularUIManager {
     // MARK: - Hide Method
 
     func hide() {
-        // Stop mouse monitor FIRST to prevent blocking permission dialogs
         pauseMouseMonitor()
-        
-        if isInHoldMode || isInModifierHoldMode {
-            executeHoveredItemIfInHoldMode()
+
+        // Capture and clear hold mode flags BEFORE executing
+        // to prevent double-execution if hide() is called again
+        let wasInHoldMode = isInHoldMode || isInModifierHoldMode
+        isInHoldMode = false
+        isInModifierHoldMode = false
+
+        if wasInHoldMode {
+            executeHoveredItemIfInHoldMode(wasInHoldMode: wasInHoldMode)
         }
         
         mouseTracker?.stopTrackingMouse()
@@ -169,8 +174,9 @@ extension CircularUIManager {
     // MARK: - Hold Mode
     
     /// Execute the hovered item when releasing hold mode (if auto-execute is enabled)
-    func executeHoveredItemIfInHoldMode() {
-        guard isInHoldMode || isInModifierHoldMode else {
+    func executeHoveredItemIfInHoldMode(wasInHoldMode: Bool) {
+        
+        guard wasInHoldMode else {
             print("[HoldMode] Not in hold mode - skipping auto-execute")
             return
         }

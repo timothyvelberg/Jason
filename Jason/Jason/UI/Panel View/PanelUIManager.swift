@@ -240,10 +240,16 @@ class PanelUIManager: ObservableObject, UIManager {
         
         // Stop mouse monitor
         stopPanelMouseMonitor()
+        
 
-        // Execute hovered item if in hold mode or modifier hold mode
-        if isInHoldMode || isInModifierHoldMode {
-            executeHoveredItemIfInHoldMode()
+        // Capture and clear hold mode flags BEFORE executing
+        // to prevent double-execution if hide() is called again
+        let wasInHoldMode = isInHoldMode || isInModifierHoldMode
+        isInHoldMode = false
+        isInModifierHoldMode = false
+
+        if wasInHoldMode {
+            executeHoveredItemIfInHoldMode(wasInHoldMode: wasInHoldMode)
         }
         
         // Stop gesture monitoring
@@ -555,30 +561,40 @@ class PanelUIManager: ObservableObject, UIManager {
     
     // MARK: - Hold Mode
     
-    private func executeHoveredItemIfInHoldMode() {
-        guard isInHoldMode || isInModifierHoldMode else { return }
-        
+    private func executeHoveredItemIfInHoldMode(wasInHoldMode: Bool) {
+        guard wasInHoldMode else { return }
+
         let autoExecuteEnabled = activeTrigger?.autoExecuteOnRelease ?? true
         guard autoExecuteEnabled else {
             print("[PanelUIManager] Auto-execute disabled")
             return
         }
-        
+
         guard let panelManager = listPanelManager else { return }
-        
+
         let activeLevel = panelManager.activePanelLevel
+
+        let hoveredIndex: Int?
+        if panelManager.isKeyboardDriven {
+            hoveredIndex = panelManager.keyboardSelectedRow[activeLevel]
+                ?? panelManager.hoveredRow[activeLevel]
+        } else {
+            hoveredIndex = panelManager.hoveredRow[activeLevel]
+                ?? panelManager.keyboardSelectedRow[activeLevel]
+        }
+
         guard let panel = panelManager.panelStack.first(where: { $0.level == activeLevel }),
-              let hoveredIndex = panelManager.keyboardSelectedRow[activeLevel] ?? panelManager.hoveredRow[activeLevel],
-              hoveredIndex < panel.items.count else {
+              let index = hoveredIndex,
+              index < panel.items.count else {
             print("[PanelUIManager] No item hovered for auto-execute")
             return
         }
-        
-        let selectedNode = panel.items[hoveredIndex]
+
+        let selectedNode = panel.items[index]
         print("[PanelUIManager] Auto-executing: \(selectedNode.name)")
-        
+
         let behavior = selectedNode.onLeftClick.resolve(with: [])
-        
+
         switch behavior {
         case .execute(let action), .executeKeepOpen(let action):
             action()

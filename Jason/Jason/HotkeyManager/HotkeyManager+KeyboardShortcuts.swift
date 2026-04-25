@@ -226,6 +226,7 @@ extension HotkeyManager {
                 print("[HotkeyManager] Sustain modifiers released for config \(activeConfigId)")
                 activeModifierHoldRegistration = nil
                 currentSustainMask = 0
+                print("[HotkeyManager] Firing onRelease from handleFlagsChanged for config \(activeConfigId)")
                 DispatchQueue.main.async { registration.onRelease?() }
             }
         }

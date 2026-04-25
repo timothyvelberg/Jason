@@ -713,6 +713,7 @@ extension CircularUIInstanceManager {
     }
         
     private func hideFromModifierHoldMode(configId: Int) {
+        print("[InstanceManager] hideFromModifierHoldMode called for config \(configId)")
         guard let instance = getInstance(forConfigId: configId) else {
             print("[InstanceManager] Cannot hide from modifier hold mode - no instance for config \(configId)")
             return
