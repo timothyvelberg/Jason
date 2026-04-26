@@ -684,8 +684,7 @@ class RingConfigurationManager: ObservableObject {
             switch (bundleId, config.bundleId) {
             case (nil, nil):                        sameScope = true   // both global
             case (let a?, let b?) where a == b:     sameScope = true   // same app
-            case (nil, _), (_, nil):                sameScope = true   // global vs app-scoped — conflict
-            default:                                sameScope = false  // different apps — no conflict
+            default:                                sameScope = false  // no conflict
             }
             guard sameScope else { continue }
 

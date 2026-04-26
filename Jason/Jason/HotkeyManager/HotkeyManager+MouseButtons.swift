@@ -25,8 +25,8 @@ extension HotkeyManager {
             if existing.buttonNumber == buttonNumber && existing.modifierFlags == modifierFlags {
                 let sameScope: Bool
                 switch (bundleId, existing.bundleId) {
-                case (nil, nil):                        sameScope = true
-                case (let a?, let b?) where a == b:     sameScope = true
+                case (nil, nil):                        sameScope = true   // both global
+                case (let a?, let b?) where a == b:     sameScope = true   // same app
                 default:                                sameScope = false
                 }
                 if sameScope {
