@@ -16,6 +16,7 @@ struct AddContextShortcutSheet: View {
     let onSave: () -> Void
     let availableGroups: [ContextShortcutGroup]
     let defaultGroupId: Int64?
+    let ungroupedSortOrder: Int?
 
     @State private var shortcutName: String = ""
     @State private var description: String = ""
@@ -31,6 +32,7 @@ struct AddContextShortcutSheet: View {
         ringId: Int,
         availableGroups: [ContextShortcutGroup] = [],
         defaultGroupId: Int64? = nil,
+        ungroupedSortOrder: Int? = nil,
         existingShortcut: ContextShortcut? = nil,
         onSave: @escaping () -> Void
     ) {
@@ -38,6 +40,7 @@ struct AddContextShortcutSheet: View {
         self.ringId = ringId
         self.availableGroups = availableGroups
         self.defaultGroupId = defaultGroupId
+        self.ungroupedSortOrder = ungroupedSortOrder
         self.existingShortcut = existingShortcut
         self.onSave = onSave
     }
@@ -233,8 +236,13 @@ struct AddContextShortcutSheet: View {
             )
             DatabaseManager.shared.updateContextShortcut(updated)
         } else {
-            // Insert
             let existingShortcuts = DatabaseManager.shared.fetchContextShortcuts(for: ringId)
+            let sortOrder: Int
+            if let groupId = selectedGroupId {
+                sortOrder = existingShortcuts.filter { $0.groupId == groupId }.count
+            } else {
+                sortOrder = ungroupedSortOrder ?? existingShortcuts.filter { $0.groupId == nil }.count
+            }
             let shortcut = ContextShortcut(
                 id: 0,
                 ringId: ringId,
@@ -244,7 +252,8 @@ struct AddContextShortcutSheet: View {
                 keyCode: keyCode,
                 modifierFlags: modifierFlags,
                 enabled: true,
-                sortOrder: existingShortcuts.count
+                sortOrder: sortOrder,
+                groupId: selectedGroupId
             )
             DatabaseManager.shared.insertContextShortcut(shortcut)
         }

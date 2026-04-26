@@ -299,6 +299,12 @@ private struct InstanceSubRow: View {
     let onEdit: () -> Void
 
     @State private var isHovered = false
+    
+    private var topLevelItems: [ContextTopLevelItem] {
+        let groupItems = groups.map { ContextTopLevelItem.group($0) }
+        let ungroupedItems = shortcuts.filter { $0.groupId == nil }.map { ContextTopLevelItem.ungroupedShortcut($0) }
+        return (groupItems + ungroupedItems).sorted { $0.sortOrder < $1.sortOrder }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -362,46 +368,16 @@ private struct InstanceSubRow: View {
                     .padding(.vertical, 8)
                 } else {
                     VStack(alignment: .leading, spacing: 0) {
+                        ForEach(topLevelItems) { item in
+                            switch item {
+                            case .group(let group):
+                                let groupShortcuts = shortcuts.filter { $0.groupId == group.id }
 
-                        // Grouped shortcuts
-                        ForEach(groups) { group in
-                            let groupShortcuts = shortcuts.filter { $0.groupId == group.id }
-
-                            // Group header
-                            HStack(spacing: 6) {
-                                Image(systemName: group.iconName ?? "folder")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.secondary)
-                                Text(group.name)
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.leading, 26)
-                            .padding(.top, 8)
-                            .padding(.bottom, 2)
-
-                            ForEach(groupShortcuts) { shortcut in
-                                ReadOnlyShortcutRow(shortcut: shortcut)
-                                    .padding(.leading, 40)
-                            }
-
-                            if groupShortcuts.isEmpty {
-                                Text("Empty group")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                    .italic()
-                                    .padding(.leading, 40)
-                                    .padding(.bottom, 4)
-                            }
-                        }
-
-                        // Ungrouped shortcuts
-                        let ungrouped = shortcuts.filter { $0.groupId == nil }
-                        if !ungrouped.isEmpty {
-                            if !groups.isEmpty {
                                 HStack(spacing: 6) {
-                                    Text("Ungrouped")
+                                    Image(systemName: group.iconName ?? "folder")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary)
+                                    Text(group.name)
                                         .font(.caption)
                                         .fontWeight(.semibold)
                                         .foregroundColor(.secondary)
@@ -409,9 +385,22 @@ private struct InstanceSubRow: View {
                                 .padding(.leading, 26)
                                 .padding(.top, 8)
                                 .padding(.bottom, 2)
-                            }
 
-                            ForEach(ungrouped) { shortcut in
+                                ForEach(groupShortcuts) { shortcut in
+                                    ReadOnlyShortcutRow(shortcut: shortcut)
+                                        .padding(.leading, 40)
+                                }
+
+                                if groupShortcuts.isEmpty {
+                                    Text("Empty group")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                        .italic()
+                                        .padding(.leading, 40)
+                                        .padding(.bottom, 4)
+                                }
+
+                            case .ungroupedShortcut(let shortcut):
                                 ReadOnlyShortcutRow(shortcut: shortcut)
                                     .padding(.leading, groups.isEmpty ? 26 : 40)
                             }

@@ -7,6 +7,29 @@
 
 import SwiftUI
 
+// MARK: - Top Level Item
+
+enum ContextTopLevelItem: Identifiable {
+    case group(ContextShortcutGroup)
+    case ungroupedShortcut(ContextShortcut)
+
+    var id: String {
+        switch self {
+        case .group(let g): return "group-\(g.id)"
+        case .ungroupedShortcut(let s): return "shortcut-\(s.id)"
+        }
+    }
+
+    var sortOrder: Int {
+        switch self {
+        case .group(let g): return g.sortOrder
+        case .ungroupedShortcut(let s): return s.sortOrder
+        }
+    }
+}
+
+// MARK: - Edit Instance Sheet
+
 struct EditContextInstanceSheet: View {
     @Environment(\.dismiss) var dismiss
 
@@ -23,6 +46,7 @@ struct EditContextInstanceSheet: View {
     @State private var showAddGroupSheet = false
     @State private var isAddingShortcut = false
     @State private var defaultGroupIdForNewShortcut: Int64? = nil
+    @State private var ungroupedSortOrderForNewShortcut: Int = 0
     @State private var editingShortcut: ContextShortcut? = nil
     @State private var errorMessage: String?
 
@@ -38,6 +62,29 @@ struct EditContextInstanceSheet: View {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
         !triggers.isEmpty &&
         triggers.allSatisfy { $0.isValid }
+    }
+
+    private var topLevelItems: [ContextTopLevelItem] {
+        let groupItems = groups.map { ContextTopLevelItem.group($0) }
+        let ungroupedItems = shortcuts.filter { $0.groupId == nil }.map { ContextTopLevelItem.ungroupedShortcut($0) }
+        return (groupItems + ungroupedItems).sorted { $0.sortOrder < $1.sortOrder }
+    }
+    
+    private var nextTopLevelSortOrder: Int { topLevelItems.count }
+
+    private var shortcutsListHeight: CGFloat {
+        var h: CGFloat = 0
+        for item in topLevelItems {
+            switch item {
+            case .group(let g):
+                let count = shortcuts.filter { $0.groupId == g.id }.count
+                h += 36
+                h += count == 0 ? 30 : CGFloat(count) * 44
+            case .ungroupedShortcut:
+                h += 44
+            }
+        }
+        return max(h, 60)
     }
 
     var body: some View {
@@ -139,6 +186,7 @@ struct EditContextInstanceSheet: View {
 
                             Button(action: {
                                 defaultGroupIdForNewShortcut = nil
+                                ungroupedSortOrderForNewShortcut = nextTopLevelSortOrder
                                 isAddingShortcut = true
                             }) {
                                 Image(systemName: "plus.circle.fill")
@@ -149,7 +197,7 @@ struct EditContextInstanceSheet: View {
                             .help("Add shortcut")
                         }
 
-                        if groups.isEmpty && shortcuts.isEmpty {
+                        if topLevelItems.isEmpty {
                             HStack {
                                 Spacer()
                                 VStack(spacing: 8) {
@@ -167,42 +215,44 @@ struct EditContextInstanceSheet: View {
                                 Spacer()
                             }
                         } else {
-
-                            // Groups
-                            ForEach(groups) { group in
-                                let groupShortcuts = shortcuts.filter { $0.groupId == group.id }
-                                InstanceGroupSection(
-                                    group: group,
-                                    shortcuts: groupShortcuts,
-                                    allGroups: groups,
-                                    onAddShortcut: {
-                                        defaultGroupIdForNewShortcut = group.id
-                                        isAddingShortcut = true
-                                    },
-                                    onEditShortcut: { editingShortcut = $0 },
-                                    onDeleteShortcut: deleteShortcut,
-                                    onMoveShortcut: { source, dest in
-                                        moveShortcut(from: source, to: dest, groupId: group.id)
-                                    },
-                                    onReassignShortcut: reassignShortcut,
-                                    onDeleteGroup: { deleteGroup(group) }
-                                )
+                            List {
+                                ForEach(topLevelItems) { item in
+                                    switch item {
+                                    case .group(let group):
+                                        InstanceGroupSection(
+                                            group: group,
+                                            shortcuts: shortcuts.filter { $0.groupId == group.id },
+                                            allGroups: groups,
+                                            onAddShortcut: {
+                                                defaultGroupIdForNewShortcut = group.id
+                                                ungroupedSortOrderForNewShortcut = 0
+                                                isAddingShortcut = true
+                                            },
+                                            onEditShortcut: { editingShortcut = $0 },
+                                            onDeleteShortcut: deleteShortcut,
+                                            onReassignShortcut: reassignShortcut,
+                                            onDeleteGroup: { deleteGroup(group) },
+                                            onMoveShortcut: { source, dest in moveShortcutWithinGroup(from: source, to: dest, groupId: group.id) }
+                                        )
+                                        .listRowInsets(EdgeInsets())
+                                        .listRowSeparator(.hidden)
+                                        .listRowBackground(Color.clear)
+                                    case .ungroupedShortcut(let shortcut):
+                                        InstanceShortcutRow(
+                                            shortcut: shortcut,
+                                            allGroups: groups,
+                                            onEdit: { editingShortcut = shortcut },
+                                            onDelete: { deleteShortcut(shortcut) },
+                                            onReassign: { reassignShortcut(shortcut, to: $0) }
+                                        )
+                                        .listRowSeparator(.hidden)
+                                    }
+                                }
+                                .onMove(perform: moveTopLevelItem)
                             }
-
-                            // Ungrouped shortcuts
-                            let ungrouped = shortcuts.filter { $0.groupId == nil }
-                            if !ungrouped.isEmpty {
-                                InstanceUngroupedSection(
-                                    shortcuts: ungrouped,
-                                    allGroups: groups,
-                                    onEditShortcut: { editingShortcut = $0 },
-                                    onDeleteShortcut: deleteShortcut,
-                                    onMoveShortcut: { source, dest in
-                                        moveShortcut(from: source, to: dest, groupId: nil)
-                                    },
-                                    onReassignShortcut: reassignShortcut
-                                )
-                            }
+                            .listStyle(.plain)
+                            .scrollDisabled(true)
+                            .frame(height: shortcutsListHeight)
                         }
                     }
 
@@ -231,7 +281,10 @@ struct EditContextInstanceSheet: View {
         .frame(width: 560, height: 700)
         .onAppear { loadData() }
         .sheet(isPresented: $showAddGroupSheet) {
-            AddContextShortcutGroupSheet(ringId: config.id) { newGroup in
+            AddContextShortcutGroupSheet(
+                ringId: config.id,
+                startingSortOrder: nextTopLevelSortOrder
+            ) { newGroup in
                 groups.append(newGroup)
             }
         }
@@ -240,7 +293,8 @@ struct EditContextInstanceSheet: View {
                 app: app,
                 ringId: config.id,
                 availableGroups: groups,
-                defaultGroupId: defaultGroupIdForNewShortcut
+                defaultGroupId: defaultGroupIdForNewShortcut,
+                ungroupedSortOrder: defaultGroupIdForNewShortcut == nil ? ungroupedSortOrderForNewShortcut : nil
             ) {
                 loadShortcuts()
             }
@@ -271,13 +325,47 @@ struct EditContextInstanceSheet: View {
     private func loadShortcuts() {
         shortcuts = DatabaseManager.shared.fetchContextShortcuts(for: config.id)
     }
+    
+    private func moveShortcutWithinGroup(from source: IndexSet, to dest: Int, groupId: Int64) {
+        var scoped = shortcuts.filter { $0.groupId == groupId }
+        scoped.move(fromOffsets: source, toOffset: dest)
+        let updates = scoped.enumerated().map { (index, s) in (id: s.id, sortOrder: index) }
+        DatabaseManager.shared.updateContextShortcutSortOrders(updates)
+        // Update local state to match
+        let rest = shortcuts.filter { $0.groupId != groupId }
+        shortcuts = rest + scoped
+    }
+
+    // MARK: - Top Level Reorder
+
+    private func moveTopLevelItem(from source: IndexSet, to destination: Int) {
+        var items = topLevelItems
+        items.move(fromOffsets: source, toOffset: destination)
+
+        for (index, item) in items.enumerated() {
+            switch item {
+            case .group(let g):
+                let updated = ContextShortcutGroup(id: g.id, ringId: g.ringId, name: g.name, iconName: g.iconName, sortOrder: index)
+                DatabaseManager.shared.updateContextShortcutGroup(updated)
+                if let idx = groups.firstIndex(where: { $0.id == g.id }) {
+                    groups[idx] = updated
+                }
+            case .ungroupedShortcut(let s):
+                var updated = s
+                updated.sortOrder = index
+                DatabaseManager.shared.updateContextShortcut(updated)
+                if let idx = shortcuts.firstIndex(where: { $0.id == s.id }) {
+                    shortcuts[idx] = updated
+                }
+            }
+        }
+    }
 
     // MARK: - Groups
 
     private func deleteGroup(_ group: ContextShortcutGroup) {
         DatabaseManager.shared.deleteContextShortcutGroup(id: group.id)
         groups.removeAll { $0.id == group.id }
-        // ON DELETE SET NULL — reload so groupId is cleared on affected shortcuts
         loadShortcuts()
     }
 
@@ -288,15 +376,6 @@ struct EditContextInstanceSheet: View {
         shortcuts.removeAll { $0.id == shortcut.id }
     }
 
-    private func moveShortcut(from source: IndexSet, to dest: Int, groupId: Int64?) {
-        var scoped = shortcuts.filter { $0.groupId == groupId }
-        scoped.move(fromOffsets: source, toOffset: dest)
-        let rest = shortcuts.filter { $0.groupId != groupId }
-        shortcuts = rest + scoped
-        let updates = scoped.enumerated().map { (index, s) in (id: s.id, sortOrder: index) }
-        DatabaseManager.shared.updateContextShortcutSortOrders(updates)
-    }
-
     private func reassignShortcut(_ shortcut: ContextShortcut, to newGroupId: Int64?) {
         var updated = shortcut
         updated.groupId = newGroupId
@@ -304,7 +383,7 @@ struct EditContextInstanceSheet: View {
         loadShortcuts()
     }
 
-    // MARK: - Save (name + triggers)
+    // MARK: - Save
 
     private func save() {
         errorMessage = nil
@@ -362,9 +441,9 @@ private struct InstanceGroupSection: View {
     let onAddShortcut: () -> Void
     let onEditShortcut: (ContextShortcut) -> Void
     let onDeleteShortcut: (ContextShortcut) -> Void
-    let onMoveShortcut: (IndexSet, Int) -> Void
     let onReassignShortcut: (ContextShortcut, Int64?) -> Void
     let onDeleteGroup: () -> Void
+    let onMoveShortcut: (IndexSet, Int) -> Void
 
     @State private var isHovered = false
 
@@ -373,6 +452,10 @@ private struct InstanceGroupSection: View {
 
             // Group header
             HStack(spacing: 8) {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary.opacity(0.4))
+
                 Image(systemName: group.iconName ?? "folder")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
@@ -421,59 +504,17 @@ private struct InstanceGroupSection: View {
                             allGroups: allGroups,
                             onEdit: { onEditShortcut(shortcut) },
                             onDelete: { onDeleteShortcut(shortcut) },
-                            onReassign: { newGroupId in onReassignShortcut(shortcut, newGroupId) }
+                            onReassign: { onReassignShortcut(shortcut, $0) }
                         )
-                        .listRowInsets(EdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 0))
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 0))
+                        .listRowSeparator(.hidden)
                     }
                     .onMove(perform: onMoveShortcut)
                 }
                 .listStyle(.plain)
+                .scrollDisabled(true)
                 .frame(height: CGFloat(shortcuts.count) * 44)
             }
-        }
-    }
-}
-
-// MARK: - Ungrouped Section
-
-private struct InstanceUngroupedSection: View {
-    let shortcuts: [ContextShortcut]
-    let allGroups: [ContextShortcutGroup]
-    let onEditShortcut: (ContextShortcut) -> Void
-    let onDeleteShortcut: (ContextShortcut) -> Void
-    let onMoveShortcut: (IndexSet, Int) -> Void
-    let onReassignShortcut: (ContextShortcut, Int64?) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-
-            HStack {
-                Text("Ungrouped")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                Spacer()
-            }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 8)
-            .background(Color.secondary.opacity(0.06))
-            .cornerRadius(6)
-
-            List {
-                ForEach(shortcuts) { shortcut in
-                    InstanceShortcutRow(
-                        shortcut: shortcut,
-                        allGroups: allGroups,
-                        onEdit: { onEditShortcut(shortcut) },
-                        onDelete: { onDeleteShortcut(shortcut) },
-                        onReassign: { newGroupId in onReassignShortcut(shortcut, newGroupId) }
-                    )
-                    .listRowInsets(EdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 0))
-                }
-                .onMove(perform: onMoveShortcut)
-            }
-            .listStyle(.plain)
-            .frame(height: CGFloat(shortcuts.count) * 44)
         }
     }
 }
@@ -591,6 +632,7 @@ struct AddContextShortcutGroupSheet: View {
     @Environment(\.dismiss) var dismiss
 
     let ringId: Int
+    let startingSortOrder: Int
     let onSave: (ContextShortcutGroup) -> Void
 
     @State private var name: String = ""
@@ -630,16 +672,14 @@ struct AddContextShortcutGroupSheet: View {
 
                     let trimmed = iconName.trimmingCharacters(in: .whitespaces)
                     if !trimmed.isEmpty {
-                        HStack(spacing: 8) {
-                            if NSImage(systemSymbolName: trimmed, accessibilityDescription: nil) != nil {
-                                Image(systemName: trimmed)
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.blue)
-                            } else {
-                                Text("Invalid symbol")
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                            }
+                        if NSImage(systemSymbolName: trimmed, accessibilityDescription: nil) != nil {
+                            Image(systemName: trimmed)
+                                .font(.system(size: 20))
+                                .foregroundColor(.blue)
+                        } else {
+                            Text("Invalid symbol")
+                                .font(.caption)
+                                .foregroundColor(.red)
                         }
                     }
                 }
@@ -668,13 +708,11 @@ struct AddContextShortcutGroupSheet: View {
         let validIcon: String? = trimmed.isEmpty ? nil :
             (NSImage(systemSymbolName: trimmed, accessibilityDescription: nil) != nil ? trimmed : nil)
 
-        let existingCount = DatabaseManager.shared.fetchContextShortcutGroups(for: ringId).count
-
         guard let newId = DatabaseManager.shared.insertContextShortcutGroup(
             ringId: ringId,
             name: name.trimmingCharacters(in: .whitespaces),
             iconName: validIcon,
-            sortOrder: existingCount
+            sortOrder: startingSortOrder
         ) else { return }
 
         let group = ContextShortcutGroup(
@@ -682,7 +720,7 @@ struct AddContextShortcutGroupSheet: View {
             ringId: ringId,
             name: name.trimmingCharacters(in: .whitespaces),
             iconName: validIcon,
-            sortOrder: existingCount
+            sortOrder: startingSortOrder
         )
         onSave(group)
         dismiss()

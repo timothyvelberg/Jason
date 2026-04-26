@@ -60,8 +60,10 @@ class ContextProvider: ObservableObject, FunctionProvider {
             return [categoryNode(children: children)]
         }
 
-        // Build group category nodes
-        var topLevelChildren: [FunctionNode] = groups.map { group in
+        // Build top-level children sorted by sort_order (groups and ungrouped shortcuts interleaved)
+        var topLevel: [(sortOrder: Int, node: FunctionNode)] = []
+
+        for group in groups {
             let groupShortcuts = enabledShortcuts
                 .filter { $0.groupId == group.id }
                 .map { shortcut in
@@ -73,22 +75,21 @@ class ContextProvider: ObservableObject, FunctionProvider {
                         modifierFlags: shortcut.modifierFlags
                     )
                 }
-            return makeGroupNode(group: group, children: groupShortcuts)
+            topLevel.append((sortOrder: group.sortOrder, node: makeGroupNode(group: group, children: groupShortcuts)))
         }
 
-        // Append ungrouped shortcuts after all groups
-        let ungrouped = enabledShortcuts
-            .filter { $0.groupId == nil }
-            .map { shortcut in
-                makeShortcutNode(
-                    id: "context-\(shortcut.id)",
-                    name: shortcut.shortcutName,
-                    icon: shortcut.iconName ?? "command",
-                    keyCode: shortcut.keyCode,
-                    modifierFlags: shortcut.modifierFlags
-                )
-            }
-        topLevelChildren.append(contentsOf: ungrouped)
+        for shortcut in enabledShortcuts.filter({ $0.groupId == nil }) {
+            let node = makeShortcutNode(
+                id: "context-\(shortcut.id)",
+                name: shortcut.shortcutName,
+                icon: shortcut.iconName ?? "command",
+                keyCode: shortcut.keyCode,
+                modifierFlags: shortcut.modifierFlags
+            )
+            topLevel.append((sortOrder: shortcut.sortOrder, node: node))
+        }
+
+        var topLevelChildren = topLevel.sorted { $0.sortOrder < $1.sortOrder }.map { $0.node }
 
         if topLevelChildren.isEmpty {
             topLevelChildren = [noActionsNode()]
