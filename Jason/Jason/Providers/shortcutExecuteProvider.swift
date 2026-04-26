@@ -163,16 +163,14 @@ class ShortcutExecuteProvider: ObservableObject, FunctionProvider {
 /// Utility for posting keyboard shortcuts via CGEvent
 struct ShortcutExecutor {
     
-    /// Execute a keyboard shortcut by posting CGEvents
-    /// - Parameters:
-    ///   - keyCode: The main key code
-    ///   - modifierFlags: The modifier flags (command, shift, option, control)
+    static var isSwitchingFocus: Bool = false
+    
     static func execute(keyCode: UInt16, modifierFlags: UInt, pid: pid_t? = nil) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             postKeyboardShortcut(keyCode: keyCode, modifierFlags: modifierFlags, pid: pid)
         }
     }
-
+    
     private static func postKeyboardShortcut(keyCode: UInt16, modifierFlags: UInt, pid: pid_t? = nil) {
         let source = CGEventSource(stateID: .combinedSessionState)
         
@@ -196,16 +194,64 @@ struct ShortcutExecutor {
         }
         keyUp.flags = cgFlags
         
+        let display = TriggerFormatting.formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
+        
         if let pid = pid {
-            keyDown.postToPid(pid)
-            keyUp.postToPid(pid)
-            print("✅ [ShortcutExecutor] Posted shortcut to PID \(pid)")
+            if isElectronApp(pid: pid) {
+                print("⚡️ [ShortcutExecutor] Electron app detected — using focus-switch for PID \(pid)")
+                postViaFocusSwitch(keyDown: keyDown, keyUp: keyUp, pid: pid)
+            } else {
+                keyDown.postToPid(pid)
+                keyUp.postToPid(pid)
+                print("✅ [ShortcutExecutor] Posted shortcut to PID \(pid)")
+            }
         } else {
             keyDown.post(tap: .cgSessionEventTap)
             keyUp.post(tap: .cgSessionEventTap)
         }
         
-        let display = TriggerFormatting.formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
         print("✅ [ShortcutExecutor] Posted shortcut: \(display) (keyCode=\(keyCode), cgFlags=\(cgFlags.rawValue))")
+    }
+    
+    private static func isElectronApp(pid: pid_t) -> Bool {
+        guard let app = NSRunningApplication(processIdentifier: pid),
+              let bundleURL = app.bundleURL else {
+            return false
+        }
+        let electronFrameworkURL = bundleURL
+            .appendingPathComponent("Contents")
+            .appendingPathComponent("Frameworks")
+            .appendingPathComponent("Electron Framework.framework")
+        let isElectron = FileManager.default.fileExists(atPath: electronFrameworkURL.path)
+        print("🔍 [ShortcutExecutor] \(app.localizedName ?? "Unknown") is Electron: \(isElectron)")
+        return isElectron
+    }
+    
+    private static func postViaFocusSwitch(keyDown: CGEvent, keyUp: CGEvent, pid: pid_t) {
+        guard let targetApp = NSRunningApplication(processIdentifier: pid),
+              let jasonApp = NSRunningApplication(processIdentifier: ProcessInfo.processInfo.processIdentifier) else {
+            print("❌ [ShortcutExecutor] Could not resolve apps for focus switch")
+            return
+        }
+        
+        ShortcutExecutor.isSwitchingFocus = true
+        
+        AppSwitcherManager.shared.activeUIManager?.ignoreFocusChangesTemporarily(duration: 0.3)
+        
+        targetApp.activate()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            keyDown.post(tap: .cgSessionEventTap)
+            keyUp.post(tap: .cgSessionEventTap)
+            print("✅ [ShortcutExecutor] Posted shortcut via focus-switch to \(targetApp.localizedName ?? "Unknown")")
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                jasonApp.activate()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    ShortcutExecutor.isSwitchingFocus = false
+                }
+            }
+        }
     }
 }

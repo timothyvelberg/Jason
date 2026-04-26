@@ -204,6 +204,7 @@ class ContextProvider: ObservableObject, FunctionProvider {
     // MARK: - Notifications
     
     @objc private func frontmostAppChanged() {
+        guard !ShortcutExecutor.isSwitchingFocus else { return }
         guard let app = FrontmostAppMonitor.shared.frontmostApp,
               let bundleID = app.bundleIdentifier,
               bundleID != Bundle.main.bundleIdentifier else {
