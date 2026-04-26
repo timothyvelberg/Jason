@@ -128,10 +128,17 @@ class ContextProvider: ObservableObject, FunctionProvider {
             preferredLayout: nil,
             showLabel: true,
             providerId: providerId,
-            onLeftClick: ModifierAwareInteraction(base: .execute {
-                print("🎯 [ContextProvider] Executing: \(name)")
-                ShortcutExecutor.execute(keyCode: keyCode, modifierFlags: modifierFlags)
-            }),
+            onLeftClick: ModifierAwareInteraction(
+                base: .execute {
+                    print("🎯 [ContextProvider] Executing: \(name)")
+                    ShortcutExecutor.execute(keyCode: keyCode, modifierFlags: modifierFlags)
+                },
+                command: .executeKeepOpen {
+                    print("🎯 [ContextProvider] Executing (keep open): \(name)")
+                    let pid = AppSwitcherManager.shared.activeUIManager?.previousApp?.processIdentifier
+                    ShortcutExecutor.execute(keyCode: keyCode, modifierFlags: modifierFlags, pid: pid)
+                }
+            ),
             onRightClick: ModifierAwareInteraction(base: .doNothing),
             onMiddleClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)

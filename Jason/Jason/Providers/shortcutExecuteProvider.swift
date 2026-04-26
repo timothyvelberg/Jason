@@ -167,17 +167,15 @@ struct ShortcutExecutor {
     /// - Parameters:
     ///   - keyCode: The main key code
     ///   - modifierFlags: The modifier flags (command, shift, option, control)
-    static func execute(keyCode: UInt16, modifierFlags: UInt) {
-        // Small delay to ensure the ring has dismissed and target app has focus
+    static func execute(keyCode: UInt16, modifierFlags: UInt, pid: pid_t? = nil) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            postKeyboardShortcut(keyCode: keyCode, modifierFlags: modifierFlags)
+            postKeyboardShortcut(keyCode: keyCode, modifierFlags: modifierFlags, pid: pid)
         }
     }
-    
-    private static func postKeyboardShortcut(keyCode: UInt16, modifierFlags: UInt) {
+
+    private static func postKeyboardShortcut(keyCode: UInt16, modifierFlags: UInt, pid: pid_t? = nil) {
         let source = CGEventSource(stateID: .combinedSessionState)
         
-        // Convert NSEvent modifier flags to CGEventFlags
         let nsFlags = NSEvent.ModifierFlags(rawValue: modifierFlags)
         var cgFlags = CGEventFlags()
         
@@ -186,23 +184,26 @@ struct ShortcutExecutor {
         if nsFlags.contains(.option) { cgFlags.insert(.maskAlternate) }
         if nsFlags.contains(.control) { cgFlags.insert(.maskControl) }
         
-        // Create key down event
         guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true) else {
             print("❌ [ShortcutExecutor] Failed to create keyDown event")
             return
         }
         keyDown.flags = cgFlags
         
-        // Create key up event
         guard let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) else {
             print("❌ [ShortcutExecutor] Failed to create keyUp event")
             return
         }
         keyUp.flags = cgFlags
         
-        // Post events
-        keyDown.post(tap: .cgSessionEventTap)
-        keyUp.post(tap: .cgSessionEventTap)
+        if let pid = pid {
+            keyDown.postToPid(pid)
+            keyUp.postToPid(pid)
+            print("✅ [ShortcutExecutor] Posted shortcut to PID \(pid)")
+        } else {
+            keyDown.post(tap: .cgSessionEventTap)
+            keyUp.post(tap: .cgSessionEventTap)
+        }
         
         let display = TriggerFormatting.formatShortcut(keyCode: keyCode, modifiers: modifierFlags)
         print("✅ [ShortcutExecutor] Posted shortcut: \(display) (keyCode=\(keyCode), cgFlags=\(cgFlags.rawValue))")

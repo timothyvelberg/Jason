@@ -29,6 +29,8 @@ protocol UIManager: AnyObject {
     /// The list panel manager (both ring and panel modes have this)
     var listPanelManager: ListPanelManager? { get }
     
+    var previousApp: NSRunningApplication? { get }
+    
     /// Setup the manager (create windows, wire callbacks)
     func setup(injectedProviders: [any FunctionProvider]?)
     
