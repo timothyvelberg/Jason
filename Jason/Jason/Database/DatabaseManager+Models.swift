@@ -167,6 +167,15 @@ struct ContextShortcut: Identifiable {
     var modifierFlags: UInt
     var enabled: Bool
     var sortOrder: Int
+    var groupId: Int64?
+}
+
+struct ContextShortcutGroup: Identifiable {
+    let id: Int64
+    var ringId: Int
+    var name: String
+    var iconName: String?
+    var sortOrder: Int
 }
 
 struct ContextApp: Identifiable {

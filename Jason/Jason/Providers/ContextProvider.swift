@@ -40,22 +40,61 @@ class ContextProvider: ObservableObject, FunctionProvider {
     // MARK: - FunctionProvider Protocol
     
     func provideFunctions() -> [FunctionNode] {
-        let shortcuts = DatabaseManager.shared.fetchContextShortcuts(for: ringId)  // CHANGED
+        let shortcuts = DatabaseManager.shared.fetchContextShortcuts(for: ringId)
         let enabledShortcuts = shortcuts.filter { $0.enabled }
-        
-        let children: [FunctionNode] = enabledShortcuts.isEmpty
-        ? [noActionsNode()]
-        : enabledShortcuts.map { shortcut in
-            makeShortcutNode(
-                id: "context-\(shortcut.id)",
-                name: shortcut.shortcutName,
-                icon: shortcut.iconName ?? "command",
-                keyCode: shortcut.keyCode,
-                modifierFlags: shortcut.modifierFlags
-            )
+        let groups = DatabaseManager.shared.fetchContextShortcutGroups(for: ringId)
+
+        // If no groups exist, fall back to flat list (original behaviour)
+        if groups.isEmpty {
+            let children: [FunctionNode] = enabledShortcuts.isEmpty
+                ? [noActionsNode()]
+                : enabledShortcuts.map { shortcut in
+                    makeShortcutNode(
+                        id: "context-\(shortcut.id)",
+                        name: shortcut.shortcutName,
+                        icon: shortcut.iconName ?? "command",
+                        keyCode: shortcut.keyCode,
+                        modifierFlags: shortcut.modifierFlags
+                    )
+                }
+            return [categoryNode(children: children)]
         }
-        
-        return [categoryNode(children: children)]
+
+        // Build group category nodes
+        var topLevelChildren: [FunctionNode] = groups.map { group in
+            let groupShortcuts = enabledShortcuts
+                .filter { $0.groupId == group.id }
+                .map { shortcut in
+                    makeShortcutNode(
+                        id: "context-\(shortcut.id)",
+                        name: shortcut.shortcutName,
+                        icon: shortcut.iconName ?? "command",
+                        keyCode: shortcut.keyCode,
+                        modifierFlags: shortcut.modifierFlags
+                    )
+                }
+            return makeGroupNode(group: group, children: groupShortcuts)
+        }
+
+        // Append ungrouped shortcuts after all groups
+        let ungrouped = enabledShortcuts
+            .filter { $0.groupId == nil }
+            .map { shortcut in
+                makeShortcutNode(
+                    id: "context-\(shortcut.id)",
+                    name: shortcut.shortcutName,
+                    icon: shortcut.iconName ?? "command",
+                    keyCode: shortcut.keyCode,
+                    modifierFlags: shortcut.modifierFlags
+                )
+            }
+        topLevelChildren.append(contentsOf: ungrouped)
+
+        if topLevelChildren.isEmpty {
+            topLevelChildren = [noActionsNode()]
+        }
+
+        return [categoryNode(children: topLevelChildren)]
     }
     
     func refresh() {
@@ -98,6 +137,28 @@ class ContextProvider: ObservableObject, FunctionProvider {
         )
     }
     
+    private func makeGroupNode(group: ContextShortcutGroup, children: [FunctionNode]) -> FunctionNode {
+        let iconImage = group.iconName.flatMap {
+            NSImage(systemSymbolName: $0, accessibilityDescription: nil)
+        } ?? NSImage(systemSymbolName: "folder", accessibilityDescription: nil) ?? NSImage()
+
+        return FunctionNode(
+            id: "context-group-\(group.id)",
+            name: group.name,
+            type: .category,
+            icon: iconImage,
+            children: children.isEmpty ? [noActionsNode()] : children,
+//            childDisplayMode: .panel,
+            preferredLayout: .partialSlice,
+            slicePositioning: .center,
+            providerId: providerId,
+            onLeftClick: ModifierAwareInteraction(base: .doNothing),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .expand)
+        )
+    }
+    
     private func noActionsNode() -> FunctionNode {
         return FunctionNode(
             id: "context-no-actions",
@@ -121,7 +182,7 @@ class ContextProvider: ObservableObject, FunctionProvider {
             type: .category,
             icon: providerIcon,
             children: children,
-            childDisplayMode: .panel,
+//            childDisplayMode: .panel,
             preferredLayout: .partialSlice,
             slicePositioning: .center,
             providerId: providerId,

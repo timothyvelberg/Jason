@@ -14,6 +14,8 @@ struct AddContextShortcutSheet: View {
     let ringId: Int                        // NEW: ring instance this shortcut belongs to
     let existingShortcut: ContextShortcut?
     let onSave: () -> Void
+    let availableGroups: [ContextShortcutGroup]
+    let defaultGroupId: Int64?
 
     @State private var shortcutName: String = ""
     @State private var description: String = ""
@@ -21,10 +23,21 @@ struct AddContextShortcutSheet: View {
     @State private var recordedKeyCode: UInt16?
     @State private var recordedModifierFlags: UInt?
     @State private var errorMessage: String?
+    @State private var selectedGroupId: Int64? = nil
 
-    init(app: ContextApp, ringId: Int, existingShortcut: ContextShortcut? = nil, onSave: @escaping () -> Void) {
+
+    init(
+        app: ContextApp,
+        ringId: Int,
+        availableGroups: [ContextShortcutGroup] = [],
+        defaultGroupId: Int64? = nil,
+        existingShortcut: ContextShortcut? = nil,
+        onSave: @escaping () -> Void
+    ) {
         self.app = app
         self.ringId = ringId
+        self.availableGroups = availableGroups
+        self.defaultGroupId = defaultGroupId
         self.existingShortcut = existingShortcut
         self.onSave = onSave
     }
@@ -117,6 +130,24 @@ struct AddContextShortcutSheet: View {
                     }
 
                     Divider()
+                    
+                    // Group
+                    if !availableGroups.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Group")
+                                .font(.headline)
+                            Picker("", selection: $selectedGroupId) {
+                                Text("No Group").tag(Int64?.none)
+                                ForEach(availableGroups) { group in
+                                    Text(group.name).tag(Int64?.some(group.id))
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 200)
+                        }
+
+                        Divider()
+                    }
 
                     // Key recorder
                     VStack(alignment: .leading, spacing: 8) {
@@ -161,12 +192,16 @@ struct AddContextShortcutSheet: View {
     // MARK: - Populate
 
     private func populateIfEditing() {
-        guard let shortcut = existingShortcut else { return }
+        guard let shortcut = existingShortcut else {
+            selectedGroupId = defaultGroupId   // ← add this line
+            return
+        }
         shortcutName = shortcut.shortcutName
         description = shortcut.description ?? ""
         iconName = shortcut.iconName ?? ""
         recordedKeyCode = shortcut.keyCode
         recordedModifierFlags = shortcut.modifierFlags
+        selectedGroupId = shortcut.groupId   // ← add this line
     }
 
     // MARK: - Save
@@ -193,7 +228,8 @@ struct AddContextShortcutSheet: View {
                 keyCode: keyCode,
                 modifierFlags: modifierFlags,
                 enabled: existing.enabled,
-                sortOrder: existing.sortOrder
+                sortOrder: existing.sortOrder,
+                groupId: selectedGroupId
             )
             DatabaseManager.shared.updateContextShortcut(updated)
         } else {

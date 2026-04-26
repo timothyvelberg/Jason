@@ -16,8 +16,9 @@ struct ShortcutEditContext: Identifiable {
     let app: ContextApp
 }
 
-struct InstanceShortcutTarget: Identifiable {
-    let id: Int     // ringId
+struct InstanceEditContext: Identifiable {
+    let id: Int
+    let config: StoredRingConfiguration
     let app: ContextApp
 }
 
@@ -28,12 +29,13 @@ struct ContextShortcutsSettingsView: View {
     @State private var apps: [ContextApp] = []
     @State private var instances: [String: [StoredRingConfiguration]] = [:]
     @State private var shortcuts: [Int: [ContextShortcut]] = [:]
+    @State private var groups: [Int: [ContextShortcutGroup]] = [:]
     @State private var expandedApps: Set<String> = []
     @State private var expandedInstances: Set<Int> = []
     @State private var showingAppPicker = false
     @State private var addingInstanceForApp: ContextApp? = nil
-    @State private var addingShortcutForRing: InstanceShortcutTarget? = nil
-    @State private var editingContext: ShortcutEditContext? = nil
+    @State private var editingInstanceContext: InstanceEditContext? = nil
+
 
     var body: some View {
         SettingsListShell(
@@ -51,6 +53,7 @@ struct ContextShortcutsSettingsView: View {
                     app: app,
                     instances: instances[app.bundleId] ?? [],
                     shortcuts: shortcuts,
+                    groups: groups,
                     isExpanded: expandedApps.contains(app.bundleId),
                     expandedInstances: expandedInstances,
                     onToggleExpand: { toggleExpandApp(app) },
@@ -58,14 +61,12 @@ struct ContextShortcutsSettingsView: View {
                     onDeleteApp: { deleteApp(app) },
                     onDeleteInstance: { config in deleteInstance(config, for: app) },
                     onAddInstance: { addingInstanceForApp = app },
-                    onAddShortcut: { ringId in addingShortcutForRing = InstanceShortcutTarget(id: ringId, app: app) },
-                    onEditShortcut: { shortcut in editingContext = ShortcutEditContext(id: shortcut.id, shortcut: shortcut, app: app) },
-                    onDeleteShortcut: { shortcut in deleteShortcut(shortcut) },
-                    onMoveShortcut: { source, dest, ringId in moveShortcut(from: source, to: dest, ringId: ringId) }
+                    onEditInstance: { config in
+                        editingInstanceContext = InstanceEditContext(id: config.id, config: config, app: app)
+                    }
                 )
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
             }
-            .onMove(perform: moveApp)
         }
         .onAppear {
             loadApps()
@@ -77,23 +78,16 @@ struct ContextShortcutsSettingsView: View {
             }
         }
         .sheet(item: $addingInstanceForApp) { app in
-            EditRingView(configuration: nil, bundleId: app.bundleId) {
+            AddContextInstanceSheet(bundleId: app.bundleId) {
                 loadInstances(for: app)
                 CircularUIInstanceManager.shared.syncWithConfigurations()
             }
         }
-        .sheet(item: $addingShortcutForRing) { target in
-            AddContextShortcutSheet(app: target.app, ringId: target.id) {
-                loadShortcuts(for: target.id)
-            }
-        }
-        .sheet(item: $editingContext) { context in
-            AddContextShortcutSheet(
-                app: context.app,
-                ringId: context.shortcut.ringId,
-                existingShortcut: context.shortcut
-            ) {
-                loadShortcuts(for: context.shortcut.ringId)
+        .sheet(item: $editingInstanceContext) { context in
+            EditContextInstanceSheet(config: context.config, app: context.app) {
+                loadInstances(for: context.app)
+                loadData(for: context.config.id)
+                CircularUIInstanceManager.shared.syncWithConfigurations()
             }
         }
     }
@@ -112,8 +106,9 @@ struct ContextShortcutsSettingsView: View {
         instances[app.bundleId] = all.filter { $0.bundleId == app.bundleId }
     }
 
-    private func loadShortcuts(for ringId: Int) {
+    private func loadData(for ringId: Int) {
         shortcuts[ringId] = DatabaseManager.shared.fetchContextShortcuts(for: ringId)
+        groups[ringId] = DatabaseManager.shared.fetchContextShortcutGroups(for: ringId)
     }
 
     // MARK: - Add
@@ -127,12 +122,12 @@ struct ContextShortcutsSettingsView: View {
     // MARK: - Delete
 
     private func deleteApp(_ app: ContextApp) {
-        // Remove all ring instances for this app
         let appInstances = instances[app.bundleId] ?? []
         for config in appInstances {
             CircularUIInstanceManager.shared.removeInstance(forConfigId: config.id)
             DatabaseManager.shared.deleteRingConfiguration(id: config.id)
             shortcuts.removeValue(forKey: config.id)
+            groups.removeValue(forKey: config.id)
             expandedInstances.remove(config.id)
         }
         DatabaseManager.shared.deleteContextApp(bundleId: app.bundleId)
@@ -145,14 +140,10 @@ struct ContextShortcutsSettingsView: View {
         CircularUIInstanceManager.shared.removeInstance(forConfigId: config.id)
         DatabaseManager.shared.deleteRingConfiguration(id: config.id)
         shortcuts.removeValue(forKey: config.id)
+        groups.removeValue(forKey: config.id)
         expandedInstances.remove(config.id)
         loadInstances(for: app)
         CircularUIInstanceManager.shared.syncWithConfigurations()
-    }
-
-    private func deleteShortcut(_ shortcut: ContextShortcut) {
-        DatabaseManager.shared.deleteContextShortcut(id: shortcut.id)
-        loadShortcuts(for: shortcut.ringId)
     }
 
     // MARK: - Expand / Collapse
@@ -171,24 +162,8 @@ struct ContextShortcutsSettingsView: View {
             expandedInstances.remove(ringId)
         } else {
             expandedInstances.insert(ringId)
-            loadShortcuts(for: ringId)
+            loadData(for: ringId)
         }
-    }
-
-    // MARK: - Reorder
-
-    private func moveApp(from source: IndexSet, to destination: Int) {
-        apps.move(fromOffsets: source, toOffset: destination)
-        let updates = apps.enumerated().map { (index, app) in (id: app.id, sortOrder: index) }
-        DatabaseManager.shared.updateContextAppSortOrders(updates)
-    }
-
-    private func moveShortcut(from source: IndexSet, to destination: Int, ringId: Int) {
-        var ringShortcuts = shortcuts[ringId] ?? []
-        ringShortcuts.move(fromOffsets: source, toOffset: destination)
-        shortcuts[ringId] = ringShortcuts
-        let updates = ringShortcuts.enumerated().map { (index, s) in (id: s.id, sortOrder: index) }
-        DatabaseManager.shared.updateContextShortcutSortOrders(updates)
     }
 }
 
@@ -199,6 +174,7 @@ private struct ContextAppRow: View {
     let app: ContextApp
     let instances: [StoredRingConfiguration]
     let shortcuts: [Int: [ContextShortcut]]
+    let groups: [Int: [ContextShortcutGroup]]
     let isExpanded: Bool
     let expandedInstances: Set<Int>
     let onToggleExpand: () -> Void
@@ -206,10 +182,7 @@ private struct ContextAppRow: View {
     let onDeleteApp: () -> Void
     let onDeleteInstance: (StoredRingConfiguration) -> Void
     let onAddInstance: () -> Void
-    let onAddShortcut: (Int) -> Void
-    let onEditShortcut: (ContextShortcut) -> Void
-    let onDeleteShortcut: (ContextShortcut) -> Void
-    let onMoveShortcut: (IndexSet, Int, Int) -> Void
+    let onEditInstance: (StoredRingConfiguration) -> Void
 
     @State private var appIcon: NSImage?
     @State private var isHovered = false
@@ -219,11 +192,6 @@ private struct ContextAppRow: View {
 
             // App header row
             HStack(spacing: 12) {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary.opacity(0.5))
-                    .help("Drag to reorder")
-
                 if let icon = appIcon {
                     Image(nsImage: icon)
                         .resizable()
@@ -294,13 +262,11 @@ private struct ContextAppRow: View {
                             InstanceSubRow(
                                 config: config,
                                 shortcuts: shortcuts[config.id] ?? [],
+                                groups: groups[config.id] ?? [],
                                 isExpanded: expandedInstances.contains(config.id),
                                 onToggleExpand: { onToggleExpandInstance(config.id) },
                                 onDelete: { onDeleteInstance(config) },
-                                onAddShortcut: { onAddShortcut(config.id) },
-                                onEditShortcut: onEditShortcut,
-                                onDeleteShortcut: onDeleteShortcut,
-                                onMoveShortcut: { source, dest in onMoveShortcut(source, dest, config.id) }
+                                onEdit: { onEditInstance(config) }
                             )
                         }
                     }
@@ -326,13 +292,11 @@ private struct InstanceSubRow: View {
 
     let config: StoredRingConfiguration
     let shortcuts: [ContextShortcut]
+    let groups: [ContextShortcutGroup]
     let isExpanded: Bool
     let onToggleExpand: () -> Void
     let onDelete: () -> Void
-    let onAddShortcut: () -> Void
-    let onEditShortcut: (ContextShortcut) -> Void
-    let onDeleteShortcut: (ContextShortcut) -> Void
-    let onMoveShortcut: (IndexSet, Int) -> Void
+    let onEdit: () -> Void
 
     @State private var isHovered = false
 
@@ -341,7 +305,7 @@ private struct InstanceSubRow: View {
 
             // Instance header
             HStack(spacing: 10) {
-                Image(systemName: config.isPanelMode ? "rectangle.stack" : "circle.grid.cross")
+                Image(systemName: "circle.grid.cross")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
                     .frame(width: 16)
@@ -358,13 +322,11 @@ private struct InstanceSubRow: View {
                 Spacer()
 
                 if isHovered {
-                    Button(action: onAddShortcut) {
-                        Image(systemName: "plus.circle")
-                            .font(.system(size: 13))
-                            .foregroundColor(.secondary)
+                    Button(action: onEdit) {
+                        Image("context_actions_edit")
                     }
                     .buttonStyle(.borderless)
-                    .help("Add shortcut to this instance")
+                    .help("Edit instance")
 
                     Button(action: onDelete) {
                         Image("context_actions_delete")
@@ -384,13 +346,13 @@ private struct InstanceSubRow: View {
             .contentShape(Rectangle())
             .onHover { isHovered = $0 }
 
-            // Shortcuts list
+            // Read-only shortcut summary
             if isExpanded {
                 Divider().padding(.leading, 26)
 
-                if shortcuts.isEmpty {
+                if shortcuts.isEmpty && groups.isEmpty {
                     HStack {
-                        Text("No shortcuts yet")
+                        Text("No shortcuts configured")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .italic()
@@ -399,19 +361,63 @@ private struct InstanceSubRow: View {
                     .padding(.leading, 26)
                     .padding(.vertical, 8)
                 } else {
-                    List {
-                        ForEach(shortcuts) { shortcut in
-                            ShortcutSubRow(
-                                shortcut: shortcut,
-                                onEdit: { onEditShortcut(shortcut) },
-                                onDelete: { onDeleteShortcut(shortcut) }
-                            )
-                            .listRowInsets(EdgeInsets(top: 0, leading: 26, bottom: 0, trailing: 0))
+                    VStack(alignment: .leading, spacing: 0) {
+
+                        // Grouped shortcuts
+                        ForEach(groups) { group in
+                            let groupShortcuts = shortcuts.filter { $0.groupId == group.id }
+
+                            // Group header
+                            HStack(spacing: 6) {
+                                Image(systemName: group.iconName ?? "folder")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                                Text(group.name)
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.leading, 26)
+                            .padding(.top, 8)
+                            .padding(.bottom, 2)
+
+                            ForEach(groupShortcuts) { shortcut in
+                                ReadOnlyShortcutRow(shortcut: shortcut)
+                                    .padding(.leading, 40)
+                            }
+
+                            if groupShortcuts.isEmpty {
+                                Text("Empty group")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .italic()
+                                    .padding(.leading, 40)
+                                    .padding(.bottom, 4)
+                            }
                         }
-                        .onMove(perform: onMoveShortcut)
+
+                        // Ungrouped shortcuts
+                        let ungrouped = shortcuts.filter { $0.groupId == nil }
+                        if !ungrouped.isEmpty {
+                            if !groups.isEmpty {
+                                HStack(spacing: 6) {
+                                    Text("Ungrouped")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.leading, 26)
+                                .padding(.top, 8)
+                                .padding(.bottom, 2)
+                            }
+
+                            ForEach(ungrouped) { shortcut in
+                                ReadOnlyShortcutRow(shortcut: shortcut)
+                                    .padding(.leading, groups.isEmpty ? 26 : 40)
+                            }
+                        }
                     }
-                    .listStyle(.plain)
-                    .frame(height: CGFloat(shortcuts.count) * 44)
+                    .padding(.bottom, 8)
                 }
             }
 
@@ -420,55 +426,34 @@ private struct InstanceSubRow: View {
     }
 }
 
-// MARK: - Shortcut Sub Row
+// MARK: - Read Only Shortcut Row
 
-private struct ShortcutSubRow: View {
-
+private struct ReadOnlyShortcutRow: View {
     let shortcut: ContextShortcut
-    let onEdit: () -> Void
-    let onDelete: () -> Void
-
-    @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Image(systemName: shortcut.iconName ?? "command")
-                .font(.system(size: 12))
+                .font(.system(size: 11))
                 .foregroundColor(.secondary)
-                .frame(width: 16)
+                .frame(width: 14)
 
             Text(shortcut.shortcutName)
-                .font(.subheadline)
+                .font(.caption)
 
             Spacer()
 
             Text(formatShortcut(keyCode: shortcut.keyCode, modifierFlags: shortcut.modifierFlags))
-                .font(.caption)
+                .font(.caption2)
                 .foregroundColor(.secondary)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, 5)
                 .padding(.vertical, 2)
                 .background(
                     RoundedRectangle(cornerRadius: 4)
                         .fill(Color.secondary.opacity(0.1))
                 )
-
-            if isHovered {
-                Button(action: onEdit) {
-                    Image("context_actions_edit")
-                }
-                .buttonStyle(.borderless)
-                .help("Edit shortcut")
-
-                Button(action: onDelete) {
-                    Image("context_actions_delete")
-                }
-                .buttonStyle(.borderless)
-                .help("Delete shortcut")
-            }
         }
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
-        .onHover { isHovered = $0 }
+        .padding(.vertical, 3)
     }
 
     private func formatShortcut(keyCode: UInt16, modifierFlags: UInt) -> String {

@@ -297,6 +297,17 @@ class DatabaseManager {
         );
         """
         
+        let contextShortcutGroupsSQL = """
+        CREATE TABLE IF NOT EXISTS context_shortcut_groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ring_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            icon_name TEXT,
+            sort_order INTEGER NOT NULL,
+            FOREIGN KEY (ring_id) REFERENCES ring_configurations(id) ON DELETE CASCADE
+        );
+        """
+        
         let contextShortcutsSQL = """
         CREATE TABLE IF NOT EXISTS context_shortcuts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -308,7 +319,9 @@ class DatabaseManager {
             modifier_flags INTEGER NOT NULL,
             enabled INTEGER NOT NULL DEFAULT 1,
             sort_order INTEGER NOT NULL,
-            FOREIGN KEY (ring_id) REFERENCES ring_configurations(id) ON DELETE CASCADE
+            group_id INTEGER DEFAULT NULL,
+            FOREIGN KEY (ring_id) REFERENCES ring_configurations(id) ON DELETE CASCADE,
+            FOREIGN KEY (group_id) REFERENCES context_shortcut_groups(id) ON DELETE SET NULL
         );
         """
         
@@ -329,6 +342,7 @@ class DatabaseManager {
             snippetsSQL,
             providerSettingsSQL,
             contextAppsSQL,
+            contextShortcutGroupsSQL,
             contextShortcutsSQL
         ]
         
