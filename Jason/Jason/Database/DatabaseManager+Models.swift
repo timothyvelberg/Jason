@@ -157,19 +157,25 @@ struct RingTriggerEntry: Identifiable {
     let createdAt: Int
 }
 
+enum ShortcutType: String {
+    case keyboard = "keyboard"
+    case menu = "menu"
+}
+
 struct ContextShortcut: Identifiable {
     let id: Int64
     var ringId: Int
     var shortcutName: String
     var description: String?
     var iconName: String?
-    var keyCode: UInt16
-    var modifierFlags: UInt
+    var shortcutType: ShortcutType
+    var keyCode: UInt16?
+    var modifierFlags: UInt?
+    var menuPath: String?
     var enabled: Bool
     var sortOrder: Int
     var groupId: Int64?
 }
-
 struct ContextShortcutGroup: Identifiable {
     let id: Int64
     var ringId: Int

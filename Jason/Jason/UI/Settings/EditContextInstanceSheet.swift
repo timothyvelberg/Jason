@@ -558,15 +558,26 @@ private struct InstanceShortcutRow: View {
 
             Spacer()
 
-            Text(formatShortcut(keyCode: shortcut.keyCode, modifierFlags: shortcut.modifierFlags))
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.secondary.opacity(0.1))
-                )
+            Group {
+                switch shortcut.shortcutType {
+                case .keyboard:
+                    if let keyCode = shortcut.keyCode, let modifierFlags = shortcut.modifierFlags {
+                        Text(formatShortcut(keyCode: keyCode, modifierFlags: modifierFlags))
+                    }
+                case .menu:
+                    if let menuPath = shortcut.menuPath {
+                        Text(menuPath.replacingOccurrences(of: ";", with: " › "))
+                    }
+                }
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.secondary.opacity(0.1))
+            )
 
             if isHovered {
                 if !allGroups.isEmpty {

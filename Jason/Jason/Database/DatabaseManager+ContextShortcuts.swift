@@ -320,8 +320,8 @@ extension DatabaseManager {
 
             let sql = """
             INSERT INTO context_shortcuts
-                (ring_id, shortcut_name, description, icon_name, key_code, modifier_flags, enabled, sort_order, group_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                (ring_id, shortcut_name, description, icon_name, shortcut_type, key_code, modifier_flags, menu_path, enabled, sort_order, group_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """
 
             var statement: OpaquePointer?
@@ -342,15 +342,33 @@ extension DatabaseManager {
                     sqlite3_bind_null(statement, 4)
                 }
 
-                sqlite3_bind_int(statement, 5, Int32(shortcut.keyCode))
-                sqlite3_bind_int64(statement, 6, Int64(shortcut.modifierFlags))
-                sqlite3_bind_int(statement, 7, shortcut.enabled ? 1 : 0)
-                sqlite3_bind_int(statement, 8, Int32(shortcut.sortOrder))
+                sqlite3_bind_text(statement, 5, shortcut.shortcutType.rawValue, -1, SQLITE_TRANSIENT_CS)
+
+                if let keyCode = shortcut.keyCode {
+                    sqlite3_bind_int(statement, 6, Int32(keyCode))
+                } else {
+                    sqlite3_bind_null(statement, 6)
+                }
+
+                if let modifierFlags = shortcut.modifierFlags {
+                    sqlite3_bind_int64(statement, 7, Int64(modifierFlags))
+                } else {
+                    sqlite3_bind_null(statement, 7)
+                }
+
+                if let menuPath = shortcut.menuPath {
+                    sqlite3_bind_text(statement, 8, menuPath, -1, SQLITE_TRANSIENT_CS)
+                } else {
+                    sqlite3_bind_null(statement, 8)
+                }
+
+                sqlite3_bind_int(statement, 9, shortcut.enabled ? 1 : 0)
+                sqlite3_bind_int(statement, 10, Int32(shortcut.sortOrder))
 
                 if let groupId = shortcut.groupId {
-                    sqlite3_bind_int64(statement, 9, groupId)
+                    sqlite3_bind_int64(statement, 11, groupId)
                 } else {
-                    sqlite3_bind_null(statement, 9)
+                    sqlite3_bind_null(statement, 11)
                 }
 
                 if sqlite3_step(statement) == SQLITE_DONE {
@@ -374,7 +392,7 @@ extension DatabaseManager {
             guard let db = self.db else { return }
 
             let sql = """
-            SELECT id, ring_id, shortcut_name, description, icon_name, key_code, modifier_flags, enabled, sort_order, group_id
+            SELECT id, ring_id, shortcut_name, description, icon_name, shortcut_type, key_code, modifier_flags, menu_path, enabled, sort_order, group_id
             FROM context_shortcuts
             WHERE ring_id = ?
             ORDER BY sort_order ASC;
@@ -408,7 +426,7 @@ extension DatabaseManager {
 
             let sql = """
             SELECT cs.id, cs.ring_id, cs.shortcut_name, cs.description, cs.icon_name,
-                   cs.key_code, cs.modifier_flags, cs.enabled, cs.sort_order, cs.group_id
+                   cs.shortcut_type, cs.key_code, cs.modifier_flags, cs.menu_path, cs.enabled, cs.sort_order, cs.group_id
             FROM context_shortcuts cs
             JOIN ring_configurations rc ON cs.ring_id = rc.id
             WHERE rc.bundle_id = ?
@@ -441,7 +459,7 @@ extension DatabaseManager {
 
             let sql = """
             UPDATE context_shortcuts
-            SET shortcut_name = ?, description = ?, icon_name = ?, key_code = ?, modifier_flags = ?, enabled = ?, sort_order = ?, group_id = ?
+            SET shortcut_name = ?, description = ?, icon_name = ?, shortcut_type = ?, key_code = ?, modifier_flags = ?, menu_path = ?, enabled = ?, sort_order = ?, group_id = ?
             WHERE id = ?;
             """
 
@@ -462,18 +480,36 @@ extension DatabaseManager {
                     sqlite3_bind_null(statement, 3)
                 }
 
-                sqlite3_bind_int(statement, 4, Int32(shortcut.keyCode))
-                sqlite3_bind_int64(statement, 5, Int64(shortcut.modifierFlags))
-                sqlite3_bind_int(statement, 6, shortcut.enabled ? 1 : 0)
-                sqlite3_bind_int(statement, 7, Int32(shortcut.sortOrder))
+                sqlite3_bind_text(statement, 4, shortcut.shortcutType.rawValue, -1, SQLITE_TRANSIENT_CS)
 
-                if let groupId = shortcut.groupId {
-                    sqlite3_bind_int64(statement, 8, groupId)
+                if let keyCode = shortcut.keyCode {
+                    sqlite3_bind_int(statement, 5, Int32(keyCode))
                 } else {
-                    sqlite3_bind_null(statement, 8)
+                    sqlite3_bind_null(statement, 5)
                 }
 
-                sqlite3_bind_int64(statement, 9, shortcut.id)
+                if let modifierFlags = shortcut.modifierFlags {
+                    sqlite3_bind_int64(statement, 6, Int64(modifierFlags))
+                } else {
+                    sqlite3_bind_null(statement, 6)
+                }
+
+                if let menuPath = shortcut.menuPath {
+                    sqlite3_bind_text(statement, 7, menuPath, -1, SQLITE_TRANSIENT_CS)
+                } else {
+                    sqlite3_bind_null(statement, 7)
+                }
+
+                sqlite3_bind_int(statement, 8, shortcut.enabled ? 1 : 0)
+                sqlite3_bind_int(statement, 9, Int32(shortcut.sortOrder))
+
+                if let groupId = shortcut.groupId {
+                    sqlite3_bind_int64(statement, 10, groupId)
+                } else {
+                    sqlite3_bind_null(statement, 10)
+                }
+
+                sqlite3_bind_int64(statement, 11, shortcut.id)
 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("✅ [DatabaseManager] Updated context shortcut id:\(shortcut.id) '\(shortcut.shortcutName)'")
@@ -570,14 +606,30 @@ extension DatabaseManager {
             iconName = String(cString: iconCString)
         }
 
-        let keyCode = UInt16(sqlite3_column_int(statement, 5))
-        let modifierFlags = UInt(sqlite3_column_int64(statement, 6))
-        let enabled = sqlite3_column_int(statement, 7) != 0
-        let sortOrder = Int(sqlite3_column_int(statement, 8))
+        let shortcutType: ShortcutType
+        if let typeCString = sqlite3_column_text(statement, 5) {
+            shortcutType = ShortcutType(rawValue: String(cString: typeCString)) ?? .keyboard
+        } else {
+            shortcutType = .keyboard
+        }
+
+        let keyCode: UInt16? = sqlite3_column_type(statement, 6) != SQLITE_NULL
+            ? UInt16(sqlite3_column_int(statement, 6)) : nil
+
+        let modifierFlags: UInt? = sqlite3_column_type(statement, 7) != SQLITE_NULL
+            ? UInt(sqlite3_column_int64(statement, 7)) : nil
+
+        var menuPath: String? = nil
+        if let pathCString = sqlite3_column_text(statement, 8) {
+            menuPath = String(cString: pathCString)
+        }
+
+        let enabled = sqlite3_column_int(statement, 9) != 0
+        let sortOrder = Int(sqlite3_column_int(statement, 10))
 
         var groupId: Int64? = nil
-        if sqlite3_column_type(statement, 9) != SQLITE_NULL {
-            groupId = sqlite3_column_int64(statement, 9)
+        if sqlite3_column_type(statement, 11) != SQLITE_NULL {
+            groupId = sqlite3_column_int64(statement, 11)
         }
 
         return ContextShortcut(
@@ -586,8 +638,10 @@ extension DatabaseManager {
             shortcutName: shortcutName,
             description: description,
             iconName: iconName,
+            shortcutType: shortcutType,
             keyCode: keyCode,
             modifierFlags: modifierFlags,
+            menuPath: menuPath,
             enabled: enabled,
             sortOrder: sortOrder,
             groupId: groupId

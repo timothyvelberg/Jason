@@ -44,49 +44,24 @@ class ContextProvider: ObservableObject, FunctionProvider {
         let enabledShortcuts = shortcuts.filter { $0.enabled }
         let groups = DatabaseManager.shared.fetchContextShortcutGroups(for: ringId)
 
-        // If no groups exist, fall back to flat list (original behaviour)
         if groups.isEmpty {
             let children: [FunctionNode] = enabledShortcuts.isEmpty
                 ? [noActionsNode()]
-                : enabledShortcuts.map { shortcut in
-                    makeShortcutNode(
-                        id: "context-\(shortcut.id)",
-                        name: shortcut.shortcutName,
-                        icon: shortcut.iconName ?? "command",
-                        keyCode: shortcut.keyCode,
-                        modifierFlags: shortcut.modifierFlags
-                    )
-                }
+                : enabledShortcuts.map { makeShortcutNode(shortcut: $0) }
             return [categoryNode(children: children)]
         }
 
-        // Build top-level children sorted by sort_order (groups and ungrouped shortcuts interleaved)
         var topLevel: [(sortOrder: Int, node: FunctionNode)] = []
 
         for group in groups {
             let groupShortcuts = enabledShortcuts
                 .filter { $0.groupId == group.id }
-                .map { shortcut in
-                    makeShortcutNode(
-                        id: "context-\(shortcut.id)",
-                        name: shortcut.shortcutName,
-                        icon: shortcut.iconName ?? "command",
-                        keyCode: shortcut.keyCode,
-                        modifierFlags: shortcut.modifierFlags
-                    )
-                }
+                .map { makeShortcutNode(shortcut: $0) }
             topLevel.append((sortOrder: group.sortOrder, node: makeGroupNode(group: group, children: groupShortcuts)))
         }
 
         for shortcut in enabledShortcuts.filter({ $0.groupId == nil }) {
-            let node = makeShortcutNode(
-                id: "context-\(shortcut.id)",
-                name: shortcut.shortcutName,
-                icon: shortcut.iconName ?? "command",
-                keyCode: shortcut.keyCode,
-                modifierFlags: shortcut.modifierFlags
-            )
-            topLevel.append((sortOrder: shortcut.sortOrder, node: node))
+            topLevel.append((sortOrder: shortcut.sortOrder, node: makeShortcutNode(shortcut: shortcut)))
         }
 
         var topLevelChildren = topLevel.sorted { $0.sortOrder < $1.sortOrder }.map { $0.node }
@@ -111,17 +86,48 @@ class ContextProvider: ObservableObject, FunctionProvider {
     
     // MARK: - Node Helpers
     
-    private func makeShortcutNode(
-        id: String,
-        name: String,
-        icon: String,
-        keyCode: UInt16,
-        modifierFlags: UInt
-    ) -> FunctionNode {
+    private func makeShortcutNode(shortcut: ContextShortcut) -> FunctionNode {
+        let name = shortcut.shortcutName
+        let icon = shortcut.iconName ?? "command"
         let iconImage = NSImage(systemSymbolName: icon, accessibilityDescription: nil) ?? NSImage()
-        
+
+        let baseAction: () -> Void
+        let keepOpenAction: () -> Void
+
+        switch shortcut.shortcutType {
+        case .keyboard:
+            guard let keyCode = shortcut.keyCode,
+                  let modifierFlags = shortcut.modifierFlags else {
+                return noActionsNode()
+            }
+            baseAction = {
+                print("🎯 [ContextProvider] Executing keyboard: \(name)")
+                ShortcutExecutor.execute(keyCode: keyCode, modifierFlags: modifierFlags)
+            }
+            keepOpenAction = {
+                print("🎯 [ContextProvider] Executing keyboard (keep open): \(name)")
+                let pid = AppSwitcherManager.shared.activeUIManager?.previousApp?.processIdentifier
+                ShortcutExecutor.execute(keyCode: keyCode, modifierFlags: modifierFlags, pid: pid)
+            }
+
+        case .menu:
+            guard let menuPath = shortcut.menuPath,
+                  !menuPath.isEmpty else {
+                return noActionsNode()
+            }
+            baseAction = {
+                print("🎯 [ContextProvider] Executing menu: \(name) — \(menuPath)")
+                guard let pid = AppSwitcherManager.shared.activeUIManager?.previousApp?.processIdentifier else {
+                    print("❌ [ContextProvider] No previous app PID for menu execution")
+                    return
+                }
+                MenuItemExecutor.execute(menuPath: menuPath, pid: pid)
+            }
+            keepOpenAction = baseAction
+        }
+
         return FunctionNode(
-            id: id,
+            id: "context-\(shortcut.id)",
             name: name,
             type: .action,
             icon: iconImage,
@@ -129,15 +135,8 @@ class ContextProvider: ObservableObject, FunctionProvider {
             showLabel: true,
             providerId: providerId,
             onLeftClick: ModifierAwareInteraction(
-                base: .execute {
-                    print("🎯 [ContextProvider] Executing: \(name)")
-                    ShortcutExecutor.execute(keyCode: keyCode, modifierFlags: modifierFlags)
-                },
-                command: .executeKeepOpen {
-                    print("🎯 [ContextProvider] Executing (keep open): \(name)")
-                    let pid = AppSwitcherManager.shared.activeUIManager?.previousApp?.processIdentifier
-                    ShortcutExecutor.execute(keyCode: keyCode, modifierFlags: modifierFlags, pid: pid)
-                }
+                base: .execute(baseAction),
+                command: .executeKeepOpen(keepOpenAction)
             ),
             onRightClick: ModifierAwareInteraction(base: .doNothing),
             onMiddleClick: ModifierAwareInteraction(base: .doNothing),

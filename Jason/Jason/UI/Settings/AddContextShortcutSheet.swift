@@ -11,7 +11,7 @@ struct AddContextShortcutSheet: View {
     @Environment(\.dismiss) var dismiss
 
     let app: ContextApp
-    let ringId: Int                        // NEW: ring instance this shortcut belongs to
+    let ringId: Int
     let existingShortcut: ContextShortcut?
     let onSave: () -> Void
     let availableGroups: [ContextShortcutGroup]
@@ -21,11 +21,12 @@ struct AddContextShortcutSheet: View {
     @State private var shortcutName: String = ""
     @State private var description: String = ""
     @State private var iconName: String = ""
+    @State private var shortcutType: ShortcutType = .keyboard
     @State private var recordedKeyCode: UInt16?
     @State private var recordedModifierFlags: UInt?
+    @State private var menuPath: String = ""
     @State private var errorMessage: String?
     @State private var selectedGroupId: Int64? = nil
-
 
     init(
         app: ContextApp,
@@ -48,7 +49,13 @@ struct AddContextShortcutSheet: View {
     var isEditing: Bool { existingShortcut != nil }
 
     var isValid: Bool {
-        !shortcutName.trimmingCharacters(in: .whitespaces).isEmpty && recordedKeyCode != nil
+        guard !shortcutName.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        switch shortcutType {
+        case .keyboard:
+            return recordedKeyCode != nil
+        case .menu:
+            return !menuPath.trimmingCharacters(in: .whitespaces).isEmpty
+        }
     }
 
     var body: some View {
@@ -133,7 +140,7 @@ struct AddContextShortcutSheet: View {
                     }
 
                     Divider()
-                    
+
                     // Group
                     if !availableGroups.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
@@ -152,17 +159,44 @@ struct AddContextShortcutSheet: View {
                         Divider()
                     }
 
-                    // Key recorder
+                    // Type toggle
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Keyboard Shortcut")
+                        Text("Action Type")
                             .font(.headline)
-                        KeyboardShortcutRecorder(
-                            keyCode: $recordedKeyCode,
-                            modifierFlags: $recordedModifierFlags
-                        )
-                        Text("Click the button and press your desired key combination.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        Picker("", selection: $shortcutType) {
+                            Text("Keyboard Shortcut").tag(ShortcutType.keyboard)
+                            Text("Menu Item").tag(ShortcutType.menu)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    Divider()
+
+                    // Keyboard or menu input
+                    switch shortcutType {
+                    case .keyboard:
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Keyboard Shortcut")
+                                .font(.headline)
+                            KeyboardShortcutRecorder(
+                                keyCode: $recordedKeyCode,
+                                modifierFlags: $recordedModifierFlags
+                            )
+                            Text("Click the button and press your desired key combination.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                    case .menu:
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Menu Path")
+                                .font(.headline)
+                            TextField("e.g. File;Export;Export as PNG", text: $menuPath)
+                                .textFieldStyle(.roundedBorder)
+                            Text("Separate each menu level with a semicolon.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
 
                     // Error
@@ -188,7 +222,7 @@ struct AddContextShortcutSheet: View {
             }
             .padding()
         }
-        .frame(width: 480, height: 500)
+        .frame(width: 480, height: 540)
         .onAppear { populateIfEditing() }
     }
 
@@ -196,40 +230,57 @@ struct AddContextShortcutSheet: View {
 
     private func populateIfEditing() {
         guard let shortcut = existingShortcut else {
-            selectedGroupId = defaultGroupId   // ← add this line
+            selectedGroupId = defaultGroupId
             return
         }
         shortcutName = shortcut.shortcutName
         description = shortcut.description ?? ""
         iconName = shortcut.iconName ?? ""
+        shortcutType = shortcut.shortcutType
         recordedKeyCode = shortcut.keyCode
         recordedModifierFlags = shortcut.modifierFlags
-        selectedGroupId = shortcut.groupId   // ← add this line
+        menuPath = shortcut.menuPath ?? ""
+        selectedGroupId = shortcut.groupId
     }
 
     // MARK: - Save
 
     private func save() {
-        guard let keyCode = recordedKeyCode,
-              let modifierFlags = recordedModifierFlags else {
-            errorMessage = "Please record a keyboard shortcut."
-            return
-        }
-
         let trimmedIcon = iconName.trimmingCharacters(in: .whitespaces)
         let validatedIcon: String? = trimmedIcon.isEmpty ? nil :
             (NSImage(systemSymbolName: trimmedIcon, accessibilityDescription: nil) != nil ? trimmedIcon : nil)
 
+        switch shortcutType {
+        case .keyboard:
+            guard let keyCode = recordedKeyCode,
+                  let modifierFlags = recordedModifierFlags else {
+                errorMessage = "Please record a keyboard shortcut."
+                return
+            }
+            saveShortcut(keyCode: keyCode, modifierFlags: modifierFlags, menuPath: nil, validatedIcon: validatedIcon)
+
+        case .menu:
+            let trimmedPath = menuPath.trimmingCharacters(in: .whitespaces)
+            guard !trimmedPath.isEmpty else {
+                errorMessage = "Please enter a menu path."
+                return
+            }
+            saveShortcut(keyCode: nil, modifierFlags: nil, menuPath: trimmedPath, validatedIcon: validatedIcon)
+        }
+    }
+
+    private func saveShortcut(keyCode: UInt16?, modifierFlags: UInt?, menuPath: String?, validatedIcon: String?) {
         if let existing = existingShortcut {
-            // Update — ring_id is immutable once created
             let updated = ContextShortcut(
                 id: existing.id,
                 ringId: existing.ringId,
                 shortcutName: shortcutName.trimmingCharacters(in: .whitespaces),
                 description: description.trimmingCharacters(in: .whitespaces).isEmpty ? nil : description.trimmingCharacters(in: .whitespaces),
                 iconName: validatedIcon,
+                shortcutType: shortcutType,
                 keyCode: keyCode,
                 modifierFlags: modifierFlags,
+                menuPath: menuPath,
                 enabled: existing.enabled,
                 sortOrder: existing.sortOrder,
                 groupId: selectedGroupId
@@ -249,8 +300,10 @@ struct AddContextShortcutSheet: View {
                 shortcutName: shortcutName.trimmingCharacters(in: .whitespaces),
                 description: description.trimmingCharacters(in: .whitespaces).isEmpty ? nil : description.trimmingCharacters(in: .whitespaces),
                 iconName: validatedIcon,
+                shortcutType: shortcutType,
                 keyCode: keyCode,
                 modifierFlags: modifierFlags,
+                menuPath: menuPath,
                 enabled: true,
                 sortOrder: sortOrder,
                 groupId: selectedGroupId
