@@ -8,13 +8,14 @@ import Foundation
 
 enum SettingsTab: String, CaseIterable, Identifiable {
     case instance = "Instances"
+    case shortcuts = "Shortcuts"
     case apps = "Apps"
     case folders = "Folders"
     case files = "Files"
     case snippets = "Snippets"
     case calendar = "Calendar"
     case reminder = "Reminder"
-    case shortcuts = "Shortcuts"
+    
     case settings = "Settings"
 
     var id: String { rawValue }
@@ -22,13 +23,13 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .instance:  return "core_settings_menu_instance"
+        case .shortcuts:  return "core_settings_menu_shortcut"
         case .apps:      return "core_settings_menu_apps"
         case .folders:   return "core_settings_menu_folders"
         case .files:     return "core_settings_menu_files"
         case .snippets:  return "core_settings_menu_snippets"
         case .calendar:  return "core_settings_menu_calendar"
         case .reminder:  return "core_settings_menu_reminders"
-        case .shortcuts:  return "core_settings_menu_settings"
         case .settings:  return "core_settings_menu_settings"
         }
     }
