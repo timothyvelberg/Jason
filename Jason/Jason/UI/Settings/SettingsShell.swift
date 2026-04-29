@@ -40,15 +40,12 @@ struct SettingsPermissionConfig {
 /// since .onMove can only be applied to ForEach — not to a generic View.
 struct SettingsListShell<RowContent: View>: View {
 
-    // Page title — mirrors the active sidebar item label
     let title: String
 
-    // Empty state
     let emptyIcon: String
     let emptyTitle: String
     let emptySubtitle: String
 
-    // Toolbar — primaryIcon is optional (nil renders plain text button)
     let primaryLabel: String
     let primaryIcon: String?
     let primaryAction: () -> Void
@@ -56,10 +53,8 @@ struct SettingsListShell<RowContent: View>: View {
     let secondaryAction: (() -> Void)?
     let onProviderSettings: (() -> Void)?
 
-    // Optional permission gating
     let permission: SettingsPermissionConfig?
 
-    // isEmpty must come before the @ViewBuilder rows closure
     let isEmpty: Bool
 
     @ViewBuilder let rows: () -> RowContent
@@ -77,7 +72,6 @@ struct SettingsListShell<RowContent: View>: View {
         permission: SettingsPermissionConfig? = nil,
         isEmpty: Bool,
         onProviderSettings: (() -> Void)? = nil,
-
         @ViewBuilder rows: @escaping () -> RowContent
     ) {
         self.title = title
@@ -102,7 +96,7 @@ struct SettingsListShell<RowContent: View>: View {
                 Text(title)
                     .font(.title2)
                     .fontWeight(.semibold)
-                
+
                 if let onProviderSettings {
                     Button(action: onProviderSettings) {
                         Image(systemName: "gearshape")
@@ -319,7 +313,7 @@ struct SettingsRow<Metadata: View>: View {
             }
             .padding(.vertical, 16)
             .padding(.horizontal, 8)
-            
+
             Divider()
                 .padding(.horizontal, -8)
         }
