@@ -390,9 +390,7 @@ struct EditRingView: View {
                             TextField("Ring Name", text: $name)
                                 .textFieldStyle(.roundedBorder)
                                 .onAppear {
-                                    DispatchQueue.main.async {
                                         NSApp.keyWindow?.makeFirstResponder(nil)
-                                    }
                                 }
                         }
                         .padding(12)
