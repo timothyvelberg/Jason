@@ -3,27 +3,34 @@
 //  Jason
 //
 //  Created by Timothy Velberg on 29/04/2026.
-//  Collapsed group header row rendered in the root-level list of
-//  InstanceShortcutListView. Tapping the chevron opens the group,
-//  switching the list into group mode and locking drag-and-drop
-//  to that group's shortcuts.
-//
+
+//  Group header row rendered inside the flat shortcut list.
+//  The chevron toggles inline expansion of the group's shortcuts.
+//  The drag handle is shown only when isDraggable — i.e. no group
+//  is currently expanded and root-level reordering is active.
 
 import SwiftUI
 
 struct InstanceGroupRow: View {
     let group: ContextShortcutGroup
-    let onExpand: () -> Void
+    let isExpanded: Bool
+    let isDraggable: Bool
+    let onToggleExpand: () -> Void
     let onAddShortcut: () -> Void
+    let onEdit: () -> Void
     let onDelete: () -> Void
 
     @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary.opacity(0.4))
+
+            // Drag handle — removed entirely when root is frozen
+            if isDraggable {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary.opacity(0.4))
+            }
 
             Image(systemName: group.iconName ?? "folder")
                 .font(.system(size: 12))
@@ -33,17 +40,16 @@ struct InstanceGroupRow: View {
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundColor(.secondary)
+                .padding(.vertical,2)
 
             Spacer()
 
             if isHovered {
-                Button(action: onAddShortcut) {
-                    Image(systemName: "plus.circle")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
+                Button(action: onEdit) {
+                    Image("context_actions_edit")
                 }
                 .buttonStyle(.borderless)
-                .help("Add shortcut to \(group.name)")
+                .help("Edit group")
 
                 Button(action: onDelete) {
                     Image("context_actions_delete")
@@ -52,13 +58,16 @@ struct InstanceGroupRow: View {
                 .help("Delete group — shortcuts become ungrouped")
             }
 
-            Button(action: onExpand) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+            Button(action: onToggleExpand) {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 11, weight: .heavy))
+                    .foregroundColor(.white)
+                    .frame(width: 16, height: 16)
+                    .background(Color.blue .opacity(0.8))
+                    .cornerRadius(4)
             }
             .buttonStyle(.plain)
-            .help("Open group to reorder its shortcuts")
+            .help(isExpanded ? "Collapse group" : "Expand group")
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 8)

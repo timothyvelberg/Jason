@@ -109,9 +109,9 @@ struct SettingsListShell<RowContent: View>: View {
 
                 Spacer()
             }
-            .padding(.horizontal)
-            .padding(.top, 20)
-            .padding(.bottom, 12)
+            .padding(.top, 24)
+            .padding(.bottom, 16)
+            .padding(.horizontal, 16)
 
             Divider()
 

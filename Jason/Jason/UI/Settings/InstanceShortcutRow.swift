@@ -3,16 +3,18 @@
 //  Jason
 //
 //  Created by Timothy Velberg on 29/04/2026.
+
 //  Draggable shortcut row used in both root mode and group mode of
 //  InstanceShortcutListView. Displays the shortcut name, key binding badge,
 //  and a group picker for reassignment on hover.
-//
+
 
 import SwiftUI
 
 struct InstanceShortcutRow: View {
     let shortcut: ContextShortcut
     let allGroups: [ContextShortcutGroup]
+    let isDraggable: Bool
     let onEdit: () -> Void
     let onDelete: () -> Void
     let onReassign: (Int64?) -> Void
@@ -32,10 +34,16 @@ struct InstanceShortcutRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary.opacity(0.4))
+        HStack(spacing: 8) {
+
+            // Drag handle — hidden when this shortcut is not in the active drag context
+            if isDraggable {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary.opacity(0.4))
+            } else {
+                Color.clear.frame(width: 16, height: 12)
+            }
 
             Image(systemName: shortcut.iconName ?? "command")
                 .font(.system(size: 12))
@@ -50,17 +58,6 @@ struct InstanceShortcutRow: View {
             shortcutBadge
 
             if isHovered {
-                if !allGroups.isEmpty {
-                    Picker("", selection: groupPickerBinding) {
-                        Text("No Group").tag(Int64?.none)
-                        ForEach(allGroups) { group in
-                            Text(group.name).tag(Int64?.some(group.id))
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(width: 120)
-                }
-
                 Button(action: onEdit) {
                     Image("context_actions_edit")
                 }
@@ -74,7 +71,8 @@ struct InstanceShortcutRow: View {
                 .help("Delete shortcut")
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 2)
+        .padding(.horizontal, 8)
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .onAppear { selectedGroupId = shortcut.groupId }
@@ -97,7 +95,7 @@ struct InstanceShortcutRow: View {
         .font(.caption)
         .foregroundColor(.secondary)
         .padding(.horizontal, 6)
-        .padding(.vertical, 2)
+        .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.secondary.opacity(0.1))

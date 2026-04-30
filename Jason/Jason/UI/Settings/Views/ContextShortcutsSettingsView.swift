@@ -3,9 +3,11 @@
 //  Jason
 //
 //  Created by Timothy Velberg on 18/04/2026.
+
 //  Read-only settings list for context-aware shortcuts.
 //  Shows apps → instances → shortcuts in a collapsible hierarchy.
 //
+
 
 import SwiftUI
 import AppKit
@@ -66,7 +68,8 @@ struct ContextShortcutsSettingsView: View {
                         editingInstanceContext = InstanceEditContext(id: config.id, config: config, app: app)
                     }
                 )
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets())
             }
         }
         .onAppear { loadApps() }
@@ -83,7 +86,7 @@ struct ContextShortcutsSettingsView: View {
             }
         }
         .sheet(item: $editingInstanceContext) { context in
-            EditContextInstanceSheet(config: context.config, app: context.app) {
+            EditContextShortcutsSheet(config: context.config, app: context.app) {
                 loadInstances(for: context.app)
                 loadData(for: context.config.id)
                 CircularUIInstanceManager.shared.syncWithConfigurations()
@@ -186,7 +189,6 @@ private struct ContextAppRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-
             // App header row
             HStack(spacing: 12) {
                 if let icon = appIcon {
@@ -211,7 +213,7 @@ private struct ContextAppRow: View {
                 }
 
                 Spacer()
-
+ 
                 if isHovered {
                     Button(action: onAddInstance) {
                         Label("Add Instance", systemImage: "plus.rectangle.on.rectangle")
@@ -229,20 +231,22 @@ private struct ContextAppRow: View {
                 }
 
                 Button(action: onToggleExpand) {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundColor(.white)
+                        .frame(width: 16, height: 16)
+                        .background(Color.blue.opacity(0.8))
+                        .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
             }
             .padding(.vertical, 12)
-            .contentShape(Rectangle())
             .onHover { isHovered = $0 }
 
             // Instances list
             if isExpanded {
-                Divider().padding(.leading, 36)
-
+                Divider()
+                    .padding(.horizontal, 8)
                 if instances.isEmpty {
                     HStack {
                         Text("No instances yet — add one to get started.")
@@ -251,7 +255,6 @@ private struct ContextAppRow: View {
                             .italic()
                         Spacer()
                     }
-                    .padding(.leading, 36)
                     .padding(.vertical, 10)
                 } else {
                     VStack(spacing: 0) {
@@ -267,11 +270,10 @@ private struct ContextAppRow: View {
                             )
                         }
                     }
-                    .padding(.leading, 36)
                 }
             }
-
             Divider()
+                .padding(.horizontal, -8)
         }
         .onAppear { loadIcon() }
     }
@@ -305,7 +307,6 @@ private struct InstanceSubRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-
             // Instance header
             HStack(spacing: 10) {
                 Image(systemName: "circle.grid.cross")
@@ -339,20 +340,23 @@ private struct InstanceSubRow: View {
                 }
 
                 Button(action: onToggleExpand) {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundColor(.white)    
+                        .frame(width: 16, height: 16)
+                        .background(Color.blue.opacity(0.8))
+                        .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
             }
             .padding(.vertical, 10)
-            .contentShape(Rectangle())
+            .padding(.horizontal, 16)
             .onHover { isHovered = $0 }
 
             // Read-only shortcut summary
             if isExpanded {
-                Divider().padding(.leading, 26)
-
+                Divider()
+                    .padding(.horizontal, 8)
                 if shortcuts.isEmpty && groups.isEmpty {
                     HStack {
                         Text("No shortcuts configured")
@@ -361,8 +365,8 @@ private struct InstanceSubRow: View {
                             .italic()
                         Spacer()
                     }
-                    .padding(.leading, 26)
                     .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
                 } else {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(topLevelItems) { item in
@@ -387,7 +391,7 @@ private struct InstanceSubRow: View {
                                     ReadOnlyShortcutRow(shortcut: shortcut)
                                         .padding(.leading, 40)
                                 }
-
+                                
                                 if groupShortcuts.isEmpty {
                                     Text("Empty group")
                                         .font(.caption2)
@@ -404,10 +408,9 @@ private struct InstanceSubRow: View {
                         }
                     }
                     .padding(.bottom, 8)
+                    .padding(.horizontal, 8)
                 }
             }
-
-            Divider().padding(.leading, 16).opacity(0.5)
         }
     }
 }
@@ -454,4 +457,4 @@ private struct ReadOnlyShortcutRow: View {
                     .fill(Color.secondary.opacity(0.1))
             )
     }
-}
+} 
