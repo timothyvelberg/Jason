@@ -202,15 +202,10 @@ private struct ContextAppRow: View {
                         .foregroundColor(.secondary)
                         .frame(width: 24, height: 24)
                 }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(app.displayName)
-                        .font(.body)
-                        .fontWeight(.medium)
-                    Text(app.bundleId)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                
+                Text(app.displayName)
+                    .font(.body)
+                    .fontWeight(.medium)
 
                 Spacer()
  
@@ -240,13 +235,12 @@ private struct ContextAppRow: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.vertical, 12)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 16)
             .onHover { isHovered = $0 }
-
+            
             // Instances list
             if isExpanded {
-                Divider()
-                    .padding(.horizontal, 8)
                 if instances.isEmpty {
                     HStack {
                         Text("No instances yet — add one to get started.")
@@ -259,6 +253,8 @@ private struct ContextAppRow: View {
                 } else {
                     VStack(spacing: 0) {
                         ForEach(instances) { config in
+                            Divider()
+                                .padding(.horizontal, -8)
                             InstanceSubRow(
                                 config: config,
                                 shortcuts: shortcuts[config.id] ?? [],
@@ -270,6 +266,7 @@ private struct ContextAppRow: View {
                             )
                         }
                     }
+//                    .padding(.vertical, 8)
                 }
             }
             Divider()
@@ -322,6 +319,7 @@ private struct InstanceSubRow: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+                .padding(.vertical, 4)
 
                 Spacer()
 
@@ -349,7 +347,7 @@ private struct InstanceSubRow: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
             .padding(.horizontal, 16)
             .onHover { isHovered = $0 }
 
@@ -368,47 +366,49 @@ private struct InstanceSubRow: View {
                     .padding(.vertical, 8)
                     .padding(.horizontal, 16)
                 } else {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(topLevelItems) { item in
-                            switch item {
-                            case .group(let group):
-                                let groupShortcuts = shortcuts.filter { $0.groupId == group.id }
+                    VStack(spacing: 8){
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(topLevelItems) { item in
+                                switch item {
+                                case .group(let group):
+                                    let groupShortcuts = shortcuts.filter { $0.groupId == group.id }
 
-                                HStack(spacing: 6) {
-                                    Image(systemName: group.iconName ?? "folder")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(.secondary)
-                                    Text(group.name)
-                                        .font(.caption)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(.leading, 26)
-                                .padding(.top, 8)
-                                .padding(.bottom, 2)
+                                    HStack(spacing: 6) {
+                                        Image(systemName: group.iconName ?? "folder")
+                                            .font(.system(size: 10))
+                                            .foregroundColor(.secondary)
+                                        Text(group.name)
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.leading, 26)
+                                    .padding(.top, 8)
 
-                                ForEach(groupShortcuts) { shortcut in
+                                    ForEach(groupShortcuts) { shortcut in
+                                        ReadOnlyShortcutRow(shortcut: shortcut)
+                                            .padding(.leading, 40)
+                                            .padding(.vertical, 16)
+                                    }
+                                    
+                                    if groupShortcuts.isEmpty {
+                                        Text("Empty group")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                            .italic()
+                                            .padding(.leading, 40)
+                                            .padding(.bottom, 4)
+                                    }
+
+                                case .ungroupedShortcut(let shortcut):
                                     ReadOnlyShortcutRow(shortcut: shortcut)
-                                        .padding(.leading, 40)
+                                        .padding(.leading, groups.isEmpty ? 26 : 40)
                                 }
-                                
-                                if groupShortcuts.isEmpty {
-                                    Text("Empty group")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                        .italic()
-                                        .padding(.leading, 40)
-                                        .padding(.bottom, 4)
-                                }
-
-                            case .ungroupedShortcut(let shortcut):
-                                ReadOnlyShortcutRow(shortcut: shortcut)
-                                    .padding(.leading, groups.isEmpty ? 26 : 40)
                             }
                         }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical,16)
                     }
-                    .padding(.bottom, 8)
-                    .padding(.horizontal, 8)
                 }
             }
         }

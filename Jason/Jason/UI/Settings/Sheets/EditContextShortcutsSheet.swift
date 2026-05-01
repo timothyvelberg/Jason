@@ -128,17 +128,21 @@ struct EditContextShortcutsSheet: View {
                 Text("Shortcuts").font(.headline)
                 Spacer()
                 Button(action: { showAddGroupSheet = true }) {
-                    Label("Add Group", systemImage: "folder.badge.plus")
+                    Text("Add Group")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
                 .buttonStyle(.borderless)
                 .help("Add a shortcut group")
+                
+                Text("/")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
 
                 Button(action: { handleAddShortcut(groupId: nil) }) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.blue)
+                    Text("Add Shortcut")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
                 .help("Add shortcut")
