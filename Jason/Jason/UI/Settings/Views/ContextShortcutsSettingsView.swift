@@ -306,20 +306,19 @@ private struct InstanceSubRow: View {
         VStack(spacing: 0) {
             // Instance header
             HStack(spacing: 10) {
-                Image(systemName: "circle.grid.cross")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                Image("core_settings_menu_instance")
                     .frame(width: 16)
 
-                VStack(alignment: .leading, spacing: 2) {
+                HStack() {
                     Text(config.name)
                         .font(.subheadline)
                         .fontWeight(.medium)
+                        .foregroundColor(.white)
                     Text(config.triggersSummary)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 8)
 
                 Spacer()
 
@@ -348,7 +347,7 @@ private struct InstanceSubRow: View {
                 .buttonStyle(.plain)
             }
             .padding(.vertical, 8)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 24)
             .onHover { isHovered = $0 }
 
             // Read-only shortcut summary
@@ -373,14 +372,15 @@ private struct InstanceSubRow: View {
                                 case .group(let group):
                                     let groupShortcuts = shortcuts.filter { $0.groupId == group.id }
 
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: 4) {
                                         Image(systemName: group.iconName ?? "folder")
                                             .font(.system(size: 10))
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(.white)
                                         Text(group.name)
                                             .font(.caption)
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(.secondary)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.white)
+                                            .padding(.vertical, 8)
                                     }
                                     .padding(.leading, 26)
                                     .padding(.top, 8)
@@ -388,7 +388,6 @@ private struct InstanceSubRow: View {
                                     ForEach(groupShortcuts) { shortcut in
                                         ReadOnlyShortcutRow(shortcut: shortcut)
                                             .padding(.leading, 40)
-                                            .padding(.vertical, 16)
                                     }
                                     
                                     if groupShortcuts.isEmpty {
