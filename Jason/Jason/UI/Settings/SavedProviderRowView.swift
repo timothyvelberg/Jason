@@ -16,7 +16,7 @@ struct SavedProviderRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "list.bullet")
+            Image(systemName: "line.3.horizontal")
                 .font(.system(size: 16))
                 .foregroundColor(.white)
                 .frame(width: 24)

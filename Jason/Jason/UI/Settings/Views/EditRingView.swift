@@ -476,7 +476,7 @@ struct EditRingView: View {
                     triggers:           triggerData,
                     providers:          providerData
                 )
-                print("✅ [EditRing] Created '\(newConfig.name)' with \(newConfig.triggers.count) trigger(s)")
+                print("[EditRing] Created '\(newConfig.name)' with \(newConfig.triggers.count) trigger(s)")
 
             } else {
                 guard let config = configuration else {
@@ -500,7 +500,7 @@ struct EditRingView: View {
                 for provider in config.providers { try configManager.removeProvider(id: provider.id) }
                 for p        in providerData    { _ = try configManager.addProvider(toRing: config.id, providerType: p.type, order: p.order, angle: p.angle, config: p.displayMode.map { ["displayMode": $0] }) }
 
-                print("✅ [EditRing] Updated ring (ID: \(config.id)) with \(triggers.count) trigger(s)")
+                print("[EditRing] Updated ring (ID: \(config.id)) with \(triggers.count) trigger(s)")
             }
 
             onSave()
@@ -508,7 +508,7 @@ struct EditRingView: View {
 
         } catch {
             errorMessage = "Failed to save: \(error.localizedDescription)"
-            print("❌ [EditRing] Save failed: \(error)")
+            print("[EditRing] Save failed: \(error)")
         }
     }
 }

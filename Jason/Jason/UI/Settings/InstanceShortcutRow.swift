@@ -3,11 +3,11 @@
 //  Jason
 //
 //  Created by Timothy Velberg on 29/04/2026.
-
-//  Draggable shortcut row used in both root mode and group mode of
-//  InstanceShortcutListView. Displays the shortcut name, key binding badge,
-//  and a group picker for reassignment on hover.
-
+//
+//  Shortcut row used in both root mode (ungrouped) and group mode (inside
+//  an expanded group). The drag handle is shown only when isDraggable —
+//  i.e. this shortcut is in the currently active drag context.
+//
 
 import SwiftUI
 
@@ -34,15 +34,13 @@ struct InstanceShortcutRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
 
-            // Drag handle — hidden when this shortcut is not in the active drag context
+            // Drag handle — removed entirely when this shortcut is not in the active drag context
             if isDraggable {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary.opacity(0.4))
-            } else {
-                Color.clear.frame(width: 16, height: 12)
             }
 
             Image(systemName: shortcut.iconName ?? "command")
@@ -52,12 +50,24 @@ struct InstanceShortcutRow: View {
 
             Text(shortcut.shortcutName)
                 .font(.subheadline)
+                .padding(.vertical, 6)
 
             Spacer()
 
             shortcutBadge
 
             if isHovered {
+                if !allGroups.isEmpty {
+                    Picker("", selection: groupPickerBinding) {
+                        Text("No Group").tag(Int64?.none)
+                        ForEach(allGroups) { group in
+                            Text(group.name).tag(Int64?.some(group.id))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 120)
+                }
+
                 Button(action: onEdit) {
                     Image("context_actions_edit")
                 }
@@ -71,8 +81,6 @@ struct InstanceShortcutRow: View {
                 .help("Delete shortcut")
             }
         }
-        .padding(.vertical, 2)
-        .padding(.horizontal, 8)
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .onAppear { selectedGroupId = shortcut.groupId }
@@ -88,14 +96,14 @@ struct InstanceShortcutRow: View {
                 }
             case .menu:
                 if let menuPath = shortcut.menuPath {
-                    Text(menuPath.replacingOccurrences(of: ";", with: " › "))
+                    Text(menuPath.components(separatedBy: ";").last ?? menuPath)
                 }
             }
         }
         .font(.caption)
         .foregroundColor(.secondary)
         .padding(.horizontal, 6)
-        .padding(.vertical, 8)
+        .padding(.vertical, 2)
         .background(
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.secondary.opacity(0.1))

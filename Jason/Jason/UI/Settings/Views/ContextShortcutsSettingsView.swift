@@ -211,8 +211,7 @@ private struct ContextAppRow: View {
  
                 if isHovered {
                     Button(action: onAddInstance) {
-                        Label("Add Instance", systemImage: "plus.rectangle.on.rectangle")
-                            .font(.system(size: 12))
+                        Image("context_actions_add")
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.borderless)
@@ -305,13 +304,13 @@ private struct InstanceSubRow: View {
     var body: some View {
         VStack(spacing: 0) {
             // Instance header
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Image("core_settings_menu_instance")
                     .frame(width: 16)
 
                 HStack() {
                     Text(config.name)
-                        .font(.subheadline)
+                        .font(.system(size: 12))
                         .fontWeight(.medium)
                         .foregroundColor(.white)
                     Text(config.triggersSummary)
@@ -338,8 +337,8 @@ private struct InstanceSubRow: View {
 
                 Button(action: onToggleExpand) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 11, weight: .heavy))
-                        .foregroundColor(.white)    
+                        .font(.system(size: 12, weight: .heavy))
+                        .foregroundColor(.white)
                         .frame(width: 16, height: 16)
                         .background(Color.blue.opacity(0.8))
                         .cornerRadius(4)
@@ -374,10 +373,10 @@ private struct InstanceSubRow: View {
 
                                     HStack(spacing: 4) {
                                         Image(systemName: group.iconName ?? "folder")
-                                            .font(.system(size: 10))
+                                            .font(.system(size: 12))
                                             .foregroundColor(.white)
                                         Text(group.name)
-                                            .font(.caption)
+                                            .font(.system(size: 12))
                                             .fontWeight(.bold)
                                             .foregroundColor(.white)
                                             .padding(.vertical, 8)
@@ -415,22 +414,22 @@ private struct InstanceSubRow: View {
 }
 
 // MARK: - Read Only Shortcut Row
-
+ 
 private struct ReadOnlyShortcutRow: View {
     let shortcut: ContextShortcut
-
+ 
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: shortcut.iconName ?? "command")
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundColor(.secondary)
                 .frame(width: 14)
-
+ 
             Text(shortcut.shortcutName)
-                .font(.caption)
-
+                .font(.system(size: 12))
+ 
             Spacer()
-
+ 
             switch shortcut.shortcutType {
             case .keyboard:
                 if let keyCode = shortcut.keyCode, let modifierFlags = shortcut.modifierFlags {
@@ -438,16 +437,16 @@ private struct ReadOnlyShortcutRow: View {
                 }
             case .menu:
                 if let menuPath = shortcut.menuPath {
-                    badge(menuPath.replacingOccurrences(of: ";", with: " › "))
+                    badge(menuPath.components(separatedBy: ";").last ?? menuPath)
                 }
             }
         }
         .padding(.vertical, 3)
     }
-
+ 
     private func badge(_ text: String) -> some View {
         Text(text)
-            .font(.caption2)
+            .font(.system(size: 12))
             .foregroundColor(.secondary)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
@@ -456,4 +455,4 @@ private struct ReadOnlyShortcutRow: View {
                     .fill(Color.secondary.opacity(0.1))
             )
     }
-} 
+}

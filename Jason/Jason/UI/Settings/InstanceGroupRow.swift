@@ -40,7 +40,7 @@ struct InstanceGroupRow: View {
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundColor(.secondary)
-                .padding(.vertical,2)
+//                .padding(.vertical,4)
 
             Spacer()
 

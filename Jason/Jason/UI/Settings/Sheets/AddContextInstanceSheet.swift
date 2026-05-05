@@ -19,6 +19,7 @@ struct AddContextInstanceSheet: View {
     @State private var triggers: [TriggerFormConfig] = []
     @State private var showAddTriggerSheet = false
     @State private var errorMessage: String?
+    @State private var appIcon: NSImage?
 
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
@@ -31,14 +32,20 @@ struct AddContextInstanceSheet: View {
 
             // Header
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("New Instance")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                    Text(bundleId)
-                        .font(.caption)
+                if let icon = appIcon {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                } else {
+                    Image(systemName: "app.fill")
+                        .font(.system(size: 20))
                         .foregroundColor(.secondary)
+                        .frame(width: 24, height: 24)
                 }
+                Text("New Instance")
+                    .font(.title3)
+                    .fontWeight(.semibold)
                 Spacer()
                 Button("Cancel") { dismiss() }
                     .buttonStyle(.bordered)
