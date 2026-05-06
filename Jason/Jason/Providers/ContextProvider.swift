@@ -22,11 +22,11 @@ class ContextProvider: ObservableObject, FunctionProvider {
     
     // MARK: - Properties
     
-    private let ringId: Int     // NEW
+    private let ringId: Int
     
     // MARK: - Initialization
     
-    init(ringId: Int) {         // NEW
+    init(ringId: Int) {
         self.ringId = ringId
         NotificationCenter.default.addObserver(
             self,
@@ -123,7 +123,14 @@ class ContextProvider: ObservableObject, FunctionProvider {
                 }
                 MenuItemExecutor.execute(menuPath: menuPath, pid: pid)
             }
-            keepOpenAction = baseAction
+            keepOpenAction = {
+                print("🎯 [ContextProvider] Executing menu (keep open): \(name) — \(menuPath)")
+                guard let pid = AppSwitcherManager.shared.activeUIManager?.previousApp?.processIdentifier else {
+                    print("❌ [ContextProvider] No previous app PID for menu keep-open execution")
+                    return
+                }
+                MenuItemExecutor.executeKeepOpen(menuPath: menuPath, pid: pid)
+            }
         }
 
         return FunctionNode(
