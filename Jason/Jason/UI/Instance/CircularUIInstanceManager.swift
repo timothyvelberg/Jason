@@ -80,8 +80,8 @@ class CircularUIInstanceManager: ObservableObject {
         )
         
         var resolvedProviders: [any FunctionProvider] = []
-        let providerTypes = config.sortedProviders.map { $0.providerType }
-        
+        var providerConfigMap: [String: ProviderConfiguration] = [:]
+
         for providerConfig in config.sortedProviders {
             let registryKey: String
             switch providerConfig.providerType {
@@ -97,6 +97,7 @@ class CircularUIInstanceManager: ObservableObject {
                 providerType: registryKey,
                 factory: { factory.createProvider(from: providerConfig) }
             ) {
+                providerConfigMap[provider.providerId] = providerConfig
                 resolvedProviders.append(provider)
             }
         }
@@ -112,7 +113,7 @@ class CircularUIInstanceManager: ObservableObject {
             }
         }
         
-        instance.setup(injectedProviders: resolvedProviders)
+        instance.setup(injectedProviders: resolvedProviders, providerConfigurations: providerConfigMap)
         print("   Instance created and setup complete")
     }
     

@@ -10,8 +10,7 @@ import SwiftUI
 
 extension CircularUIManager {
     
-    func setup(injectedProviders: [any FunctionProvider]? = nil) {
-        // Create FunctionManager with configuration values
+    func setup(injectedProviders: [any FunctionProvider]? = nil, providerConfigurations: [String: ProviderConfiguration] = [:]) {
         self.functionManager = FunctionManager(
             ringThickness: CGFloat(ringConfiguration.ringRadius),
             centerHoleRadius: CGFloat(ringConfiguration.centerHoleRadius),
@@ -53,22 +52,14 @@ extension CircularUIManager {
 
         // Register all providers with their configurations
         for provider in providers {
-            // Look up this provider's configuration by matching normalized names
-            let normalizedProviderId = ProviderFactory.normalizeProviderName(provider.providerId)
+            let config = providerConfigurations[provider.providerId]
+            functionManager?.registerProvider(provider, configuration: config)
 
-            let providerConfig = ringConfiguration.providers.first { config in
-                let normalizedConfigType = ProviderFactory.normalizeProviderName(config.providerType)
-                return normalizedConfigType == normalizedProviderId
-            }
-            
-            if let config = providerConfig {
-                functionManager?.registerProvider(provider, configuration: config)
+            if let config = config {
                 print("      Registered '\(provider.providerName)' (providerId: \(provider.providerId)) with config")
                 print("      displayMode: \(config.effectiveDisplayMode)")
             } else {
-                functionManager?.registerProvider(provider, configuration: nil)
                 print("      Registered '\(provider.providerName)' (providerId: \(provider.providerId)) WITHOUT config")
-                print("      Available configs: \(ringConfiguration.providers.map { $0.providerType }.joined(separator: ", "))")
             }
         }
         

@@ -32,7 +32,7 @@ protocol UIManager: AnyObject {
     var previousApp: NSRunningApplication? { get }
     
     /// Setup the manager (create windows, wire callbacks)
-    func setup(injectedProviders: [any FunctionProvider]?)
+    func setup(injectedProviders: [any FunctionProvider]?, providerConfigurations: [String: ProviderConfiguration])
     
     /// Show the UI
     func show(triggerDirection: RotationDirection?)
@@ -62,7 +62,6 @@ extension UIManager {
     }
     
     func setup() {
-        setup(injectedProviders: nil)
+        setup(injectedProviders: nil, providerConfigurations: [:])
     }
-    
 }
