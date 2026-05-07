@@ -189,7 +189,7 @@ class AppSwitcherManager: ObservableObject {
             // Post notifications for both AppSwitcher and CombinedApps providers
             DispatchQueue.main.async {
                 NotificationCenter.default.postProviderUpdate(providerId: "app-switcher")
-                NotificationCenter.default.postProviderUpdate(providerId: "combined-apps")
+                NotificationCenter.default.post(name: .runningAppsDidChange, object: nil)
             }
         }
     }

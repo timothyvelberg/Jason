@@ -83,9 +83,15 @@ class CircularUIInstanceManager: ObservableObject {
         let providerTypes = config.sortedProviders.map { $0.providerType }
         
         for providerConfig in config.sortedProviders {
-            let registryKey = providerConfig.providerType == "ContextProvider"
-                ? "ContextProvider-\(config.id)"
-                : providerConfig.providerType
+            let registryKey: String
+            switch providerConfig.providerType {
+            case "ContextProvider":
+                registryKey = "ContextProvider-\(config.id)"
+            case "CombinedAppsProvider" where providerConfig.hasConfig:
+                registryKey = "CombinedAppsProvider-\(config.id)"
+            default:
+                registryKey = providerConfig.providerType
+            }
 
             if let provider = ProviderRegistry.shared.acquire(
                 providerType: registryKey,
@@ -96,7 +102,14 @@ class CircularUIInstanceManager: ObservableObject {
         }
 
         instanceProviderTypes[config.id] = config.sortedProviders.map { p in
-            p.providerType == "ContextProvider" ? "ContextProvider-\(config.id)" : p.providerType
+            switch p.providerType {
+            case "ContextProvider":
+                return "ContextProvider-\(config.id)"
+            case "CombinedAppsProvider" where p.hasConfig:
+                return "CombinedAppsProvider-\(config.id)"
+            default:
+                return p.providerType
+            }
         }
         
         instance.setup(injectedProviders: resolvedProviders)

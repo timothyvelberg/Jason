@@ -9,11 +9,20 @@
 import Foundation
 import AppKit
 
+enum AppDisplayMode: String {
+    case all                 // Favorites + running (current default)
+    case favoritesOnly       // Only favorited apps
+    case runningNonFavorites // Only running apps not in favorites
+}
+
 class CombinedAppsProvider: ObservableObject, FunctionProvider {
     
     // MARK: - FunctionProvider Protocol
     
     var providerId: String {
+        if let ringId = ringId {
+            return "combined-apps-\(ringId)"
+        }
         return "combined-apps"
     }
     
@@ -50,6 +59,9 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     weak var appSwitcherManager: AppSwitcherManager?
     weak var circularUIManager: CircularUIManager?
     
+    private let displayMode: AppDisplayMode
+    private let ringId: Int?
+    
     // MARK: - App Entry Structure
     
     private struct AppEntry {
@@ -70,29 +82,40 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     
     // MARK: - Initialization
     
-    init() {
-        print("CombinedAppsProvider initialized")
+    init(displayMode: AppDisplayMode = .all, ringId: Int? = nil) {
+        self.displayMode = displayMode
+        self.ringId = ringId
+        print("[CombinedAppsProvider] init (mode: \(displayMode.rawValue), providerId: combined-apps-\(ringId?.description ?? "global"))")
         loadApps()
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRunningAppsDidChange),
+            name: .runningAppsDidChange,
+            object: nil
+        )
+    }
+
+    @objc private func handleRunningAppsDidChange() {
+        refresh()
+        NotificationCenter.default.postProviderUpdate(providerId: providerId)
     }
     
     // MARK: - App Loading
     
     private func loadApps() {
-        // 1. Get current data sources
         let favorites = DatabaseManager.shared.getFavoriteApps()
         let currentFavoritesOrder = favorites.map { $0.bundleIdentifier }
         let favoriteBundleIds = Set(currentFavoritesOrder)
-        
-        // 2. Check if favorites were reordered in settings (not add/remove)
+
         let lastSet = Set(lastFavoritesOrder)
         let currentSet = Set(currentFavoritesOrder)
-
         if lastSet == currentSet && lastFavoritesOrder != currentFavoritesOrder {
-            print("🔀 [CombinedApps] Favorites reordered in settings - rebuilding display order")
+            print("🔀 [CombinedApps] Favorites reordered - rebuilding display order")
             displayedBundleIds = []
         }
         lastFavoritesOrder = currentFavoritesOrder
-        
+
         let runningApps = AppSwitcherManager.shared.runningApps
         let runningAppsMap: [String: NSRunningApplication] = Dictionary(
             uniqueKeysWithValues: runningApps.compactMap { app in
@@ -101,17 +124,23 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             }
         )
         let runningBundleIds = Set(runningAppsMap.keys)
-        
-        // 3. Calculate valid bundle IDs (should be displayed)
-        let favoritesOnly = currentSettingValue(for: "favorites_only") == "true"
-        let validBundleIds = favoritesOnly ? favoriteBundleIds : favoriteBundleIds.union(runningBundleIds)
-        
-        // 4. Update display order
+
+        // Calculate valid bundle IDs based on display mode
+        let validBundleIds: Set<String>
+        switch displayMode {
+        case .all:
+            validBundleIds = favoriteBundleIds.union(runningBundleIds)
+        case .favoritesOnly:
+            validBundleIds = favoriteBundleIds
+        case .runningNonFavorites:
+            validBundleIds = runningBundleIds.subtracting(favoriteBundleIds)
+        }
+
+        // Update display order
         if displayedBundleIds.isEmpty {
-            // First load: favorites first (in db order), then running non-favorites (alphabetically)
-            displayedBundleIds = currentFavoritesOrder
-            
-            if !favoritesOnly {
+            switch displayMode {
+            case .all:
+                displayedBundleIds = currentFavoritesOrder
                 let nonFavoriteRunning = runningApps
                     .filter { app in
                         guard let bundleId = app.bundleIdentifier else { return false }
@@ -119,20 +148,26 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                     }
                     .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }
                     .compactMap { $0.bundleIdentifier }
-
                 displayedBundleIds.append(contentsOf: nonFavoriteRunning)
+
+            case .favoritesOnly:
+                displayedBundleIds = currentFavoritesOrder
+
+            case .runningNonFavorites:
+                displayedBundleIds = runningApps
+                    .filter { app in
+                        guard let bundleId = app.bundleIdentifier else { return false }
+                        return !favoriteBundleIds.contains(bundleId)
+                    }
+                    .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }
+                    .compactMap { $0.bundleIdentifier }
             }
         } else {
-            // Subsequent load: maintain order, remove invalid, append new
-            
-            // Remove items that are no longer valid (not favorite AND not running)
             displayedBundleIds = displayedBundleIds.filter { validBundleIds.contains($0) }
-            
-            // Find new items (valid but not in display list)
-            let currentSet = Set(displayedBundleIds)
-            let newBundleIds = validBundleIds.subtracting(currentSet)
-            
-            // Append new items (newly launched apps) - sort alphabetically
+
+            let displayedSet = Set(displayedBundleIds)
+            let newBundleIds = validBundleIds.subtracting(displayedSet)
+
             let sortedNew = newBundleIds.sorted { id1, id2 in
                 let name1 = runningAppsMap[id1]?.localizedName ?? id1
                 let name2 = runningAppsMap[id2]?.localizedName ?? id2
@@ -140,18 +175,17 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             }
             displayedBundleIds.append(contentsOf: sortedNew)
         }
-        
-        // 5. Build app entries in display order
+
+        // Build app entries in display order
         let favoritesMap: [String: (displayName: String?, iconOverride: String?)] = Dictionary(
             uniqueKeysWithValues: favorites.map { ($0.bundleIdentifier, ($0.displayName, $0.iconOverride)) }
         )
-        
+
         var entries: [AppEntry] = []
-        
         for bundleId in displayedBundleIds {
             let isFavorite = favoriteBundleIds.contains(bundleId)
             let favorite = favoritesMap[bundleId]
-            
+
             if let appEntry = createAppEntry(
                 bundleIdentifier: bundleId,
                 customName: favorite?.displayName,
@@ -163,13 +197,9 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
                 entries.append(appEntry)
             }
         }
-        
+
         appEntries = entries
-        
-        let favoriteCount = entries.filter { $0.isFavorite }.count
-        let runningCount = entries.filter { $0.isRunning }.count
-        
-        print("[CombinedApps] Total apps: \(appEntries.count)")
+        print("[CombinedApps] Mode: \(displayMode.rawValue), Total apps: \(appEntries.count)")
     }
     
     private func createAppEntry(
@@ -276,7 +306,8 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     }
     
     func teardown() {
-        print("[CombinedAppsProvider] teardown()")
+        print("[CombinedAppsProvider] teardown() - \(providerId)")
+        NotificationCenter.default.removeObserver(self, name: .runningAppsDidChange, object: nil)
         appEntries.removeAll()
         displayedBundleIds.removeAll()
         lastFavoritesOrder.removeAll()

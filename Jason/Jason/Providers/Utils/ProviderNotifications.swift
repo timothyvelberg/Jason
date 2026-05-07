@@ -12,6 +12,7 @@ import Foundation
 extension Notification.Name {
     /// Posted when a provider's content has been updated
     static let providerContentUpdated = Notification.Name("providerContentUpdated")
+    static let runningAppsDidChange = Notification.Name("runningAppsDidChange")
 }
 
 // MARK: - Update Info

@@ -108,12 +108,22 @@ class ProviderFactory {
     // MARK: - Individual Provider Factories
     
     private func createCombinedAppsProvider(config: ProviderConfiguration) -> CombinedAppsProvider? {
-        let provider = CombinedAppsProvider()
-        
-        // Wire up dependencies
+        let displayMode: AppDisplayMode
+        if let raw = config.stringConfig(forKey: "appDisplayMode"),
+           let mode = AppDisplayMode(rawValue: raw) {
+            displayMode = mode
+        } else {
+            displayMode = .all
+        }
+
+        let provider = CombinedAppsProvider(
+            displayMode: displayMode,
+            ringId: ringId > 0 ? ringId : nil
+        )
+
         provider.circularUIManager = circularUIManager
-        provider.appSwitcherManager = appSwitcherManager  //This is now the shared instance
-    
+        provider.appSwitcherManager = appSwitcherManager
+
         return provider
     }
     
