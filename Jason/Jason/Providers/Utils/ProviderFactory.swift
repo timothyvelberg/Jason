@@ -75,11 +75,12 @@ class ProviderFactory {
             provider = createRemindersProvider(config: config)
         case "CalendarProvider":
             provider = createCalendarProvider(config: config)
-            
         case "FocusedWindowSwitcherProvider":
             provider = createFocusedWindowSwitcherProvider(config: config)
         case "ContextProvider":
             provider = createContextProvider(config: config)
+        case "SpotifyProvider":
+            provider = createSpotifyProvider(config: config)
             
         default:
             return nil
@@ -178,6 +179,11 @@ class ProviderFactory {
         return provider
     }
     
+    private func createSpotifyProvider(config: ProviderConfiguration) -> SpotifyProvider? {
+        let provider = SpotifyProvider()
+        return provider
+    }
+    
     // MARK: - Provider Type Validation
     static func isProviderTypeSupported(_ type: String) -> Bool {
         return supportedProviderTypes().contains(type)
@@ -197,7 +203,8 @@ class ProviderFactory {
             "RemindersProvider",
             "CalendarProvider",
             "FocusedWindowSwitcherProvider",
-            "ContextProvider"
+            "ContextProvider",
+            "SpotifyProvider"
         ]
     }
 }
