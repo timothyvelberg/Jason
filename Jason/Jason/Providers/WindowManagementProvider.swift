@@ -58,40 +58,9 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 }),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.fullscreen(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.fullscreen()
-                    }
-                })
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
-//            // 12 o'clock (Top) - Top 50%
-//            FunctionNode(
-//                id: "window-top-half",
-//                name: "Top Half",
-//                type: .action,
-//                icon: NSImage(systemSymbolName: "arrow.up", accessibilityDescription: nil) ?? NSImage(),
-//                preferredLayout: nil,
-//                showLabel: true,
-//                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
-//                    if let manager = self?.circularUIManager {
-//                        WindowManager.positionTopHalf(targetApp: manager.previousApp)
-//                    } else {
-//                        WindowManager.positionTopHalf()
-//                    }
-//                }),
-//                onRightClick: ModifierAwareInteraction(base: .doNothing),
-//                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-//                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-//                    if let manager = self?.circularUIManager {
-//                        WindowManager.positionTopHalf(targetApp: manager.previousApp)
-//                    } else {
-//                        WindowManager.positionTopHalf()
-//                    }
-//                })
-//            ),
-            
+
             // 1 o'clock - Top-right quarter
             FunctionNode(
                 id: "window-top-right",
@@ -109,13 +78,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 }),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.positionTopRight(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.positionTopRight()
-                    }
-                })
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
             
             // 3 o'clock (Right) - Right half
@@ -135,13 +98,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 }),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.positionRightHalf(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.positionRightHalf()
-                    }
-                })
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
             
             // 4:30 - Bottom-right quarter
@@ -161,13 +118,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 }),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.positionBottomRight(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.positionBottomRight()
-                    }
-                })
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
             
             // Hide
@@ -187,40 +138,8 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 }),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.hideWindow(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.hideWindow()
-                    }
-                })
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
-            
-//            // 6 o'clock (Bottom) - Bottom 50%
-//            FunctionNode(
-//                id: "window-bottom-half",
-//                name: "Bottom Half",
-//                type: .action,
-//                icon: NSImage(systemSymbolName: "arrow.down", accessibilityDescription: nil) ?? NSImage(),
-//                preferredLayout: nil,
-//                showLabel: true,
-//                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
-//                    if let manager = self?.circularUIManager {
-//                        WindowManager.positionBottomHalf(targetApp: manager.previousApp)
-//                    } else {
-//                        WindowManager.positionBottomHalf()
-//                    }
-//                }),
-//                onRightClick: ModifierAwareInteraction(base: .doNothing),
-//                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-//                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-//                    if let manager = self?.circularUIManager {
-//                        WindowManager.positionBottomHalf(targetApp: manager.previousApp)
-//                    } else {
-//                        WindowManager.positionBottomHalf()
-//                    }
-//                })
-//            ),
             
             // 7:30 - Bottom-left quarter
             FunctionNode(
@@ -239,13 +158,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 }),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.positionBottomLeft(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.positionBottomLeft()
-                    }
-                })
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
             
             // 9 o'clock (Left) - Left half
@@ -265,13 +178,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 }),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.positionLeftHalf(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.positionLeftHalf()
-                    }
-                })
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
             
             // 10:30 - Top-left quarter
@@ -291,42 +198,8 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 }),
                 onRightClick: ModifierAwareInteraction(base: .doNothing),
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-                    if let manager = self?.circularUIManager {
-                        WindowManager.positionTopLeft(targetApp: manager.previousApp)
-                    } else {
-                        WindowManager.positionTopLeft()
-                    }
-                })
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             )
-        
-//            
-//            // Send to other monitor
-//            FunctionNode(
-//                id: "window-send-to-other-monitor",
-//                name: "Other Monitor",
-//                type: .action,
-//                icon: NSImage(systemSymbolName: "arrow.left.arrow.right", accessibilityDescription: nil) ?? NSImage(),
-//                preferredLayout: nil,
-//                showLabel: true,
-//                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
-//                    if let manager = self?.circularUIManager {
-//                        WindowManager.sendToOtherMonitor(targetApp: manager.previousApp)
-//                    } else {
-//                        WindowManager.sendToOtherMonitor()
-//                    }
-//                }),
-//                onRightClick: ModifierAwareInteraction(base: .doNothing),
-//                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-//                onBoundaryCross: ModifierAwareInteraction(base: .execute { [weak self] in
-//                    if let manager = self?.circularUIManager {
-//                        WindowManager.sendToOtherMonitor(targetApp: manager.previousApp)
-//                    } else {
-//                        WindowManager.sendToOtherMonitor()
-//                    }
-//                })
-//            ),
-            
         ]
         
         return [
