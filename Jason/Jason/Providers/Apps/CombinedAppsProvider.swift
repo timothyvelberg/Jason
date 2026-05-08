@@ -9,12 +9,6 @@
 import Foundation
 import AppKit
 
-enum AppDisplayMode: String {
-    case all                 // Favorites + running (current default)
-    case favoritesOnly       // Only favorited apps
-    case runningNonFavorites // Only running apps not in favorites
-}
-
 class CombinedAppsProvider: ObservableObject, FunctionProvider {
     
     // MARK: - FunctionProvider Protocol

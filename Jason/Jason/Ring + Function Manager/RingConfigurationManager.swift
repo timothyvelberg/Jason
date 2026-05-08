@@ -163,7 +163,7 @@ class RingConfigurationManager: ObservableObject {
         presentationMode: PresentationMode = .ring,
         bundleId: String? = nil,        // NEW
         triggers: [(type: String, keyCode: UInt16?, modifierFlags: UInt, buttonNumber: Int32?, swipeDirection: String?, fingerCount: Int?, isHoldMode: Bool, isModifierHoldMode: Bool, autoExecuteOnRelease: Bool)] = [],
-        providers: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
+        providers: [(type: String, order: Int, instanceSettings: [String: String], angle: Double?)] = []
     ) throws -> StoredRingConfiguration {
         print("[RingConfigManager] Creating configuration '\(name)'")
 
@@ -252,13 +252,13 @@ class RingConfigurationManager: ObservableObject {
 
         var providerConfigs: [ProviderConfiguration] = []
         for (index, provider) in providers.enumerated() {
-            var configJSON: String? = nil
-            if let displayMode = provider.displayMode {
-                let config = ["displayMode": displayMode]
-                if let jsonData = try? JSONSerialization.data(withJSONObject: config),
-                   let jsonString = String(data: jsonData, encoding: .utf8) {
-                    configJSON = jsonString
-                }
+            let configJSON: String?
+            if !provider.instanceSettings.isEmpty,
+               let jsonData = try? JSONSerialization.data(withJSONObject: provider.instanceSettings),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                configJSON = jsonString
+            } else {
+                configJSON = nil
             }
 
             guard let providerId = databaseManager.createProvider(
@@ -272,10 +272,7 @@ class RingConfigurationManager: ObservableObject {
                 continue
             }
 
-            var configDict: [String: Any]? = nil
-            if let displayMode = provider.displayMode {
-                configDict = ["displayMode": displayMode]
-            }
+            let configDict: [String: Any]? = provider.instanceSettings.isEmpty ? nil : provider.instanceSettings
 
             providerConfigs.append(ProviderConfiguration(
                 id: providerId,

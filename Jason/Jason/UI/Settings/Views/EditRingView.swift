@@ -41,18 +41,18 @@ struct EditRingView: View {
     // MARK: - Default Providers
 
     private static let defaultProviders: [ProviderConfig] = [
-        ProviderConfig(type: "CombinedAppsProvider",        name: "Apps",               description: "Running and favorite applications",           isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "FavoriteFilesProvider",        name: "Favorite Files",     description: "Quick access to favorite files",               isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "FavoriteFolderProvider",       name: "Finder Logic",       description: "Browse folders and recent locations",          isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "ContextProvider",              name: "Context Provider",   description: "Shortcut for your individual apps",            isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "ClipboardHistoryProvider",     name: "Clipboard History",  description: "Access previously copied text",                isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "RemindersProvider",            name: "Reminders",          description: "Quick task list with add and complete",         isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "CalendarProvider",             name: "Calendar",           description: "Show today's calendar items",                  isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "FocusedWindowSwitcherProvider",name: "Window Switcher",    description: "List of Windows of current focused app",        isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "SystemActionsProvider",        name: "System Actions",     description: "Lock, Sleep, Logout, etc.",                    isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "WindowManagementProvider",     name: "Window Management",  description: "Resize and position windows",                  isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "ShortcutExecuteProvider",      name: "Keyboard Shortcuts", description: "Execute keyboard shortcuts (Copy, Paste, etc.)",isEnabled: false, displayMode: .parent),
-        ProviderConfig(type: "SpotifyProvider",      name: "Spotify Controls", description: "Spotify Controls",isEnabled: false, displayMode: .parent),
+        ProviderConfig(type: "CombinedAppsProvider",        name: "Apps",               description: "Running and favorite applications",           isEnabled: false, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "CombinedAppsProvider")),
+        ProviderConfig(type: "FavoriteFilesProvider",        name: "Favorite Files",     description: "Quick access to favorite files",               isEnabled: false, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "FavoriteFilesProvider")),
+        ProviderConfig(type: "FavoriteFolderProvider",       name: "Finder Logic",       description: "Browse folders and recent locations",          isEnabled: false, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "FavoriteFolderProvider")),
+        ProviderConfig(type: "ContextProvider",              name: "Context Provider",   description: "Shortcut for your individual apps",            isEnabled: false, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "ContextProvider")),
+        ProviderConfig(type: "ClipboardHistoryProvider",     name: "Clipboard History",  description: "Access previously copied text",                isEnabled: false, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "ClipboardHistoryProvider")),
+        ProviderConfig(type: "RemindersProvider",            name: "Reminders",          description: "Quick task list with add and complete",         isEnabled: false, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "RemindersProvider")),
+        ProviderConfig(type: "CalendarProvider",             name: "Calendar",           description: "Show today's calendar items",                  isEnabled: false, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "CalendarProvider")),
+        ProviderConfig(type: "FocusedWindowSwitcherProvider",name: "Window Switcher",    description: "List of Windows of current focused app",        isEnabled: false, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "FocusedWindowSwitcherProvider")),
+        ProviderConfig(type: "SystemActionsProvider",        name: "System Actions",     description: "Lock, Sleep, Logout, etc.",                    isEnabled: false, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "SystemActionsProvider")),
+        ProviderConfig(type: "WindowManagementProvider",     name: "Window Management",  description: "Resize and position windows",                  isEnabled: false, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "WindowManagementProvider")),
+        ProviderConfig(type: "ShortcutExecuteProvider",      name: "Keyboard Shortcuts", description: "Execute keyboard shortcuts (Copy, Paste, etc.)",isEnabled: false, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "ShortcutExecuteProvider")),
+        ProviderConfig(type: "SpotifyProvider",      name: "Spotify Controls", description: "Spotify Controls",isEnabled: false, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "SpotifyProvider"))
     ]
 
     // MARK: - Body
@@ -279,7 +279,7 @@ struct EditRingView: View {
                         ForEach(savedProviderIndices, id: \.self) { index in
                             SavedProviderRowView(
                                 provider: providers[index],
-                                displayMode: $providers[index].displayMode,
+                                instanceSettings: $providers[index].instanceSettings,
                                 isPanelMode: isPanelMode,
                                 onRemove: {
                                     withAnimation { removeProvider(type: providers[index].type) }
@@ -303,8 +303,8 @@ struct EditRingView: View {
             AddProviderSheet(
                 availableProviders: availableProviders,
                 isPanelMode: isPanelMode
-            ) { type, displayMode in
-                withAnimation { addProvider(type: type, displayMode: displayMode) }
+            ) { type, settings in
+                withAnimation { addProvider(type: type, instanceSettings: settings) }
             }
         }
     }
@@ -353,10 +353,10 @@ struct EditRingView: View {
         isPanelMode ? panelProviderType == nil : providers.contains { !$0.isEnabled }
     }
 
-    private func addProvider(type: String, displayMode: ProviderDisplayMode) {
+    private func addProvider(type: String, instanceSettings: [String: String]) {
         guard let index = providers.firstIndex(where: { $0.type == type }) else { return }
         if isPanelMode { panelProviderType = type } else { providers[index].isEnabled = true }
-        providers[index].displayMode = displayMode
+        providers[index].instanceSettings = instanceSettings
     }
 
     private func removeProvider(type: String) {
@@ -391,10 +391,22 @@ struct EditRingView: View {
         startAngle       = config.startAngle
         triggers         = config.triggers.map { TriggerFormConfig(from: $0) }
 
-        var savedByType: [String: (order: Int, displayMode: ProviderDisplayMode)] = [:]
+        var savedByType: [String: (order: Int, instanceSettings: [String: String])] = [:]
         for p in config.providers {
-            let mode = ProviderDisplayMode(rawValue: p.displayMode ?? "parent") ?? .parent
-            savedByType[p.providerType] = (p.order, mode)
+            var settings = ProviderInstanceSettingsRegistry.defaultSettings(for: p.providerType)
+            // Merge saved config on top of defaults
+            if let config = p.config {
+                for (key, value) in config {
+                    if let stringValue = value as? String {
+                        settings[key] = stringValue
+                    }
+                }
+            }
+            // Ensure displayMode is always present
+            if let displayMode = p.displayMode {
+                settings["displayMode"] = displayMode
+            }
+            savedByType[p.providerType] = (p.order, settings)
         }
 
         var enabled: [(ProviderConfig, Int)] = []
@@ -404,7 +416,7 @@ struct EditRingView: View {
             if let saved = savedByType[defaultProvider.type] {
                 var p = defaultProvider
                 p.isEnabled = true
-                p.displayMode = saved.displayMode
+                p.instanceSettings = saved.instanceSettings
                 enabled.append((p, saved.order))
             } else {
                 disabled.append(defaultProvider)
@@ -426,7 +438,7 @@ struct EditRingView: View {
     // MARK: - Save
 
     private func saveRing() {
-        print("🔍 [SaveRing] About to save \(triggers.count) trigger(s)")
+        print("[SaveRing] About to save \(triggers.count) trigger(s)")
         errorMessage = nil
 
         guard let radiusValue = Double(ringRadius),
@@ -452,12 +464,12 @@ struct EditRingView: View {
 
         let shortcutDisplay = triggers.first?.displayDescription ?? "No trigger"
 
-        var providerData: [(type: String, order: Int, displayMode: String?, angle: Double?)] = []
+        var providerData: [(type: String, order: Int, instanceSettings: [String: String], angle: Double?)] = []
         var order = 1
         for p in providers {
             if isPanelMode { guard p.type == panelProviderType else { continue } }
             else           { guard p.isEnabled               else { continue } }
-            providerData.append((p.type, order, p.displayMode.rawValue, nil))
+            providerData.append((p.type, order, p.instanceSettings, nil))
             order += 1
         }
 
@@ -499,7 +511,7 @@ struct EditRingView: View {
                 for trigger  in config.triggers  { try configManager.removeTrigger(id: trigger.id) }
                 for trigger  in triggers         { _ = try configManager.addTrigger(toRing: config.id, triggerType: trigger.triggerType.rawValue, keyCode: trigger.triggerType == .keyboard ? trigger.keyCode : nil, modifierFlags: trigger.modifierFlags, buttonNumber: trigger.triggerType == .mouse ? trigger.buttonNumber : nil, swipeDirection: trigger.triggerType == .trackpad ? trigger.swipeDirection.rawValue : nil, fingerCount: trigger.triggerType == .trackpad ? trigger.fingerCount : nil, isHoldMode: trigger.isHoldMode, isModifierHoldMode: trigger.isModifierHoldMode, autoExecuteOnRelease: trigger.autoExecuteOnRelease) }
                 for provider in config.providers { try configManager.removeProvider(id: provider.id) }
-                for p        in providerData    { _ = try configManager.addProvider(toRing: config.id, providerType: p.type, order: p.order, angle: p.angle, config: p.displayMode.map { ["displayMode": $0] }) }
+                for p in providerData { _ = try configManager.addProvider(toRing: config.id, providerType: p.type, order: p.order, angle: p.angle, config: p.instanceSettings.isEmpty ? nil : p.instanceSettings) }
 
                 print("[EditRing] Updated ring (ID: \(config.id)) with \(triggers.count) trigger(s)")
             }

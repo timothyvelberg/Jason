@@ -19,3 +19,17 @@ enum ProviderDisplayMode: String, CaseIterable {
         }
     }
 }
+
+enum AppDisplayMode: String, CaseIterable {
+    case all                 = "all"
+    case favoritesOnly       = "favoritesOnly"
+    case runningNonFavorites = "runningNonFavorites"
+
+    var displayName: String {
+        switch self {
+        case .all:                 return "All Apps"
+        case .favoritesOnly:       return "Favorites Only"
+        case .runningNonFavorites: return "Running (Non-Favorites)"
+        }
+    }
+}

@@ -169,8 +169,8 @@ struct AddContextInstanceSheet: View {
             )
         }
 
-        let providerData: [(type: String, order: Int, displayMode: String?, angle: Double?)] = [
-            ("ContextProvider", 1, "parent", nil)
+        let providerData: [(type: String, order: Int, instanceSettings: [String: String], angle: Double?)] = [
+            ("ContextProvider", 1, ProviderInstanceSettingsRegistry.defaultSettings(for: "ContextProvider"), nil)
         ]
 
         do {

@@ -10,7 +10,7 @@ import SwiftUI
 
 struct SavedProviderRowView: View {
     let provider: ProviderConfig
-    @Binding var displayMode: ProviderDisplayMode
+    @Binding var instanceSettings: [String: String]
     let isPanelMode: Bool
     let onRemove: () -> Void
 
@@ -26,22 +26,12 @@ struct SavedProviderRowView: View {
                     .font(.body)
                     .fontWeight(.medium)
 
-                Text(provider.description)
+                Text(settingsSummary)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             Spacer()
-
-            if !isPanelMode {
-                Picker("", selection: $displayMode) {
-                    ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 140)
-            }
 
             Button(action: onRemove) {
                 Image(systemName: "trash")
@@ -51,5 +41,28 @@ struct SavedProviderRowView: View {
             .help("Remove provider")
         }
         .padding(.vertical, 8)
+    }
+
+    // MARK: - Settings Summary
+
+    private var settingsSummary: String {
+        let definitions = ProviderInstanceSettingsRegistry.settings(for: provider.type)
+        let parts: [String] = definitions.compactMap { definition in
+            guard let value = instanceSettings[definition.key] else { return nil }
+            let display = displayName(for: definition.key, value: value)
+            return "\(definition.label): \(display)"
+        }
+        return parts.isEmpty ? provider.description : parts.joined(separator: " · ")
+    }
+
+    private func displayName(for key: String, value: String) -> String {
+        switch key {
+        case "displayMode":
+            return ProviderDisplayMode(rawValue: value)?.displayName ?? value
+        case "appDisplayMode":
+            return AppDisplayMode(rawValue: value)?.displayName ?? value
+        default:
+            return value
+        }
     }
 }

@@ -222,7 +222,17 @@ struct ProviderConfig: Identifiable {
     let name: String
     let description: String
     var isEnabled: Bool
-    var displayMode: ProviderDisplayMode
+    var instanceSettings: [String: String]
+
+    var displayMode: ProviderDisplayMode {
+        get {
+            guard let raw = instanceSettings["displayMode"] else { return .parent }
+            return ProviderDisplayMode(rawValue: raw) ?? .parent
+        }
+        set {
+            instanceSettings["displayMode"] = newValue.rawValue
+        }
+    }
 }
 
 // MARK: - Settings Row Icon

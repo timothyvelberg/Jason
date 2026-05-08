@@ -106,12 +106,12 @@ class FirstLaunchConfiguration {
                     keyboardTrigger(keyCode: 2, modifiers: [.control, .shift])  // Ctrl+Shift+D
                 ],
                 providers: [
-                    (type: "CombinedAppsProvider", order: 1, displayMode: "parent", angle: nil),
-                    (type: "ClipboardHistoryProvider", order: 2, displayMode: "parent", angle: nil),
-                    (type: "RemindersProvider", order: 3, displayMode: "parent", angle: nil),
-                    (type: "FavoriteFolderProvider", order: 4, displayMode: "parent", angle: nil),
-                    (type: "FavoriteFilesProvider", order: 5, displayMode: "parent", angle: nil),
-                    (type: "CalendarProvider", order: 6, displayMode: "parent", angle: nil)
+                    (type: "CombinedAppsProvider",      order: 1, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "CombinedAppsProvider"),      angle: nil),
+                    (type: "ClipboardHistoryProvider",   order: 2, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "ClipboardHistoryProvider"),   angle: nil),
+                    (type: "RemindersProvider",          order: 3, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "RemindersProvider"),          angle: nil),
+                    (type: "FavoriteFolderProvider",     order: 4, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "FavoriteFolderProvider"),     angle: nil),
+                    (type: "FavoriteFilesProvider",      order: 5, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "FavoriteFilesProvider"),      angle: nil),
+                    (type: "CalendarProvider",           order: 6, instanceSettings: ProviderInstanceSettingsRegistry.defaultSettings(for: "CalendarProvider"),           angle: nil)
                 ]
             )
             print("   Created '\(defaultConfig.name)' - \(defaultConfig.triggersSummary)")
@@ -126,7 +126,7 @@ class FirstLaunchConfiguration {
                     keyboardTrigger(keyCode: 12, modifiers: [.control, .shift])  // Ctrl+Shift+Q
                 ],
                 providers: [
-                    (type: "CombinedAppsProvider", order: 1, displayMode: "direct", angle: nil)
+                    (type: "CombinedAppsProvider", order: 1, instanceSettings: ["displayMode": "direct", "appDisplayMode": AppDisplayMode.all.rawValue], angle: nil)
                 ]
             )
             
