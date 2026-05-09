@@ -53,7 +53,7 @@ extension WindowManager {
               let window = getFrontmostWindow(targetApp: targetApp),
               let screen = getScreenForWindow(window) else { return }
         let f = screen.visibleFrame
-        setWindowFrame(window, frame: CGRect(x: f.minX, y: f.minY, width: f.width, height: f.height / 2))
+        setWindowFrame(window, frame: CGRect(x: f.minX, y: f.midY, width: f.width, height: f.height / 2))
         print("[WindowManager] Top half")
     }
 
@@ -62,7 +62,7 @@ extension WindowManager {
               let window = getFrontmostWindow(targetApp: targetApp),
               let screen = getScreenForWindow(window) else { return }
         let f = screen.visibleFrame
-        setWindowFrame(window, frame: CGRect(x: f.minX, y: f.midY, width: f.width, height: f.height / 2))
+        setWindowFrame(window, frame: CGRect(x: f.minX, y: f.minY, width: f.width, height: f.height / 2))
         print("[WindowManager] Bottom half")
     }
 

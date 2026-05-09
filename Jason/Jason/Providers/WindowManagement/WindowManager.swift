@@ -77,16 +77,24 @@ class WindowManager {
     }
 
     static func setWindowFrame(_ window: AXUIElement, frame: CGRect) {
-        print("[WindowManager] Setting frame: origin(\(frame.origin.x), \(frame.origin.y)) size(\(frame.width)x\(frame.height))")
+        // Convert from AppKit coordinates (y=0 at bottom) to CG/AX coordinates (y=0 at top)
+        guard let primaryScreen = NSScreen.screens.first else {
+            print("[WindowManager] No screens available")
+            return
+        }
+        let cgY = primaryScreen.frame.height - (frame.origin.y + frame.height)
+        let convertedFrame = CGRect(x: frame.origin.x, y: cgY, width: frame.width, height: frame.height)
 
-        var size = frame.size
+        print("[WindowManager] Setting frame: origin(\(convertedFrame.origin.x), \(convertedFrame.origin.y)) size(\(convertedFrame.width)x\(convertedFrame.height))")
+
+        var size = convertedFrame.size
         let sizeValue = AXValueCreate(.cgSize, &size)!
         let sizeResult = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
         if sizeResult != .success {
             print("[WindowManager] Failed to set size (error: \(sizeResult.rawValue))")
         }
 
-        var origin = frame.origin
+        var origin = convertedFrame.origin
         let positionValue = AXValueCreate(.cgPoint, &origin)!
         let positionResult = AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, positionValue)
         if positionResult != .success {
