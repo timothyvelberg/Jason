@@ -1,0 +1,96 @@
+//
+//  WindowManager.swift
+//  Jason
+//
+//  Created by Timothy Velberg on 09/05/2026.
+//
+
+import Foundation
+import AppKit
+import ApplicationServices
+
+class WindowManager {
+
+    // MARK: - Accessibility Permissions
+
+    static func checkAccessibilityPermissions() -> Bool {
+        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        let accessEnabled = AXIsProcessTrustedWithOptions(options)
+
+        if !accessEnabled {
+            print("[WindowManager] Accessibility permissions not granted")
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = "Accessibility Permission Required"
+                alert.informativeText = "Jason needs Accessibility permissions to manage windows. Please grant access in System Settings > Privacy & Security > Accessibility, then restart Jason."
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "Open System Settings")
+                alert.addButton(withTitle: "Cancel")
+
+                let response = alert.runModal()
+                if response == .alertFirstButtonReturn {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
+        }
+
+        return accessEnabled
+    }
+
+    // MARK: - Accessibility API
+
+    static func getFrontmostWindow(targetApp: NSRunningApplication? = nil) -> AXUIElement? {
+        let app = targetApp ?? NSWorkspace.shared.frontmostApplication
+
+        guard let app = app else {
+            print("[WindowManager] No target application")
+            return nil
+        }
+
+        print("[WindowManager] Target app: \(app.localizedName ?? "Unknown") (PID: \(app.processIdentifier))")
+
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        var value: AnyObject?
+
+        let result = AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &value)
+
+        if result == .success, let window = value {
+            print("[WindowManager] Got focused window")
+            return (window as! AXUIElement)
+        }
+
+        print("[WindowManager] Could not get focused window (error: \(result.rawValue)) — trying first window")
+
+        var windowsValue: AnyObject?
+        let windowsResult = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsValue)
+
+        if windowsResult == .success,
+           let windows = windowsValue as? [AXUIElement],
+           let firstWindow = windows.first {
+            print("[WindowManager] Using first available window")
+            return firstWindow
+        }
+
+        return nil
+    }
+
+    static func setWindowFrame(_ window: AXUIElement, frame: CGRect) {
+        print("[WindowManager] Setting frame: origin(\(frame.origin.x), \(frame.origin.y)) size(\(frame.width)x\(frame.height))")
+
+        var size = frame.size
+        let sizeValue = AXValueCreate(.cgSize, &size)!
+        let sizeResult = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
+        if sizeResult != .success {
+            print("[WindowManager] Failed to set size (error: \(sizeResult.rawValue))")
+        }
+
+        var origin = frame.origin
+        let positionValue = AXValueCreate(.cgPoint, &origin)!
+        let positionResult = AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, positionValue)
+        if positionResult != .success {
+            print("[WindowManager] Failed to set position (error: \(positionResult.rawValue))")
+        }
+    }
+}
