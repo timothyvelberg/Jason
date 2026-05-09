@@ -4,6 +4,7 @@
 //
 //  Provider for window management with directional positioning
 //
+//
 
 import Foundation
 import AppKit
@@ -26,7 +27,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
     // MARK: - Initialization
 
     init() {
-        print("WindowManagementProvider initialized")
+        print("🪟 WindowManagementProvider initialized")
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleDisplayChange),
@@ -36,7 +37,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
     }
 
     @objc private func handleDisplayChange() {
-        print("[WindowManagementProvider] Display configuration changed - rebuilding")
+        print("🪟 [WindowManagementProvider] Display configuration changed - rebuilding")
         NotificationCenter.default.postProviderUpdate(providerId: providerId)
     }
 
@@ -45,7 +46,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
     }
 
     func refresh() {
-        print("[WindowManagementProvider] Refresh called (no-op)")
+        print("🪟 [WindowManagementProvider] Refresh called (no-op)")
     }
 
     // MARK: - FunctionProvider Methods
@@ -59,13 +60,13 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
 
         let items: [FunctionNode] = [
             makeTopNode(),
-            makeQuarterNode(id: "window-top-right",    name: "Top Right",    symbol: "chevron.up.forward.2", action: WindowManager.positionTopRight),
+            makeQuarterNode(id: "window-top-right",    name: "Top Right",    imageName: "window_manager_top_right",    action: WindowManager.positionTopRight),
             makeDirectionalHalfNode(direction: .right, neighbourScreen: rightScreen),
-            makeQuarterNode(id: "window-bottom-right", name: "Bottom Right", symbol: "chevron.down.right.2", action: WindowManager.positionBottomRight),
+            makeQuarterNode(id: "window-bottom-right", name: "Bottom Right", imageName: "window_manager_bottom_right", action: WindowManager.positionBottomRight),
             makeBottomNode(),
-            makeQuarterNode(id: "window-bottom-left",  name: "Bottom Left",  symbol: "arrow.down.left",      action: WindowManager.positionBottomLeft),
+            makeQuarterNode(id: "window-bottom-left",  name: "Bottom Left",  imageName: "window_manager_bottom_left",  action: WindowManager.positionBottomLeft),
             makeDirectionalHalfNode(direction: .left,  neighbourScreen: leftScreen),
-            makeQuarterNode(id: "window-top-left",     name: "Top Left",     symbol: "arrow.up.left",        action: WindowManager.positionTopLeft),
+            makeQuarterNode(id: "window-top-left",     name: "Top Left",     imageName: "window_manager_top_left",     action: WindowManager.positionTopLeft),
         ]
 
         return [
@@ -92,13 +93,13 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
             id: "window-top",
             name: "Top",
             type: .category,
-            icon: NSImage(systemSymbolName: "chevron.up", accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: "window_manager_fullscreen") ?? NSImage(),
             children: [
                 FunctionNode(
                     id: "window-fullscreen",
                     name: "Fullscreen",
                     type: .action,
-                    icon: NSImage(systemSymbolName: "chevron.up", accessibilityDescription: nil) ?? NSImage(),
+                    icon: NSImage(named: "window_manager_fullscreen") ?? NSImage(),
                     showLabel: true,
                     onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                         WindowManager.fullscreen(targetApp: self?.circularUIManager?.previousApp)
@@ -111,7 +112,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                     id: "window-top-half",
                     name: "Top Half",
                     type: .action,
-                    icon: NSImage(systemSymbolName: "rectangle.tophalf.filled", accessibilityDescription: nil) ?? NSImage(),
+                    icon: NSImage(named: "window_manager_top_half") ?? NSImage(),
                     showLabel: true,
                     onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                         WindowManager.positionTopHalf(targetApp: self?.circularUIManager?.previousApp)
@@ -135,13 +136,13 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
             id: "window-bottom",
             name: "Bottom",
             type: .category,
-            icon: NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: "window_manager_hide") ?? NSImage(),
             children: [
                 FunctionNode(
                     id: "window-bottom-half",
                     name: "Bottom Half",
                     type: .action,
-                    icon: NSImage(systemSymbolName: "rectangle.bottomhalf.filled", accessibilityDescription: nil) ?? NSImage(),
+                    icon: NSImage(named: "window_manager_bottom_half") ?? NSImage(),
                     showLabel: true,
                     onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                         WindowManager.positionBottomHalf(targetApp: self?.circularUIManager?.previousApp)
@@ -154,7 +155,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                     id: "window-hide",
                     name: "Hide",
                     type: .action,
-                    icon: NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil) ?? NSImage(),
+                    icon: NSImage(named: "window_manager_hide") ?? NSImage(),
                     showLabel: true,
                     onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                         WindowManager.hideWindow(targetApp: self?.circularUIManager?.previousApp)
@@ -177,14 +178,14 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
     private func makeQuarterNode(
         id: String,
         name: String,
-        symbol: String,
+        imageName: String,
         action: @escaping (NSRunningApplication?) -> Void
     ) -> FunctionNode {
         FunctionNode(
             id: id,
             name: name,
             type: .action,
-            icon: NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: imageName) ?? NSImage(),
             preferredLayout: nil,
             showLabel: true,
             onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
@@ -202,20 +203,21 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
         direction: ScreenDirection,
         neighbourScreen: NSScreen?
     ) -> FunctionNode {
-        let isRight = direction == .right
-        let id         = isRight ? "window-right-half"         : "window-left-half"
-        let symbol     = isRight ? "chevron.right"             : "arrow.left"
-        let moveId     = isRight ? "window-move-right-screen"  : "window-move-left-screen"
-        let moveName   = isRight ? "Move to Right Display"     : "Move to Left Display"
-        let halfAction = isRight ? WindowManager.positionRightHalf : WindowManager.positionLeftHalf
+        let isRight      = direction == .right
+        let id           = isRight ? "window-right-half"                  : "window-left-half"
+        let halfName     = isRight ? "Right Half"                         : "Left Half"
+        let halfImage    = isRight ? "window_manager_right_half"          : "window_manager_left_half"
+        let moveId       = isRight ? "window-move-right-screen"           : "window-move-left-screen"
+        let moveName     = isRight ? "Move to Right Display"              : "Move to Left Display"
+        let moveImage    = isRight ? "window_manager_switch_monitor_right" : "window_manager_switch_monitor_left"
+        let halfAction   = isRight ? WindowManager.positionRightHalf      : WindowManager.positionLeftHalf
 
         guard let screen = neighbourScreen else {
-            // No neighbour — plain action node
             return FunctionNode(
                 id: id,
-                name: isRight ? "Right Half" : "Left Half",
+                name: halfName,
                 type: .action,
-                icon: NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage(),
+                icon: NSImage(named: halfImage) ?? NSImage(),
                 preferredLayout: nil,
                 showLabel: true,
                 onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
@@ -227,12 +229,11 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
             )
         }
 
-        // Neighbour exists — category node with child ring
         let halfChild = FunctionNode(
             id: "\(id)-action",
-            name: isRight ? "Right Half" : "Left Half",
+            name: halfName,
             type: .action,
-            icon: NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: halfImage) ?? NSImage(),
             showLabel: true,
             onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                 halfAction(self?.circularUIManager?.previousApp)
@@ -246,7 +247,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
             id: moveId,
             name: moveName,
             type: .action,
-            icon: NSImage(systemSymbolName: "display.2", accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: moveImage) ?? NSImage(),
             showLabel: true,
             onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
                 WindowManager.moveToScreen(screen, targetApp: self?.circularUIManager?.previousApp)
@@ -260,7 +261,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
             id: id,
             name: isRight ? "Right" : "Left",
             type: .category,
-            icon: NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage(),
+            icon: NSImage(named: halfImage) ?? NSImage(),
             children: [halfChild, moveChild],
             preferredLayout: .partialSlice,
             slicePositioning: .center,

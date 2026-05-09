@@ -89,6 +89,9 @@ extension WindowManager {
         )
 
         setWindowFrame(window, frame: newFrame)
-        print("[WindowManager] Moved window to screen: \(targetScreen.localizedName ?? "unknown")")
-    }
+
+        // Re-raise the moved window so it retains AX focus on the target screen
+        AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+
+        print("🪟 [WindowManager] Moved window to screen: \(targetScreen.localizedName ?? "unknown")")    }
 }
