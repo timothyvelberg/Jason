@@ -35,6 +35,8 @@ struct EditRingView: View {
     @State private var showAddProviderSheet = false
     @State private var providers: [ProviderConfig] = []
     @State private var errorMessage: String?
+    @State private var isActive: Bool = true
+
 
     var isCreating: Bool { configuration == nil }
 
@@ -77,8 +79,10 @@ struct EditRingView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             Spacer()
-            Button("Cancel") { dismiss() }
-                .buttonStyle(.bordered)
+            if !isCreating {
+                Toggle(isActive ? "Enabled" : "Disabled", isOn: $isActive)
+                    .toggleStyle(.switch)
+            }
         }
         .padding()
     }
@@ -384,12 +388,13 @@ struct EditRingView: View {
             return
         }
 
-        name             = config.name
-        ringRadius       = String(Int(config.ringRadius))
-        centerHoleRadius = String(Int(config.centerHoleRadius))
-        iconSize         = String(Int(config.iconSize))
-        startAngle       = config.startAngle
-        triggers         = config.triggers.map { TriggerFormConfig(from: $0) }
+        name                = config.name
+        ringRadius          = String(Int(config.ringRadius))
+        centerHoleRadius    = String(Int(config.centerHoleRadius))
+        iconSize            = String(Int(config.iconSize))
+        startAngle          = config.startAngle
+        isActive            = config.isActive
+        triggers            = config.triggers.map { TriggerFormConfig(from: $0) }
 
         var savedByType: [String: (order: Int, instanceSettings: [String: String])] = [:]
         for p in config.providers {
@@ -513,6 +518,7 @@ struct EditRingView: View {
                 for provider in config.providers { try configManager.removeProvider(id: provider.id) }
                 for p in providerData { _ = try configManager.addProvider(toRing: config.id, providerType: p.type, order: p.order, angle: p.angle, config: p.instanceSettings.isEmpty ? nil : p.instanceSettings) }
 
+                try configManager.setConfigurationActive(config.id, isActive: isActive)
                 print("[EditRing] Updated ring (ID: \(config.id)) with \(triggers.count) trigger(s)")
             }
 

@@ -260,7 +260,7 @@ class RingConfigurationManager: ObservableObject {
             } else {
                 configJSON = nil
             }
-
+            
             guard let providerId = databaseManager.createProvider(
                 ringId: ringId,
                 providerType: provider.type,

@@ -27,7 +27,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
     // MARK: - Initialization
 
     init() {
-        print("🪟 WindowManagementProvider initialized")
+        print("WindowManagementProvider initialized")
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleDisplayChange),
@@ -37,7 +37,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
     }
 
     @objc private func handleDisplayChange() {
-        print("🪟 [WindowManagementProvider] Display configuration changed - rebuilding")
+        print("[WindowManagementProvider] Display configuration changed - rebuilding")
         NotificationCenter.default.postProviderUpdate(providerId: providerId)
     }
 
@@ -46,7 +46,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
     }
 
     func refresh() {
-        print("🪟 [WindowManagementProvider] Refresh called (no-op)")
+        print("[WindowManagementProvider] Refresh called (no-op)")
     }
 
     // MARK: - FunctionProvider Methods
@@ -57,13 +57,15 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
         let neighbours = DisplayMonitor.shared.neighbours(of: currentScreen)
         let leftScreen  = neighbours.first { $0.direction == .left }?.screen
         let rightScreen = neighbours.first { $0.direction == .right }?.screen
+        let aboveScreen = neighbours.first { $0.direction == .above }?.screen
+        let belowScreen = neighbours.first { $0.direction == .below }?.screen
 
         let items: [FunctionNode] = [
-            makeTopNode(),
+            makeTopNode(neighbourScreen: aboveScreen),
             makeQuarterNode(id: "window-top-right",    name: "Top Right",    imageName: "window_manager_top_right",    action: WindowManager.positionTopRight),
             makeDirectionalHalfNode(direction: .right, neighbourScreen: rightScreen),
             makeQuarterNode(id: "window-bottom-right", name: "Bottom Right", imageName: "window_manager_bottom_right", action: WindowManager.positionBottomRight),
-            makeBottomNode(),
+            makeBottomNode(neighbourScreen: belowScreen),
             makeQuarterNode(id: "window-bottom-left",  name: "Bottom Left",  imageName: "window_manager_bottom_left",  action: WindowManager.positionBottomLeft),
             makeDirectionalHalfNode(direction: .left,  neighbourScreen: leftScreen),
             makeQuarterNode(id: "window-top-left",     name: "Top Left",     imageName: "window_manager_top_left",     action: WindowManager.positionTopLeft),
@@ -88,40 +90,59 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
 
     // MARK: - Node Builders
 
-    private func makeTopNode() -> FunctionNode {
-        FunctionNode(
+    private func makeTopNode(neighbourScreen: NSScreen?) -> FunctionNode {
+        let fullscreenChild = FunctionNode(
+            id: "window-fullscreen",
+            name: "Fullscreen",
+            type: .action,
+            icon: NSImage(named: "window_manager_fullscreen") ?? NSImage(),
+            showLabel: true,
+            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                WindowManager.fullscreen(targetApp: self?.circularUIManager?.previousApp)
+            }),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
+
+        let topHalfChild = FunctionNode(
+            id: "window-top-half",
+            name: "Top Half",
+            type: .action,
+            icon: NSImage(named: "window_manager_top_half") ?? NSImage(),
+            showLabel: true,
+            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                WindowManager.positionTopHalf(targetApp: self?.circularUIManager?.previousApp)
+            }),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
+
+        var children = [fullscreenChild, topHalfChild]
+
+        if let screen = neighbourScreen {
+            children.append(FunctionNode(
+                id: "window-move-above-screen",
+                name: "Move to Above Display",
+                type: .action,
+                icon: NSImage(named: "window_manager_switch_monitor_top") ?? NSImage(),
+                showLabel: true,
+                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                    WindowManager.moveToScreen(screen, targetApp: self?.circularUIManager?.previousApp)
+                }),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+            ))
+        }
+
+        return FunctionNode(
             id: "window-top",
             name: "Top",
             type: .category,
             icon: NSImage(named: "window_manager_fullscreen") ?? NSImage(),
-            children: [
-                FunctionNode(
-                    id: "window-fullscreen",
-                    name: "Fullscreen",
-                    type: .action,
-                    icon: NSImage(named: "window_manager_fullscreen") ?? NSImage(),
-                    showLabel: true,
-                    onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
-                        WindowManager.fullscreen(targetApp: self?.circularUIManager?.previousApp)
-                    }),
-                    onRightClick: ModifierAwareInteraction(base: .doNothing),
-                    onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                    onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
-                ),
-                FunctionNode(
-                    id: "window-top-half",
-                    name: "Top Half",
-                    type: .action,
-                    icon: NSImage(named: "window_manager_top_half") ?? NSImage(),
-                    showLabel: true,
-                    onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
-                        WindowManager.positionTopHalf(targetApp: self?.circularUIManager?.previousApp)
-                    }),
-                    onRightClick: ModifierAwareInteraction(base: .doNothing),
-                    onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                    onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
-                )
-            ],
+            children: children,
             preferredLayout: .partialSlice,
             slicePositioning: .center,
             onLeftClick: ModifierAwareInteraction(base: .doNothing),
@@ -131,40 +152,59 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
         )
     }
 
-    private func makeBottomNode() -> FunctionNode {
-        FunctionNode(
+    private func makeBottomNode(neighbourScreen: NSScreen?) -> FunctionNode {
+        let bottomHalfChild = FunctionNode(
+            id: "window-bottom-half",
+            name: "Bottom Half",
+            type: .action,
+            icon: NSImage(named: "window_manager_bottom_half") ?? NSImage(),
+            showLabel: true,
+            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                WindowManager.positionBottomHalf(targetApp: self?.circularUIManager?.previousApp)
+            }),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
+
+        let hideChild = FunctionNode(
+            id: "window-hide",
+            name: "Hide",
+            type: .action,
+            icon: NSImage(named: "window_manager_hide") ?? NSImage(),
+            showLabel: true,
+            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                WindowManager.hideWindow(targetApp: self?.circularUIManager?.previousApp)
+            }),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
+
+        var children = [bottomHalfChild, hideChild]
+
+        if let screen = neighbourScreen {
+            children.append(FunctionNode(
+                id: "window-move-below-screen",
+                name: "Move to Below Display",
+                type: .action,
+                icon: NSImage(named: "window_manager_switch_monitor_bottom") ?? NSImage(),
+                showLabel: true,
+                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                    WindowManager.moveToScreen(screen, targetApp: self?.circularUIManager?.previousApp)
+                }),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+            ))
+        }
+
+        return FunctionNode(
             id: "window-bottom",
             name: "Bottom",
             type: .category,
             icon: NSImage(named: "window_manager_hide") ?? NSImage(),
-            children: [
-                FunctionNode(
-                    id: "window-bottom-half",
-                    name: "Bottom Half",
-                    type: .action,
-                    icon: NSImage(named: "window_manager_bottom_half") ?? NSImage(),
-                    showLabel: true,
-                    onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
-                        WindowManager.positionBottomHalf(targetApp: self?.circularUIManager?.previousApp)
-                    }),
-                    onRightClick: ModifierAwareInteraction(base: .doNothing),
-                    onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                    onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
-                ),
-                FunctionNode(
-                    id: "window-hide",
-                    name: "Hide",
-                    type: .action,
-                    icon: NSImage(named: "window_manager_hide") ?? NSImage(),
-                    showLabel: true,
-                    onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
-                        WindowManager.hideWindow(targetApp: self?.circularUIManager?.previousApp)
-                    }),
-                    onRightClick: ModifierAwareInteraction(base: .doNothing),
-                    onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                    onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
-                )
-            ],
+            children: children,
             preferredLayout: .partialSlice,
             slicePositioning: .center,
             onLeftClick: ModifierAwareInteraction(base: .doNothing),
