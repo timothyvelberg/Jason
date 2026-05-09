@@ -50,6 +50,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 // Register streams with coordinator
                 LiveDataCoordinator.shared.register(FolderWatcherManager.shared)
+                LiveDataCoordinator.shared.register(DisplayMonitor.shared)
                 
                 // Start all live data monitoring (includes sleep/wake handling)
                 LiveDataCoordinator.shared.startAll()

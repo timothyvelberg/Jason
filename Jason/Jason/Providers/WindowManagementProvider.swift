@@ -32,15 +32,38 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
     // MARK: - Initialization
     
     init() {
-        print("🪟 WindowManagementProvider initialized")
+        print("WindowManagementProvider initialized")
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDisplayChange),
+            name: .displayConfigurationDidChange,
+            object: nil
+        )
+    }
+
+    @objc private func handleDisplayChange() {
+        print("[WindowManagementProvider] Display configuration changed - rebuilding")
+        NotificationCenter.default.postProviderUpdate(providerId: providerId)
+    }
+
+    func teardown() {
+        NotificationCenter.default.removeObserver(self, name: .displayConfigurationDidChange, object: nil)
     }
     
     // MARK: - FunctionProvider Methods
     
     func provideFunctions() -> [FunctionNode] {
-        let items = [
-            
-            // Center - Fullscreen
+
+        // Determine which screens neighbour the current app's screen
+        let targetApp = circularUIManager?.previousApp
+        let currentScreen = WindowManager.currentScreen(for: targetApp)
+        let neighbours = DisplayMonitor.shared.neighbours(of: currentScreen)
+        let leftScreen  = neighbours.first { $0.direction == .left }?.screen
+        let rightScreen = neighbours.first { $0.direction == .right }?.screen
+
+        let items: [FunctionNode] = [
+
+            // Fullscreen
             FunctionNode(
                 id: "window-fullscreen",
                 name: "Fullscreen",
@@ -61,7 +84,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
 
-            // 1 o'clock - Top-right quarter
+            // Top-right quarter
             FunctionNode(
                 id: "window-top-right",
                 name: "Top Right",
@@ -80,9 +103,54 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
                 onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
-            
-            // 3 o'clock (Right) - Right half
-            FunctionNode(
+
+            // Right half — category if right screen exists, direct action otherwise
+            rightScreen.map { screen in
+                FunctionNode(
+                    id: "window-right-half",
+                    name: "Right",
+                    type: .category,
+                    icon: NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil) ?? NSImage(),
+                    children: [
+                        FunctionNode(
+                            id: "window-right-half-action",
+                            name: "Right Half",
+                            type: .action,
+                            icon: NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil) ?? NSImage(),
+                            showLabel: true,
+                            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                                if let manager = self?.circularUIManager {
+                                    WindowManager.positionRightHalf(targetApp: manager.previousApp)
+                                } else {
+                                    WindowManager.positionRightHalf()
+                                }
+                            }),
+                            onRightClick: ModifierAwareInteraction(base: .doNothing),
+                            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+                        ),
+                        FunctionNode(
+                            id: "window-move-right-screen",
+                            name: "Move to Right Display",
+                            type: .action,
+                            icon: NSImage(systemSymbolName: "display.2", accessibilityDescription: nil) ?? NSImage(),
+                            showLabel: true,
+                            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                                WindowManager.moveToScreen(screen, targetApp: self?.circularUIManager?.previousApp)
+                            }),
+                            onRightClick: ModifierAwareInteraction(base: .doNothing),
+                            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+                        )
+                    ],
+                    preferredLayout: .partialSlice,
+                    slicePositioning: .center,
+                    onLeftClick: ModifierAwareInteraction(base: .doNothing),
+                    onRightClick: ModifierAwareInteraction(base: .doNothing),
+                    onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                    onBoundaryCross: ModifierAwareInteraction(base: .expand)
+                )
+            } ?? FunctionNode(
                 id: "window-right-half",
                 name: "Right Half",
                 type: .action,
@@ -100,8 +168,8 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
                 onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
-            
-            // 4:30 - Bottom-right quarter
+
+            // Bottom-right quarter
             FunctionNode(
                 id: "window-bottom-right",
                 name: "Bottom Right",
@@ -120,7 +188,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
                 onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
-            
+
             // Hide
             FunctionNode(
                 id: "window-hide",
@@ -140,8 +208,8 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
                 onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
-            
-            // 7:30 - Bottom-left quarter
+
+            // Bottom-left quarter
             FunctionNode(
                 id: "window-bottom-left",
                 name: "Bottom Left",
@@ -160,9 +228,54 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
                 onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
-            
-            // 9 o'clock (Left) - Left half
-            FunctionNode(
+
+            // Left half — category if left screen exists, direct action otherwise
+            leftScreen.map { screen in
+                FunctionNode(
+                    id: "window-left-half",
+                    name: "Left",
+                    type: .category,
+                    icon: NSImage(systemSymbolName: "arrow.left", accessibilityDescription: nil) ?? NSImage(),
+                    children: [
+                        FunctionNode(
+                            id: "window-left-half-action",
+                            name: "Left Half",
+                            type: .action,
+                            icon: NSImage(systemSymbolName: "arrow.left", accessibilityDescription: nil) ?? NSImage(),
+                            showLabel: true,
+                            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                                if let manager = self?.circularUIManager {
+                                    WindowManager.positionLeftHalf(targetApp: manager.previousApp)
+                                } else {
+                                    WindowManager.positionLeftHalf()
+                                }
+                            }),
+                            onRightClick: ModifierAwareInteraction(base: .doNothing),
+                            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+                        ),
+                        FunctionNode(
+                            id: "window-move-left-screen",
+                            name: "Move to Left Display",
+                            type: .action,
+                            icon: NSImage(systemSymbolName: "display.2", accessibilityDescription: nil) ?? NSImage(),
+                            showLabel: true,
+                            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                                WindowManager.moveToScreen(screen, targetApp: self?.circularUIManager?.previousApp)
+                            }),
+                            onRightClick: ModifierAwareInteraction(base: .doNothing),
+                            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+                        )
+                    ],
+                    preferredLayout: .partialSlice,
+                    slicePositioning: .center,
+                    onLeftClick: ModifierAwareInteraction(base: .doNothing),
+                    onRightClick: ModifierAwareInteraction(base: .doNothing),
+                    onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                    onBoundaryCross: ModifierAwareInteraction(base: .expand)
+                )
+            } ?? FunctionNode(
                 id: "window-left-half",
                 name: "Left Half",
                 type: .action,
@@ -180,8 +293,8 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 onMiddleClick: ModifierAwareInteraction(base: .doNothing),
                 onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             ),
-            
-            // 10:30 - Top-left quarter
+
+            // Top-left quarter
             FunctionNode(
                 id: "window-top-left",
                 name: "Top Left",
@@ -201,7 +314,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
                 onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
             )
         ]
-        
+
         return [
             FunctionNode(
                 id: "window-management",
@@ -563,6 +676,60 @@ class WindowManager {
         print("🔍 [WindowManager] Hiding app: \(app.localizedName ?? "Unknown")")
         app.hide()
         print("🪟 [WindowManager] Hid application")
+    }
+    
+    /// Gets the screen the target app's window is currently on.
+    /// Falls back to the screen under the mouse cursor if AX is unavailable.
+    static func currentScreen(for app: NSRunningApplication?) -> NSScreen {
+        if let window = getFrontmostWindow(targetApp: app),
+           let screen = getScreenForWindow(window) {
+            return screen
+        }
+        let mouse = NSEvent.mouseLocation
+        return NSScreen.screens.first { $0.frame.contains(mouse) }
+            ?? NSScreen.main
+            ?? NSScreen.screens[0]
+    }
+
+    /// Moves a window to the target screen, preserving its relative position and size.
+    static func moveToScreen(_ targetScreen: NSScreen, targetApp: NSRunningApplication? = nil) {
+        guard checkAccessibilityPermissions() else { return }
+        guard let window = getFrontmostWindow(targetApp: targetApp) else {
+            print("❌ [WindowManager] No frontmost window found")
+            return
+        }
+        guard let currentScreen = getScreenForWindow(window) else {
+            print("❌ [WindowManager] Could not determine current screen")
+            return
+        }
+
+        var posValue: AnyObject?
+        var sizeValue: AnyObject?
+        AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &posValue)
+        AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeValue)
+
+        var position = CGPoint.zero
+        var size = CGSize.zero
+        if let p = posValue { AXValueGetValue(p as! AXValue, .cgPoint, &position) }
+        if let s = sizeValue { AXValueGetValue(s as! AXValue, .cgSize, &size) }
+
+        let src = currentScreen.visibleFrame
+        let dst = targetScreen.visibleFrame
+
+        let relX = (position.x - src.origin.x) / src.width
+        let relY = (position.y - src.origin.y) / src.height
+        let relW = size.width / src.width
+        let relH = size.height / src.height
+
+        let newFrame = CGRect(
+            x: dst.origin.x + relX * dst.width,
+            y: dst.origin.y + relY * dst.height,
+            width: relW * dst.width,
+            height: relH * dst.height
+        )
+
+        setWindowFrame(window, frame: newFrame)
+        print("[WindowManager] Moved window to screen: \(targetScreen.localizedName ?? "unknown")")
     }
     
     static func sendToOtherMonitor(targetApp: NSRunningApplication? = nil) {
