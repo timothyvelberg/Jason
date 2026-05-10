@@ -29,7 +29,7 @@ class FrontmostAppMonitor: ObservableObject {
     // MARK: - Init
 
     private init() {
-        print("🔭 [FrontmostAppMonitor] Initialized")
+        print("[FrontmostAppMonitor] Initialized")
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(handleAppActivated(_:)),
@@ -49,7 +49,7 @@ class FrontmostAppMonitor: ObservableObject {
             return
         }
 
-        print("🔭 [FrontmostAppMonitor] Frontmost app changed: \(app.localizedName ?? "unknown") (\(app.bundleIdentifier ?? "?"))")
+        print("[FrontmostAppMonitor] Frontmost app changed: \(app.localizedName ?? "unknown") (\(app.bundleIdentifier ?? "?"))")
 
         DispatchQueue.main.async {
             self.frontmostApp = app
