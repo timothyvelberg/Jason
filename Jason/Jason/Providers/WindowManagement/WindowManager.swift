@@ -76,12 +76,16 @@ class WindowManager {
         return nil
     }
 
+    
+    
     static func setWindowFrame(_ window: AXUIElement, frame: CGRect) {
         guard let primaryScreen = NSScreen.screens.first else {
             print("[WindowManager] No screens available")
             return
         }
 
+        // AX API uses CG space (Y=0 at top of primary screen); AppKit uses Y=0 at bottom.
+        // Inverse of the conversion in getScreenForWindow.
         let cgY = primaryScreen.frame.height - (frame.origin.y + frame.height)
         let convertedFrame = CGRect(x: frame.origin.x, y: cgY, width: frame.width, height: frame.height)
 

@@ -26,17 +26,26 @@ extension WindowManager {
             return NSScreen.main
         }
 
-        var position = CGPoint.zero
-        AXValueGetValue(axValue as! AXValue, .cgPoint, &position)
+        var cgPosition = CGPoint.zero
+        AXValueGetValue(axValue as! AXValue, .cgPoint, &cgPosition)
 
-        if let screen = NSScreen.screens.first(where: { $0.frame.contains(position) }) {
+        // AX API returns positions in CG space (Y=0 at top of primary screen).
+        // NSScreen.frame is in AppKit space (Y=0 at bottom of primary screen).
+        // Convert before matching.
+        guard let primaryScreen = NSScreen.screens.first else { return NSScreen.main }
+        let appKitPosition = CGPoint(
+            x: cgPosition.x,
+            y: primaryScreen.frame.height - cgPosition.y
+        )
+
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(appKitPosition) }) {
             return screen
         }
 
-        // Fallback: closest screen by center distance
+        // Fallback: closest screen by center distance (using converted AppKit position)
         return NSScreen.screens.min(by: { a, b in
-            let da = hypot(a.frame.midX - position.x, a.frame.midY - position.y)
-            let db = hypot(b.frame.midX - position.x, b.frame.midY - position.y)
+            let da = hypot(a.frame.midX - appKitPosition.x, a.frame.midY - appKitPosition.y)
+            let db = hypot(b.frame.midX - appKitPosition.x, b.frame.midY - appKitPosition.y)
             return da < db
         }) ?? NSScreen.main
     }

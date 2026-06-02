@@ -111,12 +111,13 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         lastFavoritesOrder = currentFavoritesOrder
 
         let runningApps = AppSwitcherManager.shared.runningApps
-        let runningAppsMap: [String: NSRunningApplication] = Dictionary(
-            uniqueKeysWithValues: runningApps.compactMap { app in
-                guard let bundleId = app.bundleIdentifier else { return nil }
-                return (bundleId, app)
+        var runningAppsMap: [String: NSRunningApplication] = [:]
+        for app in runningApps {
+            guard let bundleId = app.bundleIdentifier else { continue }
+            if runningAppsMap[bundleId] == nil {
+                runningAppsMap[bundleId] = app
             }
-        )
+        }
         let runningBundleIds = Set(runningAppsMap.keys)
 
         // Calculate valid bundle IDs based on display mode
