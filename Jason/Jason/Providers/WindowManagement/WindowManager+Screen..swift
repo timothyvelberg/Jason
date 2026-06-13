@@ -82,25 +82,49 @@ extension WindowManager {
         AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &posValue)
         AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeValue)
 
-        var position = CGPoint.zero
+        var cgPosition = CGPoint.zero
         var size = CGSize.zero
-        if let p = posValue { AXValueGetValue(p as! AXValue, .cgPoint, &position) }
+        if let p = posValue { AXValueGetValue(p as! AXValue, .cgPoint, &cgPosition) }
         if let s = sizeValue { AXValueGetValue(s as! AXValue, .cgSize, &size) }
+
+        // AX position is in CG space; convert to AppKit space before relative arithmetic.
+        // Inverse of the conversion in getScreenForWindow.
+        guard let primaryScreen = NSScreen.screens.first else { return }
+        let appKitTopLeft = CGPoint(
+            x: cgPosition.x,
+            y: primaryScreen.frame.height - cgPosition.y
+        )
 
         let src = currentScreen.visibleFrame
         let dst = targetScreen.visibleFrame
 
+        // Compute relative position using the window's top-left corner.
+        // AppKit Y increases upward, so the top of the screen is src.maxY.
+        let relX = (appKitTopLeft.x - src.origin.x) / src.width
+        let relY = (src.maxY - appKitTopLeft.y) / src.height  // 0 = top of screen, 1 = bottom
+
+        // Scale size proportionally between screens.
+        let newWidth  = (size.width  / src.width)  * dst.width
+        let newHeight = (size.height / src.height) * dst.height
+
+        // Reconstruct the top-left corner on the destination screen,
+        // then convert to bottom-left (AppKit origin) by subtracting newHeight.
+        let newTopLeftY = dst.maxY - relY * dst.height
+        let newY = newTopLeftY - newHeight
+
         let newFrame = CGRect(
-            x: dst.origin.x + ((position.x - src.origin.x) / src.width) * dst.width,
-            y: dst.origin.y + ((position.y - src.origin.y) / src.height) * dst.height,
-            width: (size.width / src.width) * dst.width,
-            height: (size.height / src.height) * dst.height
+            x: dst.origin.x + relX * dst.width,
+            y: newY,
+            width: newWidth,
+            height: newHeight
         )
 
+        print("🪟 [moveToScreen] appKitTopLeft: \(appKitTopLeft)")
+        print("🪟 [moveToScreen] relX: \(relX), relY: \(relY)")
+        print("🪟 [moveToScreen] src: \(src), dst: \(dst)")
+        print("🪟 [moveToScreen] newFrame: \(newFrame)")
+
         setWindowFrame(window, frame: newFrame)
-
-        // Re-raise the moved window so it retains AX focus on the target screen
         AXUIElementPerformAction(window, kAXRaiseAction as CFString)
-
-        print("🪟 [WindowManager] Moved window to screen: \(targetScreen.localizedName ?? "unknown")")    }
+    }
 }

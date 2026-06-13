@@ -101,4 +101,31 @@ extension WindowManager {
         setWindowFrame(window, frame: CGRect(x: f.midX, y: f.minY, width: f.width / 2, height: f.height / 2))
         print("[WindowManager] Bottom right")
     }
+    
+    static func positionLeftThird(targetApp: NSRunningApplication? = nil) {
+        guard checkAccessibilityPermissions(),
+              let window = getFrontmostWindow(targetApp: targetApp),
+              let screen = getScreenForWindow(window) else { return }
+        let f = screen.visibleFrame
+        setWindowFrame(window, frame: CGRect(x: f.minX, y: f.minY, width: f.width / 3, height: f.height))
+        print("[WindowManager] Left third")
+    }
+
+    static func positionCenterThird(targetApp: NSRunningApplication? = nil) {
+        guard checkAccessibilityPermissions(),
+              let window = getFrontmostWindow(targetApp: targetApp),
+              let screen = getScreenForWindow(window) else { return }
+        let f = screen.visibleFrame
+        setWindowFrame(window, frame: CGRect(x: f.minX + f.width / 3, y: f.minY, width: f.width / 3, height: f.height))
+        print("[WindowManager] Center third")
+    }
+
+    static func positionRightThird(targetApp: NSRunningApplication? = nil) {
+        guard checkAccessibilityPermissions(),
+              let window = getFrontmostWindow(targetApp: targetApp),
+              let screen = getScreenForWindow(window) else { return }
+        let f = screen.visibleFrame
+        setWindowFrame(window, frame: CGRect(x: f.minX + (f.width / 3) * 2, y: f.minY, width: f.width / 3, height: f.height))
+        print("[WindowManager] Right third")
+    }
 }

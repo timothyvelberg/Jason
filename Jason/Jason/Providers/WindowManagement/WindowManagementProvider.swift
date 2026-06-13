@@ -104,6 +104,20 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
             onMiddleClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
+        
+        let centerThirdChild = FunctionNode(
+            id: "window-center-third",
+            name: "Center Third",
+            type: .action,
+            icon: NSImage(named: "window_manager_fullscreen") ?? NSImage(),
+            showLabel: true,
+            onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                WindowManager.positionCenterThird(targetApp: self?.circularUIManager?.previousApp)
+            }),
+            onRightClick: ModifierAwareInteraction(base: .doNothing),
+            onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+            onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+        )
 
         let topHalfChild = FunctionNode(
             id: "window-top-half",
@@ -119,7 +133,7 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
 
-        var children = [fullscreenChild, topHalfChild]
+        var children = [fullscreenChild, topHalfChild, centerThirdChild]
 
         if let screen = neighbourScreen {
             children.append(FunctionNode(
@@ -244,30 +258,16 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
         neighbourScreen: NSScreen?
     ) -> FunctionNode {
         let isRight      = direction == .right
-        let id           = isRight ? "window-right-half"                  : "window-left-half"
-        let halfName     = isRight ? "Right Half"                         : "Left Half"
-        let halfImage    = isRight ? "window_manager_right_half"          : "window_manager_left_half"
-        let moveId       = isRight ? "window-move-right-screen"           : "window-move-left-screen"
-        let moveName     = isRight ? "Move to Right Display"              : "Move to Left Display"
-        let moveImage    = isRight ? "window_manager_switch_monitor_right" : "window_manager_switch_monitor_left"
-        let halfAction   = isRight ? WindowManager.positionRightHalf      : WindowManager.positionLeftHalf
-
-        guard let screen = neighbourScreen else {
-            return FunctionNode(
-                id: id,
-                name: halfName,
-                type: .action,
-                icon: NSImage(named: halfImage) ?? NSImage(),
-                preferredLayout: nil,
-                showLabel: true,
-                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
-                    halfAction(self?.circularUIManager?.previousApp)
-                }),
-                onRightClick: ModifierAwareInteraction(base: .doNothing),
-                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
-                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
-            )
-        }
+        let id           = isRight ? "window-right-half"                   : "window-left-half"
+        let halfName     = isRight ? "Right Half"                          : "Left Half"
+        let halfImage    = isRight ? "window_manager_right_half"           : "window_manager_left_half"
+        let thirdId      = isRight ? "window-right-third"                  : "window-left-third"
+        let thirdName    = isRight ? "Right Third"                         : "Left Third"
+        let moveId       = isRight ? "window-move-right-screen"            : "window-move-left-screen"
+        let moveName     = isRight ? "Move to Right Display"               : "Move to Left Display"
+        let moveImage    = isRight ? "window_manager_switch_monitor_right"  : "window_manager_switch_monitor_left"
+        let halfAction   = isRight ? WindowManager.positionRightHalf       : WindowManager.positionLeftHalf
+        let thirdAction  = isRight ? WindowManager.positionRightThird      : WindowManager.positionLeftThird
 
         let halfChild = FunctionNode(
             id: "\(id)-action",
@@ -283,26 +283,44 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
 
-        let moveChild = FunctionNode(
-            id: moveId,
-            name: moveName,
+        let thirdChild = FunctionNode(
+            id: thirdId,
+            name: thirdName,
             type: .action,
-            icon: NSImage(named: moveImage) ?? NSImage(),
+            icon: NSImage(named: halfImage) ?? NSImage(),
             showLabel: true,
             onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
-                WindowManager.moveToScreen(screen, targetApp: self?.circularUIManager?.previousApp)
+                thirdAction(self?.circularUIManager?.previousApp)
             }),
             onRightClick: ModifierAwareInteraction(base: .doNothing),
             onMiddleClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
         )
 
+        var children: [FunctionNode] = [halfChild, thirdChild]
+
+        if let screen = neighbourScreen {
+            children.append(FunctionNode(
+                id: moveId,
+                name: moveName,
+                type: .action,
+                icon: NSImage(named: moveImage) ?? NSImage(),
+                showLabel: true,
+                onLeftClick: ModifierAwareInteraction(base: .execute { [weak self] in
+                    WindowManager.moveToScreen(screen, targetApp: self?.circularUIManager?.previousApp)
+                }),
+                onRightClick: ModifierAwareInteraction(base: .doNothing),
+                onMiddleClick: ModifierAwareInteraction(base: .doNothing),
+                onBoundaryCross: ModifierAwareInteraction(base: .doNothing)
+            ))
+        }
+
         return FunctionNode(
             id: id,
             name: isRight ? "Right" : "Left",
             type: .category,
             icon: NSImage(named: halfImage) ?? NSImage(),
-            children: [halfChild, moveChild],
+            children: children,
             preferredLayout: .partialSlice,
             slicePositioning: .center,
             onLeftClick: ModifierAwareInteraction(base: .doNothing),
@@ -310,5 +328,4 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
             onMiddleClick: ModifierAwareInteraction(base: .doNothing),
             onBoundaryCross: ModifierAwareInteraction(base: .expand)
         )
-    }
-}
+    }}
