@@ -61,7 +61,11 @@ class HotkeyManager {
     
     var mouseEventTap: CFMachPort?
     var mouseRunLoopSource: CFRunLoopSource?
-    
+
+    /// Polls for Accessibility permission when it's missing at startup, so the event
+    /// taps can be created the moment it's granted — no app relaunch required.
+    private var accessibilityRecoveryTimer: Timer?
+
     // MARK: - Multitouch
     
     var multitouchCoordinator: MultitouchCoordinator?
@@ -114,6 +118,7 @@ class HotkeyManager {
             startKeyboardEventTap()
         } else {
             print("[HotkeyManager] Skipping keyboard event tap (no accessibility permission)")
+            startAccessibilityRecoveryPolling()
         }
         
         globalFlagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged]) { [weak self] event in
@@ -159,6 +164,7 @@ class HotkeyManager {
                 startMouseMonitoring()
             } else if !hasAccessibility {
                 print("   Cannot monitor mouse buttons - no accessibility permission")
+                startAccessibilityRecoveryPolling()
             }
         }
         
@@ -182,6 +188,8 @@ class HotkeyManager {
         if let monitor = localFlagsMonitor { NSEvent.removeMonitor(monitor); localFlagsMonitor = nil }
         if let monitor = globalSwipeMonitor { NSEvent.removeMonitor(monitor); globalSwipeMonitor = nil }
         
+        accessibilityRecoveryTimer?.invalidate()
+        accessibilityRecoveryTimer = nil
         stopCircleMonitoring()
         stopMouseMonitoring()
         stopKeyboardEventTap()
@@ -189,6 +197,33 @@ class HotkeyManager {
         print("[HotkeyManager] Monitoring stopped")
     }
     
+    // MARK: - Accessibility Recovery
+
+    /// When Accessibility is missing at startup, poll for it and create the event taps
+    /// the moment it's granted, so the user doesn't have to relaunch the app.
+    private func startAccessibilityRecoveryPolling() {
+        guard accessibilityRecoveryTimer == nil else { return }
+        print("[HotkeyManager] Watching for Accessibility permission to be granted...")
+        accessibilityRecoveryTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] timer in
+            guard let self = self else {
+                timer.invalidate()
+                return
+            }
+            guard PermissionManager.shared.hasAccessibilityAccess else { return }
+            print("[HotkeyManager] Accessibility granted — enabling event taps")
+            timer.invalidate()
+            self.accessibilityRecoveryTimer = nil
+            self.enableAccessibilityGatedFeatures()
+        }
+    }
+
+    private func enableAccessibilityGatedFeatures() {
+        startKeyboardEventTap()
+        if !registeredMouseButtons.isEmpty {
+            startMouseMonitoring()
+        }
+    }
+
     func resetState() {
         wasShiftPressed = false
         wasCtrlPressed = false

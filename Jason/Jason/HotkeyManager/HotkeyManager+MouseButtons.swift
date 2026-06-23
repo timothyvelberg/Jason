@@ -78,6 +78,14 @@ extension HotkeyManager {
             eventsOfInterest: CGEventMask(eventMask),
             callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
                 let mySelf = Unmanaged<HotkeyManager>.fromOpaque(refcon!).takeUnretainedValue()
+                // Re-enable the tap if the system disabled it (timeout / input overload);
+                // otherwise mouse-button shortcuts silently stop working until relaunch.
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                    if let tap = mySelf.mouseEventTap {
+                        CGEvent.tapEnable(tap: tap, enable: true)
+                    }
+                    return Unmanaged.passRetained(event)
+                }
                 mySelf.handleMouseEvent(event, type: type)
                 return Unmanaged.passRetained(event)
             },
