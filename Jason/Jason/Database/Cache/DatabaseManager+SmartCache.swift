@@ -205,27 +205,30 @@ extension DatabaseManager {
             
             // Begin transaction
             sqlite3_exec(db, "BEGIN TRANSACTION", nil, nil, nil)
-            
+            var success = true
+
             // Delete existing cached items for this folder
             let deleteSQL = "DELETE FROM folder_contents WHERE folder_path = ?"
             var deleteStatement: OpaquePointer?
-            
+
             if sqlite3_prepare_v2(db, deleteSQL, -1, &deleteStatement, nil) == SQLITE_OK {
                 sqlite3_bind_text(deleteStatement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
-                sqlite3_step(deleteStatement)
+                if sqlite3_step(deleteStatement) != SQLITE_DONE { success = false }
+            } else {
+                success = false
             }
             sqlite3_finalize(deleteStatement)
-            
+
             // Insert all items
             let insertSQL = """
-            INSERT INTO folder_contents 
+            INSERT INTO folder_contents
             (folder_path, item_name, item_path, is_directory, modification_date, cached_at)
             VALUES (?, ?, ?, ?, ?, ?)
             """
-            
-            for item in items {
+
+            for item in items where success {
                 var statement: OpaquePointer?
-                
+
                 if sqlite3_prepare_v2(db, insertSQL, -1, &statement, nil) == SQLITE_OK {
                     sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
                     sqlite3_bind_text(statement, 2, (item.name as NSString).utf8String, -1, SQLITE_TRANSIENT)
@@ -233,17 +236,23 @@ extension DatabaseManager {
                     sqlite3_bind_int(statement, 4, item.isDirectory ? 1 : 0)
                     sqlite3_bind_double(statement, 5, item.modificationDate.timeIntervalSince1970)
                     sqlite3_bind_double(statement, 6, now)
-                    
-                    sqlite3_step(statement)
+
+                    if sqlite3_step(statement) != SQLITE_DONE { success = false }
+                } else {
+                    success = false
                 }
-                
+
                 sqlite3_finalize(statement)
             }
-            
-            // Commit transaction
-            sqlite3_exec(db, "COMMIT", nil, nil, nil)
-            
-            print("[SmartCache] 💾 Cached \(items.count) items for: \(folderPath)")
+
+            // Commit, or roll back on any failure so the transaction is never left open
+            if success {
+                sqlite3_exec(db, "COMMIT", nil, nil, nil)
+                print("[SmartCache] 💾 Cached \(items.count) items for: \(folderPath)")
+            } else {
+                sqlite3_exec(db, "ROLLBACK", nil, nil, nil)
+                print("[SmartCache] ⚠️ Rolled back folder content cache for: \(folderPath)")
+            }
         }
     }
     
