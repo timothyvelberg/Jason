@@ -21,6 +21,20 @@ class SpotifyProvider: ObservableObject, FunctionProvider {
         NSImage(systemSymbolName: "music.note", accessibilityDescription: nil) ?? NSImage()
     }
 
+    // MARK: - Cached Playback Snapshot
+
+    /// Spotify state is read via AppleScript, which blocks (and can hang for seconds
+    /// if Spotify is busy). We never read it on the main thread: provideFunctions()
+    /// builds nodes from this cached snapshot and kicks off a background refresh that
+    /// posts a provider update only when the snapshot changes.
+    private let snapshotLock = NSLock()
+    private var cachedState: String = "stopped"
+    private var cachedTrack: (name: String, artist: String)?
+    private var lastSnapshotRefresh: Date = .distantPast
+    private var isRefreshingSnapshot = false
+    private let snapshotMinInterval: TimeInterval = 1.0
+    private let snapshotQueue = DispatchQueue(label: "com.jason.spotify", qos: .userInitiated)
+
     // MARK: - Initialization
 
     init() {
@@ -32,6 +46,8 @@ class SpotifyProvider: ObservableObject, FunctionProvider {
             object: nil
         )
         print("🎵 [SpotifyProvider] Initialized")
+        // Warm the snapshot so the first show has real state without blocking.
+        refreshSnapshotAsync(force: true)
     }
 
     deinit {
@@ -45,9 +61,11 @@ class SpotifyProvider: ObservableObject, FunctionProvider {
             return [notRunningNode()]
         }
 
-        let state  = playerState
+        // Build from the cached snapshot — never block the main thread on AppleScript.
+        // Refresh in the background; an update is posted if the snapshot changes.
+        refreshSnapshotAsync()
+        let (state, track) = currentSnapshot()
         let isPlaying = state == "playing"
-        let track  = currentTrackInfo
 
         let children: [FunctionNode] = [
             playPauseNode(isPlaying: isPlaying),
@@ -76,6 +94,7 @@ class SpotifyProvider: ObservableObject, FunctionProvider {
 
     func refresh() {
         print("🎵 [SpotifyProvider] refresh() called")
+        refreshSnapshotAsync(force: true)
         NotificationCenter.default.postProviderUpdate(providerId: providerId)
     }
 
@@ -102,6 +121,57 @@ class SpotifyProvider: ObservableObject, FunctionProvider {
             return nil
         }
         return (name, artist)
+    }
+
+    // MARK: - Snapshot
+
+    private func currentSnapshot() -> (state: String, track: (name: String, artist: String)?) {
+        snapshotLock.lock(); defer { snapshotLock.unlock() }
+        return (cachedState, cachedTrack)
+    }
+
+    /// Refresh the cached snapshot on a background queue (AppleScript can block).
+    /// Posts a provider update only when the snapshot actually changes, which also
+    /// terminates the provideFunctions → refresh → update loop once state settles.
+    private func refreshSnapshotAsync(force: Bool = false) {
+        snapshotLock.lock()
+        let due = force || Date().timeIntervalSince(lastSnapshotRefresh) > snapshotMinInterval
+        guard due, !isRefreshingSnapshot else {
+            snapshotLock.unlock()
+            return
+        }
+        isRefreshingSnapshot = true
+        snapshotLock.unlock()
+
+        snapshotQueue.async { [weak self] in
+            guard let self = self else { return }
+            let running = self.isSpotifyRunning
+            let newState = running ? self.playerState : "stopped"
+            let newTrack = running ? self.currentTrackInfo : nil
+
+            self.snapshotLock.lock()
+            let changed = newState != self.cachedState
+                || !self.tracksEqual(self.cachedTrack, newTrack)
+            self.cachedState = newState
+            self.cachedTrack = newTrack
+            self.lastSnapshotRefresh = Date()
+            self.isRefreshingSnapshot = false
+            self.snapshotLock.unlock()
+
+            if changed {
+                DispatchQueue.main.async {
+                    NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
+                }
+            }
+        }
+    }
+
+    private func tracksEqual(_ a: (name: String, artist: String)?, _ b: (name: String, artist: String)?) -> Bool {
+        switch (a, b) {
+        case (nil, nil): return true
+        case let (l?, r?): return l.name == r.name && l.artist == r.artist
+        default: return false
+        }
     }
 
     // MARK: - Node Builders
@@ -216,8 +286,8 @@ class SpotifyProvider: ObservableObject, FunctionProvider {
 
     // MARK: - AppleScript
 
-    /// Synchronous — used for reading state in provideFunctions().
-    /// Always called from a non-main context via provideFunctions.
+    /// Synchronous AppleScript — only ever called from the background snapshot/refresh
+    /// queue (or the async action helper below), never on the main thread.
     @discardableResult
     private func runAppleScript(_ source: String) -> String? {
         var error: NSDictionary?
@@ -240,8 +310,8 @@ class SpotifyProvider: ObservableObject, FunctionProvider {
     // MARK: - Notifications
 
     @objc private func spotifyStateChanged() {
-        DispatchQueue.main.async {
-            NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
-        }
+        // Spotify changed track/state — refresh the snapshot, which posts a provider
+        // update once the new state is read (off the main thread).
+        refreshSnapshotAsync(force: true)
     }
 }
