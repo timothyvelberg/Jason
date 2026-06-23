@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import AppKit
 
 /// Multitouch source using the private MultitouchSupport framework
 class PrivateFrameworkSource: MultitouchSourceProtocol {
@@ -36,7 +37,16 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
     
     private var devices: [MTDeviceRef] = []
     private let deviceLock = NSLock()
-    
+
+    /// Set when the system is about to sleep. The current MTDeviceRefs become
+    /// invalid across a sleep/wake cycle, so afterwards we must NOT call any
+    /// MultitouchSupport function on them (even unregister) — doing so crashes.
+    /// Guarded by `deviceLock`.
+    private var devicesAreStale = false
+
+    /// Token for the workspace sleep observer (block-based; removed in deinit).
+    private var sleepObserver: NSObjectProtocol?
+
     // MARK: - Singleton for C Callback
     
     fileprivate static var shared: PrivateFrameworkSource?
@@ -44,12 +54,31 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
     // MARK: - Lifecycle
     
     init() {
+        // The MTDeviceRefs we create become invalid across sleep/wake; observe
+        // sleep so we can avoid calling framework functions on stale handles.
+        sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.markDevicesStale()
+        }
         print("[PrivateFrameworkSource] Initialized")
     }
-    
+
     deinit {
+        if let sleepObserver = sleepObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(sleepObserver)
+        }
         stopMonitoring()
         print("[PrivateFrameworkSource] Deallocated")
+    }
+
+    private func markDevicesStale() {
+        deviceLock.lock()
+        devicesAreStale = true
+        deviceLock.unlock()
+        print("[PrivateFrameworkSource] System will sleep — devices marked stale")
     }
     
     // MARK: - Protocol Methods
@@ -93,6 +122,7 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
             print("[PrivateFrameworkSource] No devices found")
         } else {
             isMonitoring = true
+            devicesAreStale = false  // handles came from a fresh MTDeviceCreateList
             PrivateFrameworkSource.shared = self
             print("[PrivateFrameworkSource] Monitoring started")
         }
@@ -109,15 +139,24 @@ class PrivateFrameworkSource: MultitouchSourceProtocol {
         // Clear state FIRST to stop accepting callbacks
         isMonitoring = false
         PrivateFrameworkSource.shared = nil
-        
-        // THEN unregister (callbacks may still fire but will be ignored)
-        // Only unregister if devices are valid (not after wake where they're stale)
-        for device in devices {
-            // The framework will handle cleanup - just unregister callback
-            // Don't call MTDeviceStop as device may be invalid after sleep
-            MTUnregisterContactFrameCallback(device, privateFrameworkTouchCallback)
+
+        if devicesAreStale {
+            // After sleep the MTDeviceRefs are invalid; calling ANY MultitouchSupport
+            // function on them (even unregister) can crash. Just drop the handles and
+            // let startMonitoring() build a fresh list.
+            print("[PrivateFrameworkSource] Devices stale (post-sleep) — discarding without framework calls")
+        } else {
+            // Normal teardown: stop the device and unregister our callback. Do NOT
+            // call MTDeviceRelease — the device pointers come from MTDeviceCreateList's
+            // array by the Get Rule (borrowed; owned by the framework, not us), so
+            // releasing them over-releases and crashes inside CFRelease. Stopping
+            // pairs with MTDeviceStart so a later restart doesn't double-start.
+            for device in devices {
+                MTDeviceStop(device)
+                MTUnregisterContactFrameCallback(device, privateFrameworkTouchCallback)
+            }
         }
-        
+
         devices.removeAll()
         
         print("[PrivateFrameworkSource] Stopped")

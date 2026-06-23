@@ -17,6 +17,12 @@ class MultitouchCoordinator {
     
     /// Registered gesture recognizers
     private var recognizers: [GestureRecognizer] = []
+
+    /// Serializes recognizer state access. Touch frames arrive on the
+    /// MultitouchSupport callback thread while `reset()` is invoked from the main
+    /// thread; running both on this one serial queue prevents concurrent mutation
+    /// of recognizer state (e.g. an `Array` realloc during iteration → crash).
+    private let recognizerQueue = DispatchQueue(label: "com.jason.multitouch.recognizers")
     
     /// Unified callback for all gesture events
     var onGesture: ((GestureEvent) -> Void)?
@@ -135,9 +141,13 @@ class MultitouchCoordinator {
     // MARK: - Private
     
     private func processTouchFrame(_ frame: TouchFrame) {
-        // Feed frame to all enabled recognizers
-        for recognizer in recognizers where recognizer.isEnabled {
-            recognizer.processTouchFrame(frame)
+        // Feed frames on the serial recognizer queue so they never run concurrently
+        // with resetAllRecognizers() (invoked from the main thread on hide/sleep).
+        recognizerQueue.async { [weak self] in
+            guard let self = self else { return }
+            for recognizer in self.recognizers where recognizer.isEnabled {
+                recognizer.processTouchFrame(frame)
+            }
         }
     }
     
@@ -151,8 +161,13 @@ class MultitouchCoordinator {
     }
     
     private func resetAllRecognizers() {
-        for recognizer in recognizers {
-            recognizer.reset()
+        // Runs on the same serial queue as frame processing, so it is enqueued after
+        // any in-flight frames — recognizer state is never mutated concurrently.
+        recognizerQueue.async { [weak self] in
+            guard let self = self else { return }
+            for recognizer in self.recognizers {
+                recognizer.reset()
+            }
         }
     }
     
