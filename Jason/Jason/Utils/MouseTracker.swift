@@ -44,9 +44,15 @@ class MouseTracker {
         
         var hasMouseMoved = false
 
-        trackingTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+        trackingTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
+            // Weak capture so the timer can't keep the tracker (and its object graph)
+            // alive; if the owner was torn down without stopping, invalidate ourselves.
+            guard let self = self else {
+                timer.invalidate()
+                return
+            }
             guard let start = self.trackingStartPoint else { return }
-            
+
             let current = NSEvent.mouseLocation
             let distance = hypot(current.x - start.x, current.y - start.y)
 

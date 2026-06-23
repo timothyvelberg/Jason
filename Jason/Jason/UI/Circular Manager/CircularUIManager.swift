@@ -149,6 +149,7 @@ class CircularUIManager: ObservableObject, UIManager {
         
         // 7. Nil out sub-objects to release their memory
         functionManager = nil
+        mouseTracker?.stopTrackingMouse()  // halt the tracking timer before releasing
         mouseTracker = nil
         gestureManager = nil
         inputCoordinator = nil
