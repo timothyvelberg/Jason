@@ -703,9 +703,31 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
         }
     }
     
+    private var isReloading = false
+
     func refresh() {
-        print("FavoriteFiles] Refreshing files")
-        loadFiles()
+        // Defer the load off the synchronous show path so the ring appears instantly.
+        // fileEntries keeps the previous data until the reload completes (no flicker),
+        // and loadFiles() stays on the main thread (it rasterizes icons via lockFocus,
+        // which is not safe off-main). Only post an update when the file set actually
+        // changed, so a routine show doesn't reset the user's hover/selection.
+        guard !isReloading else { return }
+        isReloading = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            print("[FavoriteFiles] Refreshing files")
+            let before = self.filesSignature(self.fileEntries)
+            self.loadFiles()
+            let after = self.filesSignature(self.fileEntries)
+            self.isReloading = false
+            if before != after {
+                NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
+            }
+        }
+    }
+
+    private func filesSignature(_ entries: [FileEntry]) -> [String] {
+        entries.map { "\($0.id)|\($0.displayName)|\($0.filePath)|\($0.isDirectory)" }
     }
     
     func teardown() {

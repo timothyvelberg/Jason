@@ -91,8 +91,8 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     }
 
     @objc private func handleRunningAppsDidChange() {
+        // refresh() now reloads asynchronously and posts the update itself (on change).
         refresh()
-        NotificationCenter.default.postProviderUpdate(providerId: providerId)
     }
     
     // MARK: - App Loading
@@ -457,9 +457,31 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
         ]
     }
     
+    private var isReloading = false
+
     func refresh() {
-        print("[CombinedApps] Refreshing apps")
-        loadApps()
+        // Defer the load off the synchronous show path so the ring appears instantly.
+        // appEntries keeps the previous data until the reload completes (no flicker),
+        // and loadApps() stays on the main thread (it rasterizes icons via lockFocus,
+        // which is not safe off-main). Only post an update when the app set actually
+        // changed, so a routine show doesn't reset the user's hover/selection.
+        guard !isReloading else { return }
+        isReloading = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            print("[CombinedApps] Refreshing apps")
+            let before = self.appsSignature(self.appEntries)
+            self.loadApps()
+            let after = self.appsSignature(self.appEntries)
+            self.isReloading = false
+            if before != after {
+                NotificationCenter.default.postProviderUpdate(providerId: self.providerId)
+            }
+        }
+    }
+
+    private func appsSignature(_ entries: [AppEntry]) -> [String] {
+        entries.map { "\($0.bundleIdentifier)|\($0.name)|\($0.isRunning)|\($0.badge ?? "")" }
     }
     
     // MARK: - App Actions
