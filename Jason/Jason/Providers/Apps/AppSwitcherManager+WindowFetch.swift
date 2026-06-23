@@ -25,6 +25,9 @@ extension AppSwitcherManager {
         }
         
         let axApp = AXUIElementCreateApplication(app.processIdentifier)
+        // Bound AX messaging so an unresponsive target app can't hang the main thread;
+        // the call returns an error after the timeout instead of blocking indefinitely.
+        AXUIElementSetMessagingTimeout(axApp, 0.5)
         var windowsRef: CFTypeRef?
         
         guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
@@ -65,6 +68,9 @@ extension AppSwitcherManager {
         }
 
         let axApp = AXUIElementCreateApplication(app.processIdentifier)
+        // Bound AX messaging so an unresponsive target app can't hang the main thread;
+        // the call returns an error after the timeout instead of blocking indefinitely.
+        AXUIElementSetMessagingTimeout(axApp, 0.5)
         var windowsRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
               let axWindows = windowsRef as? [AXUIElement] else {
