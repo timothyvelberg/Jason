@@ -52,7 +52,7 @@ extension WindowManager {
 
     /// Gets the screen the target app's window is currently on.
     /// Falls back to the screen under the mouse cursor if AX is unavailable.
-    static func currentScreen(for app: NSRunningApplication?) -> NSScreen {
+    static func currentScreen(for app: NSRunningApplication?) -> NSScreen? {
         if let window = getFrontmostWindow(targetApp: app),
            let screen = getScreenForWindow(window) {
             return screen
@@ -60,7 +60,7 @@ extension WindowManager {
         let mouse = NSEvent.mouseLocation
         return NSScreen.screens.first { $0.frame.contains(mouse) }
             ?? NSScreen.main
-            ?? NSScreen.screens[0]
+            ?? NSScreen.screens.first
     }
 
     // MARK: - Move to Screen1

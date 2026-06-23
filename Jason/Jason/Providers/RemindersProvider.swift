@@ -302,7 +302,11 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
         
         let reminder = EKReminder(eventStore: eventStore)
         reminder.title = cleanTitle
-        reminder.calendar = findOrDefaultList(named: listName)
+        guard let targetList = findOrDefaultList(named: listName) else {
+            print("[RemindersProvider] No Reminders list available; cannot add '\(cleanTitle)'")
+            return
+        }
+        reminder.calendar = targetList
         
         do {
             try eventStore.save(reminder, commit: true)
@@ -336,7 +340,7 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
     // MARK: - List Lookup
     
     /// Find a Reminders list by name, or return the default list
-    private func findOrDefaultList(named name: String) -> EKCalendar {
+    private func findOrDefaultList(named name: String) -> EKCalendar? {
         let eventStore = PermissionManager.shared.getEventStore()
         
         if !name.isEmpty {
@@ -366,7 +370,7 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
             }
         }
         
-        return eventStore.defaultCalendarForNewReminders() ?? eventStore.calendars(for: .reminder).first!
+        return eventStore.defaultCalendarForNewReminders() ?? eventStore.calendars(for: .reminder).first
     }
     
     // MARK: - Actions

@@ -252,6 +252,7 @@ struct RingView: View {
         .overlay(
             Group {
                 if let selectedIndex = selectedIndex,
+                   selectedIndex < nodes.count,
                    !shouldDimOpacity && isLabelActive {
                     let node = nodes[selectedIndex]
                     if node.showLabel {

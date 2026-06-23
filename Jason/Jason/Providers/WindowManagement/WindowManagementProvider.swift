@@ -53,7 +53,9 @@ class WindowManagementProvider: ObservableObject, FunctionProvider {
 
     func provideFunctions() -> [FunctionNode] {
         let targetApp = circularUIManager?.previousApp
-        let currentScreen = WindowManager.currentScreen(for: targetApp)
+        guard let currentScreen = WindowManager.currentScreen(for: targetApp) else {
+            return []
+        }
         let neighbours = DisplayMonitor.shared.neighbours(of: currentScreen)
         let leftScreen  = neighbours.first { $0.direction == .left }?.screen
         let rightScreen = neighbours.first { $0.direction == .right }?.screen

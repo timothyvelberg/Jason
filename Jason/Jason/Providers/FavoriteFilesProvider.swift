@@ -1030,10 +1030,17 @@ class FavoriteFilesProvider: ObservableObject, FunctionProvider {
     func reorderFavorites(from sourceIndex: Int, to destinationIndex: Int) -> Bool {
         // Get all files sorted by current sort order
         var allFiles = fileEntries
-        
+
+        // Validate the source and clamp the destination to avoid an out-of-range crash.
+        guard allFiles.indices.contains(sourceIndex) else {
+            print("[FavoriteFilesProvider] reorderFavorites: source index \(sourceIndex) out of range (count: \(allFiles.count))")
+            return false
+        }
+
         // Perform the move
         let movedFile = allFiles.remove(at: sourceIndex)
-        allFiles.insert(movedFile, at: destinationIndex)
+        let clampedDestination = min(max(destinationIndex, 0), allFiles.count)
+        allFiles.insert(movedFile, at: clampedDestination)
         
         // Update sort orders in database
         for (index, entry) in allFiles.enumerated() {

@@ -345,17 +345,17 @@ class AppSwitcherManager: ObservableObject {
     // MARK: - Navigation
     
     func navigateNext() {
-        if !runningApps.isEmpty {
-            selectedAppIndex = (selectedAppIndex + 1) % runningApps.count
-            print("Selected: \(runningApps[selectedAppIndex].localizedName ?? "Unknown") (\(selectedAppIndex + 1)/\(runningApps.count))")
-        }
+        guard !runningApps.isEmpty else { return }
+        selectedAppIndex = (selectedAppIndex + 1) % runningApps.count
+        guard selectedAppIndex < runningApps.count else { return }
+        print("Selected: \(runningApps[selectedAppIndex].localizedName ?? "Unknown") (\(selectedAppIndex + 1)/\(runningApps.count))")
     }
-    
+
     func navigatePrevious() {
-        if !runningApps.isEmpty {
-            selectedAppIndex = selectedAppIndex > 0 ? selectedAppIndex - 1 : runningApps.count - 1
-            print("Selected: \(runningApps[selectedAppIndex].localizedName ?? "Unknown") (\(selectedAppIndex + 1)/\(runningApps.count))")
-        }
+        guard !runningApps.isEmpty else { return }
+        selectedAppIndex = selectedAppIndex > 0 ? selectedAppIndex - 1 : runningApps.count - 1
+        guard selectedAppIndex < runningApps.count else { return }
+        print("Selected: \(runningApps[selectedAppIndex].localizedName ?? "Unknown") (\(selectedAppIndex + 1)/\(runningApps.count))")
     }
     
     func selectCurrentApp() {
