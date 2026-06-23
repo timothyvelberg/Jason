@@ -14,6 +14,11 @@ extension DatabaseManager {
     
     /// Remove a folder from heavy_folders table
     func removeHeavyFolder(path: String) {
+        queue.sync { removeHeavyFolderLocked(path: path) }
+    }
+
+    /// Core logic. Caller MUST already be executing on `queue`.
+    private func removeHeavyFolderLocked(path: String) {
         guard let db = db else {
             print("DatabaseManager] Database not initialized")
             return
@@ -23,7 +28,7 @@ extension DatabaseManager {
         var statement: OpaquePointer?
         
         if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
             
             if sqlite3_step(statement) == SQLITE_DONE {
                 print("[DatabaseManager] Removed from heavy folders: \(path)")
@@ -41,6 +46,11 @@ extension DatabaseManager {
     
     /// Get heavy folder item count
     func getHeavyFolderItemCount(path: String) -> Int? {
+        return queue.sync { getHeavyFolderItemCountLocked(path: path) }
+    }
+
+    /// Core logic. Caller MUST already be executing on `queue`.
+    private func getHeavyFolderItemCountLocked(path: String) -> Int? {
         guard let db = db else { return nil }
         
         let sql = "SELECT item_count FROM heavy_folders WHERE path = ?;"
@@ -50,7 +60,7 @@ extension DatabaseManager {
             return nil
         }
         
-        sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
         
         var count: Int?
         if sqlite3_step(statement) == SQLITE_ROW {
@@ -63,6 +73,11 @@ extension DatabaseManager {
     
     /// Update heavy folder item count
     func updateHeavyFolderItemCount(path: String, itemCount: Int) {
+        queue.sync { updateHeavyFolderItemCountLocked(path: path, itemCount: itemCount) }
+    }
+
+    /// Core logic. Caller MUST already be executing on `queue`.
+    private func updateHeavyFolderItemCountLocked(path: String, itemCount: Int) {
         guard let db = db else { return }
         
         let sql = "UPDATE heavy_folders SET item_count = ? WHERE path = ?;"
@@ -70,7 +85,7 @@ extension DatabaseManager {
         
         if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
             sqlite3_bind_int(statement, 1, Int32(itemCount))
-            sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
             
             if sqlite3_step(statement) == SQLITE_DONE {
                 print("[DatabaseManager] Updated item count for: \(path) to \(itemCount)")

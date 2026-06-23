@@ -80,7 +80,7 @@ extension DatabaseManager {
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_int(statement, 1, Int32(ringId))
-                sqlite3_bind_text(statement, 2, (triggerType as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 2, (triggerType as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if let keyCode = keyCode {
                     sqlite3_bind_int(statement, 3, Int32(keyCode))
@@ -97,7 +97,7 @@ extension DatabaseManager {
                 }
                 
                 if let swipeDirection = swipeDirection {
-                    sqlite3_bind_text(statement, 6, (swipeDirection as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 6, (swipeDirection as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 6)
                 }

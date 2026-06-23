@@ -35,7 +35,7 @@ extension DatabaseManager {
         var selectStatement: OpaquePointer?
         
         if sqlite3_prepare_v2(db, selectSQL, -1, &selectStatement, nil) == SQLITE_OK {
-            sqlite3_bind_text(selectStatement, 1, (path as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(selectStatement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
             
             if sqlite3_step(selectStatement) == SQLITE_ROW {
                 folderId = Int(sqlite3_column_int(selectStatement, 0))
@@ -59,8 +59,8 @@ extension DatabaseManager {
             var insertStatement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, insertSQL, -1, &insertStatement, nil) == SQLITE_OK {
-                sqlite3_bind_text(insertStatement, 1, (path as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(insertStatement, 2, (folderName as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(insertStatement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(insertStatement, 2, (folderName as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_int64(insertStatement, 3, Int64(now))
                 
                 if sqlite3_step(insertStatement) == SQLITE_DONE {
@@ -98,7 +98,7 @@ extension DatabaseManager {
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_int64(statement, 1, Int64(now))
-                sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("[DatabaseManager] Updated access for: \(path)")
@@ -137,21 +137,21 @@ extension DatabaseManager {
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 if let iconName = iconName {
-                    sqlite3_bind_text(statement, 1, (iconName as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 1, (iconName as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 1)
                 }
                 
                 if let iconColorHex = iconColorHex {
-                    sqlite3_bind_text(statement, 2, (iconColorHex as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 2, (iconColorHex as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 2)
                 }
                 
-                sqlite3_bind_text(statement, 3, (baseAsset as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 3, (baseAsset as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_double(statement, 4, Double(symbolSize))
                 sqlite3_bind_double(statement, 5, Double(symbolOffset))
-                sqlite3_bind_text(statement, 6, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 6, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("[DatabaseManager] Set custom icon for folder: \(path)")
@@ -182,7 +182,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("[DatabaseManager] Removed custom icon for folder: \(path)")
@@ -276,7 +276,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_ROW {
                     let id = Int(sqlite3_column_int(statement, 0))

@@ -66,12 +66,12 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (name as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (name as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if let iconData = iconData {
                     iconData.withUnsafeBytes { bytes in
-                        sqlite3_bind_blob(statement, 3, bytes.baseAddress, Int32(iconData.count), nil)
+                        sqlite3_bind_blob(statement, 3, bytes.baseAddress, Int32(iconData.count), SQLITE_TRANSIENT)
                     }
                 } else {
                     sqlite3_bind_null(statement, 3)
@@ -105,7 +105,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("🗑️ [DatabaseManager] Removed favorite: \(path)")

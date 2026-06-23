@@ -111,7 +111,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_int(statement, 2, Int32(itemCount))
                 sqlite3_bind_double(statement, 3, now)
                 sqlite3_bind_double(statement, 4, now)
@@ -144,7 +144,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_ROW {
                     isHeavy = true
@@ -211,7 +211,7 @@ extension DatabaseManager {
             var deleteStatement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, deleteSQL, -1, &deleteStatement, nil) == SQLITE_OK {
-                sqlite3_bind_text(deleteStatement, 1, (folderPath as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(deleteStatement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_step(deleteStatement)
             }
             sqlite3_finalize(deleteStatement)
@@ -227,9 +227,9 @@ extension DatabaseManager {
                 var statement: OpaquePointer?
                 
                 if sqlite3_prepare_v2(db, insertSQL, -1, &statement, nil) == SQLITE_OK {
-                    sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
-                    sqlite3_bind_text(statement, 2, (item.name as NSString).utf8String, -1, nil)
-                    sqlite3_bind_text(statement, 3, (item.path as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                    sqlite3_bind_text(statement, 2, (item.name as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                    sqlite3_bind_text(statement, 3, (item.path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                     sqlite3_bind_int(statement, 4, item.isDirectory ? 1 : 0)
                     sqlite3_bind_double(statement, 5, item.modificationDate.timeIntervalSince1970)
                     sqlite3_bind_double(statement, 6, now)
@@ -264,7 +264,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 while sqlite3_step(statement) == SQLITE_ROW {
                     let name = String(cString: sqlite3_column_text(statement, 0))
@@ -296,7 +296,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("[SmartCache] 🗑️ Removed cache for: \(folderPath)")
@@ -322,7 +322,7 @@ extension DatabaseManager {
             
             if sqlite3_prepare_v2(db, updateSQL, -1, &updateStatement, nil) == SQLITE_OK {
                 sqlite3_bind_double(updateStatement, 1, now)
-                sqlite3_bind_text(updateStatement, 2, (folderPath as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(updateStatement, 2, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_step(updateStatement)
             }
             sqlite3_finalize(updateStatement)
@@ -332,7 +332,7 @@ extension DatabaseManager {
             var insertStatement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, insertSQL, -1, &insertStatement, nil) == SQLITE_OK {
-                sqlite3_bind_text(insertStatement, 1, (folderPath as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(insertStatement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_double(insertStatement, 2, now)
                 sqlite3_step(insertStatement)
             }
@@ -371,7 +371,7 @@ extension DatabaseManager {
                 var deleteHeavyStmt: OpaquePointer?
                 
                 if sqlite3_prepare_v2(db, deleteHeavySQL, -1, &deleteHeavyStmt, nil) == SQLITE_OK {
-                    sqlite3_bind_text(deleteHeavyStmt, 1, (path as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(deleteHeavyStmt, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                     sqlite3_step(deleteHeavyStmt)
                 }
                 sqlite3_finalize(deleteHeavyStmt)
@@ -381,7 +381,7 @@ extension DatabaseManager {
                 var deleteContentsStmt: OpaquePointer?
                 
                 if sqlite3_prepare_v2(db, deleteContentsSQL, -1, &deleteContentsStmt, nil) == SQLITE_OK {
-                    sqlite3_bind_text(deleteContentsStmt, 1, (path as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(deleteContentsStmt, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                     sqlite3_step(deleteContentsStmt)
                 }
                 sqlite3_finalize(deleteContentsStmt)

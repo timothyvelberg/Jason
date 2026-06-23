@@ -38,7 +38,7 @@ extension DatabaseManager {
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_int(statement, 1, Int32(ringId))
-                sqlite3_bind_text(statement, 2, (providerType as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 2, (providerType as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_int(statement, 3, Int32(providerOrder))
                 
                 if let parentItemAngle = parentItemAngle {
@@ -48,7 +48,7 @@ extension DatabaseManager {
                 }
                 
                 if let providerConfig = providerConfig {
-                    sqlite3_bind_text(statement, 5, (providerConfig as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 5, (providerConfig as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 5)
                 }
@@ -207,7 +207,7 @@ extension DatabaseManager {
                     paramIndex += 1
                 }
                 if !clearConfig, let providerConfig = providerConfig {
-                    sqlite3_bind_text(statement, paramIndex, (providerConfig as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, paramIndex, (providerConfig as NSString).utf8String, -1, SQLITE_TRANSIENT)
                     paramIndex += 1
                 }
                 
@@ -282,7 +282,7 @@ extension DatabaseManager {
             
             if sqlite3_prepare_v2(db, selectSQL, -1, &selectStatement, nil) == SQLITE_OK {
                 sqlite3_bind_int(selectStatement, 1, Int32(ringId))
-                sqlite3_bind_text(selectStatement, 2, (providerType as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(selectStatement, 2, (providerType as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(selectStatement) == SQLITE_ROW {
                     // Check if provider_config is NULL
@@ -324,9 +324,9 @@ extension DatabaseManager {
             var updateStatement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, updateSQL, -1, &updateStatement, nil) == SQLITE_OK {
-                sqlite3_bind_text(updateStatement, 1, (jsonString as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(updateStatement, 1, (jsonString as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_int(updateStatement, 2, Int32(ringId))
-                sqlite3_bind_text(updateStatement, 3, (providerType as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(updateStatement, 3, (providerType as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(updateStatement) == SQLITE_DONE {
                     print("[DatabaseManager] Updated display mode for provider '\(providerType)' in ring \(ringId) to '\(displayMode)'")

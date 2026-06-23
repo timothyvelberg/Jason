@@ -7,8 +7,6 @@ import Foundation
 import SQLite3
 import AppKit
 
-private let SQLITE_TRANSIENT_CS = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-
 extension DatabaseManager {
 
     // MARK: - Context Apps: Insert
@@ -25,8 +23,8 @@ extension DatabaseManager {
 
             var statement: OpaquePointer?
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, bundleId, -1, SQLITE_TRANSIENT_CS)
-                sqlite3_bind_text(statement, 2, displayName, -1, SQLITE_TRANSIENT_CS)
+                sqlite3_bind_text(statement, 1, bundleId, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 2, displayName, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_int(statement, 3, Int32(sortOrder))
 
                 if sqlite3_step(statement) == SQLITE_DONE {
@@ -86,7 +84,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
 
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, bundleId, -1, SQLITE_TRANSIENT_CS)
+                sqlite3_bind_text(statement, 1, bundleId, -1, SQLITE_TRANSIENT)
 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("🗑️ [DatabaseManager] Deleted context app: \(bundleId) (and all its shortcuts via CASCADE)")
@@ -153,10 +151,10 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_int(statement, 1, Int32(ringId))
-                sqlite3_bind_text(statement, 2, name, -1, SQLITE_TRANSIENT_CS)
+                sqlite3_bind_text(statement, 2, name, -1, SQLITE_TRANSIENT)
 
                 if let iconName = iconName {
-                    sqlite3_bind_text(statement, 3, iconName, -1, SQLITE_TRANSIENT_CS)
+                    sqlite3_bind_text(statement, 3, iconName, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 3)
                 }
@@ -223,10 +221,10 @@ extension DatabaseManager {
 
             var statement: OpaquePointer?
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, group.name, -1, SQLITE_TRANSIENT_CS)
+                sqlite3_bind_text(statement, 1, group.name, -1, SQLITE_TRANSIENT)
 
                 if let iconName = group.iconName {
-                    sqlite3_bind_text(statement, 2, iconName, -1, SQLITE_TRANSIENT_CS)
+                    sqlite3_bind_text(statement, 2, iconName, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 2)
                 }
@@ -328,21 +326,21 @@ extension DatabaseManager {
 
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_int(statement, 1, Int32(shortcut.ringId))
-                sqlite3_bind_text(statement, 2, shortcut.shortcutName, -1, SQLITE_TRANSIENT_CS)
+                sqlite3_bind_text(statement, 2, shortcut.shortcutName, -1, SQLITE_TRANSIENT)
 
                 if let description = shortcut.description {
-                    sqlite3_bind_text(statement, 3, description, -1, SQLITE_TRANSIENT_CS)
+                    sqlite3_bind_text(statement, 3, description, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 3)
                 }
 
                 if let iconName = shortcut.iconName {
-                    sqlite3_bind_text(statement, 4, iconName, -1, SQLITE_TRANSIENT_CS)
+                    sqlite3_bind_text(statement, 4, iconName, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 4)
                 }
 
-                sqlite3_bind_text(statement, 5, shortcut.shortcutType.rawValue, -1, SQLITE_TRANSIENT_CS)
+                sqlite3_bind_text(statement, 5, shortcut.shortcutType.rawValue, -1, SQLITE_TRANSIENT)
 
                 if let keyCode = shortcut.keyCode {
                     sqlite3_bind_int(statement, 6, Int32(keyCode))
@@ -357,7 +355,7 @@ extension DatabaseManager {
                 }
 
                 if let menuPath = shortcut.menuPath {
-                    sqlite3_bind_text(statement, 8, menuPath, -1, SQLITE_TRANSIENT_CS)
+                    sqlite3_bind_text(statement, 8, menuPath, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 8)
                 }
@@ -436,7 +434,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
 
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, bundleId, -1, SQLITE_TRANSIENT_CS)
+                sqlite3_bind_text(statement, 1, bundleId, -1, SQLITE_TRANSIENT)
 
                 while sqlite3_step(statement) == SQLITE_ROW {
                     if let shortcut = contextShortcutFromStatement(statement) {
@@ -466,21 +464,21 @@ extension DatabaseManager {
             var statement: OpaquePointer?
 
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, shortcut.shortcutName, -1, SQLITE_TRANSIENT_CS)
+                sqlite3_bind_text(statement, 1, shortcut.shortcutName, -1, SQLITE_TRANSIENT)
 
                 if let description = shortcut.description {
-                    sqlite3_bind_text(statement, 2, description, -1, SQLITE_TRANSIENT_CS)
+                    sqlite3_bind_text(statement, 2, description, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 2)
                 }
 
                 if let iconName = shortcut.iconName {
-                    sqlite3_bind_text(statement, 3, iconName, -1, SQLITE_TRANSIENT_CS)
+                    sqlite3_bind_text(statement, 3, iconName, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 3)
                 }
 
-                sqlite3_bind_text(statement, 4, shortcut.shortcutType.rawValue, -1, SQLITE_TRANSIENT_CS)
+                sqlite3_bind_text(statement, 4, shortcut.shortcutType.rawValue, -1, SQLITE_TRANSIENT)
 
                 if let keyCode = shortcut.keyCode {
                     sqlite3_bind_int(statement, 5, Int32(keyCode))
@@ -495,7 +493,7 @@ extension DatabaseManager {
                 }
 
                 if let menuPath = shortcut.menuPath {
-                    sqlite3_bind_text(statement, 7, menuPath, -1, SQLITE_TRANSIENT_CS)
+                    sqlite3_bind_text(statement, 7, menuPath, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 7)
                 }

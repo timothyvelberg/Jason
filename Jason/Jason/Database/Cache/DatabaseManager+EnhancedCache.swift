@@ -66,6 +66,11 @@ extension DatabaseManager {
     
     /// Create enhanced cache tables with thumbnail support
     func createEnhancedCacheTables() {
+        queue.sync { createEnhancedCacheTablesLocked() }
+    }
+
+    /// Core table-creation logic. Caller MUST already be executing on `queue`.
+    private func createEnhancedCacheTablesLocked() {
         guard let db = db else {
             print("❌ [EnhancedCache] Database not initialized")
             return
@@ -141,7 +146,7 @@ extension DatabaseManager {
             var deleteStmt: OpaquePointer?
             
             if sqlite3_prepare_v2(db, deleteSQL, -1, &deleteStmt, nil) == SQLITE_OK {
-                sqlite3_bind_text(deleteStmt, 1, (folderPath as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(deleteStmt, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(deleteStmt) == SQLITE_DONE {
                     print("[EnhancedCache] Cleared old cache for: \(folderPath)")
@@ -176,9 +181,9 @@ extension DatabaseManager {
                 sqlite3_reset(insertStmt)
                 
                 // Bind values
-                sqlite3_bind_text(insertStmt, 1, (folderPath as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(insertStmt, 2, (item.name as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(insertStmt, 3, (item.path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(insertStmt, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(insertStmt, 2, (item.name as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(insertStmt, 3, (item.path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_int(insertStmt, 4, item.isDirectory ? 1 : 0)
                 sqlite3_bind_int64(insertStmt, 5, Int64(item.modificationDate.timeIntervalSince1970))
 
@@ -186,7 +191,7 @@ extension DatabaseManager {
                 sqlite3_bind_int64(insertStmt, 7, Int64(item.dateAdded.timeIntervalSince1970))
 
 
-                sqlite3_bind_text(insertStmt, 8, (item.fileExtension as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(insertStmt, 8, (item.fileExtension as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_int64(insertStmt, 9, item.fileSize)
                 sqlite3_bind_int(insertStmt, 10, item.hasCustomIcon ? 1 : 0)
                 sqlite3_bind_int(insertStmt, 11, item.isImageFile ? 1 : 0)
@@ -194,7 +199,7 @@ extension DatabaseManager {
                 // Bind thumbnail data (BLOB)
                 if let thumbnailData = item.thumbnailData {
                     thumbnailData.withUnsafeBytes { bytes in
-                        sqlite3_bind_blob(insertStmt, 12, bytes.baseAddress, Int32(thumbnailData.count), nil)
+                        sqlite3_bind_blob(insertStmt, 12, bytes.baseAddress, Int32(thumbnailData.count), SQLITE_TRANSIENT)
                     }
                     thumbnailCount += 1
                 } else {
@@ -203,13 +208,13 @@ extension DatabaseManager {
 
                 // Bind folder config JSON
                 if let configJSON = item.folderConfigJSON {
-                    sqlite3_bind_text(insertStmt, 13, (configJSON as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(insertStmt, 13, (configJSON as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(insertStmt, 13)
                 }
 
                 sqlite3_bind_int64(insertStmt, 14, Int64(now))
-                sqlite3_bind_text(insertStmt, 15, (cacheType as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(insertStmt, 15, (cacheType as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(insertStmt) == SQLITE_DONE {
                     savedCount += 1
@@ -264,7 +269,7 @@ extension DatabaseManager {
                 return nil
             }
             
-            sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
             
             var cacheType: String?
             if sqlite3_step(statement) == SQLITE_ROW {
@@ -305,7 +310,7 @@ extension DatabaseManager {
                 return nil
             }
             
-            sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
             
             var items: [EnhancedFolderItem] = []
             
@@ -367,6 +372,11 @@ extension DatabaseManager {
     
     /// Check if enhanced cache exists for a folder
     func hasEnhancedCache(for folderPath: String) -> Bool {
+        return queue.sync { hasEnhancedCacheLocked(for: folderPath) }
+    }
+
+    /// Core logic. Caller MUST already be executing on `queue`.
+    private func hasEnhancedCacheLocked(for folderPath: String) -> Bool {
         guard let db = db else { return false }
         
         let sql = "SELECT COUNT(*) FROM folder_contents_enhanced WHERE folder_path = ?;"
@@ -376,7 +386,7 @@ extension DatabaseManager {
             return false
         }
         
-        sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
         
         var count = 0
         if sqlite3_step(statement) == SQLITE_ROW {
@@ -400,7 +410,7 @@ extension DatabaseManager {
                 return nil
             }
             
-            sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
             
             var timestamp: Date?
             if sqlite3_step(statement) == SQLITE_ROW {
@@ -432,7 +442,7 @@ extension DatabaseManager {
                 return [:]
             }
 
-            sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
 
             var result: [String: Data] = [:]
 
@@ -460,7 +470,7 @@ extension DatabaseManager {
             var beforeCount = 0
             
             if sqlite3_prepare_v2(db, countSQL, -1, &countStmt, nil) == SQLITE_OK {
-                sqlite3_bind_text(countStmt, 1, (folderPath as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(countStmt, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 if sqlite3_step(countStmt) == SQLITE_ROW {
                     beforeCount = Int(sqlite3_column_int(countStmt, 0))
                 }
@@ -474,7 +484,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     let deletedRows = sqlite3_changes(db)
@@ -500,7 +510,7 @@ extension DatabaseManager {
             var afterStmt: OpaquePointer?
             var afterCount = 0
             if sqlite3_prepare_v2(db, countSQL, -1, &afterStmt, nil) == SQLITE_OK {
-                sqlite3_bind_text(afterStmt, 1, (folderPath as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(afterStmt, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 if sqlite3_step(afterStmt) == SQLITE_ROW {
                     afterCount = Int(sqlite3_column_int(afterStmt, 0))
                 }
@@ -513,6 +523,11 @@ extension DatabaseManager {
     
     /// Clean up old enhanced cache entries (older than 7 days)
     func cleanupOldEnhancedCache() {
+        queue.sync { cleanupOldEnhancedCacheLocked() }
+    }
+
+    /// Core logic. Caller MUST already be executing on `queue`.
+    private func cleanupOldEnhancedCacheLocked() {
         guard let db = db else { return }
         
         let sevenDaysAgo = Int(Date().timeIntervalSince1970) - (7 * 24 * 60 * 60)
@@ -535,6 +550,11 @@ extension DatabaseManager {
     
     /// Get cache size statistics
     func getEnhancedCacheStats() -> (folders: Int, items: Int, thumbnails: Int, totalSize: Int64) {
+        return queue.sync { getEnhancedCacheStatsLocked() }
+    }
+
+    /// Core logic. Caller MUST already be executing on `queue`.
+    private func getEnhancedCacheStatsLocked() -> (folders: Int, items: Int, thumbnails: Int, totalSize: Int64) {
         guard let db = db else { return (0, 0, 0, 0) }
         
         let sql = """
@@ -622,7 +642,7 @@ extension DatabaseManager {
                 
                 for path in stalePaths {
                     sqlite3_reset(deleteStmt)
-                    sqlite3_bind_text(deleteStmt, 1, (path as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(deleteStmt, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                     
                     if sqlite3_step(deleteStmt) == SQLITE_DONE {
                         let deleted = sqlite3_changes(db)

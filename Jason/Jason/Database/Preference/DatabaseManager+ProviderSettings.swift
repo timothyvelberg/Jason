@@ -24,9 +24,9 @@ extension DatabaseManager {
             var statement: OpaquePointer?
 
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (providerId as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 2, (key as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 3, (value as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (providerId as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 2, (key as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 3, (value as NSString).utf8String, -1, SQLITE_TRANSIENT)
 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("⚙️ [ProviderSettings] Saved '\(key)' = '\(value)' for provider '\(providerId)'")
@@ -58,8 +58,8 @@ extension DatabaseManager {
             var statement: OpaquePointer?
 
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (providerId as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 2, (key as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (providerId as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 2, (key as NSString).utf8String, -1, SQLITE_TRANSIENT)
 
                 if sqlite3_step(statement) == SQLITE_ROW {
                     if let raw = sqlite3_column_text(statement, 0) {
@@ -92,7 +92,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
 
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (providerId as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (providerId as NSString).utf8String, -1, SQLITE_TRANSIENT)
 
                 while sqlite3_step(statement) == SQLITE_ROW {
                     if let rawKey = sqlite3_column_text(statement, 0),

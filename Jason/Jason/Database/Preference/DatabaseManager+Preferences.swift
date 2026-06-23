@@ -22,7 +22,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (key as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (key as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_ROW {
                     result = String(cString: sqlite3_column_text(statement, 0))
@@ -48,8 +48,8 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (key as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 2, (value as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (key as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 2, (value as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("⚙️ [DatabaseManager] Set preference: \(key) = \(value)")

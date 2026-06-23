@@ -65,7 +65,7 @@ extension DatabaseManager {
             var alreadyExists = false
             
             if sqlite3_prepare_v2(db, checkSQL, -1, &checkStatement, nil) == SQLITE_OK {
-                sqlite3_bind_text(checkStatement, 1, (bundleIdentifier as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(checkStatement, 1, (bundleIdentifier as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 if sqlite3_step(checkStatement) == SQLITE_ROW {
                     alreadyExists = true
                 }
@@ -100,12 +100,12 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (bundleIdentifier as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 2, (displayName as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (bundleIdentifier as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 2, (displayName as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_int(statement, 3, Int32(nextSortOrder))
                 
                 if let iconOverride = iconOverride {
-                    sqlite3_bind_text(statement, 4, (iconOverride as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 4, (iconOverride as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 4)
                 }
@@ -140,7 +140,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (bundleIdentifier as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (bundleIdentifier as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("🗑️ [DatabaseManager] Removed favorite app: \(bundleIdentifier)")
@@ -177,7 +177,7 @@ extension DatabaseManager {
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_int64(statement, 1, Int64(now))
-                sqlite3_bind_text(statement, 2, (bundleIdentifier as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 2, (bundleIdentifier as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("📊 [DatabaseManager] Updated access for app: \(bundleIdentifier)")
@@ -206,7 +206,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (bundleIdentifier as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (bundleIdentifier as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_ROW {
                     let id = Int(sqlite3_column_int(statement, 0))
@@ -248,7 +248,7 @@ extension DatabaseManager {
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_int(statement, 1, Int32(sortOrder))
-                sqlite3_bind_text(statement, 2, (bundleIdentifier as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 2, (bundleIdentifier as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("📊 [DatabaseManager] Updated sort order for app: \(bundleIdentifier)")
@@ -281,15 +281,15 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (displayName as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (displayName as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if let iconOverride = iconOverride {
-                    sqlite3_bind_text(statement, 2, (iconOverride as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 2, (iconOverride as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 2)
                 }
                 
-                sqlite3_bind_text(statement, 3, (bundleIdentifier as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 3, (bundleIdentifier as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("✏️ [DatabaseManager] Updated favorite app: \(displayName)")
@@ -322,7 +322,7 @@ extension DatabaseManager {
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_int(statement, 1, Int32(newSortOrder))
-                sqlite3_bind_text(statement, 2, (bundleIdentifier as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 2, (bundleIdentifier as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("🔄 [DatabaseManager] Reordered app: \(bundleIdentifier) to position \(newSortOrder)")

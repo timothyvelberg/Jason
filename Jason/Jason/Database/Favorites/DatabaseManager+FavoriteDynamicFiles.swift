@@ -111,18 +111,18 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (displayName as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 2, (folderPath as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 3, (sortOrder.rawValue as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (displayName as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 2, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 3, (sortOrder.rawValue as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if let fileExtensions = fileExtensions {
-                    sqlite3_bind_text(statement, 4, (fileExtensions as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 4, (fileExtensions as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 4)
                 }
                 
                 if let namePattern = namePattern {
-                    sqlite3_bind_text(statement, 5, (namePattern as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 5, (namePattern as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 5)
                 }
@@ -131,7 +131,7 @@ extension DatabaseManager {
                 
                 if let iconData = iconData {
                     iconData.withUnsafeBytes { buffer in
-                        sqlite3_bind_blob(statement, 7, buffer.baseAddress, Int32(iconData.count), nil)
+                        sqlite3_bind_blob(statement, 7, buffer.baseAddress, Int32(iconData.count), SQLITE_TRANSIENT)
                     }
                 } else {
                     sqlite3_bind_null(statement, 7)
@@ -309,25 +309,25 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (displayName as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 2, (folderPath as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 3, (sortOrder.rawValue as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (displayName as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 2, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 3, (sortOrder.rawValue as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if let fileExtensions = fileExtensions {
-                    sqlite3_bind_text(statement, 4, (fileExtensions as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 4, (fileExtensions as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 4)
                 }
                 
                 if let namePattern = namePattern {
-                    sqlite3_bind_text(statement, 5, (namePattern as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 5, (namePattern as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 5)
                 }
                 
                 if let iconData = iconData {
                     iconData.withUnsafeBytes { buffer in
-                        sqlite3_bind_blob(statement, 6, buffer.baseAddress, Int32(iconData.count), nil)
+                        sqlite3_bind_blob(statement, 6, buffer.baseAddress, Int32(iconData.count), SQLITE_TRANSIENT)
                     }
                 } else {
                     sqlite3_bind_null(statement, 6)

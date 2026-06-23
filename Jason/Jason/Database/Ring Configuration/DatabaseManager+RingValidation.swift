@@ -41,7 +41,7 @@ extension DatabaseManager {
                 bind(statement!)
                 if let bid = bundleId {
                     let paramCount = sqlite3_bind_parameter_count(statement)
-                    sqlite3_bind_text(statement, paramCount, (bid as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, paramCount, (bid as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 }
                 if sqlite3_step(statement) == SQLITE_ROW { inUse = true }
             }
@@ -69,7 +69,7 @@ extension DatabaseManager {
             guard let swipeDirection = swipeDirection, let fingerCount = fingerCount else { return false }
             let sql = "SELECT id FROM ring_configurations WHERE trigger_type = 'trackpad' AND swipe_direction = ? AND finger_count = ? AND modifier_flags = ? AND is_active = 1 \(scopeClause);"
             return bindAndCheck(sql) { stmt in
-                sqlite3_bind_text(stmt, 1, (swipeDirection as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 1, (swipeDirection as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_int(stmt, 2, Int32(fingerCount))
                 sqlite3_bind_int(stmt, 3, Int32(modifierFlags))
             }
@@ -78,7 +78,7 @@ extension DatabaseManager {
             guard let swipeDirection = swipeDirection else { return false }
             let sql = "SELECT id FROM ring_configurations WHERE trigger_type IN ('swipe', 'trackpad') AND swipe_direction = ? AND (finger_count = 3 OR finger_count IS NULL) AND modifier_flags = ? AND is_active = 1 \(scopeClause);"
             return bindAndCheck(sql) { stmt in
-                sqlite3_bind_text(stmt, 1, (swipeDirection as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 1, (swipeDirection as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_int(stmt, 2, Int32(modifierFlags))
             }
         }

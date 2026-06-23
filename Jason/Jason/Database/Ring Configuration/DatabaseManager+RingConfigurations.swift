@@ -70,13 +70,13 @@ extension DatabaseManager {
             var statement: OpaquePointer?
 
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (name as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 2, (shortcut as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (name as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 2, (shortcut as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_double(statement, 3, Double(ringRadius))
                 sqlite3_bind_double(statement, 4, Double(centerHoleRadius))
                 sqlite3_bind_double(statement, 5, Double(iconSize))
                 sqlite3_bind_double(statement, 6, Double(startAngle))
-                sqlite3_bind_text(statement, 7, (triggerType as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 7, (triggerType as NSString).utf8String, -1, SQLITE_TRANSIENT)
 
                 if let keyCode = keyCode {
                     sqlite3_bind_int(statement, 8, Int32(keyCode))
@@ -97,7 +97,7 @@ extension DatabaseManager {
                 }
 
                 if let swipeDirection = swipeDirection {
-                    sqlite3_bind_text(statement, 11, (swipeDirection as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 11, (swipeDirection as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 11)
                 }
@@ -110,12 +110,12 @@ extension DatabaseManager {
 
                 sqlite3_bind_int(statement, 13, isHoldMode ? 1 : 0)
                 sqlite3_bind_int(statement, 14, autoExecuteOnRelease ? 1 : 0)
-                sqlite3_bind_text(statement, 15, (presentationMode as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 15, (presentationMode as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_int64(statement, 16, Int64(now))
                 sqlite3_bind_int(statement, 17, Int32(displayOrder))
 
                 if let bundleId = bundleId {
-                    sqlite3_bind_text(statement, 18, (bundleId as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 18, (bundleId as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 18)
                 }
@@ -389,22 +389,22 @@ extension DatabaseManager {
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 var paramIndex: Int32 = 1
 
-                if let name = name { sqlite3_bind_text(statement, paramIndex, (name as NSString).utf8String, -1, nil); paramIndex += 1 }
-                if let shortcut = shortcut { sqlite3_bind_text(statement, paramIndex, (shortcut as NSString).utf8String, -1, nil); paramIndex += 1 }
+                if let name = name { sqlite3_bind_text(statement, paramIndex, (name as NSString).utf8String, -1, SQLITE_TRANSIENT); paramIndex += 1 }
+                if let shortcut = shortcut { sqlite3_bind_text(statement, paramIndex, (shortcut as NSString).utf8String, -1, SQLITE_TRANSIENT); paramIndex += 1 }
                 if let ringRadius = ringRadius { sqlite3_bind_double(statement, paramIndex, Double(ringRadius)); paramIndex += 1 }
                 if let centerHoleRadius = centerHoleRadius { sqlite3_bind_double(statement, paramIndex, Double(centerHoleRadius)); paramIndex += 1 }
                 if let iconSize = iconSize { sqlite3_bind_double(statement, paramIndex, Double(iconSize)); paramIndex += 1 }
                 if let startAngle = startAngle { sqlite3_bind_double(statement, paramIndex, Double(startAngle)); paramIndex += 1 }
-                if let triggerType = triggerType { sqlite3_bind_text(statement, paramIndex, (triggerType as NSString).utf8String, -1, nil); paramIndex += 1 }
+                if let triggerType = triggerType { sqlite3_bind_text(statement, paramIndex, (triggerType as NSString).utf8String, -1, SQLITE_TRANSIENT); paramIndex += 1 }
                 if let keyCode = keyCode { sqlite3_bind_int(statement, paramIndex, Int32(keyCode)); paramIndex += 1 }
                 if let modifierFlags = modifierFlags { sqlite3_bind_int(statement, paramIndex, Int32(modifierFlags)); paramIndex += 1 }
                 if let buttonNumber = buttonNumber { sqlite3_bind_int(statement, paramIndex, buttonNumber); paramIndex += 1 }
-                if let swipeDirection = swipeDirection { sqlite3_bind_text(statement, paramIndex, (swipeDirection as NSString).utf8String, -1, nil); paramIndex += 1 }
+                if let swipeDirection = swipeDirection { sqlite3_bind_text(statement, paramIndex, (swipeDirection as NSString).utf8String, -1, SQLITE_TRANSIENT); paramIndex += 1 }
                 if let fingerCount = fingerCount { sqlite3_bind_int(statement, paramIndex, Int32(fingerCount)); paramIndex += 1 }
                 if let isHoldMode = isHoldMode { sqlite3_bind_int(statement, paramIndex, isHoldMode ? 1 : 0); paramIndex += 1 }
                 if let autoExecuteOnRelease = autoExecuteOnRelease { sqlite3_bind_int(statement, paramIndex, autoExecuteOnRelease ? 1 : 0); paramIndex += 1 }
                 if let displayOrder = displayOrder { sqlite3_bind_int(statement, paramIndex, Int32(displayOrder)); paramIndex += 1 }
-                if let presentationMode = presentationMode { sqlite3_bind_text(statement, paramIndex, (presentationMode as NSString).utf8String, -1, nil); paramIndex += 1 }
+                if let presentationMode = presentationMode { sqlite3_bind_text(statement, paramIndex, (presentationMode as NSString).utf8String, -1, SQLITE_TRANSIENT); paramIndex += 1 }
 
                 sqlite3_bind_int(statement, paramIndex, Int32(id))
 
@@ -504,7 +504,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
 
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (presentationMode as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (presentationMode as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_int(statement, 2, Int32(id))
 
                 if sqlite3_step(statement) == SQLITE_DONE {

@@ -143,9 +143,9 @@ extension DatabaseManager {
                 }
                 
                 if let layout = settings?.preferredLayout {
-                    sqlite3_bind_text(statement, 4, (layout as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 4, (layout as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
-                    sqlite3_bind_text(statement, 4, ("partialSlice" as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 4, ("partialSlice" as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 }
                 
                 if let angleSize = settings?.itemAngleSize {
@@ -155,9 +155,9 @@ extension DatabaseManager {
                 }
                 
                 if let positioning = settings?.slicePositioning {
-                    sqlite3_bind_text(statement, 6, (positioning as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 6, (positioning as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
-                    sqlite3_bind_text(statement, 6, ("center" as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 6, ("center" as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 }
                 
                 if let thickness = settings?.childRingThickness {
@@ -174,9 +174,9 @@ extension DatabaseManager {
                 
                 // Bind content_sort_order
                 if let sortOrder = settings?.contentSortOrder {
-                    sqlite3_bind_text(statement, 9, (sortOrder.rawValue as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 9, (sortOrder.rawValue as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
-                    sqlite3_bind_text(statement, 9, ("modified_newest" as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 9, ("modified_newest" as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 }
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
@@ -212,7 +212,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("🗑️ [DatabaseManager] Removed favorite folder: \(path)")
@@ -245,8 +245,8 @@ extension DatabaseManager {
             var folderStatement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, updateFolderSQL, -1, &folderStatement, nil) == SQLITE_OK {
-                sqlite3_bind_text(folderStatement, 1, (title as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(folderStatement, 2, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(folderStatement, 1, (title as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(folderStatement, 2, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(folderStatement) == SQLITE_DONE {
                     print("✏️ [DatabaseManager] Updated folder title: \(title)")
@@ -285,9 +285,9 @@ extension DatabaseManager {
                 }
                 
                 if let layout = settings.preferredLayout {
-                    sqlite3_bind_text(settingsStatement, 2, (layout as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(settingsStatement, 2, (layout as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
-                    sqlite3_bind_text(settingsStatement, 2, ("partialSlice" as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(settingsStatement, 2, ("partialSlice" as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 }
                 
                 if let angleSize = settings.itemAngleSize {
@@ -297,9 +297,9 @@ extension DatabaseManager {
                 }
                 
                 if let positioning = settings.slicePositioning {
-                    sqlite3_bind_text(settingsStatement, 4, (positioning as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(settingsStatement, 4, (positioning as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
-                    sqlite3_bind_text(settingsStatement, 4, ("center" as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(settingsStatement, 4, ("center" as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 }
                 
                 if let thickness = settings.childRingThickness {
@@ -316,12 +316,12 @@ extension DatabaseManager {
                 
                 // Bind content_sort_order
                 if let sortOrder = settings.contentSortOrder {
-                    sqlite3_bind_text(settingsStatement, 7, (sortOrder.rawValue as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(settingsStatement, 7, (sortOrder.rawValue as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
-                    sqlite3_bind_text(settingsStatement, 7, ("modified_newest" as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(settingsStatement, 7, ("modified_newest" as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 }
                 
-                sqlite3_bind_text(settingsStatement, 8, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(settingsStatement, 8, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(settingsStatement) == SQLITE_DONE {
                     print("✅ [DatabaseManager] Updated favorite settings for: \(path)")
@@ -364,14 +364,15 @@ extension DatabaseManager {
             }
             sqlite3_finalize(selectStatement)
             
-            guard sourceIndex < folderIds.count else {
+            guard sourceIndex >= 0, sourceIndex < folderIds.count else {
                 print("❌ [DatabaseManager] Source index out of bounds")
                 return
             }
-            
-            // Reorder the array
+
+            // Reorder the array (clamp destination to avoid an out-of-range crash)
             let movedId = folderIds.remove(at: sourceIndex)
-            folderIds.insert(movedId, at: destinationIndex)
+            let clampedDestination = min(max(destinationIndex, 0), folderIds.count)
+            folderIds.insert(movedId, at: clampedDestination)
             
             // Update all sort_order values
             let updateSQL = "UPDATE favorite_folders SET sort_order = ? WHERE folder_id = ?;"

@@ -8,6 +8,13 @@ import Foundation
 import SQLite3
 import AppKit
 
+/// SQLite destructor sentinel: tells SQLite to copy the bound bytes immediately,
+/// because the source value's lifetime is not guaranteed past the bind call
+/// (e.g. `(string as NSString).utf8String` returns a temporary buffer). Always use
+/// this for text/blob binds instead of `nil` — `nil` is `SQLITE_STATIC`, which
+/// causes a use-after-free when the bound value is a temporary Swift string.
+let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
 class DatabaseManager {
     
     // MARK: - Singleton
@@ -31,6 +38,7 @@ class DatabaseManager {
             if sqlite3_open(dbPath, &db) == SQLITE_OK {
                 print("[DatabaseManager] Database opened successfully")
                 try setupDatabase()
+                runMigrations()
             } else {
                 print("[DatabaseManager] Failed to open database")
                 if let error = sqlite3_errmsg(db) {

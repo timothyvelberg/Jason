@@ -72,7 +72,7 @@ extension DatabaseManager {
             var alreadyExists = false
             
             if sqlite3_prepare_v2(db, checkSQL, -1, &checkStatement, nil) == SQLITE_OK {
-                sqlite3_bind_text(checkStatement, 1, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(checkStatement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 if sqlite3_step(checkStatement) == SQLITE_ROW {
                     alreadyExists = true
                 }
@@ -107,10 +107,10 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if let displayName = displayName {
-                    sqlite3_bind_text(statement, 2, (displayName as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 2, (displayName as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 2)
                 }
@@ -119,7 +119,7 @@ extension DatabaseManager {
                 
                 if let iconData = iconData {
                     iconData.withUnsafeBytes { buffer in
-                        sqlite3_bind_blob(statement, 4, buffer.baseAddress, Int32(iconData.count), nil)
+                        sqlite3_bind_blob(statement, 4, buffer.baseAddress, Int32(iconData.count), SQLITE_TRANSIENT)
                     }
                 } else {
                     sqlite3_bind_null(statement, 4)
@@ -156,7 +156,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("[DatabaseManager] Removed favorite file: \(path)")
@@ -193,7 +193,7 @@ extension DatabaseManager {
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_int64(statement, 1, Int64(now))
-                sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("[DatabaseManager] Updated access for file: \(path)")
@@ -222,7 +222,7 @@ extension DatabaseManager {
             var statement: OpaquePointer?
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_ROW {
                     let id = Int(sqlite3_column_int(statement, 0))
@@ -276,20 +276,20 @@ extension DatabaseManager {
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 if let displayName = displayName {
-                    sqlite3_bind_text(statement, 1, (displayName as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(statement, 1, (displayName as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(statement, 1)
                 }
                 
                 if let iconData = iconData {
                     iconData.withUnsafeBytes { buffer in
-                        sqlite3_bind_blob(statement, 2, buffer.baseAddress, Int32(iconData.count), nil)
+                        sqlite3_bind_blob(statement, 2, buffer.baseAddress, Int32(iconData.count), SQLITE_TRANSIENT)
                     }
                 } else {
                     sqlite3_bind_null(statement, 2)
                 }
                 
-                sqlite3_bind_text(statement, 3, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 3, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("[DatabaseManager] Updated favorite file: \(path)")
@@ -322,7 +322,7 @@ extension DatabaseManager {
             
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
                 sqlite3_bind_int(statement, 1, Int32(newSortOrder))
-                sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 2, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("[DatabaseManager] Reordered file: \(path) to position \(newSortOrder)")

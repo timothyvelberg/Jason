@@ -15,6 +15,7 @@ extension DatabaseManager {
     /// Update sort order preference for a favorite folder
     func updateFavoriteFolderSortOrder(folderPath: String, sortOrder: FolderSortOrder) {
         guard let db = db else { return }
+        var didUpdate = false
         
         queue.sync {
             let sql = """
@@ -25,20 +26,26 @@ extension DatabaseManager {
             
             var statement: OpaquePointer?
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (sortOrder.rawValue as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(statement, 2, (folderPath as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (sortOrder.rawValue as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 2, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
                     print("✅ [DatabaseManager] Updated sort order for \(folderPath) to \(sortOrder.displayName)")
                     
-                    // Invalidate cache so next visit uses new sorting
-                    invalidateEnhancedCache(for: folderPath)
+                    didUpdate = true
                 } else {
                     let error = String(cString: sqlite3_errmsg(db))
                     print("⚠️ [DatabaseManager] Failed to update sort order: \(error)")
                 }
             }
             sqlite3_finalize(statement)
+        }
+
+        // Invalidate the cache OUTSIDE the serial queue: invalidateEnhancedCache runs
+        // its own queue.sync, so calling it inside the block above would re-enter the
+        // serial queue and deadlock.
+        if didUpdate {
+            invalidateEnhancedCache(for: folderPath)
         }
     }
     
@@ -58,7 +65,7 @@ extension DatabaseManager {
             
             var statement: OpaquePointer?
             if sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(statement, 1, (folderPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 
                 if sqlite3_step(statement) == SQLITE_ROW {
                     if let sortOrderText = sqlite3_column_text(statement, 0) {
