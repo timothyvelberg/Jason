@@ -17,16 +17,27 @@ class DockBadgeReader {
     static let shared = DockBadgeReader()
     
     // MARK: - State
-    
+
+    /// Guards `cachedBadges`, `lastRefresh`, and `isFetching` — read on the main
+    /// thread while building nodes, written on the background fetch queue.
+    private let lock = NSLock()
+
     /// Cached badges: [bundleIdentifier: badgeText]
     private var cachedBadges: [String: String] = [:]
-    
+
     /// Last refresh timestamp
     private var lastRefresh: Date = .distantPast
-    
+
+    /// Whether a background fetch is currently in flight (avoids piling up walks).
+    private var isFetching = false
+
     /// Cache duration
     private let cacheDuration: TimeInterval = 2.0
-    
+
+    /// Background queue for the Accessibility walk. The walk does synchronous AX IPC
+    /// to the Dock and every running app, so it must never run on the main thread.
+    private let fetchQueue = DispatchQueue(label: "com.jason.dockbadges", qos: .utility)
+
     /// Whether we have accessibility permission
     var isAvailable: Bool {
         return PermissionManager.shared.hasAccessibilityAccess
@@ -47,13 +58,15 @@ class DockBadgeReader {
     /// Get badge for a specific bundle identifier
     /// Returns nil if no badge, or the badge string (number, "•", or text)
     func getBadge(forBundleIdentifier bundleId: String) -> String? {
-        refreshCacheIfNeeded()
+        refreshInBackgroundIfNeeded()
+        lock.lock(); defer { lock.unlock() }
         return cachedBadges[bundleId]
     }
-    
+
     /// Get all app badges: [bundleIdentifier: badgeText]
     func getAllBadges() -> [String: String] {
-        refreshCacheIfNeeded()
+        refreshInBackgroundIfNeeded()
+        lock.lock(); defer { lock.unlock() }
         return cachedBadges
     }
     
@@ -62,22 +75,35 @@ class DockBadgeReader {
         return getBadge(forBundleIdentifier: bundleIdentifier) != nil
     }
     
-    /// Force refresh the cache (call when ring shows or app events occur)
+    /// Request a refresh (call when the ring shows or app events occur). Returns
+    /// immediately — the Accessibility walk runs on a background queue, so badges
+    /// reflect the last completed fetch and may lag one open.
     func forceRefresh() {
-        lastRefresh = .distantPast
-        refreshCacheIfNeeded()
+        lock.lock(); lastRefresh = .distantPast; lock.unlock()
+        refreshInBackgroundIfNeeded()
     }
-    
+
     // MARK: - Private Methods
-    
-    private func refreshCacheIfNeeded() {
-        let now = Date()
-        guard now.timeIntervalSince(lastRefresh) > cacheDuration else {
+
+    private func refreshInBackgroundIfNeeded() {
+        lock.lock()
+        let isStale = Date().timeIntervalSince(lastRefresh) > cacheDuration
+        guard isStale, !isFetching, isAvailable else {
+            lock.unlock()
             return
         }
-        
-        cachedBadges = fetchAllBadges()
-        lastRefresh = now
+        isFetching = true
+        lock.unlock()
+
+        fetchQueue.async { [weak self] in
+            guard let self = self else { return }
+            let badges = self.fetchAllBadges()
+            self.lock.lock()
+            self.cachedBadges = badges
+            self.lastRefresh = Date()
+            self.isFetching = false
+            self.lock.unlock()
+        }
     }
     
     private func fetchAllBadges() -> [String: String] {
