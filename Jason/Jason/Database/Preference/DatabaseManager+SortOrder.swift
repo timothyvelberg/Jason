@@ -20,7 +20,7 @@ extension DatabaseManager {
         queue.sync {
             let sql = """
             UPDATE favorite_folders 
-            SET sort_order = ? 
+            SET content_sort_order = ? 
             WHERE folder_id = (SELECT id FROM folders WHERE path = ?);
             """
             
@@ -57,7 +57,7 @@ extension DatabaseManager {
         
         queue.sync {
             let sql = """
-            SELECT ff.sort_order 
+            SELECT ff.content_sort_order 
             FROM favorite_folders ff
             JOIN folders f ON ff.folder_id = f.id
             WHERE f.path = ?;

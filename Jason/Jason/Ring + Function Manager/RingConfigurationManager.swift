@@ -344,17 +344,6 @@ class RingConfigurationManager: ObservableObject {
             ringRadius: ringRadius.map { CGFloat($0) },
             centerHoleRadius: centerHoleRadius.map { CGFloat($0) },
             iconSize: iconSize.map { CGFloat($0) },
-            startAngle: startAngle.map { CGFloat($0) }
-        )
-        
-        // Update in database
-        databaseManager.updateRingConfiguration(
-            id: id,
-            name: name,
-            shortcut: shortcut,
-            ringRadius: ringRadius.map { CGFloat($0) },
-            centerHoleRadius: centerHoleRadius.map { CGFloat($0) },
-            iconSize: iconSize.map { CGFloat($0) },
             startAngle: startAngle.map { CGFloat($0) },
             presentationMode: presentationMode?.rawValue
         )

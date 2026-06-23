@@ -347,8 +347,8 @@ extension DatabaseManager {
         
         let isHoldMode = sqlite3_column_int(statement, 8) == 1
         let isModifierHoldMode = sqlite3_column_int(statement, 9) == 1
-        let autoExecuteOnRelease = sqlite3_column_int(statement, 9) == 1
-        let createdAt = Int(sqlite3_column_int64(statement, 10))
+        let autoExecuteOnRelease = sqlite3_column_int(statement, 10) == 1
+        let createdAt = Int(sqlite3_column_int64(statement, 11))
         
         return RingTriggerEntry(
             id: id,
