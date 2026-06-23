@@ -20,8 +20,74 @@ class IconProvider {
 
     private var iconCache: [String: NSImage] = [:]
 
+    /// Serializes all access to the image/config caches. `IconProvider.shared` is
+    /// touched from the main thread *and* from background folder-loading tasks, so
+    /// every read/write of these dictionaries must hold this lock. Helpers below
+    /// only ever lock around the dictionary access itself — never across the
+    /// expensive icon rendering or a call to another locked helper — so there is
+    /// no risk of holding the lock during compute or of re-entrant deadlock.
+    private let cacheLock = NSLock()
+
     private func clearImageCache() {
+        cacheLock.lock(); defer { cacheLock.unlock() }
         iconCache.removeAll()
+    }
+
+    // MARK: - Thread-safe cache accessors
+
+    private func cachedThumbnail(forKey key: String) -> NSImage? {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        guard let image = thumbnailCache[key] else { return nil }
+        thumbnailAccessOrder.removeAll { $0 == key }
+        thumbnailAccessOrder.append(key)
+        return image
+    }
+
+    private func storeThumbnail(_ image: NSImage, forKey key: String) {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        thumbnailCache[key] = image
+        thumbnailAccessOrder.append(key)
+        if thumbnailCache.count > thumbnailCacheLimit {
+            let evicted = thumbnailAccessOrder.removeFirst()
+            thumbnailCache.removeValue(forKey: evicted)
+        }
+    }
+
+    private func cachedIcon(forKey key: String) -> NSImage? {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        return iconCache[key]
+    }
+
+    private func storeIcon(_ image: NSImage, forKey key: String) {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        iconCache[key] = image
+    }
+
+    private func folderConfig(forPath path: String) -> FolderConfig? {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        return pathBasedFolderIcons[path]
+    }
+
+    private func setFolderConfig(_ config: FolderConfig?, forPath path: String) {
+        cacheLock.lock()
+        if let config = config {
+            pathBasedFolderIcons[path] = config
+        } else {
+            pathBasedFolderIcons.removeValue(forKey: path)
+        }
+        cacheLock.unlock()
+        // Called after releasing the lock — clearImageCache acquires it itself.
+        clearImageCache()
+    }
+
+    private func customizedFolderPaths() -> [String] {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        return Array(pathBasedFolderIcons.keys)
+    }
+
+    private func folderConfigSnapshot() -> [String: FolderConfig] {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        return pathBasedFolderIcons
     }
 
     // MARK: - Icon Configuration Structures
@@ -66,9 +132,7 @@ class IconProvider {
         }
 
         let key = "thumbnail-\(url.path)-\(size)-\(cornerRadius)"
-        if let cached = thumbnailCache[key] {
-            thumbnailAccessOrder.removeAll { $0 == key }
-            thumbnailAccessOrder.append(key)
+        if let cached = cachedThumbnail(forKey: key) {
             return cached
         }
 
@@ -90,12 +154,7 @@ class IconProvider {
         NSGraphicsContext.current?.cgContext.draw(cgImage, in: rect)
         thumbnail.unlockFocus()
 
-        thumbnailCache[key] = thumbnail
-        thumbnailAccessOrder.append(key)
-        if thumbnailCache.count > thumbnailCacheLimit {
-            let evicted = thumbnailAccessOrder.removeFirst()
-            thumbnailCache.removeValue(forKey: evicted)
-        }
+        storeThumbnail(thumbnail, forKey: key)
 
         return thumbnail
     }
@@ -107,7 +166,7 @@ class IconProvider {
         let folderName = url.lastPathComponent
         let folderPath = url.path
 
-        if let config = pathBasedFolderIcons[folderPath] {
+        if let config = folderConfig(forPath: folderPath) {
             return createFolderIcon(config: config, url: url, size: size, cornerRadius: cornerRadius)
         }
 
@@ -119,13 +178,11 @@ class IconProvider {
     }
 
     func setFolderColor(_ color: NSColor, forPath path: String) {
-        pathBasedFolderIcons[path] = FolderConfig(type: .layered(color: color))
-        clearImageCache()
+        setFolderConfig(FolderConfig(type: .layered(color: color)), forPath: path)
     }
 
     func setCustomFolderAsset(_ assetName: String, forPath path: String) {
-        pathBasedFolderIcons[path] = FolderConfig(type: .customAsset(assetName))
-        clearImageCache()
+        setFolderConfig(FolderConfig(type: .customAsset(assetName)), forPath: path)
     }
 
     func setCompositeFolderIcon(
@@ -136,36 +193,37 @@ class IconProvider {
         symbolOffset: CGFloat = -4,
         forPath path: String
     ) {
-        pathBasedFolderIcons[path] = FolderConfig(
-            type: .composite(
-                baseAsset: baseAsset,
-                symbol: symbol,
-                symbolColor: symbolColor,
-                symbolSize: symbolSize,
-                symbolOffset: symbolOffset
-            )
+        setFolderConfig(
+            FolderConfig(
+                type: .composite(
+                    baseAsset: baseAsset,
+                    symbol: symbol,
+                    symbolColor: symbolColor,
+                    symbolSize: symbolSize,
+                    symbolOffset: symbolOffset
+                )
+            ),
+            forPath: path
         )
-        clearImageCache()
     }
 
     func removeFolderCustomization(forPath path: String) {
-        pathBasedFolderIcons.removeValue(forKey: path)
-        clearImageCache()
+        setFolderConfig(nil, forPath: path)
     }
 
     func hasCustomFolderIcon(forPath path: String) -> Bool {
-        return pathBasedFolderIcons[path] != nil
+        return folderConfig(forPath: path) != nil
     }
 
     func getCustomizedFolderPaths() -> [String] {
-        return Array(pathBasedFolderIcons.keys)
+        return customizedFolderPaths()
     }
 
     // MARK: - Layered Folder Icon
 
     func createLayeredFolderIcon(color: NSColor, size: CGFloat = 64, cornerRadius: CGFloat = 0) -> NSImage {
         let key = "layered-\(color.hexString)-\(size)-\(cornerRadius)"
-        if let cached = iconCache[key] { return cached }
+        if let cached = cachedIcon(forKey: key) { return cached }
 
         let compositeImage = NSImage(size: NSSize(width: size, height: size))
         let backColor = color.adjustingLightness(by: -20)
@@ -197,7 +255,7 @@ class IconProvider {
 
         compositeImage.unlockFocus()
 
-        iconCache[key] = compositeImage
+        storeIcon(compositeImage, forKey: key)
         return compositeImage
     }
 
@@ -211,7 +269,7 @@ class IconProvider {
         symbolOffset: CGFloat = -4
     ) -> NSImage {
         let key = "layered-\(color.hexString)-\(symbolName)-\(symbolColor.hexString)-\(size)-\(symbolSize)-\(cornerRadius)-\(symbolOffset)"
-        if let cached = iconCache[key] { return cached }
+        if let cached = cachedIcon(forKey: key) { return cached }
 
         let compositeImage = NSImage(size: NSSize(width: size, height: size))
 
@@ -273,7 +331,7 @@ class IconProvider {
 
         compositeImage.unlockFocus()
 
-        iconCache[key] = compositeImage
+        storeIcon(compositeImage, forKey: key)
         return compositeImage
     }
 
@@ -307,7 +365,7 @@ class IconProvider {
         symbolOffset: CGFloat = -8
     ) -> NSImage {
         let key = "composite-\(baseAssetName)-\(symbolName)-\(symbolColor.hexString)-\(size)-\(symbolSize)-\(cornerRadius)-\(symbolOffset)"
-        if let cached = iconCache[key] { return cached }
+        if let cached = cachedIcon(forKey: key) { return cached }
 
         let compositeImage = NSImage(size: NSSize(width: size, height: size))
 
@@ -387,7 +445,7 @@ class IconProvider {
 
         compositeImage.unlockFocus()
 
-        iconCache[key] = compositeImage
+        storeIcon(compositeImage, forKey: key)
         return compositeImage
     }
 
@@ -539,7 +597,7 @@ class IconProvider {
     }
 
     func exportFolderCustomizations() -> [(path: String, colorHex: String)] {
-        return pathBasedFolderIcons.compactMap { path, config in
+        return folderConfigSnapshot().compactMap { path, config in
             if case .systemWithColor(let color) = config.type {
                 return (path: path, colorHex: color.hexString)
             }
