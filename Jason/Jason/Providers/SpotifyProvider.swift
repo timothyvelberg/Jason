@@ -300,9 +300,12 @@ class SpotifyProvider: ObservableObject, FunctionProvider {
         return result.stringValue
     }
 
-    /// Async fire-and-forget — used for playback control actions.
+    /// Async fire-and-forget — used for playback control actions. Runs on the SAME
+    /// serial queue as the state reads so NSAppleScript (which is NOT thread-safe) is
+    /// never executed from two threads at once; concurrent use corrupts CoreFoundation
+    /// refcounts and crashes with a "CFTypeRef over-release".
     private func runAppleScriptAsync(_ source: String) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        snapshotQueue.async { [weak self] in
             self?.runAppleScript(source)
         }
     }
