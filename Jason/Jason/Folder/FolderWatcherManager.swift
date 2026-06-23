@@ -210,7 +210,11 @@ class FolderWatcherManager: LiveDataStream {
                 pending.cancel()
             }
             self.pendingRefreshes.removeAll()
-            
+
+            // Cancel in-flight folder-refresh operations (they check isCancelled) so they
+            // don't keep running against folders we're no longer watching (e.g. on sleep).
+            self.refreshQueue.cancelAllOperations()
+
             for (_, watcher) in self.watchers {
                 watcher.stop()
             }
@@ -441,6 +445,12 @@ private class FolderWatcher {
         FSEventStreamRelease(stream)
         
         eventStream = nil
+
+        // Drain the stream's dispatch queue so any in-flight callback — which uses an
+        // unretained pointer to self — finishes before this watcher can deallocate.
+        // onChange dispatches async to a different queue, so this cannot deadlock.
+        queue.sync { }
+
         print("[FolderWatcher] Monitoring stopped for: \(name)")
     }
     
