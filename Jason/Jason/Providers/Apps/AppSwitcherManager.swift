@@ -113,6 +113,13 @@ class AppSwitcherManager: ObservableObject {
     }
     
     func loadRunningApplications() {
+        // @Published runningApps and appUsageHistory must be mutated on the main
+        // thread; this can be reached from the backup timer's runloop.
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in self?.loadRunningApplications() }
+            return
+        }
+
         // Prevent re-entrant updates (race condition protection)
         guard !isUpdating else {
             print("[AppSwitcher] Update already in progress - skipping")
@@ -290,10 +297,10 @@ class AppSwitcherManager: ObservableObject {
             return
         }
         
-        addToUsageHistory(app.processIdentifier)
-        
-        // Force immediate re-sort without waiting for app list changes
+        // Usage history + re-sort touch @Published state, so run them on the main
+        // thread — this can be called from an openApplication completion on any thread.
         DispatchQueue.main.async {
+            self.addToUsageHistory(app.processIdentifier)
             self.forceResortApps()
         }
     }

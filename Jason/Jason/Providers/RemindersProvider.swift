@@ -115,7 +115,11 @@ class RemindersProvider: FunctionProvider, MutableListProvider {
     
     @objc private func storeChanged() {
         print("[RemindersProvider] Reminders store changed - refreshing")
-        fetchReminders()
+        // .EKEventStoreChanged may be delivered off the main thread; fetchReminders
+        // reads/writes published state, so marshal to main (mirrors CalendarProvider).
+        DispatchQueue.main.async { [weak self] in
+            self?.fetchReminders()
+        }
     }
     
 
