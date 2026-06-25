@@ -71,8 +71,9 @@ struct KeyboardShortcutRecorder: View {
                 .help("Clear shortcut")
             }
         }
+        .onDisappear { stopRecording() }
     }
-    
+
     // MARK: - Recording
     
     private func startRecording() {
