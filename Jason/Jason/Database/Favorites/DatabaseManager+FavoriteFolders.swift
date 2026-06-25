@@ -111,7 +111,7 @@ extension DatabaseManager {
             // Get next sort order
             var nextSortOrder = 0
             var countStatement: OpaquePointer?
-            if sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM favorite_folders;", -1, &countStatement, nil) == SQLITE_OK {
+            if sqlite3_prepare_v2(db, "SELECT COALESCE(MAX(CAST(sort_order AS INTEGER)) + 1, 0) FROM favorite_folders;", -1, &countStatement, nil) == SQLITE_OK {
                 if sqlite3_step(countStatement) == SQLITE_ROW {
                     nextSortOrder = Int(sqlite3_column_int(countStatement, 0))
                 }
