@@ -302,9 +302,15 @@ class PermissionManager {
     // MARK: - Request Accessibility Access
 
     func requestAccessibilityAccess() {
-        // Accessibility can't be requested programmatically like Calendar/Reminders
-        // We need to open System Settings
-        openAccessibilityPreferences()
+        // Surface the system Accessibility prompt (the only way to trigger it). It
+        // includes an "Open System Settings" button, and HotkeyManager's recovery poll
+        // enables the event taps the moment access is granted — no relaunch needed.
+        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        if !AXIsProcessTrustedWithOptions(options) {
+            // The prompt only appears once; also deep-link to the pane so there is
+            // always a clear path to grant access.
+            openAccessibilityPreferences()
+        }
     }
 
     func openAccessibilityPreferences() {
