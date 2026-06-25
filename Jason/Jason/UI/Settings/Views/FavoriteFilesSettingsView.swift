@@ -430,7 +430,7 @@ private struct DynamicFileRow: View {
                 }
             }
         )
-        .onAppear { resolveFile() }
+        .task(id: file.id) { await resolveFile() }
     }
 
     private var subtitleText: String {
@@ -441,33 +441,38 @@ private struct DynamicFileRow: View {
         }
     }
 
-    private func resolveFile() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let folderURL = URL(fileURLWithPath: file.folderPath)
+    @MainActor
+    private func resolveFile() async {
+        let folderPath = file.folderPath
+        let extensionsFilter = file.fileExtensions
+        let sortOrder = file.sortOrder
+
+        // Enumerate + sort off the main thread. Running from `.task(id:)` means this is
+        // cancelled if the row is recycled for a different file, and the guard below
+        // ensures a stale/cancelled result is never written onto the wrong row.
+        let firstPath: String? = await Task.detached(priority: .userInitiated) {
+            let folderURL = URL(fileURLWithPath: folderPath)
             guard let contents = try? FileManager.default.contentsOfDirectory(
                 at: folderURL,
                 includingPropertiesForKeys: [.contentModificationDateKey, .creationDateKey, .fileSizeKey],
                 options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
-            ) else { return }
+            ) else { return nil }
 
             var files = contents.filter {
                 (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == false
             }
 
-            if let extensions = file.fileExtensions, !extensions.isEmpty {
+            if let extensions = extensionsFilter, !extensions.isEmpty {
                 let extArray = extensions.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces).lowercased() }
                 files = files.filter { extArray.contains($0.pathExtension.lowercased()) }
             }
 
-            let sortedFiles = FolderSortingUtility.sortURLs(files, by: file.sortOrder)
+            return FolderSortingUtility.sortURLs(files, by: sortOrder).first?.path
+        }.value
 
-            if let firstFile = sortedFiles.first {
-                DispatchQueue.main.async {
-                    self.resolvedFileName = firstFile.lastPathComponent
-                    self.fileIcon = NSWorkspace.shared.icon(forFile: firstFile.path)
-                }
-            }
-        }
+        guard !Task.isCancelled, let firstPath = firstPath else { return }
+        resolvedFileName = URL(fileURLWithPath: firstPath).lastPathComponent
+        fileIcon = NSWorkspace.shared.icon(forFile: firstPath)
     }
 
     private func formatDate(_ timestamp: Int) -> String {
