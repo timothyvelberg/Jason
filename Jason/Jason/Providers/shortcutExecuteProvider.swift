@@ -234,6 +234,10 @@ struct ShortcutExecutor {
             return
         }
         
+        // The delays below are intentional and load-bearing: macOS gives no
+        // "activation complete" callback, so we wait for the target app to come
+        // forward before posting the keystroke, and for the keystroke to be consumed
+        // before reactivating Jason. These are not removable synchronization hacks.
         ShortcutExecutor.isSwitchingFocus = true
         
         AppSwitcherManager.shared.activeUIManager?.ignoreFocusChangesTemporarily(duration: 0.3)

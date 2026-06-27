@@ -593,6 +593,41 @@ extension CircularUIInstanceManager {
         // Show the new instance
         instance.show(triggerDirection: triggerDirection)
     }
+
+    /// Switch directly from the active ring/panel to another ring configuration
+    /// without bouncing focus back to the previous app.
+    ///
+    /// The previous call sites hid the current ring — which reactivated the
+    /// previously-focused app — and then, after a fixed 0.1s delay, showed the next
+    /// ring so it could re-capture the now-settled frontmost app. This instead hands
+    /// the original `previousApp` straight to the new instance, so there is no focus
+    /// round-trip and no arbitrary delay; dismissing the launched ring still restores
+    /// the app that was frontmost before the first ring opened.
+    /// - Parameter configId: The configuration ID of the ring to launch.
+    func launchRing(configId: Int) {
+        guard let instance = getInstance(forConfigId: configId) else {
+            print("[InstanceManager] Cannot launch ring - no instance for config \(configId)")
+            return
+        }
+
+        // Preserve the app that was focused before the current ring opened.
+        let inheritedPreviousApp = getActiveInstance()?.previousApp
+
+        // Tear down the active instance WITHOUT restoring focus to the previous app —
+        // we're handing off to another ring, not returning to that app.
+        if let activeId = activeInstanceId, let active = getInstance(forConfigId: activeId) {
+            active.hideForHandoff()
+        }
+
+        activeInstanceId = configId
+        instance.show(triggerDirection: nil)
+
+        // Adopt the original previous app so dismissing the launched ring restores
+        // focus there instead of to Jason itself.
+        if let inheritedPreviousApp {
+            instance.previousApp = inheritedPreviousApp
+        }
+    }
     
     /// Show a specific instance by shortcut
     /// - Parameter shortcut: The keyboard shortcut

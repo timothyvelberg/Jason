@@ -397,7 +397,9 @@ class AppSwitcherManager: ObservableObject {
         
         print("Successfully switched to \(app.localizedName ?? "Unknown")")
         
-        // Raise windows AFTER activation so macOS doesn't override them
+        // Reload the running-app list after activation settles so the snapshot
+        // reflects the now-frontmost app. macOS signals no activation completion,
+        // so this short delay is intentional rather than a removable sync hack.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             self.loadRunningApplications()
         }

@@ -70,6 +70,13 @@ class SystemActionsProvider: ObservableObject, FunctionProvider {
                     SystemActions.showDesktop()
                 })
             ),
+            // The two launchers below use `.launchRing` to open another ring config.
+            // This is an intentional, kept feature — but note there's currently no
+            // settings UI to assign `.launchRing` to arbitrary ring items, so these
+            // built-in System Actions ("Browse Files" → config 4, "Quick Apps" →
+            // config 2) are its only entry points. Revisit here when adding that UI.
+            // CircularUIInstanceManager.launchRing(_:) logs-and-no-ops if the target
+            // config no longer exists, so a stale ID here can't crash.
             FunctionNode(
                 id: "browse-files-ring",
                 name: "Browse Files",

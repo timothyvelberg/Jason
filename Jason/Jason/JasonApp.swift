@@ -42,29 +42,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         DatabaseManager.shared.setupSmartCacheTables()
         print("SmartCache: System initialized!")
         
-        // Small delay between operations to prevent conflicts
+        // All cache-table creation is serialized on the shared DB queue:
+        // setupSmartCacheTables() enqueues its work with queue.async and
+        // createEnhancedCacheTables() runs synchronously (queue.sync) behind it,
+        // so once it returns every cache table exists and the coordinator can
+        // start immediately — no artificial delay required.
         DispatchQueue.main.async {
             DatabaseManager.shared.createEnhancedCacheTables()
-            
-            // Start LiveDataCoordinator after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                // Register streams with coordinator
-                LiveDataCoordinator.shared.register(FolderWatcherManager.shared)
-                LiveDataCoordinator.shared.register(DisplayMonitor.shared)
-                
-                // Start all live data monitoring (includes sleep/wake handling)
-                LiveDataCoordinator.shared.startAll()
-                print("LiveDataCoordinator: Started with sleep/wake handling!")
-                
-                let stats = DatabaseManager.shared.getEnhancedCacheStats()
-                print("Cache stats: \(stats.folders) folders, \(stats.items) items, \(stats.thumbnails) thumbnails")
-                
-                let watchedFolders = FolderWatcherManager.shared.getWatchedFolders()
-                if !watchedFolders.isEmpty {
-                    print("Currently watching \(watchedFolders.count) folders:")
-                    for folder in watchedFolders {
-                        print("   \(folder)")
-                    }
+
+            // Register streams with the coordinator
+            LiveDataCoordinator.shared.register(FolderWatcherManager.shared)
+            LiveDataCoordinator.shared.register(DisplayMonitor.shared)
+
+            // Start all live data monitoring (includes sleep/wake handling)
+            LiveDataCoordinator.shared.startAll()
+            print("LiveDataCoordinator: Started with sleep/wake handling!")
+
+            let stats = DatabaseManager.shared.getEnhancedCacheStats()
+            print("Cache stats: \(stats.folders) folders, \(stats.items) items, \(stats.thumbnails) thumbnails")
+
+            let watchedFolders = FolderWatcherManager.shared.getWatchedFolders()
+            if !watchedFolders.isEmpty {
+                print("Currently watching \(watchedFolders.count) folders:")
+                for folder in watchedFolders {
+                    print("   \(folder)")
                 }
             }
         }
@@ -99,11 +100,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
         print("Sparkle updater initialized")
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            print("Current version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "unknown")")
-            print("Current build: \(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "unknown")")
-            self.updaterController?.updater.checkForUpdatesInBackground()
-        }
+        print("Current version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "unknown")")
+        print("Current build: \(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "unknown")")
+
+        // checkForUpdatesInBackground() is non-blocking, and Sparkle's setup above is
+        // synchronous and independent of the rest of launch, so kick off the initial
+        // background check directly rather than after an arbitrary 2s delay.
+        updaterController?.updater.checkForUpdatesInBackground()
     }
     
     func setupContentWindow() {

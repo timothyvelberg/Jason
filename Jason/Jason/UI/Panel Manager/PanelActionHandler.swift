@@ -53,9 +53,10 @@ class PanelActionHandler {
             
         case .launchRing(let configId):
             print("[PanelAction] Launching ring config \(configId)")
-            hideUI?()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                CircularUIInstanceManager.shared.show(configId: configId)
+            // Hop to the main actor (CircularUIInstanceManager is main-actor isolated);
+            // no artificial delay — the handoff itself avoids the focus round-trip.
+            DispatchQueue.main.async {
+                CircularUIInstanceManager.shared.launchRing(configId: configId)
             }
             
         case .drag(let provider):
@@ -112,9 +113,8 @@ class PanelActionHandler {
             
         case .launchRing(let configId):
             print("[PanelAction] Right click launching ring config \(configId)")
-            hideUI?()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                CircularUIInstanceManager.shared.show(configId: configId)
+            DispatchQueue.main.async {
+                CircularUIInstanceManager.shared.launchRing(configId: configId)
             }
             
         default:
@@ -150,9 +150,8 @@ class PanelActionHandler {
             
         case .launchRing(let configId):
             print("[PanelAction] Context action launching ring config \(configId)")
-            hideUI?()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                CircularUIInstanceManager.shared.show(configId: configId)
+            DispatchQueue.main.async {
+                CircularUIInstanceManager.shared.launchRing(configId: configId)
             }
             
         default:

@@ -64,13 +64,11 @@ extension CircularUIManager {
             print("Navigating into folder: '\(node.name)'")
             functionManager.navigateIntoFolder(ringLevel: ringLevel, index: index)
         case .launchRing(let configId):
-            print("[Left Click] Launching ring config \(configId)")
             print("[Left Click] Launching ring config \(configId) from item '\(node.name)' (id: \(node.id))")
-            hide()  // Hide current ring first
-            
-            // Small delay to ensure clean transition
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                CircularUIInstanceManager.shared.show(configId: configId)
+            // Hop to the main actor (CircularUIInstanceManager is main-actor isolated);
+            // no artificial delay — the handoff itself avoids the focus round-trip.
+            DispatchQueue.main.async {
+                CircularUIInstanceManager.shared.launchRing(configId: configId)
             }
         case .drag(let provider):
             // Handle click behavior based on explicit declaration
@@ -124,11 +122,8 @@ extension CircularUIManager {
             
         case .launchRing(let configId):
             print("[Right Click] Launching ring config \(configId)")
-            hide()  // Hide current ring first
-            
-            // Small delay to ensure clean transition
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                CircularUIInstanceManager.shared.show(configId: configId)
+            DispatchQueue.main.async {
+                CircularUIInstanceManager.shared.launchRing(configId: configId)
             }
             
         case .execute(let action):
@@ -174,11 +169,8 @@ extension CircularUIManager {
             action()
         case .launchRing(let configId):
             print("[Middle Click] Launching ring config \(configId)")
-            hide()  // Hide current ring first
-            
-            // Small delay to ensure clean transition
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                CircularUIInstanceManager.shared.show(configId: configId)
+            DispatchQueue.main.async {
+                CircularUIInstanceManager.shared.launchRing(configId: configId)
             }
         default:
             break

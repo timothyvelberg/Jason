@@ -228,12 +228,15 @@ extension MultitouchCoordinator: LiveDataStream {
         
         source.stopMonitoring()
         
-        // Create cancellable work item
+        // Restart the multitouch stream after a short, intentional delay: the trackpad
+        // hardware needs time to re-enumerate after sleep/wake and there's no
+        // "device ready" signal to wait on. The work item is cancellable so rapid
+        // sleep/wake cycles coalesce into a single restart.
         let work = DispatchWorkItem { [weak self] in
             self?.source.startMonitoring()
         }
         pendingRestartWork = work
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
     }
 }

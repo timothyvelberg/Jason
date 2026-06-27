@@ -37,6 +37,10 @@ struct MenuItemExecutor {
             return
         }
 
+        // The delays in this focus-switch are intentional and load-bearing: macOS
+        // provides no "activation complete" callback, so we wait for the target app to
+        // come forward before pressing the menu item via AX, then for that to take
+        // effect before reactivating Jason. These are not removable sync hacks.
         ShortcutExecutor.isSwitchingFocus = true
         AppSwitcherManager.shared.activeUIManager?.ignoreFocusChangesTemporarily(duration: 0.6)
 

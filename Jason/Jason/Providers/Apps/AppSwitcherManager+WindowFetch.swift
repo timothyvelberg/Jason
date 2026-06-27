@@ -86,23 +86,55 @@ extension AppSwitcherManager {
                 let targetWindow = axWindow
                 let targetTitle = window.title
 
-                // Hide without activating anything — we own the full sequence
+                // Hide without activating anything — we own the full sequence.
+                // hideOverlay() orders our window out synchronously, so the target
+                // app's window can be raised immediately without a settle delay.
                 activeUIManager?.hideSkippingRestore()
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    AXUIElementPerformAction(targetWindow, kAXRaiseAction as CFString)
-                    AXUIElementSetAttributeValue(targetWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
-                    app.activate()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        AXUIElementPerformAction(targetWindow, kAXRaiseAction as CFString)
-                        print("[AppSwitcherManager] Raised window '\(targetTitle)'")
-                    }
-                }
+                raiseAndActivate(window: targetWindow, app: app, title: targetTitle)
                 return
             }
         }
 
         print("[AppSwitcherManager] Could not match window ID \(window.windowID) — falling back")
         activeUIManager?.hideAndSwitchTo(app: app)
+    }
+
+    /// Raise `window` and bring its app frontmost, then re-raise once the app has
+    /// actually become active.
+    ///
+    /// macOS performs activation — and the window reordering it triggers —
+    /// asynchronously with no completion callback. Rather than guessing fixed
+    /// delays, we poll `app.isActive` (a real, observable signal) on a bounded
+    /// 50 ms schedule and re-raise the target window until it wins, giving up
+    /// after ~1 s so a stuck app can never spin forever.
+    private func raiseAndActivate(window: AXUIElement,
+                                  app: NSRunningApplication,
+                                  title: String,
+                                  attempt: Int = 0) {
+        AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+
+        if app.isActive {
+            // App is frontmost; re-raise once more so our window wins any reorder
+            // that activation caused, then we're done.
+            AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+            print("[AppSwitcherManager] Raised window '\(title)'")
+            return
+        }
+
+        // Kick off activation once, then wait for it to take effect.
+        if attempt == 0 {
+            app.activate()
+        }
+
+        guard attempt < 20 else {   // ~1 s ceiling at 50 ms per tick
+            print("[AppSwitcherManager] Gave up waiting for '\(title)' to activate")
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.raiseAndActivate(window: window, app: app, title: title, attempt: attempt + 1)
+        }
     }
 }

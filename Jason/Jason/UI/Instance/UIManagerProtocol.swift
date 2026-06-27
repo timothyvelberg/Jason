@@ -29,7 +29,12 @@ protocol UIManager: AnyObject {
     /// The list panel manager (both ring and panel modes have this)
     var listPanelManager: ListPanelManager? { get }
     
-    var previousApp: NSRunningApplication? { get }
+    var previousApp: NSRunningApplication? { get set }
+
+    /// Whether the UI is being hidden as part of an intentional app/ring switch.
+    /// When true, `hide()` must NOT restore focus to `previousApp` — the next ring
+    /// (or the target app) will take focus instead.
+    var isIntentionallySwitching: Bool { get set }
     
     /// Setup the manager (create windows, wire callbacks)
     func setup(injectedProviders: [any FunctionProvider]?, providerConfigurations: [String: ProviderConfiguration])
@@ -56,7 +61,15 @@ extension UIManager {
     func show() {
         show(triggerDirection: nil)
     }
-    
+
+    /// Hide as part of a ring-to-ring handoff: performs the full hide/teardown but
+    /// suppresses the focus restore so the next ring can take over without a focus
+    /// round-trip (and without the fixed delay that used to compensate for it).
+    func hideForHandoff() {
+        isIntentionallySwitching = true
+        hide()
+    }
+
     func teardown() {
         // Default no-op for managers that don't need cleanup
     }
