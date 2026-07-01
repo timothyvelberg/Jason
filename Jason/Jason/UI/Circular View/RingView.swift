@@ -271,6 +271,14 @@ struct RingView: View {
         .onChange(of: nodes.map { $0.id }) { _, _ in
             handleNodesChanged()
         }
+        // Node identity can stay the same while content changes (e.g. a dock badge
+        // appears on a running app). That doesn't trip the id-based handler above, and
+        // the badge is drawn from the node but gated by badgeOpacities — so sync the
+        // indicator opacities on content changes too, or a newly-added badge renders
+        // invisibly (opacity 0) until the next full rebuild.
+        .onChange(of: nodes.map { "\($0.metadata?["badge"] as? String ?? "")|\($0.metadata?["isRunning"] as? Bool ?? false)" }) { _, _ in
+            syncIndicatorOpacities()
+        }
         .onChange(of: selectedIndex) {
             handleSelectedIndexChanged()
         }

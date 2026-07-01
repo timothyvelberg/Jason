@@ -109,6 +109,17 @@ class FunctionManager: ObservableObject {
             }
         }
     }
+
+    /// Force `ringConfigurations` to recompute on its next read. The config cache is
+    /// keyed only on ring *structure* (node count + collapsed state), so a surgical
+    /// content update that keeps structure identical — e.g. a provider replacing nodes
+    /// with new dock badges — wouldn't invalidate it, and the ring view would keep
+    /// rendering the cached, stale nodes until the next full rebuild. Call this after
+    /// such an update so the change is actually rendered.
+    func invalidateConfigurationCache() {
+        lastRingsHash = 0
+        cachedConfigurations = []
+    }
     
     // MARK: - Hit Testing
     

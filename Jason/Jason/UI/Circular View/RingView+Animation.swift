@@ -208,6 +208,36 @@ extension RingView {
         }
     }
     
+    // MARK: - Indicator Opacity Sync
+
+    /// Sync per-node indicator opacities (dock badge, running dot) to the current
+    /// nodes' content. The surgical-update path keys off node *ids*, so a badge or
+    /// running-state change on an existing icon (same id) wouldn't update its opacity —
+    /// leaving e.g. a newly-added badge drawn at opacity 0 (invisible) until the next
+    /// full rebuild. Call this whenever node content (not identity) may have changed.
+    func syncIndicatorOpacities() {
+        for node in nodes {
+            guard let metadata = node.metadata else { continue }
+
+            let badge = metadata["badge"] as? String
+            let targetBadge = (badge != nil && !badge!.isEmpty) ? 1.0 : 0.0
+            if (badgeOpacities[node.id] ?? 0) != targetBadge {
+                withAnimation(.easeIn(duration: 0.3)) {
+                    badgeOpacities[node.id] = targetBadge
+                }
+            }
+
+            if let isRunning = metadata["isRunning"] as? Bool {
+                let targetRunning = isRunning ? 1.0 : 0.0
+                if (runningIndicatorOpacities[node.id] ?? 0) != targetRunning {
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        runningIndicatorOpacities[node.id] = targetRunning
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Surgical Icon Animation
 
     func animateIconsSurgical(oldNodes: [FunctionNode], newNodes: [FunctionNode]) {

@@ -99,10 +99,20 @@ class DockBadgeReader {
             guard let self = self else { return }
             let badges = self.fetchAllBadges()
             self.lock.lock()
+            let changed = badges != self.cachedBadges
             self.cachedBadges = badges
             self.lastRefresh = Date()
             self.isFetching = false
             self.lock.unlock()
+
+            // Badges are read synchronously while the ring is built, so a walk that
+            // finishes after the ring is shown would otherwise only surface on the
+            // next open. Tell observers the set changed so an open ring can re-read.
+            if changed {
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .dockBadgesDidChange, object: nil)
+                }
+            }
         }
     }
     

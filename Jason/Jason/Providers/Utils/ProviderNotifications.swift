@@ -13,6 +13,9 @@ extension Notification.Name {
     /// Posted when a provider's content has been updated
     static let providerContentUpdated = Notification.Name("providerContentUpdated")
     static let runningAppsDidChange = Notification.Name("runningAppsDidChange")
+    /// Posted after a DockBadgeReader background walk changes the cached badge set,
+    /// so an open ring can re-read badges instead of waiting for the next show.
+    static let dockBadgesDidChange = Notification.Name("dockBadgesDidChange")
 }
 
 // MARK: - Update Info

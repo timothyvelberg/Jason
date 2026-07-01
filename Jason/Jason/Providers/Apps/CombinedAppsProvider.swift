@@ -88,10 +88,26 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
             name: .runningAppsDidChange,
             object: nil
         )
+
+        // Dock badges are fetched on a background queue and can land after the ring
+        // is already shown; refresh when they change so the badge appears on the
+        // current open rather than the next one.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDockBadgesDidChange),
+            name: .dockBadgesDidChange,
+            object: nil
+        )
     }
 
     @objc private func handleRunningAppsDidChange() {
         // refresh() now reloads asynchronously and posts the update itself (on change).
+        refresh()
+    }
+
+    @objc private func handleDockBadgesDidChange() {
+        // The badge text is part of appsSignature(), so refresh() posts a provider
+        // update only when a badge actually changed.
         refresh()
     }
     
@@ -303,6 +319,7 @@ class CombinedAppsProvider: ObservableObject, FunctionProvider {
     func teardown() {
         print("[CombinedAppsProvider] teardown() - \(providerId)")
         NotificationCenter.default.removeObserver(self, name: .runningAppsDidChange, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .dockBadgesDidChange, object: nil)
         appEntries.removeAll()
         displayedBundleIds.removeAll()
         lastFavoritesOrder.removeAll()

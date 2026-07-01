@@ -243,9 +243,14 @@ extension FunctionManager {
         rings[0].hoveredIndex = nil
         rings[0].selectedIndex = nil
         
+        // The nodes changed but ring structure (count/collapsed) may be identical
+        // (e.g. only a dock badge differs), which the config cache's structural hash
+        // wouldn't notice — force a recompute so the update actually renders.
+        invalidateConfigurationCache()
+
         print("Updated Ring 0: replaced nodes from provider '\(providerId)'")
     }
-    
+
     private func updateChildRing(level: Int, provider: FunctionProvider, providerId: String, contentIdentifier: String?) {
         guard level > 0, level - 1 < rings.count else {
             print("Cannot find parent ring for level \(level)")
@@ -288,7 +293,8 @@ extension FunctionManager {
                     self.rings[level].nodes = truncatedNodes
                     self.rings[level].hoveredIndex = nil
                     self.rings[level].selectedIndex = nil
-                    
+
+                    self.invalidateConfigurationCache()
                     print("Updated Ring \(level) with \(truncatedNodes.count) dynamically loaded nodes")
                 }
             } else {
@@ -302,7 +308,8 @@ extension FunctionManager {
                 rings[level].nodes = truncatedNodes
                 rings[level].hoveredIndex = nil
                 rings[level].selectedIndex = nil
-                
+
+                invalidateConfigurationCache()
                 print("Updated Ring \(level) with \(truncatedNodes.count) nodes")
             }
         } else {
