@@ -144,8 +144,11 @@ extension FunctionManager {
             if ring.providerId == providerId {
                 providerMatches = true
             } else if ring.providerId == nil {
+                // Match both direct-mode content nodes and parent-mode category
+                // wrappers, so category providers (e.g. favorite-files) update in place
+                // rather than only after the ring is reopened.
                 providerMatches = ring.nodes.contains { node in
-                    node.providerId == providerId && node.type != .category
+                    node.providerId == providerId
                 }
             } else {
                 providerMatches = false

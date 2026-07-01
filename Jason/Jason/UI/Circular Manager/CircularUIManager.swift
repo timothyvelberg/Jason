@@ -219,12 +219,14 @@ class CircularUIManager: ObservableObject, UIManager {
                 }
             }
             
-            // For mixed rings (providerId is nil), check individual nodes
-            // This handles Ring 0 in direct mode where multiple providers' content is mixed
-            // BUT: Only match actual content nodes, not category wrappers
+            // For mixed rings (providerId is nil), check individual nodes.
+            // This handles Ring 0 where multiple providers' content is mixed — match
+            // both direct-mode content nodes AND parent-mode category wrappers (e.g.
+            // favorite-files), otherwise category providers never receive the surgical
+            // update for their async refresh and stay stale until the ring is reopened.
             if ring.providerId == nil {
                 let hasMatchingNode = ring.nodes.contains { node in
-                    node.providerId == providerId && node.type != .category
+                    node.providerId == providerId
                 }
                 if hasMatchingNode {
                     print("   Found provider '\(providerId)' in mixed Ring \(index) (via node check)")
